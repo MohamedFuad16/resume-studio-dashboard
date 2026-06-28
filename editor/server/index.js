@@ -259,6 +259,12 @@ const trustedOrigins = new Set([
   'http://localhost:5173',
 ].filter(Boolean));
 const isTrustedOrigin = origin => !origin || trustedOrigins.has(origin);
+function setNoStore(res) {
+  res.setHeader('Cache-Control', 'private, no-store, no-cache, must-revalidate, max-age=0, s-maxage=0');
+  res.setHeader('CDN-Cache-Control', 'no-store');
+  res.setHeader('Vercel-CDN-Cache-Control', 'no-store');
+  res.setHeader('Surrogate-Control', 'no-store');
+}
 
 app.use(cors({
   origin(origin, callback) {
@@ -275,6 +281,10 @@ app.use((req, res, next) => {
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && !isTrustedOrigin(req.get('origin'))) {
     return res.status(403).json({ error: 'Cross-origin write rejected.' });
   }
+  next();
+});
+app.use('/api', (req, res, next) => {
+  setNoStore(res);
   next();
 });
 
