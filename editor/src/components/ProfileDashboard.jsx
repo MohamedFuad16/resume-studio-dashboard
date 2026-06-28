@@ -42,8 +42,7 @@ const dashboardValue = (value, isJa) => {
 const copy = {
   en: {
     uploadPhoto: 'Upload profile photo',
-    location: 'Tokyo, Japan',
-    classOf: 'Class of 2028',
+    graduation: value => `Expected graduation: ${value}`,
     complete: 'complete',
     readiness: 'Resume readiness',
     ready: 'Ready to tailor for each role.',
@@ -75,7 +74,7 @@ const copy = {
   ja: {
     uploadPhoto: 'プロフィール写真をアップロード',
     location: '東京、日本',
-    classOf: '2028年卒業予定',
+    graduation: value => `卒業予定: ${value}`,
     complete: '完了',
     readiness: '履歴書の完成度',
     ready: '応募先ごとに調整できます。',
@@ -178,9 +177,12 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
   const recent = records.slice(0, 5);
   const tokyoMatches = useMemo(() => catalog.filter(item => /Tokyo|東京/i.test(item.location)).slice(0, 4), [catalog]);
   const name = isJa
-    ? (resume.personal?.nameJa || resume.personal?.nameEn || 'Mohamed Fuad')
-    : (resume.personal?.nameEn || resume.personal?.nameJa || 'Mohamed Fuad');
+    ? (resume.personal?.nameJa || resume.personal?.nameEn || '名前未設定')
+    : (resume.personal?.nameEn || resume.personal?.nameJa || 'Name not set');
   const education = resume.education?.[0];
+  const profileLocation = education?.location || resume.personal?.address || '';
+  const institution = (isJa ? education?.institutionJa : education?.institution) || education?.institution || '';
+  const graduation = education?.endDate || '';
   const projects = (resume.projects || []).slice(0, 4);
 
   const onPhoto = async event => {
@@ -212,14 +214,14 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
           <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={onPhoto} hidden />
           <div>
             <h1>{name}</h1>
-            <p><MapPin size={15} /> {t.location}</p>
-            <p><GraduationCap size={15} /> {(isJa ? education?.institutionJa : education?.institution) || education?.institution || 'Tokai University'} · {t.classOf}</p>
+            {profileLocation ? <p><MapPin size={15} /> {dashboardValue(profileLocation, isJa)}</p> : null}
+            {institution || graduation ? <p><GraduationCap size={15} /> {[institution, graduation ? t.graduation(graduation) : ''].filter(Boolean).join(' · ')}</p> : null}
           </div>
         </div>
 
         <div className="profile-socials">
-          <a href={resume.personal?.github} target="_blank" rel="noreferrer"><span className="brand-mark github"><GithubMark /></span><b>GitHub</b><small>{resume.personal?.github?.replace(/^https?:\/\/(www\.)?/, '')}</small></a>
-          <a href={resume.personal?.linkedin} target="_blank" rel="noreferrer"><span className="brand-mark linkedin"><LinkedinMark /></span><b>LinkedIn</b><small>{resume.personal?.linkedin?.replace(/^https?:\/\/(www\.)?/, '')}</small></a>
+          {resume.personal?.github ? <a href={resume.personal.github} target="_blank" rel="noreferrer"><span className="brand-mark github"><GithubMark /></span><b>GitHub</b><small>{resume.personal.github.replace(/^https?:\/\/(www\.)?/, '')}</small></a> : null}
+          {resume.personal?.linkedin ? <a href={resume.personal.linkedin} target="_blank" rel="noreferrer"><span className="brand-mark linkedin"><LinkedinMark /></span><b>LinkedIn</b><small>{resume.personal.linkedin.replace(/^https?:\/\/(www\.)?/, '')}</small></a> : null}
         </div>
 
         <div className="profile-completion">
@@ -262,7 +264,7 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
           <div className="section-heading project-heading"><div><h2>{t.projects}</h2><p>{t.projectsSub}</p></div><button type="button" onClick={onOpenEditor}>{t.editProjects} <FilePenLine size={14} /></button></div>
           <div className="project-grid">
             {projects.map(project => (
-              <a className="project-card" key={project.title} href={project.link || resume.personal?.github || '#'} target="_blank" rel="noreferrer" aria-label={`${t.viewProject}: ${project.title}`}>
+              <a className="project-card" key={project.title} href={project.link} target="_blank" rel="noreferrer" aria-label={`${t.viewProject}: ${project.title}`} aria-disabled={project.link ? undefined : true} onClick={project.link ? undefined : event => event.preventDefault()}>
                 <span className="project-tech-icons" aria-label={isJa ? '使用技術' : 'Technologies used'}>
                   {projectTechnologies(project).map(tech => (
                     <span className="project-tech-icon" key={`${project.title}-${tech.label}`} title={tech.label}>

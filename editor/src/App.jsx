@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './index.css';
+import { apiUrl, applicationApi, profileApi, requestJson } from './api/client.js';
 import { debounce, TEMPLATES } from './utils/helpers.js';
 import { I, Toasts, ExportMenu, TagInput, SuggestInput } from './components/ui.jsx';
 import { InternshipDashboard } from './components/InternshipDashboard.jsx';
@@ -13,7 +14,6 @@ import {
   LOCATIONS, YEARS, TECH_SUGGESTIONS,
 } from './components/sections.jsx';
 
-const API = import.meta.env.VITE_API_BASE_URL || '';
 const EN = TEMPLATES.filter(t => t.lang === 'en');
 const JA = TEMPLATES.filter(t => t.lang === 'ja');
 let _tid = 0;
@@ -488,11 +488,9 @@ export default function App() {
   const dismiss = id => setToasts(p => p.filter(t => t.id !== id));
 
   // ── Applications List loader ─────────────────────────────
-  const fetchApps = useCallback(() => {
-    fetch(`${API}/api/applications`)
-      .then(r => r.json())
-      .then(setApplications)
-      .catch(() => {});
+  const fetchApps = useCallback(profileId => {
+    const profile = profileId || new URLSearchParams(window.location.search).get('profile') || 'mohamed_fuad';
+    applicationApi.list(profile).then(setApplications).catch(() => setApplications([]));
   }, []);
 
   // Log job application via web UI
@@ -504,21 +502,15 @@ export default function App() {
     }
     setSubmittingApp(true);
     try {
-      const res = await fetch(`${API}/api/applications`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          company: asstCompany,
-          jobTitle: asstRole,
-          jobDescription: asstDesc,
-          notes: asstNotes
-        })
+      const data = await applicationApi.create(activeProfile, {
+        company: asstCompany,
+        jobTitle: asstRole,
+        jobDescription: asstDesc,
+        notes: asstNotes,
       });
-      if (!res.ok) throw new Error('Failed to log application');
-      const data = await res.json();
       toast(`Logged application for ${asstRole} at ${asstCompany}!`, 'success');
       setAsstLetter(data.coverLetter);
-      fetchApps();
+      fetchApps(activeProfile);
     } catch (err) {
       toast(err.message, 'error');
     } finally {
@@ -551,10 +543,7 @@ export default function App() {
 
   const fetchProfiles = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/api/profiles`, { cache: 'no-store' });
-      if (!res.ok) throw new Error('Could not fetch profiles');
-      const data = await res.json();
-      setProfiles(data);
+      setProfiles(await profileApi.list());
     } catch {
       toast('Could not fetch profiles', 'error');
     }
@@ -564,12 +553,7 @@ export default function App() {
   const saveData = useCallback(debounce(async (data, profileId) => {
     setSave('saving');
     try {
-      const response = await fetch(`${API}/api/save?profile=${profileId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error('Could not save resume');
+      await profileApi.save(profileId, data);
       setSave('saved');
       fetchProfiles();
     } catch {
@@ -581,12 +565,7 @@ export default function App() {
     if (!resume) return;
     setSave('saving');
     try {
-      const response = await fetch(`${API}/api/save?profile=${activeProfile}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(resume),
-      });
-      if (!response.ok) throw new Error('Could not save resume');
+      await profileApi.save(activeProfile, resume);
       setSave('saved');
       fetchProfiles();
       toast(isJa ? '保存しました' : 'Resume saved', 'success');
@@ -605,21 +584,12 @@ export default function App() {
     setCompiling(true);
     setErrMsg(null);
     try {
-      const res = await fetch(`${API}/api/compile`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ template: tmpl, resume: data }),
-      });
-      if (!res.ok) {
-        const e = await res.json().catch(() => ({}));
-        throw new Error(e.error || 'Compilation failed');
-      }
-      const result = await res.json();
+      const result = await requestJson('/api/compile', { method: 'POST', body: { template: tmpl, resume: data } });
       if (!result.success) {
         throw new Error(result.error || 'Compilation failed');
       }
 
-      const url = `${API}${result.pdfUrl}`;
+      const url = apiUrl(result.pdfUrl);
 
       // Verify PDF content to support corrupt PDF payload error boundary
       try {
@@ -657,21 +627,11 @@ export default function App() {
   const saveProfileImmediately = useCallback(async (data, profileId, { refreshFromServer = true } = {}) => {
     const normalized = normalizeResume(data);
     setSave('saving');
-    const response = await fetch(`${API}/api/save?profile=${profileId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(normalized),
-    });
-    if (!response.ok) {
-      const errorPayload = await response.json().catch(() => ({}));
-      throw new Error(errorPayload.error || 'Could not save resume');
-    }
+    await profileApi.save(profileId, normalized);
 
     let serverResume = normalized;
     if (refreshFromServer) {
-      const fresh = await fetch(`${API}/api/resume?profile=${profileId}`, { cache: 'no-store' });
-      if (!fresh.ok) throw new Error('Saved, but could not refresh profile from server');
-      serverResume = normalizeResume(await fresh.json());
+      serverResume = normalizeResume(await profileApi.get(profileId));
     }
 
     setResume(serverResume);
@@ -682,12 +642,11 @@ export default function App() {
 
   const handleSwitchProfile = async (id, skipUrl = false) => {
     try {
-      const res = await fetch(`${API}/api/resume?profile=${id}`, { cache: 'no-store' });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
+      const data = await profileApi.get(id);
       setActiveProfile(id);
       const normalized = normalizeResume(data);
       setResume(normalized);
+      fetchApps(id);
       if (!skipUrl) {
         syncUrlWithProfile(id);
       }
@@ -710,8 +669,7 @@ export default function App() {
       : `Delete resume profile "${id}"? This cannot be undone.`;
     if (!window.confirm(confirmMessage)) return;
     try {
-      const res = await fetch(`${API}/api/profiles/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error();
+      await profileApi.remove(id);
       toast(isJa ? `履歴書を削除しました: ${id}` : `Deleted resume: ${id}`, 'success');
       fetchProfiles();
       if (activeProfile === id) {
@@ -726,14 +684,13 @@ export default function App() {
   useEffect(() => {
     const initProfile = getUrlProfile();
     syncUrlWithProfile(initProfile);
-    fetch(`${API}/api/resume?profile=${initProfile}`, { cache: 'no-store' })
-      .then(r => r.ok ? r.json() : Promise.reject(new Error('Could not load resume data')))
+    profileApi.get(initProfile)
       .then(data => {
         const normalized = normalizeResume(data);
         setResume(normalized);
       })
       .catch(() => toast('Could not load resume data', 'error'));
-    fetchApps();
+    fetchApps(initProfile);
     fetchProfiles();
   }, [fetchApps, fetchProfiles]);
 
@@ -804,14 +761,11 @@ export default function App() {
     const controller = new AbortController();
     chatAbortRef.current = controller;
     try {
-      const response = await fetch(`${API}/api/chat/edit`, {
+      const result = await requestJson('/api/chat/edit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
-        body: JSON.stringify({ profile: activeProfile, instruction: text, resume, language: lang }),
+        body: { profile: activeProfile, instruction: text, resume, language: lang },
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Resume edit failed');
       if (result.changedSections?.length && result.resume) {
         const nextResume = normalizeResume(result.resume);
         change(nextResume);
@@ -889,10 +843,12 @@ export default function App() {
     }
   };
 
-  const onPDF  = () => handleExport('pdf', `${API}/api/export/pdf?template=${template}&profile=${activeProfile}`, 'resume.pdf');
-  const onTex  = () => handleExport('tex', `${API}/api/export/tex?template=${template}&profile=${activeProfile}`, 'resume.tex');
-  const onJson = () => handleExport('json', `${API}/api/export/json?profile=${activeProfile}`, 'resume.json');
-  const onAI   = () => handleExport('ai', `${API}/api/export/ai?profile=${activeProfile}`, 'resume.md');
+  const activeProfileParam = encodeURIComponent(activeProfile);
+  const templateParam = encodeURIComponent(template);
+  const onPDF  = () => handleExport('pdf', apiUrl(`/api/export/pdf?template=${templateParam}&profile=${activeProfileParam}`), 'resume.pdf');
+  const onTex  = () => handleExport('tex', apiUrl(`/api/export/tex?template=${templateParam}&profile=${activeProfileParam}`), 'resume.tex');
+  const onJson = () => handleExport('json', apiUrl(`/api/export/json?profile=${activeProfileParam}`), 'resume.json');
+  const onAI   = () => handleExport('ai', apiUrl(`/api/export/ai?profile=${activeProfileParam}`), 'resume.md');
 
   // ── Loading ──────────────────────────────────────────────
   if (!resume) {
@@ -2290,18 +2246,13 @@ export default function App() {
                         }
                         
                         try {
-                          const res = await fetch(`${API}/api/save?profile=${pid}`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(data)
-                          });
-                          if (!res.ok) throw new Error();
+                          await profileApi.save(pid, data);
                           toast(`Created new resume profile "${pid}"!`, 'success');
                           setShowWizard(false);
                           fetchProfiles();
                           handleSwitchProfile(pid);
-                        } catch {
-                          toast('Failed to save profile. Ensure the profile ID is unique and has no special characters.', 'error');
+                        } catch (error) {
+                          toast(error.message || 'Failed to save profile. Ensure the profile ID is unique and has no special characters.', 'error');
                         }
                       }}
                     >

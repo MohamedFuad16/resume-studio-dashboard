@@ -11,6 +11,21 @@ import { generateLatex } from './templates.js';
 import { runResumeChat } from './resume-chat.js';
 import { researchCompanyInternships } from './internship-research.js';
 import { createStore } from './storage.js';
+import {
+  INTERNSHIP_RESEARCH_DATE,
+  INTERNSHIP_RESEARCH_NOTE,
+  internshipStats as seedInternshipStats,
+  internships as seedInternships,
+} from './seeds/internships.js';
+import { enrichSeedInternships } from './seeds/internship-enrichment.js';
+import {
+  sendRequestError,
+  validateApplication,
+  validateInternship,
+  validateProfileId,
+  validateResume,
+  validateTracker,
+} from './validation.js';
 
 const execFileAsync = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -25,29 +40,64 @@ const store = createStore({ localDbPath: path.join(DATA_DIR, 'resume-studio.sqli
 const internshipResearchJobs = new Map();
 const internshipResearchByCompany = new Map();
 const RESEARCH_CACHE_MS = 15 * 60 * 1000;
+const VALID_TEMPLATES = new Set(['en_01', 'en_02', 'en_03', 'en_04', 'ja_01', 'ja_02', 'ja_03']);
 
 const sanitizeProfileId = value => String(value || 'mohamed_fuad').replace(/[^a-zA-Z0-9_-]/g, '') || 'mohamed_fuad';
 const profileKey = id => `profile:${sanitizeProfileId(id)}`;
 const trackerKey = id => `tracker:${sanitizeProfileId(id)}`;
+const applicationsKey = id => `applications:${sanitizeProfileId(id)}`;
+const INTERNSHIP_CATALOG_KEY = 'internships:catalog';
+
+function mergeInternships(...groups) {
+  const byId = new Map();
+  const seenUrls = new Set();
+  for (const item of groups.flat()) {
+    if (!item?.id || byId.has(item.id) || (item.url && seenUrls.has(item.url))) continue;
+    byId.set(item.id, item);
+    if (item.url) seenUrls.add(item.url);
+  }
+  return [...byId.values()];
+}
+
+async function readInternshipCatalog() {
+  const stored = await store.getJson(INTERNSHIP_CATALOG_KEY, null);
+  if (Array.isArray(stored) && stored.length) return stored;
+  const legacyCustom = await store.getJson('customInternships', []);
+  const catalog = mergeInternships(
+    Array.isArray(legacyCustom) ? legacyCustom.map(validateInternship) : [],
+    enrichSeedInternships(seedInternships).map(validateInternship),
+  );
+  await store.setJson(INTERNSHIP_CATALOG_KEY, catalog);
+  return catalog;
+}
+
+async function writeInternshipCatalog(items) {
+  const catalog = mergeInternships(items.map(validateInternship));
+  await store.setJson(INTERNSHIP_CATALOG_KEY, catalog);
+  return catalog;
+}
+
+function internshipCatalogMeta(items) {
+  const verifiedDates = items.map(item => item.verifiedDate).filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date || '')).sort();
+  return {
+    target: Math.max(seedInternshipStats.target || 200, items.length),
+    researchDate: verifiedDates.at(-1) || INTERNSHIP_RESEARCH_DATE,
+    researchNote: INTERNSHIP_RESEARCH_NOTE,
+    count: items.length,
+  };
+}
 
 async function readCustomInternships() {
-  const stored = await store.getJson('customInternships', null);
-  if (Array.isArray(stored)) return stored;
-  try {
-    const parsed = JSON.parse(await fs.readFile(CUSTOM_INTERNSHIPS_FILE, 'utf8'));
-    if (Array.isArray(parsed)) {
-      await store.setJson('customInternships', parsed);
-      return parsed;
-    }
-    return [];
-  } catch (error) {
-    if (error.code !== 'ENOENT') console.error('Could not read custom internships:', error.message);
-    return [];
-  }
+  const catalog = await readInternshipCatalog();
+  return catalog.filter(item => item.prestigeTier === 'Live company research');
 }
 
 async function writeCustomInternships(items) {
-  await store.setJson('customInternships', items);
+  const catalog = await readInternshipCatalog();
+  const customIds = new Set(items.map(item => item.id));
+  const next = mergeInternships(items, catalog.filter(item => item.prestigeTier !== 'Live company research' && !customIds.has(item.id)));
+  await writeInternshipCatalog(next);
+  await store.setJson('customInternships', items.map(validateInternship));
   if (!process.env.VERCEL) {
     await fs.writeFile(CUSTOM_INTERNSHIPS_FILE, `${JSON.stringify(items, null, 2)}\n`, 'utf8');
   }
@@ -68,21 +118,22 @@ async function readProfile(profileId = 'mohamed_fuad') {
       try {
         defaultData = JSON.parse(await fs.readFile(DATA_FILE, 'utf8'));
       } catch {
-        defaultData = getDefaultResume();
+        defaultData = createEmptyResume();
       }
       await store.setJson(profileKey(id), defaultData);
       return defaultData;
     }
-    return getDefaultResume();
+    return createEmptyResume();
   }
 }
 
 async function writeProfile(profileId, data) {
-  const id = sanitizeProfileId(profileId);
-  await store.setJson(profileKey(id), data);
+  const id = validateProfileId(profileId);
+  const safeData = validateResume(data);
+  await store.setJson(profileKey(id), safeData);
   if (!process.env.VERCEL) {
     await fs.mkdir(PROFILES_DIR, { recursive: true });
-    await fs.writeFile(path.join(PROFILES_DIR, `${id}.json`), JSON.stringify(data, null, 2), 'utf8');
+    await fs.writeFile(path.join(PROFILES_DIR, `${id}.json`), JSON.stringify(safeData, null, 2), 'utf8');
   }
 }
 
@@ -99,8 +150,10 @@ async function listProfiles() {
 }
 
 async function deleteProfile(profileId) {
-  const id = sanitizeProfileId(profileId);
+  const id = validateProfileId(profileId);
   await store.deleteKey(profileKey(id));
+  await store.deleteKey(trackerKey(id));
+  await store.deleteKey(applicationsKey(id));
   if (!process.env.VERCEL) {
     await fs.unlink(path.join(PROFILES_DIR, `${id}.json`)).catch(error => {
       if (error.code !== 'ENOENT') throw error;
@@ -185,7 +238,7 @@ async function initPersistentStore() {
       }
     }
     await readProfile('mohamed_fuad');
-    await readCustomInternships();
+    await readInternshipCatalog();
     console.log(`✅ Resume Studio store ready (${store.backend})`);
   } catch (e) {
     console.error('Error initializing persistence:', e);
@@ -197,8 +250,33 @@ initPersistentStore();
 const app = express();
 const PORT = process.env.PORT || 5005;
 
-app.use(cors());
+const trustedOrigins = new Set([
+  process.env.RESUME_STUDIO_APP_ORIGIN,
+  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '',
+  process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : '',
+  'https://editor-omega-two.vercel.app',
+  'http://127.0.0.1:5173',
+  'http://localhost:5173',
+].filter(Boolean));
+const isTrustedOrigin = origin => !origin || trustedOrigins.has(origin);
+
+app.use(cors({
+  origin(origin, callback) {
+    callback(isTrustedOrigin(origin) ? null : new Error('Origin not allowed'), isTrustedOrigin(origin));
+  },
+  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type'],
+}));
 app.use(express.json({ limit: '12mb' }));
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && !isTrustedOrigin(req.get('origin'))) {
+    return res.status(403).json({ error: 'Cross-origin write rejected.' });
+  }
+  next();
+});
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
 fs.mkdir(PUBLIC_DIR, { recursive: true }).catch(() => {});
@@ -228,39 +306,66 @@ app.get('/api/status', async (req, res) => {
 app.get('/api/tracker', async (req, res) => {
   try {
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-    const profile = sanitizeProfileId(req.query.profile || 'mohamed_fuad');
+    const profile = validateProfileId(req.query.profile || 'mohamed_fuad');
     const tracker = await store.getJson(trackerKey(profile), {});
-    res.json(tracker && typeof tracker === 'object' && !Array.isArray(tracker) ? tracker : {});
+    res.json(validateTracker(tracker && typeof tracker === 'object' && !Array.isArray(tracker) ? tracker : {}));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    sendRequestError(res, error);
   }
 });
 
 app.post('/api/tracker', async (req, res) => {
   try {
-    const profile = sanitizeProfileId(req.query.profile || 'mohamed_fuad');
-    const tracker = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+    const profile = validateProfileId(req.query.profile || 'mohamed_fuad');
+    const tracker = validateTracker(req.body);
     await store.setJson(trackerKey(profile), tracker);
     res.json({ saved: true, profile, count: Object.keys(tracker).length });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    sendRequestError(res, error);
   }
 });
 
 // ── Live internship catalog and company research ────────────────
+app.get('/api/internships', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    const items = await readInternshipCatalog();
+    res.json({ items, meta: internshipCatalogMeta(items) });
+  } catch (error) {
+    sendRequestError(res, error);
+  }
+});
+
+app.post('/api/internships', async (req, res) => {
+  try {
+    const item = validateInternship(req.body);
+    if (!String(item.id).startsWith('live-') || item.prestigeTier !== 'Live company research' || !item.verifiedDate) {
+      return res.status(400).json({ error: 'Only live-researched internship results can be added.' });
+    }
+    const catalog = await readInternshipCatalog();
+    const existing = catalog.find(candidate => candidate.id === item.id || candidate.url === item.url);
+    if (existing) return res.json({ added: false, internship: existing });
+    await writeInternshipCatalog([item, ...catalog]);
+    res.status(201).json({ added: true, internship: item });
+  } catch (error) {
+    sendRequestError(res, error);
+  }
+});
+
 app.get('/api/internships/custom', async (req, res) => {
-  res.json(await readCustomInternships());
+  try {
+    res.json(await readCustomInternships());
+  } catch (error) {
+    sendRequestError(res, error);
+  }
 });
 
 app.post('/api/internships/custom', async (req, res) => {
-  const item = req.body;
-  if (!item || !item.id || !item.company || !item.role || !/^https:\/\//.test(item.url || '') || !/^https:\/\//.test(item.sourceUrl || '')) {
-    return res.status(400).json({ error: 'A verified internship id, company, role, apply URL, and source URL are required.' });
-  }
-  if (!String(item.id).startsWith('live-') || item.prestigeTier !== 'Live company research' || !item.verifiedDate) {
-    return res.status(400).json({ error: 'Only live-researched internship results can be added to the dashboard.' });
-  }
   try {
+    const item = validateInternship(req.body);
+    if (!String(item.id).startsWith('live-') || item.prestigeTier !== 'Live company research' || !item.verifiedDate) {
+      return res.status(400).json({ error: 'Only live-researched internship results can be added to the dashboard.' });
+    }
     const items = await readCustomInternships();
     const existing = items.find(entry => entry.id === item.id || entry.url === item.url);
     if (existing) return res.json({ added: false, internship: existing });
@@ -273,13 +378,18 @@ app.post('/api/internships/custom', async (req, res) => {
     await writeCustomInternships(items);
     res.status(201).json({ added: true, internship: normalized });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    sendRequestError(res, error);
   }
 });
 
 app.post('/api/internships/research-company', async (req, res) => {
   const company = String(req.body?.company || '').trim();
-  const profileId = String(req.body?.profile || 'mohamed_fuad').replace(/[^a-zA-Z0-9_-]/g, '');
+  let profileId;
+  try {
+    profileId = validateProfileId(req.body?.profile || 'mohamed_fuad');
+  } catch (error) {
+    return sendRequestError(res, error);
+  }
   if (!/^[\p{L}\p{N}&.' -]{2,80}$/u.test(company)) {
     return res.status(400).json({ error: 'Enter a company name between 2 and 80 characters.' });
   }
@@ -324,22 +434,22 @@ app.get('/api/profiles', async (req, res) => {
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
     res.json(await listProfiles());
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    sendRequestError(res, e);
   }
 });
 
 // ── DELETE /api/profiles/:id ──────────────────────────────────────
 app.delete('/api/profiles/:id', async (req, res) => {
-  const id = sanitizeProfileId(req.params.id);
-  if (id === 'mohamed_fuad') {
-    return res.status(400).json({ error: 'Cannot delete the default profile.' });
-  }
   try {
+    const id = validateProfileId(req.params.id);
+    if (id === 'mohamed_fuad') {
+      return res.status(400).json({ error: 'Cannot delete the default profile.' });
+    }
     await deleteProfile(id);
-    res.json({ ok: true });
+    res.json({ ok: true, success: true });
   } catch (e) {
     if (e.code === 'ENOENT') return res.status(404).json({ error: 'Profile not found.' });
-    res.status(500).json({ error: e.message });
+    sendRequestError(res, e);
   }
 });
 
@@ -347,19 +457,20 @@ app.delete('/api/profiles/:id', async (req, res) => {
 app.get('/api/resume', async (req, res) => {
   try {
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-    res.json(await readProfile(req.query.profile || 'mohamed_fuad'));
+    res.json(await readProfile(validateProfileId(req.query.profile || 'mohamed_fuad')));
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    sendRequestError(res, e);
   }
 });
 
 // ── POST /api/resume ─────────────────────────────────────────────
 app.post('/api/resume', async (req, res) => {
   try {
-    await writeProfile(req.query.profile || 'mohamed_fuad', req.body);
+    const profile = validateProfileId(req.query.profile || 'mohamed_fuad');
+    await writeProfile(profile, validateResume(req.body));
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    sendRequestError(res, e);
   }
 });
 
@@ -367,10 +478,11 @@ app.post('/api/resume', async (req, res) => {
 // Backward-compatible save route used by the frontend autosave flow.
 app.post('/api/save', async (req, res) => {
   try {
-    await writeProfile(req.query.profile || 'mohamed_fuad', req.body);
+    const profile = validateProfileId(req.query.profile || 'mohamed_fuad');
+    await writeProfile(profile, validateResume(req.body));
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    sendRequestError(res, e);
   }
 });
 
@@ -380,10 +492,13 @@ app.post('/api/save', async (req, res) => {
 app.post('/api/chat/edit', async (req, res) => {
   const { resume, instruction, language = 'en' } = req.body || {};
   try {
-    const result = await runResumeChat({ resume, instruction, language, rootDir: RESUME_ROOT });
+    const safeResume = validateResume(resume);
+    const safeInstruction = String(instruction || '').trim();
+    if (!safeInstruction || safeInstruction.length > 4000) return res.status(400).json({ error: 'Instruction must be between 1 and 4000 characters.' });
+    const result = await runResumeChat({ resume: safeResume, instruction: safeInstruction, language: language === 'ja' ? 'ja' : 'en', rootDir: RESUME_ROOT });
     res.json(result);
   } catch (error) {
-    res.status(500).json({ error: error.message || 'Resume edit failed' });
+    sendRequestError(res, error);
   }
 });
 
@@ -391,7 +506,14 @@ app.post('/api/chat/edit', async (req, res) => {
 // Body: { template: 'en_01' | 'en_02' | ..., resume: {...} }
 // Returns: JSON with pdfUrl or error
 app.post('/api/compile', async (req, res) => {
-  const { template, resume } = req.body;
+  const { template } = req.body || {};
+  if (!VALID_TEMPLATES.has(template)) return res.status(400).json({ error: 'Invalid resume template.' });
+  let resume;
+  try {
+    resume = validateResume(req.body?.resume);
+  } catch (error) {
+    return sendRequestError(res, error);
+  }
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'resume-'));
 
   try {
@@ -436,36 +558,40 @@ app.get('/api/compiled/:file', async (req, res) => {
 
 // ── GET /api/export/tex?template=en_01&profile=mohamed_fuad ──────
 app.get('/api/export/tex', async (req, res) => {
-  const { template, profile = 'mohamed_fuad' } = req.query;
   try {
+    const template = String(req.query.template || '');
+    if (!VALID_TEMPLATES.has(template)) return res.status(400).json({ error: 'Invalid resume template.' });
+    const profile = validateProfileId(req.query.profile || 'mohamed_fuad');
     const resume = await readProfile(profile);
     const latex = generateLatex(template, resume);
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="resume_${template}.tex"`);
     res.send(latex);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    sendRequestError(res, e);
   }
 });
 
 // ── GET /api/export/json?profile=mohamed_fuad ────────────────────
 app.get('/api/export/json', async (req, res) => {
-  const { profile = 'mohamed_fuad' } = req.query;
   try {
+    const profile = validateProfileId(req.query.profile || 'mohamed_fuad');
     const raw = JSON.stringify(await readProfile(profile), null, 2);
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', `attachment; filename="${profile}.json"`);
     res.send(raw);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    sendRequestError(res, e);
   }
 });
 
 // ── GET /api/export/pdf?template=en_01&profile=mohamed_fuad ──────
 app.get('/api/export/pdf', async (req, res) => {
-  const { template, profile = 'mohamed_fuad' } = req.query;
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'resume-'));
   try {
+    const template = String(req.query.template || '');
+    if (!VALID_TEMPLATES.has(template)) return res.status(400).json({ error: 'Invalid resume template.' });
+    const profile = validateProfileId(req.query.profile || 'mohamed_fuad');
     const resume = await readProfile(profile);
     const latex = generateLatex(template, resume);
     const texFile = path.join(tmpDir, 'resume.tex');
@@ -476,7 +602,7 @@ app.get('/api/export/pdf', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="resume_${template}.pdf"`);
     res.send(pdfData);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    sendRequestError(res, e);
   } finally {
     fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   }
@@ -484,41 +610,40 @@ app.get('/api/export/pdf', async (req, res) => {
 
 // ── GET /api/export/ai?profile=mohamed_fuad ──────────────────────
 app.get('/api/export/ai', async (req, res) => {
-  const { profile = 'mohamed_fuad' } = req.query;
   try {
+    const profile = validateProfileId(req.query.profile || 'mohamed_fuad');
     const r = await readProfile(profile);
     const md = buildAIProfile(r);
     res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${profile}_job_profile.md"`);
     res.send(md);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    sendRequestError(res, e);
   }
 });
 
 // ── GET /api/applications ────────────────────────────────────────
 app.get('/api/applications', async (req, res) => {
   try {
-    const list = await getApplications();
+    const profile = validateProfileId(req.query.profile || 'mohamed_fuad');
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    const list = await getApplications(profile);
     res.json(list);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    sendRequestError(res, e);
   }
 });
 
 // ── POST /api/applications ───────────────────────────────────────
 app.post('/api/applications', async (req, res) => {
-  const { company, jobTitle, jobDescription, notes = '', profile = 'mohamed_fuad' } = req.body;
-  if (!company || !jobTitle || !jobDescription) {
-    return res.status(400).json({ error: 'Missing required fields: company, jobTitle, jobDescription' });
-  }
-
   try {
+    const profile = validateProfileId(req.query.profile || req.body?.profile || 'mohamed_fuad');
+    const { company, jobTitle, jobDescription, notes } = validateApplication(req.body);
     const resume = await readProfile(profile);
     const coverLetter = buildCoverLetter(resume, company, jobTitle, jobDescription);
 
     const filename = `${company.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${jobTitle.toLowerCase().replace(/[^a-z0-9]/g, '_')}_application.md`;
-    const existing = await getApplications();
+    const existing = await getApplications(profile);
     const application = {
       fileName: filename,
       company,
@@ -530,7 +655,7 @@ app.post('/api/applications', async (req, res) => {
       coverLetter,
     };
     const nextApplications = [application, ...existing.filter(item => item.fileName !== filename)];
-    await writeApplications(nextApplications);
+    await writeApplications(profile, nextApplications);
 
 
     res.json({
@@ -538,7 +663,7 @@ app.post('/api/applications', async (req, res) => {
       ...application,
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    sendRequestError(res, e);
   }
 });
 
@@ -552,128 +677,15 @@ if (isDirectRun) {
 export default app;
 
 // ── Default resume data ──────────────────────────────────────────
-function getDefaultResume() {
+function createEmptyResume() {
   return {
-    personal: {
-      nameEn: 'Mohamed Fuad',
-      nameJa: 'モハメド フアド',
-      furigana: 'もはめど ふあど',
-      dob: '2004-02-28',
-      address: '東京都世田谷区',
-      phone: '080-7535-2988',
-      email: 'mohamed.fuad.jp@gmail.com',
-      linkedin: 'https://linkedin.com/in/mohamed-fuad-6b8483278',
-      github: 'https://github.com/MohamedFuad16',
-    },
-    education: [
-      {
-        institution: 'Tokai University',
-        institutionJa: '東海大学',
-        location: 'Tokyo, Japan',
-        degree: 'Bachelor of Science --- Information and Communication Technology',
-        degreeJa: '情報通信学部 情報通信学科（学士課程・3年次在学中）',
-        startDate: 'Apr 2024',
-        endDate: 'Mar 2028 (Expected)',
-        bullets: [
-          '3rd Year student, School of Information Science and Technology',
-          'Relevant Coursework: Data Structures & Algorithms, Computer Networks, Database Systems, Operating Systems, Software Engineering, Web Programming, Discrete Mathematics',
-        ],
-      },
-    ],
-    experience: [
-      {
-        company: 'Altius Link (formerly KDDI Evolva)',
-        companyJa: 'アルティウスリンク株式会社',
-        role: 'Translation Specialist',
-        roleJa: '翻訳スペシャリスト',
-        location: 'Tokyo, Japan',
-        startDate: 'Jun 2023',
-        endDate: 'Present',
-        bullets: [
-          'Translate customer communications for users of KDDI services, supporting bilingual customer service.',
-          'Apply precise wording, cultural nuance, and professional communication under real customer-facing conditions.',
-        ],
-      },
-      {
-        company: 'Hotel SUI Akasaka',
-        companyJa: 'ホテルSUI赤坂',
-        role: 'Front Desk Associate',
-        roleJa: 'フロントアソシエイト',
-        location: 'Tokyo, Japan',
-        startDate: 'Apr 2023',
-        endDate: 'Jul 2023',
-        bullets: [
-          'Handled guest inquiries, reservations, check-in support, and front-desk service in English/Japanese environments.',
-        ],
-      },
-      {
-        company: 'Japan Airlines',
-        companyJa: '日本航空株式会社',
-        role: 'Immigration Specialist at Haneda Airport',
-        roleJa: '出入国業務アシスタント',
-        location: 'Tokyo, Japan',
-        startDate: 'Feb 2023',
-        endDate: 'Apr 2023',
-        bullets: [
-          'Assisted document registration, web-verification workflows, and passenger guidance using English/Japanese.',
-        ],
-      },
-    ],
-    projects: [
-      {
-        title: 'Tutor-System',
-        tech: 'TypeScript, React 19, OpenRouter, Deepgram, Dexie/IndexedDB, Express',
-        year: '2025',
-        bullets: [
-          'Built an AI learning interface for PDF reading, source-aware tutor chat, voice tutoring, and concept revision.',
-          'Designed around study books, durable chat threads, and evidence-based learning progress.',
-        ],
-      },
-      {
-        title: 'TokaiHub',
-        tech: 'TypeScript, React, Tailwind CSS, AWS Amplify, Cognito, Vite, PWA',
-        year: '2025',
-        bullets: [
-          'Developed a central student portal PWA for Tokai University with mobile-first UI and bilingual support.',
-          'Integrated custom AWS Cognito authentication and SES-backed OTP verification flows.',
-        ],
-      },
-      {
-        title: 'WebDrop',
-        tech: 'HTML, CSS, JavaScript, Node.js, WebRTC, OPFS, Service Worker',
-        year: '2024--2025',
-        bullets: [
-          'Built a mobile-first nearby file-sharing app using WebRTC RTCDataChannel and OPFS chunked streaming.',
-          'Implemented ultrasonic Web Audio chirp exchange and motion sensors for proximity verification.',
-        ],
-      },
-      {
-        title: 'Codex Account Switcher',
-        tech: 'Swift, AppKit, macOS Menu Bar, Process Control',
-        year: '2025',
-        bullets: [
-          'Created a native macOS menu-bar utility to switch active Codex profiles and hot-swap session tokens.',
-        ],
-      },
-    ],
-    skills: {
-      languages: 'TypeScript, JavaScript, Python, Swift, HTML/CSS, SQL, Java, C, Bash/Shell',
-      frameworks: 'React, Node.js, Express, Flask, Tailwind CSS, SwiftUI, PWA, NumPy, Pandas',
-      tools: 'Git, GitHub, AWS (Amplify/Cognito/SES), Docker, SQLite, MySQL, VS Code, Vim',
-      concepts: 'RESTful APIs, OOP, Design Patterns, Data Structures, WebRTC, Network Protocols, Agile',
-      spoken: 'English (Professional), Japanese (Business --- JLPT N2), Tamil (Native)',
-    },
-    activities: [
-      {
-        title: 'IEEE Student Member',
-        org: 'Tokai University Student Branch',
-        location: 'Tokyo, Japan',
-        startDate: '2024',
-        endDate: 'Present',
-        bullets: ['Participated in technical seminars, workshops, and networking events in the ICT field.'],
-      },
-    ],
-    summary: '東海大学情報通信学部情報通信学科の3年次に在学中（2024年4月入学、2028年3月卒業予定）。TypeScriptやReact、Node.jsを用いたモダンなWebアプリケーション開発や、SwiftによるmacOS向けのネイティブツール開発に取り組む。英語、日本語（JLPT N2）、タミル語（母語）のトリリンガルであり、アルティウスリンク株式会社では翻訳スペシャリストとして実務に従事。',
+    personal: { nameEn: '', nameJa: '', furigana: '', dob: '', address: '', phone: '', email: '', linkedin: '', github: '', photoDataUrl: '' },
+    education: [],
+    experience: [],
+    projects: [],
+    skills: { languages: '', frameworks: '', tools: '', concepts: '', spoken: '' },
+    activities: [],
+    summary: '',
   };
 }
 
@@ -816,9 +828,21 @@ ${spokenTags}
 }
 
 // ── Helper to parse and list applications ────────────────────────
-async function getApplications() {
-  const stored = await store.getJson('applications', null);
+async function getApplications(profileId = 'mohamed_fuad') {
+  const profile = validateProfileId(profileId);
+  const stored = await store.getJson(applicationsKey(profile), null);
   if (Array.isArray(stored)) return stored;
+  if (profile === 'mohamed_fuad') {
+    const legacy = await store.getJson('applications', null);
+    if (Array.isArray(legacy)) {
+      await store.setJson(applicationsKey(profile), legacy);
+      return legacy;
+    }
+  }
+  if (profile !== 'mohamed_fuad') {
+    await store.setJson(applicationsKey(profile), []);
+    return [];
+  }
   const dir = APPLICATIONS_DIR;
   try {
     await fs.mkdir(dir, { recursive: true });
@@ -888,7 +912,7 @@ async function getApplications() {
     }
 
     list.sort((a, b) => b.dateLogged.localeCompare(a.dateLogged));
-    await store.setJson('applications', list);
+    await store.setJson(applicationsKey(profile), list);
     return list;
   } catch (e) {
     console.error('Error reading applications:', e);
@@ -896,9 +920,11 @@ async function getApplications() {
   }
 }
 
-async function writeApplications(list) {
-  await store.setJson('applications', list);
+async function writeApplications(profileId, list) {
+  const profile = validateProfileId(profileId);
+  await store.setJson(applicationsKey(profile), list);
   if (process.env.VERCEL) return;
+  if (profile !== 'mohamed_fuad') return;
   await fs.mkdir(APPLICATIONS_DIR, { recursive: true });
   for (const item of list) {
     if (!item.fileName) continue;
@@ -922,17 +948,29 @@ ${item.coverLetter || ''}
 // ── Cover Letter Generator ──────────────────────────────────────────
 function buildCoverLetter(r, company, jobTitle, jobDescription) {
   const p = r.personal || {};
+  const education = r.education?.[0] || {};
   const exp = r.experience?.[0] || {};
+  const projectNames = (r.projects || []).slice(0, 3).map(project => project.title || project.name).filter(Boolean);
+  const skills = [r.skills?.languages, r.skills?.frameworks, r.skills?.tools].filter(Boolean).join(', ');
+  const identity = [education.degree, education.institution || education.school].filter(Boolean).join(' student at ');
+  const experience = [exp.role, exp.company].filter(Boolean).join(' at ');
+  const evidence = [
+    skills ? `My technical background includes ${skills}.` : '',
+    projectNames.length ? `Projects such as ${projectNames.join(', ')} demonstrate my ability to ship working software.` : '',
+    experience ? `My experience as ${experience} strengthened my professional communication and execution.` : '',
+  ].filter(Boolean).join(' ');
+  const requirementContext = String(jobDescription || '').trim().slice(0, 600);
   return `Dear Hiring Team at ${company},
 
-I am writing to express my strong interest in the ${jobTitle} position at ${company}. As a B.Sc. in ICT student at Tokai University with hands-on experience in full-stack development using TypeScript, React, and Swift, I am excited about the opportunity to contribute to your engineering goals.
+I am writing to express my interest in the ${jobTitle} position at ${company}.${identity ? ` As a ${identity},` : ''} I would welcome the opportunity to contribute to your team.
 
-During my studies and active projects, I have designed and built mobile-first web applications, integrated AI learning tools, and worked extensively with Node.js and AWS. Additionally, my professional experience as a Translation Specialist at ${exp.company || 'Altius Link'} has honed my bilingual communications in English and Japanese (JLPT N2), which will allow me to collaborate effectively in diverse technical environments.
+${evidence || r.summary || 'My resume includes the experience and projects most relevant to this application.'}
+${requirementContext ? `I am particularly interested in the responsibilities described for this role and would be glad to discuss how my background maps to them.` : ''}
 
 Thank you for your time and consideration. I would welcome the opportunity to discuss how my technical skills and background align with the needs of ${company}.
 
 Sincerely,
-${p.nameEn || 'Mohamed Fuad'}
-${p.email || 'mohamed.fuad.jp@gmail.com'} | ${p.phone || '080-7535-2988'}
+${p.nameEn || p.nameJa || ''}
+${[p.email, p.phone].filter(Boolean).join(' | ')}
 `;
 }

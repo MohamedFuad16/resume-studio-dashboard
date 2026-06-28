@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { trackerApi } from '../api/client.js';
 
-const API = import.meta.env.VITE_API_BASE_URL || '';
-export const TRACKER_KEY = 'resume-studio:application-tracker:v1';
 export const TRACKER_EVENT = 'resume-studio:application-tracker-change';
 
 export const APPLICATION_STATUSES = [
@@ -26,10 +25,6 @@ function normalizeProfileId(profileId) {
   }
 }
 
-function storageKey(profileId) {
-  return `${TRACKER_KEY}:${normalizeProfileId(profileId)}`;
-}
-
 function normalizeTracker(parsed) {
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return EMPTY_TRACKER;
   return Object.fromEntries(Object.entries(parsed).map(([key, record]) => {
@@ -38,153 +33,120 @@ function normalizeTracker(parsed) {
   }));
 }
 
-function readTracker(profileId) {
-  try {
-    const profile = normalizeProfileId(profileId);
-    const raw = localStorage.getItem(storageKey(profile)) || (profile === DEFAULT_PROFILE ? localStorage.getItem(TRACKER_KEY) : null) || '{}';
-    return normalizeTracker(JSON.parse(raw));
-  } catch {
-    return EMPTY_TRACKER;
-  }
-}
-
 export function statusLabel(status, isJa = false) {
   const item = APPLICATION_STATUSES.find(entry => entry.value === status);
   return item ? (isJa ? item.labelJa : item.label) : (isJa ? '未管理' : 'Track');
 }
 
-async function saveServerTracker(next, profileId) {
-  const profile = normalizeProfileId(profileId);
-  const response = await fetch(`${API}/api/tracker?profile=${encodeURIComponent(profile)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(next),
-  });
-  if (!response.ok) throw new Error('Could not save application tracker');
-}
-
-function persistTracker(next, profileId, { syncServer = true } = {}) {
-  const profile = normalizeProfileId(profileId);
-  const serialized = JSON.stringify(next);
-  localStorage.setItem(storageKey(profile), serialized);
-  if (profile === DEFAULT_PROFILE) localStorage.setItem(TRACKER_KEY, serialized);
-  window.dispatchEvent(new CustomEvent(TRACKER_EVENT, { detail: { profileId: profile, tracker: next } }));
-  if (syncServer) saveServerTracker(next, profile).catch(() => {});
-}
-
 export function useApplicationTracker(profileId) {
   const activeProfile = normalizeProfileId(profileId);
-  const [tracker, setTracker] = useState(() => readTracker(activeProfile));
+  const [tracker, setTracker] = useState(EMPTY_TRACKER);
+  const trackerRef = useRef(EMPTY_TRACKER);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const replaceTracker = useCallback(next => {
+    trackerRef.current = next;
+    setTracker(next);
+  }, []);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      setError('');
+      replaceTracker(normalizeTracker(await trackerApi.get(activeProfile)));
+    } catch (fetchError) {
+      setError(fetchError.message || 'Could not load application tracker');
+    } finally {
+      setLoading(false);
+    }
+  }, [activeProfile, replaceTracker]);
+
+  const commit = useCallback(next => {
+    trackerApi.save(activeProfile, next)
+      .then(() => window.dispatchEvent(new CustomEvent(TRACKER_EVENT, { detail: { profileId: activeProfile, tracker: next } })))
+      .catch(saveError => {
+        setError(saveError.message || 'Could not save application tracker');
+        refresh();
+      });
+  }, [activeProfile, refresh]);
 
   useEffect(() => {
     const sync = event => {
-      if (event.type === TRACKER_EVENT && event.detail) {
-        if (event.detail.profileId === activeProfile) setTracker(event.detail.tracker || EMPTY_TRACKER);
-      } else {
-        setTracker(readTracker(activeProfile));
-      }
+      if (event.detail?.profileId === activeProfile) replaceTracker(normalizeTracker(event.detail.tracker));
     };
-    window.addEventListener('storage', sync);
     window.addEventListener(TRACKER_EVENT, sync);
-    return () => {
-      window.removeEventListener('storage', sync);
-      window.removeEventListener(TRACKER_EVENT, sync);
-    };
-  }, [activeProfile]);
+    return () => window.removeEventListener(TRACKER_EVENT, sync);
+  }, [activeProfile, replaceTracker]);
 
   useEffect(() => {
-    let active = true;
-    const localTracker = readTracker(activeProfile);
-    setTracker(localTracker);
-    fetch(`${API}/api/tracker?profile=${encodeURIComponent(activeProfile)}`, { cache: 'no-store' })
-      .then(response => response.ok ? response.json() : Promise.reject(new Error('tracker fetch failed')))
-      .then(remote => {
-        if (!active) return;
-        const serverTracker = normalizeTracker(remote);
-        if (Object.keys(serverTracker).length) {
-          setTracker(serverTracker);
-          persistTracker(serverTracker, activeProfile, { syncServer: false });
-        } else if (Object.keys(localTracker).length) {
-          saveServerTracker(localTracker, activeProfile).catch(() => {});
-        }
-      })
-      .catch(() => {});
-    return () => { active = false; };
-  }, [activeProfile]);
+    replaceTracker(EMPTY_TRACKER);
+    refresh();
+  }, [refresh, replaceTracker]);
 
   const updateStatus = useCallback((internship, status) => {
-    setTracker(current => {
-      const next = { ...current };
-      if (!status) {
-        delete next[internship.id];
-      } else {
-        next[internship.id] = {
-          ...current[internship.id],
-          internshipId: internship.id,
-          company: internship.company,
-          role: internship.role,
-          location: internship.location,
-          deadline: internship.deadline || 'Not stated',
-          deadlineDate: internship.deadlineDate || null,
-          applyUrl: internship.url,
-          companyDomain: internship.companyDomain || '',
-          logoUrl: internship.logoUrl || '',
-          status,
-          updatedAt: new Date().toISOString(),
-          createdAt: current[internship.id]?.createdAt || new Date().toISOString(),
-          milestones: Array.isArray(current[internship.id]?.milestones) ? current[internship.id].milestones : [],
-        };
-      }
-      try { persistTracker(next, activeProfile); } catch { /* Storage may be unavailable. */ }
-      return next;
-    });
-  }, [activeProfile]);
+    const current = trackerRef.current;
+    const next = { ...current };
+    if (!status) {
+      delete next[internship.id];
+    } else {
+      next[internship.id] = {
+        ...current[internship.id],
+        internshipId: internship.id,
+        company: internship.company,
+        role: internship.role,
+        location: internship.location,
+        deadline: internship.deadline || 'Not stated',
+        deadlineDate: internship.deadlineDate || null,
+        applyUrl: internship.url,
+        companyDomain: internship.companyDomain || '',
+        logoUrl: internship.logoUrl || '',
+        status,
+        updatedAt: new Date().toISOString(),
+        createdAt: current[internship.id]?.createdAt || new Date().toISOString(),
+        milestones: Array.isArray(current[internship.id]?.milestones) ? current[internship.id].milestones : [],
+      };
+    }
+    replaceTracker(next);
+    commit(next);
+  }, [commit, replaceTracker]);
 
   const statusFor = useCallback(id => tracker[id]?.status || '', [tracker]);
   const addMilestone = useCallback((internshipId, milestone) => {
-    setTracker(current => {
-      const record = current[internshipId];
-      if (!record || !/^\d{4}-\d{2}-\d{2}$/.test(milestone?.date || '')) return current;
-      const next = {
-        ...current,
-        [internshipId]: {
-          ...record,
-          milestones: [
-            ...(Array.isArray(record.milestones) ? record.milestones : []),
-            {
-              id: milestone.id || globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-              kind: milestone.kind || 'other',
-              date: milestone.date,
-              time: milestone.time || null,
-              timeZone: 'Asia/Tokyo',
-              title: milestone.title || '',
-              createdAt: new Date().toISOString(),
-            },
-          ],
-          updatedAt: new Date().toISOString(),
-        },
-      };
-      try { persistTracker(next, activeProfile); } catch { /* Storage may be unavailable. */ }
-      return next;
-    });
-  }, [activeProfile]);
+    const current = trackerRef.current;
+    const record = current[internshipId];
+    if (!record || !/^\d{4}-\d{2}-\d{2}$/.test(milestone?.date || '')) return;
+    const next = {
+      ...current,
+      [internshipId]: {
+        ...record,
+        milestones: [...(Array.isArray(record.milestones) ? record.milestones : []), {
+          id: milestone.id || globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          kind: milestone.kind || 'other', date: milestone.date, time: milestone.time || null,
+          timeZone: 'Asia/Tokyo', title: milestone.title || '', createdAt: new Date().toISOString(),
+        }],
+        updatedAt: new Date().toISOString(),
+      },
+    };
+    replaceTracker(next);
+    commit(next);
+  }, [commit, replaceTracker]);
 
   const removeMilestone = useCallback((internshipId, milestoneId) => {
-    setTracker(current => {
-      const record = current[internshipId];
-      if (!record) return current;
-      const next = {
-        ...current,
-        [internshipId]: {
-          ...record,
-          milestones: (record.milestones || []).filter(item => item.id !== milestoneId),
-          updatedAt: new Date().toISOString(),
-        },
-      };
-      try { persistTracker(next, activeProfile); } catch { /* Storage may be unavailable. */ }
-      return next;
-    });
-  }, [activeProfile]);
+    const current = trackerRef.current;
+    const record = current[internshipId];
+    if (!record) return;
+    const next = {
+      ...current,
+      [internshipId]: {
+        ...record,
+        milestones: (record.milestones || []).filter(item => item.id !== milestoneId),
+        updatedAt: new Date().toISOString(),
+      },
+    };
+    replaceTracker(next);
+    commit(next);
+  }, [commit, replaceTracker]);
   const records = useMemo(
     () => Object.values(tracker).sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')),
     [tracker],
@@ -194,5 +156,5 @@ export function useApplicationTracker(profileId) {
     return acc;
   }, {}), [records]);
 
-  return { tracker, records, counts, statusFor, updateStatus, addMilestone, removeMilestone };
+  return { tracker, records, counts, statusFor, updateStatus, addMilestone, removeMilestone, loading, error, refresh };
 }

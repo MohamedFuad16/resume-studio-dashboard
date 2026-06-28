@@ -19,7 +19,7 @@ import {
   Star,
   X,
 } from 'lucide-react';
-import { internshipStats, INTERNSHIP_RESEARCH_DATE } from '../data/internships.js';
+import { internshipApi } from '../api/client.js';
 import { APPLICATION_STATUSES, statusLabel, useApplicationTracker } from '../hooks/useApplicationTracker.js';
 import { notifyCatalogChange, useInternshipCatalog } from '../hooks/useInternshipCatalog.js';
 import { CompanyLogo } from './CompanyLogo.jsx';
@@ -27,7 +27,6 @@ import { displayCompany, internshipDetails } from '../utils/internshipDisplay.js
 
 const DESKTOP_PAGE_SIZE = 14;
 const MOBILE_PAGE_SIZE = 6;
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 const TODAY = new Date().toISOString().slice(0, 10);
 const DISPLAY_DATE_FORMAT = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
@@ -533,7 +532,7 @@ function CompanyResearchPanel({ company, t, isJa, job, results, error, onStart, 
 export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
   const t = isJa ? copy.ja : copy.en;
   const { records, statusFor, updateStatus } = useApplicationTracker(activeProfile);
-  const { catalog, refresh: refreshCatalog } = useInternshipCatalog();
+  const { catalog, meta, refresh: refreshCatalog } = useInternshipCatalog();
   const [query, setQuery] = useState('');
   const [region, setRegion] = useState('All');
   const [track, setTrack] = useState('All');
@@ -559,18 +558,18 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
   const savedCount = records.filter(record => record.status === 'saved').length;
   const dynamicStats = useMemo(() => ({
     total: eligibleCatalog.length,
-    target: Math.max(internshipStats.target || 200, eligibleCatalog.length),
+    target: Math.max(meta.target || 200, eligibleCatalog.length),
     tokyo: eligibleCatalog.filter(item => /Tokyo|東京/i.test(item.location)).length,
     japan: eligibleCatalog.filter(isJapanBased).length,
     englishFirst: eligibleCatalog.filter(item => item.languageType === 'English-first').length,
-  }), [eligibleCatalog]);
+  }), [eligibleCatalog, meta.target]);
   const latestVerifiedDate = useMemo(() => {
     const dates = catalog
       .map(item => item.verifiedDate)
       .filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date || ''))
       .sort();
-    return dates.at(-1) || INTERNSHIP_RESEARCH_DATE;
-  }, [catalog]);
+    return dates.at(-1) || meta.researchDate;
+  }, [catalog, meta.researchDate]);
   const companyQuery = normalizeCompanyQuery(query);
   const hasCatalogTextMatch = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -638,13 +637,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
     setResearchError('');
     setResearchResults([]);
     try {
-      const response = await fetch(`${API_BASE}/api/internships/research-company`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ company: cleanCompany, profile: 'mohamed_fuad' }),
-      });
-      if (!response.ok) throw new Error('Could not start company research');
-      const job = await response.json();
+      const job = await internshipApi.startResearch(cleanCompany, activeProfile);
       setResearchJob(job);
       if (job.status === 'complete') setResearchResults(Array.isArray(job.results) ? job.results : []);
       if (options.auto) autoResearchStarted.current.add(cleanCompany.toLowerCase());
@@ -659,9 +652,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
     let cancelled = false;
     const poll = async () => {
       try {
-        const response = await fetch(`${API_BASE}/api/internships/research-company/${researchJob.jobId}`);
-        if (!response.ok) throw new Error('Research job unavailable');
-        const job = await response.json();
+        const job = await internshipApi.researchStatus(researchJob.jobId);
         if (cancelled) return;
         setResearchJob(job);
         if (job.status === 'complete') setResearchResults(Array.isArray(job.results) ? job.results : []);
@@ -691,13 +682,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
   const addResearchResult = async item => {
     setAddingId(item.id);
     try {
-      const response = await fetch(`${API_BASE}/api/internships/custom`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(item),
-      });
-      if (!response.ok) throw new Error('Could not add internship');
-      const payload = await response.json();
+      const payload = await internshipApi.add(item);
       const addedItem = payload.internship || item;
       setAddedResearchIds(current => new Set([...current, item.id, addedItem.id]));
       await refreshCatalog();

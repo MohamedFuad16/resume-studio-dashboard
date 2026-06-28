@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { internships as seededInternships } from '../data/internships.js';
+import { useCallback, useEffect, useState } from 'react';
+import { internshipApi } from '../api/client.js';
 
-const API = import.meta.env.VITE_API_BASE_URL || '';
 export const CATALOG_EVENT = 'resume-studio:internship-catalog-change';
+const EMPTY_META = { target: 200, researchDate: '', researchNote: '', count: 0 };
+let catalogSnapshot = null;
+let catalogRequest = null;
 
-function combineCatalog(custom) {
+function normalizeCatalog(items) {
   const seenIds = new Set();
   const seenUrls = new Set();
-  return [...custom, ...seededInternships].filter(item => {
+  return (Array.isArray(items) ? items : []).filter(item => {
     if (!item?.id || seenIds.has(item.id) || (item.url && seenUrls.has(item.url))) return false;
     seenIds.add(item.id);
     if (item.url) seenUrls.add(item.url);
@@ -15,33 +17,47 @@ function combineCatalog(custom) {
   });
 }
 
+async function loadCatalog({ force = false } = {}) {
+  if (!force && catalogSnapshot) return catalogSnapshot;
+  if (!force && catalogRequest) return catalogRequest;
+  catalogRequest = internshipApi.list()
+    .then(payload => {
+      catalogSnapshot = {
+        catalog: normalizeCatalog(payload.items),
+        meta: { ...EMPTY_META, ...(payload.meta || {}) },
+      };
+      return catalogSnapshot;
+    })
+    .finally(() => { catalogRequest = null; });
+  return catalogRequest;
+}
+
 export function notifyCatalogChange() {
   window.dispatchEvent(new CustomEvent(CATALOG_EVENT));
 }
 
 export function useInternshipCatalog() {
-  const [custom, setCustom] = useState([]);
+  const [state, setState] = useState(() => catalogSnapshot || { catalog: [], meta: EMPTY_META });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async ({ force = true } = {}) => {
     try {
-      const response = await fetch(`${API}/api/internships/custom`);
-      if (!response.ok) throw new Error('Could not load custom internships');
-      const data = await response.json();
-      setCustom(Array.isArray(data) ? data : []);
-    } catch {
-      setCustom(current => current);
+      setError('');
+      setState(await loadCatalog({ force }));
+    } catch (fetchError) {
+      setError(fetchError.message || 'Could not load internships');
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    refresh();
-    window.addEventListener(CATALOG_EVENT, refresh);
-    return () => window.removeEventListener(CATALOG_EVENT, refresh);
+    refresh({ force: false });
+    const onCatalogChange = () => refresh({ force: true });
+    window.addEventListener(CATALOG_EVENT, onCatalogChange);
+    return () => window.removeEventListener(CATALOG_EVENT, onCatalogChange);
   }, [refresh]);
 
-  const catalog = useMemo(() => combineCatalog(custom), [custom]);
-  return { catalog, customCount: custom.length, loading, refresh };
+  return { catalog: state.catalog, meta: state.meta, loading, error, refresh };
 }

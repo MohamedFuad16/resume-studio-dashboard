@@ -33,6 +33,20 @@ function buildAIProfile(r) {
   ].map(t => t.trim()).filter(Boolean).map(t => `[${t}]`).join(' ');
 
   const spokenTags = (sk.spoken || '').split(',').map(t => `[${t.trim()}]`).join(' ');
+  const educationTags = edu
+    .flatMap(e => [e.institution, e.degree, e.location])
+    .filter(Boolean);
+  const profileTags = [
+    p.address,
+    sk.spoken,
+    ...educationTags,
+  ]
+    .join(', ')
+    .split(',')
+    .map(t => t.trim())
+    .filter(Boolean)
+    .map(t => `[${t}]`)
+    .join(' ');
 
   const expBlock = exp.map(e =>
     `### ${e.role || e.roleJa || ''} — ${e.company || e.companyJa || ''}\n` +
@@ -71,7 +85,7 @@ function buildAIProfile(r) {
 | Field             | Value |
 |-------------------|-------|
 | **Full Name**     | ${p.nameEn || ''} (${p.nameJa || ''}) |
-| **Location**      | ${p.address || 'Tokyo, Japan'} |
+| **Location**      | ${p.address || ''} |
 | **Email**         | ${p.email || ''} |
 | **Phone**         | ${p.phone || ''} |
 | **LinkedIn**      | ${p.linkedin || ''} |
@@ -139,8 +153,7 @@ ${allTechTags}
 ${spokenTags}
 
 ### Profile Tags
-[Tokyo] [Japan-Based] [Bilingual-EN-JA] [JLPT-N2] [Student-Developer]
-[Full-Stack] [Web-Development] [Mobile-First] [REST-API] [Open-Source]
+${profileTags || '_No profile tags listed._'}
 
 ---
 <!-- END OF AI JOB PROFILE -->
@@ -150,18 +163,37 @@ ${spokenTags}
 // ── Cover Letter Generator ──────────────────────────────────────────
 function buildCoverLetter(r, company, jobTitle, jobDescription) {
   const p = r.personal || {};
+  const sk = r.skills || {};
+  const edu = r.education?.[0] || {};
   const exp = r.experience?.[0] || {};
+  const primaryProjects = (r.projects || []).slice(0, 2).map(project => project.title).filter(Boolean);
+  const skills = [
+    sk.languages,
+    sk.frameworks,
+    sk.tools,
+  ].filter(Boolean).join(', ');
+  const candidateIntro = [
+    edu.degree ? `${edu.degree}${edu.institution ? ` student at ${edu.institution}` : ''}` : '',
+    skills ? `with experience across ${skills}` : '',
+  ].filter(Boolean).join(' ');
+  const experienceLine = exp.company
+    ? `My experience at ${exp.company}${exp.role ? ` as ${exp.role}` : ''} strengthened the communication and execution habits I would bring to this role.`
+    : 'My projects and academic work have strengthened the communication and execution habits I would bring to this role.';
+  const projectLine = primaryProjects.length
+    ? `Relevant project work includes ${primaryProjects.join(' and ')}, which I would be glad to discuss in relation to ${company}'s needs.`
+    : 'I would be glad to discuss how my background maps to your team needs.';
+  const contactLine = [p.email, p.phone].filter(Boolean).join(' | ');
   return `Dear Hiring Team at ${company},
 
-I am writing to express my strong interest in the ${jobTitle} position at ${company}. As a B.Sc. in ICT student at Tokai University with hands-on experience in full-stack development using TypeScript, React, and Swift, I am excited about the opportunity to contribute to your engineering goals.
+I am writing to express my strong interest in the ${jobTitle} position at ${company}.${candidateIntro ? ` As a ${candidateIntro},` : ''} I am excited about the opportunity to contribute to your team.
 
-During my studies and active projects, I have designed and built mobile-first web applications, integrated AI learning tools, and worked extensively with Node.js and AWS. Additionally, my professional experience as a Translation Specialist at ${exp.company || 'Altius Link'} has honed my bilingual communications in English and Japanese (JLPT N2), which will allow me to collaborate effectively in diverse technical environments.
+${experienceLine} ${projectLine}
 
 Thank you for your time and consideration. I would welcome the opportunity to discuss how my technical skills and background align with the needs of ${company}.
 
 Sincerely,
-${p.nameEn || 'Mohamed Fuad'}
-${p.email || 'mohamed.fuad.jp@gmail.com'} | ${p.phone || '080-7535-2988'}
+${p.nameEn || p.nameJa || ''}
+${contactLine}
 `;
 }
 
