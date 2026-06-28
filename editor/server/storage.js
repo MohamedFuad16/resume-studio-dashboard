@@ -11,6 +11,7 @@ export function createStore({ localDbPath }) {
   let SQL;
   let db;
   let ready;
+  let operations = Promise.resolve();
   let backend = 'local-sqlite';
 
   const hasBlob = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
@@ -77,44 +78,72 @@ export function createStore({ localDbPath }) {
     return ready;
   }
 
+  function serialize(operation) {
+    const next = operations.then(operation, operation);
+    operations = next.catch(() => {});
+    return next;
+  }
+
+  async function refreshFromBlob() {
+    if (!hasBlob()) return;
+    const bytes = await loadBlobBytes();
+    if (!bytes) return;
+    const nextDb = new SQL.Database(bytes);
+    db?.close();
+    db = nextDb;
+    backend = 'vercel-blob-sqlite';
+  }
+
   async function getJson(key, fallback = null) {
     await init();
-    const result = db.exec('SELECT value FROM kv WHERE key = ? LIMIT 1', [key]);
-    const value = result?.[0]?.values?.[0]?.[0];
-    if (typeof value !== 'string') return fallback;
-    try {
-      return JSON.parse(value);
-    } catch {
-      return fallback;
-    }
+    return serialize(async () => {
+      await refreshFromBlob();
+      const result = db.exec('SELECT value FROM kv WHERE key = ? LIMIT 1', [key]);
+      const value = result?.[0]?.values?.[0]?.[0];
+      if (typeof value !== 'string') return fallback;
+      try {
+        return JSON.parse(value);
+      } catch {
+        return fallback;
+      }
+    });
   }
 
   async function setJson(key, value) {
     await init();
-    db.run(
-      'INSERT INTO kv (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at',
-      [key, JSON.stringify(value), new Date().toISOString()],
-    );
-    await persist();
-    return value;
+    return serialize(async () => {
+      await refreshFromBlob();
+      db.run(
+        'INSERT INTO kv (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at',
+        [key, JSON.stringify(value), new Date().toISOString()],
+      );
+      await persist();
+      return value;
+    });
   }
 
   async function deleteKey(key) {
     await init();
-    db.run('DELETE FROM kv WHERE key = ?', [key]);
-    await persist();
+    return serialize(async () => {
+      await refreshFromBlob();
+      db.run('DELETE FROM kv WHERE key = ?', [key]);
+      await persist();
+    });
   }
 
   async function listJson(prefix) {
     await init();
-    const result = db.exec('SELECT key, value FROM kv WHERE key LIKE ? ORDER BY updated_at DESC', [`${prefix}%`]);
-    return (result?.[0]?.values || []).map(([key, value]) => {
-      try {
-        return { key, value: JSON.parse(value) };
-      } catch {
-        return { key, value: null };
-      }
-    }).filter(item => item.value !== null);
+    return serialize(async () => {
+      await refreshFromBlob();
+      const result = db.exec('SELECT key, value FROM kv WHERE key LIKE ? ORDER BY updated_at DESC', [`${prefix}%`]);
+      return (result?.[0]?.values || []).map(([key, value]) => {
+        try {
+          return { key, value: JSON.parse(value) };
+        } catch {
+          return { key, value: null };
+        }
+      }).filter(item => item.value !== null);
+    });
   }
 
   return {

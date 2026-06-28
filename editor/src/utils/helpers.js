@@ -1,10 +1,20 @@
 // Debounce helper
 export function debounce(fn, delay) {
   let t;
-  return (...args) => {
+  const debounced = (...args) => {
     clearTimeout(t);
     t = setTimeout(() => fn(...args), delay);
   };
+  debounced.cancel = () => {
+    clearTimeout(t);
+    t = null;
+  };
+  debounced.flush = (...args) => {
+    clearTimeout(t);
+    t = null;
+    return fn(...args);
+  };
+  return debounced;
 }
 
 // Deep clone

@@ -227,6 +227,7 @@ app.get('/api/status', async (req, res) => {
 // ── GET/POST /api/tracker?profile=id ─────────────────────────────
 app.get('/api/tracker', async (req, res) => {
   try {
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
     const profile = sanitizeProfileId(req.query.profile || 'mohamed_fuad');
     const tracker = await store.getJson(trackerKey(profile), {});
     res.json(tracker && typeof tracker === 'object' && !Array.isArray(tracker) ? tracker : {});
@@ -320,6 +321,7 @@ app.get('/api/internships/research-company/:jobId', (req, res) => {
 // ── GET /api/profiles ─────────────────────────────────────────────
 app.get('/api/profiles', async (req, res) => {
   try {
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
     res.json(await listProfiles());
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -344,6 +346,7 @@ app.delete('/api/profiles/:id', async (req, res) => {
 // ── GET /api/resume ──────────────────────────────────────────────
 app.get('/api/resume', async (req, res) => {
   try {
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
     res.json(await readProfile(req.query.profile || 'mohamed_fuad'));
   } catch (e) {
     res.status(500).json({ error: e.message });

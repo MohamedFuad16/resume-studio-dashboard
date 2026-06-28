@@ -193,7 +193,7 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
         ...resume,
         personal: { ...resume.personal, photoDataUrl },
         personalInfo: { ...resume.personalInfo, photoDataUrl },
-      });
+      }, { immediate: true, refreshFromServer: true });
     } catch (error) {
       window.alert(error.message || 'Could not upload profile photo.');
     }

@@ -96,7 +96,7 @@ export function useApplicationTracker(profileId) {
     let active = true;
     const localTracker = readTracker(activeProfile);
     setTracker(localTracker);
-    fetch(`${API}/api/tracker?profile=${encodeURIComponent(activeProfile)}`)
+    fetch(`${API}/api/tracker?profile=${encodeURIComponent(activeProfile)}`, { cache: 'no-store' })
       .then(response => response.ok ? response.json() : Promise.reject(new Error('tracker fetch failed')))
       .then(remote => {
         if (!active) return;

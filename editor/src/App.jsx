@@ -551,7 +551,8 @@ export default function App() {
 
   const fetchProfiles = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/api/profiles`);
+      const res = await fetch(`${API}/api/profiles`, { cache: 'no-store' });
+      if (!res.ok) throw new Error('Could not fetch profiles');
       const data = await res.json();
       setProfiles(data);
     } catch {
@@ -563,11 +564,12 @@ export default function App() {
   const saveData = useCallback(debounce(async (data, profileId) => {
     setSave('saving');
     try {
-      await fetch(`${API}/api/save?profile=${profileId}`, {
+      const response = await fetch(`${API}/api/save?profile=${profileId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
+      if (!response.ok) throw new Error('Could not save resume');
       setSave('saved');
       fetchProfiles();
     } catch {
@@ -579,11 +581,12 @@ export default function App() {
     if (!resume) return;
     setSave('saving');
     try {
-      await fetch(`${API}/api/save?profile=${activeProfile}`, {
+      const response = await fetch(`${API}/api/save?profile=${activeProfile}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(resume),
       });
+      if (!response.ok) throw new Error('Could not save resume');
       setSave('saved');
       fetchProfiles();
       toast(isJa ? '保存しました' : 'Resume saved', 'success');
@@ -651,9 +654,35 @@ export default function App() {
     }
   }, [toast, zoom, pdfSrc, isJa]);
 
+  const saveProfileImmediately = useCallback(async (data, profileId, { refreshFromServer = true } = {}) => {
+    const normalized = normalizeResume(data);
+    setSave('saving');
+    const response = await fetch(`${API}/api/save?profile=${profileId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(normalized),
+    });
+    if (!response.ok) {
+      const errorPayload = await response.json().catch(() => ({}));
+      throw new Error(errorPayload.error || 'Could not save resume');
+    }
+
+    let serverResume = normalized;
+    if (refreshFromServer) {
+      const fresh = await fetch(`${API}/api/resume?profile=${profileId}`, { cache: 'no-store' });
+      if (!fresh.ok) throw new Error('Saved, but could not refresh profile from server');
+      serverResume = normalizeResume(await fresh.json());
+    }
+
+    setResume(serverResume);
+    setSave('saved');
+    fetchProfiles();
+    return serverResume;
+  }, [fetchProfiles]);
+
   const handleSwitchProfile = async (id, skipUrl = false) => {
     try {
-      const res = await fetch(`${API}/api/resume?profile=${id}`);
+      const res = await fetch(`${API}/api/resume?profile=${id}`, { cache: 'no-store' });
       if (!res.ok) throw new Error();
       const data = await res.json();
       setActiveProfile(id);
@@ -697,8 +726,8 @@ export default function App() {
   useEffect(() => {
     const initProfile = getUrlProfile();
     syncUrlWithProfile(initProfile);
-    fetch(`${API}/api/resume?profile=${initProfile}`)
-      .then(r => r.json())
+    fetch(`${API}/api/resume?profile=${initProfile}`, { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('Could not load resume data')))
       .then(data => {
         const normalized = normalizeResume(data);
         setResume(normalized);
@@ -743,16 +772,28 @@ export default function App() {
   }, [resume]);
 
   // ── Change handler ───────────────────────────────────────
-  const change = useCallback(next => {
+  const change = useCallback((next, options = {}) => {
     const normalized = normalizeResume(next);
     setResume(normalized);
     setSave('saving');
+    if (options.immediate) {
+      saveData.cancel?.();
+      saveProfileImmediately(normalized, activeProfile, { refreshFromServer: options.refreshFromServer !== false })
+        .then(serverResume => {
+          if (autoCompile) compile(serverResume, template, { force: true });
+        })
+        .catch(error => {
+          setSave('error');
+          toast(error.message || (isJa ? '保存できませんでした' : 'Could not save resume'), 'error');
+        });
+      return;
+    }
     saveData(normalized, activeProfile);
     if (cmpTimer.current) clearTimeout(cmpTimer.current);
     if (autoCompile) {
       cmpTimer.current = setTimeout(() => compile(normalized, template), 700);
     }
-  }, [template, saveData, compile, activeProfile, autoCompile]);
+  }, [template, saveData, saveProfileImmediately, compile, activeProfile, autoCompile, toast, isJa]);
 
   const handleResumeChat = useCallback(async () => {
     const text = chatDraft.trim();
