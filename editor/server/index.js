@@ -206,17 +206,30 @@ app.use('/public', express.static(PUBLIC_DIR));
 
 
 // ── GET /api/status ──────────────────────────────────────────────
-app.get('/api/status', (req, res) => {
-  res.json({
-    status: 'ok',
-    message: 'Resume Editor backend is running.',
-    storage: store.backend,
-    persistent: store.backend === 'vercel-blob-sqlite' || store.backend === 'local-sqlite',
-    diagnostics: {
-      isVercel: Boolean(process.env.VERCEL),
-      hasBlobToken: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
-    },
-  });
+app.get('/api/status', async (req, res) => {
+  try {
+    await store.init();
+    res.json({
+      status: 'ok',
+      message: 'Resume Editor backend is running.',
+      storage: store.backend,
+      persistent: store.backend === 'vercel-blob-sqlite' || store.backend === 'local-sqlite',
+      diagnostics: {
+        isVercel: Boolean(process.env.VERCEL),
+        hasBlobToken: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Resume Studio storage did not initialize.',
+      error: error.message,
+      diagnostics: {
+        isVercel: Boolean(process.env.VERCEL),
+        hasBlobToken: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
+      },
+    });
+  }
 });
 
 // ── GET/POST /api/tracker?profile=id ─────────────────────────────

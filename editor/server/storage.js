@@ -14,16 +14,20 @@ export function createStore({ localDbPath }) {
   let backend = 'local-sqlite';
 
   const hasBlob = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  const blobOptions = () => ({
+    access: 'private',
+    ...(process.env.BLOB_READ_WRITE_TOKEN ? { token: process.env.BLOB_READ_WRITE_TOKEN } : {}),
+  });
 
   async function loadBlobBytes() {
     if (!hasBlob()) return null;
-    const { list } = await import('@vercel/blob');
-    const result = await list({ prefix: BLOB_DB_KEY, limit: 20 });
-    const blob = result.blobs?.find(item => item.pathname === BLOB_DB_KEY);
-    if (!blob?.url) return null;
-    const response = await fetch(blob.url);
-    if (!response.ok) return null;
-    return new Uint8Array(await response.arrayBuffer());
+    const { get } = await import('@vercel/blob');
+    const result = await get(BLOB_DB_KEY, blobOptions());
+    if (!result || result.statusCode === 404 || !result.stream) return null;
+    if (result.statusCode && result.statusCode !== 200) {
+      throw new Error(`Could not read Blob SQLite store (${result.statusCode})`);
+    }
+    return new Uint8Array(await new Response(result.stream).arrayBuffer());
   }
 
   async function loadLocalBytes() {
@@ -40,7 +44,7 @@ export function createStore({ localDbPath }) {
     if (hasBlob()) {
       const { put } = await import('@vercel/blob');
       await put(BLOB_DB_KEY, bytes, {
-        access: 'public',
+        ...blobOptions(),
         addRandomSuffix: false,
         allowOverwrite: true,
         contentType: 'application/vnd.sqlite3',
