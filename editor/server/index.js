@@ -214,20 +214,12 @@ app.get('/api/status', async (req, res) => {
       message: 'Resume Editor backend is running.',
       storage: store.backend,
       persistent: store.backend === 'vercel-blob-sqlite' || store.backend === 'local-sqlite',
-      diagnostics: {
-        isVercel: Boolean(process.env.VERCEL),
-        hasBlobToken: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
-      },
     });
   } catch (error) {
     res.status(500).json({
       status: 'error',
       message: 'Resume Studio storage did not initialize.',
       error: error.message,
-      diagnostics: {
-        isVercel: Boolean(process.env.VERCEL),
-        hasBlobToken: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
-      },
     });
   }
 });
