@@ -1,11 +1,14 @@
 import fs from 'fs/promises';
 import path from 'path';
+import { randomUUID } from 'crypto';
 import { createRequire } from 'module';
 import initSqlJs from 'sql.js';
 
 const require = createRequire(import.meta.url);
 const SQL_WASM_DIR = path.dirname(require.resolve('sql.js/dist/sql-wasm.wasm'));
 const BLOB_DB_KEY = process.env.RESUME_STUDIO_DB_BLOB_KEY || 'resume-studio/resume-studio.sqlite';
+const BLOB_DB_PREFIX = BLOB_DB_KEY.replace(/\.sqlite$/i, '');
+const BLOB_HISTORY_LIMIT = 8;
 
 export function createStore({ localDbPath }) {
   let SQL;
@@ -15,15 +18,27 @@ export function createStore({ localDbPath }) {
   let backend = 'local-sqlite';
 
   const hasBlob = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  const tokenOptions = () => (
+    process.env.BLOB_READ_WRITE_TOKEN ? { token: process.env.BLOB_READ_WRITE_TOKEN } : {}
+  );
   const blobOptions = () => ({
     access: 'private',
-    ...(process.env.BLOB_READ_WRITE_TOKEN ? { token: process.env.BLOB_READ_WRITE_TOKEN } : {}),
+    ...tokenOptions(),
   });
 
   async function loadBlobBytes() {
     if (!hasBlob()) return null;
-    const { get } = await import('@vercel/blob');
-    const result = await get(BLOB_DB_KEY, blobOptions());
+    const { get, list } = await import('@vercel/blob');
+    const listed = await list({
+      prefix: BLOB_DB_PREFIX,
+      limit: 100,
+      ...tokenOptions(),
+    });
+    const latest = listed.blobs
+      .filter(blob => blob.pathname === BLOB_DB_KEY || (blob.pathname.startsWith(`${BLOB_DB_PREFIX}-`) && blob.pathname.endsWith('.sqlite')))
+      .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())[0];
+    if (!latest) return null;
+    const result = await get(latest.url, blobOptions());
     if (!result || result.statusCode === 404 || !result.stream) return null;
     if (result.statusCode && result.statusCode !== 200) {
       throw new Error(`Could not read Blob SQLite store (${result.statusCode})`);
@@ -43,13 +58,26 @@ export function createStore({ localDbPath }) {
   async function persist() {
     const bytes = Buffer.from(db.export());
     if (hasBlob()) {
-      const { put } = await import('@vercel/blob');
-      await put(BLOB_DB_KEY, bytes, {
+      const { del, list, put } = await import('@vercel/blob');
+      const pathname = `${BLOB_DB_PREFIX}-${Date.now()}-${randomUUID()}.sqlite`;
+      await put(pathname, bytes, {
         ...blobOptions(),
         addRandomSuffix: false,
-        allowOverwrite: true,
+        allowOverwrite: false,
+        cacheControlMaxAge: 60,
         contentType: 'application/vnd.sqlite3',
       });
+      const listed = await list({
+        prefix: BLOB_DB_PREFIX,
+        limit: 100,
+        ...tokenOptions(),
+      });
+      const stale = listed.blobs
+        .filter(blob => blob.pathname === BLOB_DB_KEY || (blob.pathname.startsWith(`${BLOB_DB_PREFIX}-`) && blob.pathname.endsWith('.sqlite')))
+        .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
+        .slice(BLOB_HISTORY_LIMIT)
+        .map(blob => blob.url);
+      if (stale.length) await del(stale, tokenOptions());
       backend = 'vercel-blob-sqlite';
       return;
     }
