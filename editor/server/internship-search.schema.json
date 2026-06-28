@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["company", "summary", "results"],
+  "properties": {
+    "company": { "type": "string" },
+    "summary": { "type": "string" },
+    "results": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title", "location", "workMode", "language", "duration", "deadline",
+          "deadlineDate", "compensation", "track", "eligibility", "about",
+          "applicationProcess", "codingTest", "url", "sourceUrl", "sourceType"
+        ],
+        "properties": {
+          "title": { "type": "string" },
+          "location": { "type": "string" },
+          "workMode": { "type": "string" },
+          "language": { "type": "string" },
+          "duration": { "type": "string" },
+          "deadline": { "type": "string" },
+          "deadlineDate": { "type": ["string", "null"] },
+          "compensation": { "type": "string" },
+          "track": { "type": "string" },
+          "eligibility": { "type": "string" },
+          "about": { "type": "string" },
+          "applicationProcess": { "type": "array", "items": { "type": "string" } },
+          "codingTest": { "type": "string", "enum": ["required", "not_stated", "not_required"] },
+          "url": { "type": "string" },
+          "sourceUrl": { "type": "string" },
+          "sourceType": { "type": "string", "enum": ["official_company", "official_ats"] }
+        }
+      }
+    }
+  }
+}
+

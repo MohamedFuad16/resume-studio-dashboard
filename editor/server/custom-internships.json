@@ -1,0 +1,42 @@
+[
+  {
+    "id": "live-apple-fad4c656ea",
+    "company": "Apple",
+    "role": "Sales Internship Winter 2026",
+    "location": "Minato, Japan",
+    "region": "Japan",
+    "country": "Japan",
+    "city": "",
+    "workMode": "On-site",
+    "language": "Not stated",
+    "languageType": "English-first",
+    "duration": "Not stated",
+    "deadline": "Not stated",
+    "deadlineDate": null,
+    "compensation": "Not stated",
+    "track": "Sales",
+    "score": 88,
+    "priority": true,
+    "workAuth": "Not stated",
+    "reasons": [
+      "Japan-based official opening",
+      "No coding test stated on the official page"
+    ],
+    "fitNote": "Apple’s official listing describes a students internship in Minato with Role Number 200642759-6482 and Weekly Hours of 28. The summary focuses on contributing to Apple products, services, and customer experiences in a sales internship context.",
+    "applicationProcess": [
+      "Submit Resume through Apple Careers"
+    ],
+    "codingTest": "not_stated",
+    "url": "https://jobs.apple.com/en-us/details/200642759-6482/sales-internship-winter-2026?team=STDNT",
+    "source": "Official company careers page",
+    "sourceUrl": "https://jobs.apple.com/en-us/search?location=japan-JPNC&team=internships-STDNT-INTRN",
+    "companyUrl": "https://jobs.apple.com/en-us/search?location=japan-JPNC&team=internships-STDNT-INTRN",
+    "companyDomain": "jobs.apple.com",
+    "logoUrl": "",
+    "verifiedDate": "2026-06-28",
+    "prestigeTier": "Live company research",
+    "deadlineType": "Not stated",
+    "researchIndex": 0,
+    "addedAt": "2026-06-28T12:50:14.915Z"
+  }
+]

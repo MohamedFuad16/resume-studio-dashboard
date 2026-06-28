@@ -1,0 +1,32 @@
+node_modules/
+dist/
+.vercel/
+.env
+.env.*
+
+# Local Codex/workflow artifacts
+.agents/
+.workflow/
+graphify-out/
+tmp/
+
+# Runtime/generated local data
+editor/server/.data/
+editor/server/applications/
+editor/server/public/*.pdf
+editor/tmp/
+output/
+mohamed_fuad_resume_en.pdf
+
+# Test and diagnostic artifacts
+editor/test-results/
+editor/playwright-report/
+editor/server/browser_diagnostic.png
+editor/dist/
+editor/.vercel/
+__pycache__/
+**/__pycache__/
+
+# OS/editor noise
+.DS_Store
+*.log

@@ -1,0 +1,183 @@
+{
+  "personal": {
+    "nameEn": "Mohamed Fuad",
+    "nameJa": "モハメド フアド",
+    "furigana": "もはめど ふあど",
+    "dob": "2004-02-28",
+    "address": "東京都世田谷区",
+    "phone": "080-7535-2988",
+    "email": "mohamed.fuad.jp@gmail.com",
+    "linkedin": "https://linkedin.com/in/mohamed-fuad-6b8483278",
+    "github": "https://github.com/MohamedFuad16"
+  },
+  "summary": "Third-year Information and Communication Engineering student at Tokai University, expected to graduate in March 2028. I build modern web applications with TypeScript, React, and Node.js, and native macOS tools with Swift and AppKit. My portfolio includes an AI-powered learning assistant, a bilingual university portal, nearby WebRTC file sharing, and a native Codex account-switching utility. I bring practical engineering experience, English/Japanese communication from translation work, and a strong interest in software engineering internships where I can ship useful products.",
+  "summaryEn": "Third-year Information and Communication Engineering student at Tokai University, expected to graduate in March 2028. I build modern web applications with TypeScript, React, and Node.js, and native macOS tools with Swift and AppKit. My portfolio includes an AI-powered learning assistant, a bilingual university portal, nearby WebRTC file sharing, and a native Codex account-switching utility. I bring practical engineering experience, English/Japanese communication from translation work, and a strong interest in software engineering internships where I can ship useful products.",
+  "summaryJa": "東海大学情報通信学部情報通信学科の3年次に在学しています。TypeScript、React、Node.jsを中心としたWeb開発と、Swift、AppKitによるmacOSアプリ開発に取り組んでいます。PDFとAI対話を組み合わせた学習支援アプリ、大学生向けポータル、WebRTCを用いた近距離ファイル共有などを、企画から実装まで経験しました。翻訳業務で培った英語・日本語での正確なコミュニケーション力を活かし、利用者の課題を丁寧に捉えて形にするソフトウェアエンジニアを目指しています。",
+  "japanese": {
+    "asOfDate": "2026-06-28",
+    "summary": "東海大学情報通信学部情報通信学科の3年次に在学しています。TypeScript、React、Node.jsを中心としたWeb開発と、Swift、AppKitによるmacOSアプリ開発に取り組んでいます。PDFとAI対話を組み合わせた学習支援アプリ、大学生向けポータル、WebRTCを用いた近距離ファイル共有などを、企画から実装まで経験しました。翻訳業務で培った英語・日本語での正確なコミュニケーション力を活かし、利用者の課題を丁寧に捉えて形にするソフトウェアエンジニアを目指しています。",
+    "academicFocus": "データ構造とアルゴリズム、コンピュータネットワーク、データベース、オペレーティングシステム、ソフトウェア工学、Webプログラミング、離散数学などを履修しています。授業外では、TypeScript、React、Node.jsを用いたWebアプリケーションと、Swift、AppKitを用いたmacOSアプリの設計・開発に継続して取り組んでいます。",
+    "selfPr": "私の強みは、利用者の課題を整理し、必要な技術を学びながら動く形まで実装し切る力です。Tutor-Systemでは、PDF閲覧、出典を確認できるAI対話、音声学習、復習機能を一つの学習体験として設計しました。WebDropでは、ブラウザAPIの制約を検証しながら、WebRTCによる端末間転送と近接確認機能を実装しました。また、翻訳業務では、正確さだけでなく、相手や状況に応じて伝わる表現を選ぶことを大切にしています。開発力と日英両言語でのコミュニケーション力を活かし、チームの中で着実に価値を届けます。",
+    "qualifications": [
+      {
+        "year": "2024",
+        "month": "7",
+        "name": "日本語能力試験 N2 合格"
+      }
+    ],
+    "skills": {
+      "languages": "TypeScript, JavaScript, Python, Swift, SQL, Java, C",
+      "frameworks": "React, Node.js, Express, Tailwind CSS, SwiftUI, PWA",
+      "tools": "Git, GitHub, AWS (Amplify/Cognito/SES), Docker, SQLite, MySQL, WebRTC"
+    },
+    "languages": [
+      "日本語: 日本語能力試験 N2",
+      "英語: 業務使用経験あり",
+      "タミル語: 母語"
+    ]
+  },
+  "education": [
+    {
+      "institution": "Tokai University",
+      "institutionJa": "東海大学",
+      "location": "Tokyo, Japan",
+      "degree": "Bachelor of Science — Information and Communication Technology",
+      "degreeJa": "情報通信学部 情報通信学科（学士課程・3年次在学中）",
+      "startDate": "Apr 2024",
+      "endDate": "Mar 2028 (Expected)",
+      "bullets": [
+        "3rd year student, School of Information Science and Technology",
+        "Relevant coursework: Data Structures & Algorithms, Computer Networks, Database Systems, Operating Systems, Software Engineering, Web Programming, Discrete Mathematics"
+      ]
+    }
+  ],
+  "experience": [
+    {
+      "company": "Altius Link (formerly KDDI Evolva)",
+      "companyJa": "アルティウスリンク株式会社",
+      "role": "Translation Specialist",
+      "roleJa": "翻訳スペシャリスト",
+      "location": "Tokyo, Japan",
+      "startDate": "Jun 2023",
+      "endDate": "Present",
+      "bullets": [
+        "Translate customer communications for KDDI service users, supporting bilingual customer service operations.",
+        "Apply precise wording, cultural nuance, and professional communication under real customer-facing conditions."
+      ],
+      "bulletsJa": [
+        "KDDIサービス利用者向けの案内文や問い合わせ対応内容を英日・日英で翻訳し、二言語での顧客対応を支援。",
+        "顧客向け表現の正確性、文脈や文化的ニュアンス、読みやすさに配慮して品質を管理。"
+      ]
+    },
+    {
+      "company": "Hotel SUI Akasaka",
+      "companyJa": "ホテルSUI赤坂",
+      "role": "Front Desk Associate",
+      "roleJa": "フロントアソシエイト",
+      "location": "Tokyo, Japan",
+      "startDate": "Apr 2023",
+      "endDate": "Jul 2023",
+      "bullets": [
+        "Handled guest inquiries, reservations, check-in support, and front-desk service in English and Japanese environments."
+      ],
+      "bulletsJa": [
+        "日英両言語で、チェックイン、予約確認、問い合わせ対応などのフロント業務を担当。"
+      ]
+    },
+    {
+      "company": "Japan Airlines",
+      "companyJa": "日本航空株式会社",
+      "role": "Immigration Specialist — Haneda Airport",
+      "roleJa": "出入国業務アシスタント",
+      "location": "Tokyo, Japan",
+      "startDate": "Feb 2023",
+      "endDate": "Apr 2023",
+      "bullets": [
+        "Assisted with document registration, web-verification workflows, and passenger guidance in English and Japanese."
+      ],
+      "bulletsJa": [
+        "羽田空港で、渡航書類の登録・Web確認手続きと旅客案内を日英両言語で支援。"
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "title": "Tutor-System",
+      "tech": "TypeScript, React 19, OpenRouter, Deepgram, Dexie/IndexedDB, Express",
+      "year": "2025",
+      "bullets": [
+        "Built an AI learning interface for PDF reading, source-aware tutor chat, voice tutoring, and concept revision.",
+        "Designed around study books, durable chat threads, and evidence-based learning progress tracking."
+      ],
+      "bulletsJa": [
+        "PDF閲覧、出典を確認できるAIチューター対話、音声学習、概念復習を一体化した学習支援Webアプリを開発。",
+        "教材単位の学習履歴と会話スレッドをブラウザ内に保持し、継続学習を支える設計を実装。"
+      ],
+      "link": "https://github.com/MohamedFuad16/Tutor-System"
+    },
+    {
+      "title": "TokaiHub",
+      "tech": "TypeScript, React, Tailwind CSS, AWS Amplify, Cognito, Vite, PWA",
+      "year": "2025",
+      "bullets": [
+        "Developed a central student portal PWA for Tokai University with mobile-first UI and bilingual support.",
+        "Integrated custom AWS Cognito authentication and SES-backed OTP verification flows."
+      ],
+      "bulletsJa": [
+        "東海大学生向けのモバイルファースト学生ポータルPWAを開発し、日英両言語のUIに対応。",
+        "AWS Cognitoによる認証とSESを用いたワンタイムパスワード認証フローを実装。"
+      ],
+      "link": "https://github.com/MohamedFuad16/TokaiHub"
+    },
+    {
+      "title": "WebDrop",
+      "tech": "HTML, CSS, JavaScript, Node.js, WebRTC, OPFS, Service Worker",
+      "year": "2024–2025",
+      "bullets": [
+        "Built a mobile-first nearby file-sharing app using WebRTC RTCDataChannel and OPFS chunked streaming.",
+        "Implemented ultrasonic Web Audio chirp exchange and motion sensors for proximity verification."
+      ],
+      "bulletsJa": [
+        "WebRTC RTCDataChannelによる端末間ファイル転送と、OPFSを用いた分割ストリーミングを実装。",
+        "Web Audioの超音波チャープと端末のモーションセンサーを組み合わせた近接確認機能を開発。"
+      ],
+      "link": "https://github.com/MohamedFuad16/WebDrop"
+    },
+    {
+      "title": "Codex Account Switcher",
+      "tech": "Swift, AppKit, macOS Menu Bar, Process Control",
+      "year": "2025",
+      "bullets": [
+        "Created a native macOS menu-bar utility to switch active Codex profiles and hot-swap session tokens."
+      ],
+      "bulletsJa": [
+        "複数のCodexアカウントを切り替え、セッショントークンを反映できるmacOSメニューバーアプリをSwiftとAppKitで開発。"
+      ],
+      "link": "https://github.com/MohamedFuad16/Codex-Acc-Switcher"
+    }
+  ],
+  "skills": {
+    "languages": "TypeScript, JavaScript, Python, Swift, HTML/CSS, SQL, Java, C, Bash/Shell",
+    "frameworks": "React, Node.js, Express, Flask, Tailwind CSS, SwiftUI, PWA, NumPy, Pandas",
+    "tools": "Git, GitHub, AWS (Amplify/Cognito/SES), Docker, SQLite, MySQL, VS Code, Vim",
+    "concepts": "RESTful APIs, OOP, Design Patterns, Data Structures, WebRTC, Network Protocols, Agile",
+    "spoken": "English (Professional), Japanese (Business — JLPT N2), Tamil (Native)"
+  },
+  "activities": [
+    {
+      "title": "IEEE Student Member",
+      "org": "Tokai University Student Branch",
+      "location": "Tokyo, Japan",
+      "startDate": "2024",
+      "endDate": "Present",
+      "bullets": [
+        "Participated in technical seminars, workshops, and networking events in the ICT field."
+      ],
+      "titleJa": "IEEE 学生会員",
+      "orgJa": "東海大学学生ブランチ",
+      "bulletsJa": [
+        "情報通信分野の技術セミナー、ワークショップ、学生交流イベントに参加。"
+      ]
+    }
+  ]
+}

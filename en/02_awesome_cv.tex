@@ -1,0 +1,160 @@
+%========================
+% Awesome CV Modern Style — Mohamed Fuad
+% Modern color accent, clean professional
+% Tectonic-compatible (no fontawesome5)
+%========================
+\documentclass[10pt, a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{microtype}
+\usepackage{setspace}
+
+% --- COLOR PALETTE ---
+\definecolor{accentblue}{RGB}{20, 60, 140}
+\definecolor{darkgray}{RGB}{40, 40, 40}
+\definecolor{medgray}{RGB}{90, 90, 90}
+\definecolor{lightgray}{RGB}{220, 220, 220}
+
+% --- PAGE GEOMETRY ---
+\geometry{a4paper, top=0.8cm, bottom=0.8cm, left=1.2cm, right=1.2cm}
+
+\hypersetup{hidelinks, colorlinks=true, urlcolor=accentblue}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+
+% --- SECTION STYLE ---
+\titleformat{\section}
+  {\color{accentblue}\normalsize\bfseries\scshape}
+  {}{0em}{}
+  [\vspace{-4pt}\color{accentblue}\rule{\linewidth}{1.2pt}\vspace{1pt}]
+\titlespacing{\section}{0pt}{6pt}{3pt}
+
+\newcommand{\cventry}[4]{%
+  \vspace{1.5pt}
+  \begin{tabularx}{\linewidth}{@{}Xr@{}}
+    \textbf{\color{darkgray}#1} \textcolor{medgray}{\small $|$ #2} & \textcolor{medgray}{\small #4}\\
+    \textcolor{accentblue}{\small\itshape #3} & \\
+  \end{tabularx}
+  \vspace{-1.5pt}
+}
+
+\newcommand{\cvproject}[3]{%
+  \vspace{1.5pt}
+  \begin{tabularx}{\linewidth}{@{}Xr@{}}
+    \textbf{\color{darkgray}#1} \textcolor{medgray}{\small $|$ \textit{#2}} & \textcolor{medgray}{\small #3}\\
+  \end{tabularx}
+  \vspace{-1.5pt}
+}
+
+\newenvironment{cvbullets}{%
+  \begin{itemize}[leftmargin=1em, itemsep=0.2pt, topsep=0.5pt, parsep=0pt]
+  \small\color{darkgray}
+}{%
+  \end{itemize}\vspace{1pt}
+}
+
+\newcommand{\skillrow}[2]{%
+  \textbf{\color{darkgray}\small #1:} & \small #2 \\[2pt]
+}
+
+\begin{document}
+
+%=== HEADER ===
+\begin{center}
+  {\fontsize{22}{26}\selectfont \textbf{\color{accentblue}MOHAMED} \textbf{\color{darkgray}FUAD}}\\[3pt]
+  {\small\color{medgray}\textit{Software Engineering Student --- ICT, Tokai University}}\\[4pt]
+  {\small\color{medgray}
+    Tel: 080-7535-2988 \quad $|$ \quad
+    Email: \href{mailto:mohamed.fuad.jp@gmail.com}{mohamed.fuad.jp@gmail.com} \quad $|$ \quad
+    Location: Setagaya, Tokyo, Japan
+  }\\[2pt]
+  {\small\color{medgray}
+    LinkedIn: \href{https://linkedin.com/in/mohamed-fuad-6b8483278}{linkedin.com/in/mohamed-fuad-6b8483278} \quad $|$ \quad
+    GitHub: \href{https://github.com/MohamedFuad16}{github.com/MohamedFuad16}
+  }
+\end{center}
+
+\vspace{-2pt}
+\color{accentblue}\rule{\linewidth}{1.5pt}
+\vspace{1pt}
+
+%=== PROFESSIONAL SUMMARY ===
+\section{Professional Summary}
+{\small\color{darkgray}
+Highly motivated 3rd-year B.Sc. ICT student at Tokai University. Skilled in TypeScript, React, Node.js, and native Swift/macOS utilities. Builds practical AI-enabled learning tools and mobile PWA applications. Trilingual communicator (English, Japanese JLPT N2, Tamil) combining software engineering execution with precise communication.
+}
+
+%=== EDUCATION ===
+\section{Education}
+\cventry{Tokai University}{B.Sc. Information and Communication Technology}{School of Information Science \& Technology, Tokyo, Japan}{Apr 2024 -- Mar 2028}
+\begin{cvbullets}
+  \item 3rd Year in the ICT program, expected graduation March 2028
+  \item Coursework: Algorithms \& Data Structures, Computer Networks, Database Systems, Operating Systems, Software Engineering, Web Programming, Discrete Mathematics
+\end{cvbullets}
+
+%=== EXPERIENCE ===
+\section{Professional Experience}
+\cventry{Altius Link (formerly KDDI Evolva)}{Translation Specialist}{Tokyo, Japan}{Jun 2023 -- Present}
+\begin{cvbullets}
+  \item Translate customer communications for users of KDDI services, supporting bilingual customer service.
+  \item Apply precise wording, cultural nuance, and professional communication under real customer-facing conditions.
+\end{cvbullets}
+
+\cventry{Hotel SUI Akasaka}{Front Desk Associate}{Tokyo, Japan}{Apr 2023 -- Jul 2023}
+\begin{cvbullets}
+  \item Handled guest inquiries, reservations, check-in support, and front-desk service in English/Japanese environments.
+\end{cvbullets}
+
+\cventry{Japan Airlines}{Immigration Specialist at Haneda Airport}{Tokyo, Japan}{Feb 2023 -- Apr 2023}
+\begin{cvbullets}
+  \item Assisted document registration, web-verification workflows, and passenger guidance using English/Japanese.
+\end{cvbullets}
+
+%=== PROJECTS ===
+\section{Projects}
+
+\cvproject{Tutor-System $|$ \small\color{medgray}\href{https://github.com/MohamedFuad16/Tutor-System}{github.com/MohamedFuad16/Tutor-System}}{TypeScript, React 19, OpenRouter, Deepgram, Dexie/IndexedDB, Express}{2025}
+\begin{cvbullets}
+  \item Built an AI learning interface for PDF reading, source-aware tutor chat, voice tutoring, and concept revision.
+\end{cvbullets}
+
+\cvproject{TokaiHub $|$ \small\color{medgray}\href{https://github.com/MohamedFuad16/TokaiHub}{github.com/MohamedFuad16/TokaiHub}}{TypeScript, React, Tailwind CSS, AWS Amplify, Cognito, Vite, PWA}{2025}
+\begin{cvbullets}
+  \item Developed a central student portal PWA for Tokai University with mobile-first UI and bilingual support.
+\end{cvbullets}
+
+\cvproject{WebDrop $|$ \small\color{medgray}\href{https://github.com/MohamedFuad16/WebDrop}{github.com/MohamedFuad16/WebDrop}}{HTML, CSS, JavaScript, Node.js, WebRTC, OPFS, Service Worker}{2024 -- 2025}
+\begin{cvbullets}
+  \item Built a mobile-first nearby file-sharing app using WebRTC \texttt{RTCDataChannel} and OPFS chunked streaming.
+\end{cvbullets}
+
+\cvproject{Codex Account Switcher $|$ \small\color{medgray}\href{https://github.com/MohamedFuad16/Codex-Acc-Switcher}{github.com/MohamedFuad16/Codex-Acc-Switcher}}{Swift, AppKit, macOS Menu Bar, Process Control}{2025}
+\begin{cvbullets}
+  \item Created a native macOS menu-bar utility to switch active Codex profiles and hot-swap session tokens.
+\end{cvbullets}
+
+%=== TECHNICAL SKILLS ===
+\section{Technical Skills}
+\begin{tabular}{@{}p{0.20\linewidth}p{0.78\linewidth}@{}}
+  \skillrow{Languages}{TypeScript, JavaScript, Python, Swift, HTML/CSS, SQL, Java, C, Bash/Shell}
+  \skillrow{Frameworks}{React, Node.js, Express, Flask, Tailwind CSS, SwiftUI, PWA, NumPy, Pandas}
+  \skillrow{Tools \& DevOps}{Git, GitHub, AWS (Amplify/Cognito/SES), Docker, SQLite, MySQL, VS Code, Vim}
+  \skillrow{Concepts}{RESTful APIs, OOP, Design Patterns, Data Structures, WebRTC, Network Protocols, Agile}
+  \skillrow{Languages}{English (Professional) $\cdot$ Japanese (Business, JLPT N2) $\cdot$ Tamil (Native)}
+\end{tabular}
+
+%=== ACTIVITIES ===
+\section{Activities \& Interests}
+\begin{itemize}[leftmargin=1em, itemsep=1pt, topsep=1pt]
+  \item\small \textbf{IEEE Student Member} --- Tokai University Student Branch, participating in technical talks and seminars in the ICT field
+  \item\small \textbf{Open Source Development} --- Actively maintaining GitHub repositories with consistent commit history and thorough documentation
+\end{itemize}
+
+\end{document}

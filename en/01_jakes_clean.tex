@@ -1,0 +1,167 @@
+%========================
+% Jake's Clean Resume — Mohamed Fuad
+% ATS-Optimized, Single Column, Tectonic-compatible
+%========================
+\documentclass[letterpaper,11pt]{article}
+
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+\usepackage{microtype}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\addtolength{\oddsidemargin}{-0.5in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1in}
+\addtolength{\topmargin}{-.5in}
+\addtolength{\textheight}{1.0in}
+
+\urlstyle{same}
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+\titleformat{\section}{
+  \vspace{-4pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule \vspace{-5pt}]
+
+\newcommand{\resumeItem}[1]{
+  \item\small{#1 \vspace{-2pt}}
+}
+
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-2pt}\item
+    \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & #2 \\
+      \textit{\small#3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeProjectHeading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \small#1 & #2 \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubItem}[1]{\resumeItem{#1}\vspace{-4pt}}
+
+\renewcommand\labelitemii{$\vcenter{\hbox{\tiny$\bullet$}}$}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.15in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+
+\begin{document}
+
+\begin{center}
+    {\Huge \scshape Mohamed Fuad} \\ \vspace{1pt}
+    \small
+    Tel: 080-7535-2988 $|$
+    \href{mailto:mohamed.fuad.jp@gmail.com}{\underline{mohamed.fuad.jp@gmail.com}} $|$
+    \href{https://linkedin.com/in/mohamed-fuad-6b8483278}{\underline{linkedin.com/in/mohamed-fuad-6b8483278}} $|$
+    \href{https://github.com/MohamedFuad16}{\underline{github.com/MohamedFuad16}}
+\end{center}
+
+\section{Education}
+  \resumeSubHeadingListStart
+    \resumeSubheading
+      {Tokai University}{Tokyo, Japan}
+      {Bachelor of Science --- Information and Communication Technology}{Apr 2024 -- Mar 2028 (Expected)}
+      \resumeItemListStart
+        \resumeItem{3rd Year student, School of Information Science and Technology}
+        \resumeItem{Relevant Coursework: Data Structures \& Algorithms, Computer Networks, Database Systems, Operating Systems, Software Engineering, Web Programming, Discrete Mathematics}
+      \resumeItemListEnd
+  \resumeSubHeadingListEnd
+
+\section{Experience}
+  \resumeSubHeadingListStart
+    \resumeSubheading
+      {Translation Specialist}{Tokyo, Japan}
+      {Altius Link (formerly KDDI Evolva)}{Jun 2023 -- Present}
+      \resumeItemListStart
+        \resumeItem{Translate customer communications for users of KDDI services, supporting bilingual customer service.}
+        \resumeItem{Apply precise wording, cultural nuance, and professional communication under real customer-facing conditions.}
+      \resumeItemListEnd
+      
+    \resumeSubheading
+      {Front Desk Associate}{Tokyo, Japan}
+      {Hotel SUI Akasaka}{Apr 2023 -- Jul 2023}
+      \resumeItemListStart
+        \resumeItem{Handled guest inquiries, reservations, check-in support, and front-desk service in English/Japanese environments.}
+      \resumeItemListEnd
+
+    \resumeSubheading
+      {Immigration Specialist at Haneda Airport}{Tokyo, Japan}
+      {Japan Airlines}{Feb 2023 -- Apr 2023}
+      \resumeItemListStart
+        \resumeItem{Assisted document registration, web-verification workflows, and passenger guidance using English/Japanese.}
+      \resumeItemListEnd
+  \resumeSubHeadingListEnd
+
+\section{Projects}
+    \resumeSubHeadingListStart
+      \resumeProjectHeading
+          {\textbf{Tutor-System} $|$ \emph{TypeScript, React 19, OpenRouter, Deepgram, Dexie/IndexedDB, Express}}{2025}
+          \resumeItemListStart
+            \resumeItem{Built an AI learning interface for PDF reading, source-aware tutor chat, voice tutoring, and concept revision.}
+            \resumeItem{Designed around study books, durable chat threads, and evidence-based learning progress.}
+          \resumeItemListEnd
+
+      \resumeProjectHeading
+          {\textbf{TokaiHub} $|$ \emph{TypeScript, React, Tailwind CSS, AWS Amplify, Cognito, Vite, PWA}}{2025}
+          \resumeItemListStart
+            \resumeItem{Developed a central student portal PWA for Tokai University with mobile-first UI and bilingual support.}
+            \resumeItem{Integrated custom AWS Cognito authentication and SES-backed OTP verification flows.}
+          \resumeItemListEnd
+
+      \resumeProjectHeading
+          {\textbf{WebDrop} $|$ \emph{HTML, CSS, JavaScript, Node.js, WebRTC, OPFS, Service Worker}}{2024 -- 2025}
+          \resumeItemListStart
+            \resumeItem{Built a mobile-first nearby file-sharing app using WebRTC \texttt{RTCDataChannel} and OPFS chunked streaming.}
+            \resumeItem{Implemented ultrasonic Web Audio chirp exchange and motion sensors for proximity verification.}
+          \resumeItemListEnd
+
+      \resumeProjectHeading
+          {\textbf{Codex Account Switcher} $|$ \emph{Swift, AppKit, macOS Menu Bar, Process Control}}{2025}
+          \resumeItemListStart
+            \resumeItem{Created a native macOS menu-bar utility to switch active Codex profiles and hot-swap session tokens.}
+          \resumeItemListEnd
+    \resumeSubHeadingListEnd
+
+\section{Technical Skills}
+ \begin{itemize}[leftmargin=0.15in, label={}]
+    \small{\item{
+     \textbf{Programming Languages}{: TypeScript, JavaScript, Python, Swift, HTML/CSS, SQL, Java, C, Bash/Shell} \\
+     \textbf{Frameworks \& Libraries}{: React, Node.js, Express, Flask, Tailwind CSS, SwiftUI, PWA, NumPy, Pandas} \\
+     \textbf{Tools \& Databases}{: Git, GitHub, AWS (Amplify/Cognito/SES), Docker, SQLite, MySQL, VS Code, Vim} \\
+     \textbf{Concepts}{: RESTful APIs, OOP, Design Patterns, Data Structures, WebRTC, Network Protocols, Agile} \\
+     \textbf{Languages}{: English (Professional), Japanese (Business --- JLPT N2), Tamil (Native)}
+    }}
+ \end{itemize}
+
+\section{Activities}
+  \resumeSubHeadingListStart
+    \resumeSubheading
+      {IEEE Student Member}{Tokyo, Japan}
+      {Tokai University Student Branch}{2024 -- Present}
+      \resumeItemListStart
+        \resumeItem{Participated in technical seminars, workshops, and networking events in the ICT field.}
+      \resumeItemListEnd
+  \resumeSubHeadingListEnd
+
+\end{document}

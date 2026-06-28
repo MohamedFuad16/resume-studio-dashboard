@@ -1,0 +1,219 @@
+%========================
+% Alta Classic Resume — Mohamed Fuad
+% Traditional two-column, professional
+% Tectonic-compatible version
+%========================
+\documentclass[9.5pt, a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{tabularx}
+\usepackage{microtype}
+%% fontawesome removed - using text labels
+\usepackage{multicol}
+\usepackage{array}
+\usepackage{lmodern}
+
+% --- COLOR PALETTE ---
+\definecolor{navyblue}{RGB}{10, 40, 100}
+\definecolor{steelblue}{RGB}{50, 100, 180}
+\definecolor{darkgray}{RGB}{45, 45, 45}
+\definecolor{medgray}{RGB}{90, 90, 90}
+\definecolor{lightgray}{RGB}{238, 238, 238}
+
+% --- PAGE GEOMETRY ---
+\geometry{a4paper, top=0.7cm, bottom=0.7cm, left=1.2cm, right=1.2cm}
+
+\hypersetup{hidelinks, colorlinks=true, urlcolor=steelblue}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+
+% --- SECTION STYLE ---
+\titleformat{\section}
+  {\color{navyblue}\normalsize\bfseries\scshape}
+  {}{0em}{}
+  [\vspace{-4pt}\color{navyblue}\rule{\linewidth}{0.8pt}\vspace{1pt}]
+\titlespacing{\section}{0pt}{4pt}{2pt}
+
+\newcommand{\expheading}[4]{%
+  \vspace{1.5pt}
+  \begin{tabularx}{\linewidth}{@{}Xr@{}}
+    \small\textbf{\color{darkgray}#1} $|$ \small\textcolor{steelblue}{\textit{#2}} & \textcolor{medgray}{\small #4}\\
+    \textcolor{medgray}{\small #3} & \\
+  \end{tabularx}
+  \vspace{-1.5pt}
+}
+
+\newcommand{\projheading}[3]{%
+  \vspace{1.5pt}
+  \begin{tabularx}{\linewidth}{@{}Xr@{}}
+    \small\textbf{\color{darkgray}#1} $|$ \textcolor{medgray}{\small\textit{#2}} & \textcolor{medgray}{\small #3}\\
+  \end{tabularx}
+  \vspace{-1.5pt}
+}
+
+\newenvironment{bulletlist}{%
+  \begin{itemize}[leftmargin=1.1em, itemsep=0.2pt, topsep=0.5pt, parsep=0pt]
+  \small\color{darkgray}
+}{%
+  \end{itemize}\vspace{1.5pt}
+}
+
+\begin{document}
+
+%=== HEADER ===
+\begin{center}
+  {\fontsize{22}{26}\selectfont\bfseries\color{navyblue} Mohamed Fuad}\\[3pt]
+  {\small\color{medgray}
+    Tel: 080-7535-2988 \quad $|$ \quad
+    Email: \href{mailto:mohamed.fuad.jp@gmail.com}{mohamed.fuad.jp@gmail.com} \quad $|$ \quad
+    GitHub: \href{https://github.com/MohamedFuad16}{github.com/MohamedFuad16}
+  }\\[2pt]
+  {\small\color{medgray}
+    LinkedIn: \href{https://linkedin.com/in/mohamed-fuad-6b8483278}{linkedin.com/in/mohamed-fuad-6b8483278} \quad $|$ \quad
+    Location: Setagaya, Tokyo, Japan
+  }
+\end{center}
+
+\vspace{-2pt}
+\color{navyblue}\rule{\linewidth}{1.2pt}
+\vspace{2pt}
+
+%=== TWO COLUMN SECTION: Left=Contact/Skills, Right=Profile ===
+\begin{minipage}[t]{0.28\linewidth}
+\vspace{0pt}
+
+%--- Education (sidebar) ---
+\section{Education}
+{\small\textbf{\color{darkgray}Tokai University}}\\[2pt]
+{\footnotesize\color{medgray} B.Sc. in Information \&\\
+Communication Technology}\\[2pt]
+{\footnotesize\color{medgray} Apr 2024 -- Mar 2028}\\[2pt]
+{\footnotesize\color{medgray} 3rd Year (Expected 2028)}
+
+\vspace{4pt}
+
+%--- Technical Skills (sidebar) ---
+\section{Tech Skills}
+
+{\footnotesize\textbf{\color{steelblue} Languages}}\\[2pt]
+{\footnotesize\color{darkgray} Python $\cdot$ JavaScript\\TypeScript $\cdot$ Swift\\Java $\cdot$ C $\cdot$ SQL $\cdot$ Bash}
+
+\vspace{3pt}
+{\footnotesize\textbf{\color{steelblue} Frameworks}}\\[2pt]
+{\footnotesize\color{darkgray} React $\cdot$ Node.js $\cdot$ Express\\Tailwind CSS $\cdot$ SwiftUI\\PWA $\cdot$ NumPy $\cdot$ Pandas}
+
+\vspace{3pt}
+{\footnotesize\textbf{\color{steelblue} Tools \& DBs}}\\[2pt]
+{\footnotesize\color{darkgray} Git $\cdot$ GitHub $\cdot$ AWS\\Docker $\cdot$ SQLite $\cdot$ MySQL\\PostgreSQL $\cdot$ VS Code}
+
+\vspace{4pt}
+
+%--- Languages (sidebar) ---
+\section{Languages}
+
+{\footnotesize\color{darkgray}
+\textbf{Tamil} --- Native\\[2pt]
+\textbf{English} --- Professional\\[2pt]
+\textbf{Japanese} --- Business\\
+\phantom{x}(JLPT N2 level)
+}
+
+\vspace{4pt}
+
+%--- Interests ---
+\section{Interests}
+
+{\footnotesize\color{darkgray}
+AI/ML Tools\\[2pt]
+Open Source Dev\\[2pt]
+WebRTC \& P2P\\[2pt]
+macOS \& iOS Dev\\[2pt]
+Comp. Programming
+}
+
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.69\linewidth}
+\vspace{0pt}
+
+%--- Professional Profile ---
+\section{Professional Profile}
+{\small\color{darkgray}
+Third-year B.Sc. ICT student at Tokai University. Skilled in TypeScript, React, Node.js, and native Swift/macOS utilities. Builds practical AI-enabled learning tools and mobile PWA applications. Trilingual communicator (English, Japanese JLPT N2, Tamil) combining software engineering execution with precise communication.
+}
+
+%--- Experience ---
+\section{Experience}
+
+\expheading{Altius Link (formerly KDDI Evolva)}{Translation Specialist}{Tokyo, Japan}{Jun 2023 -- Present}
+\begin{bulletlist}
+  \item Translate customer communications for users of KDDI services, supporting bilingual customer service
+  \item Apply precise wording, cultural nuance, and professional communication under real customer-facing conditions
+\end{bulletlist}
+
+\expheading{Hotel SUI Akasaka}{Front Desk Associate}{Tokyo, Japan}{Apr 2023 -- Jul 2023}
+\begin{bulletlist}
+  \item Handled guest inquiries, reservations, check-in support, and front-desk service in English/Japanese
+\end{bulletlist}
+
+\expheading{Japan Airlines}{Immigration Specialist at Haneda Airport}{Tokyo, Japan}{Feb 2023 -- Apr 2023}
+\begin{bulletlist}
+  \item Assisted document registration, web-verification workflows, and passenger guidance using English/Japanese
+\end{bulletlist}
+
+%--- Projects ---
+\section{Selected Projects}
+
+\projheading{Tutor-System $|$ \small\color{medgray}\href{https://github.com/MohamedFuad16/Tutor-System}{github.com/.../Tutor-System}}{TypeScript, React 19, AI APIs, Dexie, Express}{2025}
+\begin{bulletlist}
+  \item Built an AI learning interface for PDF reading, source-aware tutor chat, voice tutoring, and concept revision
+\end{bulletlist}
+
+\projheading{TokaiHub $|$ \small\color{medgray}\href{https://github.com/MohamedFuad16/TokaiHub}{github.com/.../TokaiHub}}{TypeScript, React, Tailwind, AWS Amplify, Cognito, PWA}{2025}
+\begin{bulletlist}
+  \item Developed a student portal PWA for Tokai University with custom Cognito authentication and OTP flows
+\end{bulletlist}
+
+\projheading{WebDrop $|$ \small\color{medgray}\href{https://github.com/MohamedFuad16/WebDrop}{github.com/.../WebDrop}}{HTML, CSS, JS, Node.js, WebRTC, OPFS, Service Worker}{2024 -- 2025}
+\begin{bulletlist}
+  \item Built a mobile-first nearby file-sharing PWA using WebRTC \texttt{RTCDataChannel} and OPFS chunked streaming
+\end{bulletlist}
+
+\projheading{Codex Account Switcher $|$ \small\color{medgray}\href{https://github.com/MohamedFuad16/Codex-Acc-Switcher}{github.com/.../Codex-Acc-Switcher}}{Swift, AppKit, macOS Menu Bar, Process Control}{2025}
+\begin{bulletlist}
+  \item Created a native macOS menu-bar utility to switch active Codex profiles and hot-swap session tokens
+\end{bulletlist}
+
+%--- Coursework ---
+\section{Relevant Coursework}
+
+\begin{multicols}{2}
+\begin{itemize}[leftmargin=1em, itemsep=0.5pt, topsep=1pt]
+  \small\color{darkgray}
+  \item Data Structures \& Algorithms
+  \item Computer Networks
+  \item Database Systems
+  \item Operating Systems
+  \item Software Engineering
+  \item Web Development
+  \item Discrete Mathematics
+  \item Computer Architecture
+\end{itemize}
+\end{multicols}
+
+%--- Activities ---
+\section{Activities}
+
+\expheading{IEEE Student Member}{Tokai University Student Branch}{Japan}{2024 -- Present}
+\begin{bulletlist}
+  \item Attended technical talks, workshops, and ICT networking events
+\end{bulletlist}
+
+\end{minipage}
+
+\end{document}

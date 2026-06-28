@@ -1,0 +1,219 @@
+%======================================================================
+% 新卒・インターン 職務経歴書 — モハメド フアド
+%======================================================================
+\documentclass[9.5pt, a4paper]{article}
+\usepackage{fontspec}
+\usepackage{xeCJK}
+\usepackage{geometry}
+\usepackage{xcolor}
+\usepackage[bookmarks=false]{hyperref}
+\usepackage{enumitem}
+\usepackage{tabularx}
+\usepackage{array}
+
+\setCJKmainfont{ipaexg.ttf}[BoldFont={ipaexg.ttf}]
+\setCJKsansfont{ipaexg.ttf}
+\setmainfont{Helvetica Neue}
+
+\definecolor{darksidebar}{RGB}{15, 23, 42}      % Midnight Slate 900 left sidebar background
+\definecolor{lightgray}{RGB}{241, 245, 249}     % Light gray text in sidebar
+\definecolor{leftaccent}{RGB}{56, 189, 248}     % Beautiful sky blue accent
+\definecolor{sectioncolor}{RGB}{30, 80, 160}     % Right column section header (deep blue)
+\definecolor{bodycolor}{RGB}{51, 65, 85}         % Slate 700 body text
+
+\geometry{a4paper, top=0.8cm, bottom=0.8cm, left=1.2cm, right=1.2cm}
+\hypersetup{hidelinks, colorlinks=true, urlcolor=sectioncolor}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\fboxsep}{0pt}
+\setlength{\fboxrule}{0pt}
+
+\newcommand{\leftsection}[1]{%
+  \vspace{10pt}
+  {\fontsize{10.5}{12.5}\selectfont\textcolor{leftaccent}{\textbf{#1}}}\par
+  \vspace{3pt}
+  {\color{lightgray}\hrule height 0.5pt}\par
+  \vspace{6pt}
+}
+
+\newcommand{\rightsection}[1]{%
+  \vspace{10pt}
+  {\fontsize{11.5}{13.5}\selectfont\textcolor{sectioncolor}{\textbf{#1}}}\par
+  \vspace{3pt}
+  {\color{sectioncolor}\hrule height 1.2pt}\par
+  \vspace{6pt}
+}
+
+\begin{document}
+\noindent
+\colorbox{darksidebar}{%
+  \begin{minipage}[t][0.96\textheight][t]{0.34\textwidth}
+    \centering
+    \vspace*{12pt}
+    \begin{minipage}[t]{0.88\textwidth}
+      \color{white}
+      {\fontsize{18}{22}\selectfont\textbf{Mohamed Fuad}}\\
+      \vspace{4pt}
+      {\fontsize{10.5}{13.5}\selectfont\textcolor{leftaccent}{\textbf{モハメド フアド}}}\\
+      \vspace{3pt}
+      {\fontsize{9}{12}\selectfont\textcolor{lightgray}{もはめど ふあど}}
+      
+      \vspace{8pt}
+      \leftsection{連絡先}
+      {\fontsize{8.5}{12}\selectfont
+      \textcolor{leftaccent}{\textbf{住所:}} \textcolor{lightgray}{東京都世田谷区}\\
+      \vspace{3pt}
+      \textcolor{leftaccent}{\textbf{電話:}} \textcolor{lightgray}{080-7535-2988}\\
+      \vspace{3pt}
+      \textcolor{leftaccent}{\textbf{メール:}} \href{mailto:mohamed.fuad.jp@gmail.com}{\color{white}mohamed.fuad.jp@gmail.com}\\
+      \vspace{3pt}
+      \textcolor{leftaccent}{\textbf{GitHub:}} \href{https://github.com/MohamedFuad16}{\color{white}github.com/MohamedFuad16}\\
+      \vspace{3pt}
+      \textcolor{leftaccent}{\textbf{LinkedIn:}} \href{https://linkedin.com/in/mohamed-fuad-6b8483278}{\color{white}linkedin}
+      }
+
+      \leftsection{学歴}
+      {\fontsize{8.5}{12.5}\selectfont
+      \textbf{東海大学}\\
+      \vspace{2pt}
+      情報通信学部 情報通信学科（学士課程・3年次在学中）\\
+      \vspace{2pt}
+      \textcolor{lightgray}{2024年4月 -- 2028年3月（卒業予定）}
+      }
+
+      \leftsection{技術スキル}
+      {\fontsize{8.2}{11.5}\selectfont
+      \textcolor{leftaccent}{\textbf{プログラミング言語}}\\
+      \vspace{1pt}
+      \textcolor{lightgray}{TypeScript, JavaScript, Python, Swift, SQL, Java, C}\\
+      \vspace{4pt}
+      \textcolor{leftaccent}{\textbf{フレームワーク}}\\
+      \vspace{1pt}
+      \textcolor{lightgray}{React, Node.js, Express, Tailwind CSS, SwiftUI, PWA}\\
+      \vspace{4pt}
+      \textcolor{leftaccent}{\textbf{ツール・開発環境}}\\
+      \vspace{1pt}
+      \textcolor{lightgray}{Git, GitHub, AWS (Amplify/Cognito/SES), Docker, SQLite, MySQL, WebRTC}
+      }
+
+      \leftsection{語学}
+      {\fontsize{8.5}{12}\selectfont
+      \textcolor{lightgray}{日本語: 日本語能力試験 N2\\
+      \vspace{2pt}
+      英語: 業務使用経験あり\\
+      \vspace{2pt}
+      タミル語: 母語}
+      }
+    \end{minipage}
+  \end{minipage}%
+}%
+\hfill
+\begin{minipage}[t][0.96\textheight][t]{0.63\textwidth}
+  \vspace*{12pt}
+  \begin{minipage}[t]{\linewidth}
+    \color{bodycolor}
+    
+    \rightsection{自己紹介}
+    {\fontsize{9}{13}\selectfont
+    東海大学情報通信学部情報通信学科の3年次に在学しています。TypeScript、React、Node.jsを中心としたWeb開発と、Swift、AppKitによるmacOSアプリ開発に取り組んでいます。PDFとAI対話を組み合わせた学習支援アプリ、大学生向けポータル、WebRTCを用いた近距離ファイル共有などを、企画から実装まで経験しました。翻訳業務で培った英語・日本語での正確なコミュニケーション力を活かし、利用者の課題を丁寧に捉えて形にするソフトウェアエンジニアを目指しています。
+    }
+    
+    \vspace{6pt}
+    \rightsection{開発実績・プロジェクト}
+    
+    \noindent
+    \begin{minipage}[t]{\linewidth}
+      \textbf{\fontsize{9.5}{11.5}\selectfont Tutor-System}\hfill\textcolor{bodycolor}{\fontsize{8}{10}\selectfont 2025年}\par\vspace{2pt}
+      \textcolor{bodycolor}{\fontsize{8}{10}\selectfont TypeScript, React 19, OpenRouter, Deepgram, Dexie/IndexedDB, Express}\par\vspace{2pt}
+      \begin{itemize}[leftmargin=1.2em, itemsep=1pt, topsep=1pt, parsep=0pt]
+        \fontsize{8.2}{11.5}\selectfont
+        \item PDF閲覧、出典を確認できるAIチューター対話、音声学習、概念復習を一体化した学習支援Webアプリを開発。
+      \end{itemize}
+    \end{minipage}
+    \vspace{5pt}
+
+    \noindent
+    \begin{minipage}[t]{\linewidth}
+      \textbf{\fontsize{9.5}{11.5}\selectfont TokaiHub}\hfill\textcolor{bodycolor}{\fontsize{8}{10}\selectfont 2025年}\par\vspace{2pt}
+      \textcolor{bodycolor}{\fontsize{8}{10}\selectfont TypeScript, React, Tailwind CSS, AWS Amplify, Cognito, Vite, PWA}\par\vspace{2pt}
+      \begin{itemize}[leftmargin=1.2em, itemsep=1pt, topsep=1pt, parsep=0pt]
+        \fontsize{8.2}{11.5}\selectfont
+        \item 東海大学生向けのモバイルファースト学生ポータルPWAを開発し、日英両言語のUIに対応。
+      \end{itemize}
+    \end{minipage}
+    \vspace{5pt}
+
+    \noindent
+    \begin{minipage}[t]{\linewidth}
+      \textbf{\fontsize{9.5}{11.5}\selectfont WebDrop}\hfill\textcolor{bodycolor}{\fontsize{8}{10}\selectfont 2024年 - 2025年}\par\vspace{2pt}
+      \textcolor{bodycolor}{\fontsize{8}{10}\selectfont HTML, CSS, JavaScript, Node.js, WebRTC, OPFS, Service Worker}\par\vspace{2pt}
+      \begin{itemize}[leftmargin=1.2em, itemsep=1pt, topsep=1pt, parsep=0pt]
+        \fontsize{8.2}{11.5}\selectfont
+        \item WebRTC RTCDataChannelによる端末間ファイル転送と、OPFSを用いた分割ストリーミングを実装。
+      \end{itemize}
+    \end{minipage}
+    \vspace{5pt}
+
+    \noindent
+    \begin{minipage}[t]{\linewidth}
+      \textbf{\fontsize{9.5}{11.5}\selectfont Codex Account Switcher}\hfill\textcolor{bodycolor}{\fontsize{8}{10}\selectfont 2025年}\par\vspace{2pt}
+      \textcolor{bodycolor}{\fontsize{8}{10}\selectfont Swift, AppKit, macOS Menu Bar, Process Control}\par\vspace{2pt}
+      \begin{itemize}[leftmargin=1.2em, itemsep=1pt, topsep=1pt, parsep=0pt]
+        \fontsize{8.2}{11.5}\selectfont
+        \item 複数のCodexアカウントを切り替え、セッショントークンを反映できるmacOSメニューバーアプリをSwiftとAppKitで開発。
+      \end{itemize}
+    \end{minipage}
+    \vspace{5pt}
+    
+    \vspace{6pt}
+    \rightsection{課外活動・職務経歴}
+    
+    \noindent
+    \begin{minipage}[t]{\linewidth}
+      \textbf{\fontsize{9.5}{11.5}\selectfont アルティウスリンク株式会社}\hfill\textcolor{bodycolor}{\fontsize{8}{10}\selectfont 2023年6月 -- 現在}\par\vspace{2pt}
+      \textcolor{bodycolor}{\fontsize{8.5}{11}\selectfont 翻訳スペシャリスト}\par\vspace{2pt}
+      \begin{itemize}[leftmargin=1.2em, itemsep=1pt, topsep=1pt, parsep=0pt]
+        \fontsize{8.2}{11.5}\selectfont
+        \item KDDIサービス利用者向けの案内文や問い合わせ対応内容を英日・日英で翻訳し、二言語での顧客対応を支援。
+      \end{itemize}
+    \end{minipage}
+    \vspace{6pt}
+
+    \noindent
+    \begin{minipage}[t]{\linewidth}
+      \textbf{\fontsize{9.5}{11.5}\selectfont ホテルSUI赤坂}\hfill\textcolor{bodycolor}{\fontsize{8}{10}\selectfont 2023年4月 -- 2023年7月}\par\vspace{2pt}
+      \textcolor{bodycolor}{\fontsize{8.5}{11}\selectfont フロントアソシエイト}\par\vspace{2pt}
+      \begin{itemize}[leftmargin=1.2em, itemsep=1pt, topsep=1pt, parsep=0pt]
+        \fontsize{8.2}{11.5}\selectfont
+        \item 日英両言語で、チェックイン、予約確認、問い合わせ対応などのフロント業務を担当。
+      \end{itemize}
+    \end{minipage}
+    \vspace{6pt}
+
+    \noindent
+    \begin{minipage}[t]{\linewidth}
+      \textbf{\fontsize{9.5}{11.5}\selectfont 日本航空株式会社}\hfill\textcolor{bodycolor}{\fontsize{8}{10}\selectfont 2023年2月 -- 2023年4月}\par\vspace{2pt}
+      \textcolor{bodycolor}{\fontsize{8.5}{11}\selectfont 出入国業務アシスタント}\par\vspace{2pt}
+      \begin{itemize}[leftmargin=1.2em, itemsep=1pt, topsep=1pt, parsep=0pt]
+        \fontsize{8.2}{11.5}\selectfont
+        \item 羽田空港で、渡航書類の登録・Web確認手続きと旅客案内を日英両言語で支援。
+      \end{itemize}
+    \end{minipage}
+    \vspace{6pt}
+
+    \vspace{6pt}
+    \rightsection{活動・資格}
+    
+    \noindent
+    \begin{minipage}[t]{\linewidth}
+      \textbf{\fontsize{9.5}{11.5}\selectfont IEEE 学生会員}\hfill\textcolor{bodycolor}{\fontsize{8}{10}\selectfont 2024年 -- 現在}\par\vspace{2pt}
+      \textcolor{bodycolor}{\fontsize{8.5}{11}\selectfont 東海大学学生ブランチ}\par\vspace{2pt}
+      \begin{itemize}[leftmargin=1.2em, itemsep=1pt, topsep=1pt, parsep=0pt]
+        \fontsize{8.2}{11.5}\selectfont
+        \item 情報通信分野の技術セミナー、ワークショップ、学生交流イベントに参加。
+      \end{itemize}
+    \end{minipage}
+    \vspace{6pt}
+  \end{minipage}
+\end{minipage}
+\end{document}

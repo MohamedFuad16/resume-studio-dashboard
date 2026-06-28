@@ -1,0 +1,187 @@
+%========================
+% Slate Modern Resume — Mohamed Fuad
+% Bold accent header, teal accents
+% Tectonic-compatible version
+%========================
+\documentclass[9.5pt, a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{tabularx}
+\usepackage{microtype}
+%% fontawesome removed - using text labels
+\usepackage{array}
+\usepackage{lmodern}
+\usepackage{colortbl}
+\usepackage{booktabs}
+
+% --- COLOR PALETTE ---
+\definecolor{slategray}{RGB}{28, 58, 85}
+\definecolor{teal}{RGB}{0, 128, 128}
+\definecolor{darkcharcoal}{RGB}{30, 30, 30}
+\definecolor{midgray}{RGB}{90, 90, 90}
+\definecolor{lightgray}{RGB}{235, 237, 240}
+\definecolor{headerbg}{RGB}{28, 58, 85}
+
+% --- PAGE GEOMETRY ---
+\geometry{a4paper, top=0.5cm, bottom=0.5cm, left=1.2cm, right=1.2cm}
+
+\hypersetup{hidelinks, colorlinks=true, urlcolor=teal}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+
+% --- SECTION STYLE ---
+\newcommand{\colorsection}[1]{\colorbox{slategray}{\hspace{4pt}\MakeUppercase{#1}\hspace{4pt}}}
+\titleformat{\section}
+  {\color{white}\small\bfseries\scshape}
+  {}{0em}
+  {\colorsection}
+  []
+\titlespacing*{\section}{0pt}{6pt}{3pt}
+
+\newcommand{\accentrule}{{\color{teal}\rule{\linewidth}{0.6pt}}}
+
+\newcommand{\entry}[4]{%
+  \vspace{1.5pt}
+  \begin{tabularx}{\linewidth}{@{}Xr@{}}
+    \textbf{\color{darkcharcoal}#1} \textcolor{midgray}{\small $|$ \textit{#2}} & \textcolor{midgray}{\small #4}\\
+    \textcolor{teal}{\small #3} & \\
+  \end{tabularx}
+  \vspace{-1.5pt}
+}
+
+\newcommand{\projentry}[3]{%
+  \vspace{1.5pt}
+  \begin{tabularx}{\linewidth}{@{}Xr@{}}
+    \textbf{\color{darkcharcoal}#1} \textcolor{midgray}{\small $|$ \textit{#2}} & \textcolor{midgray}{\small #3}\\
+  \end{tabularx}
+  \vspace{-1.5pt}
+}
+
+\newenvironment{cvbullets}{%
+  \begin{itemize}[leftmargin=1.1em, itemsep=0.2pt, topsep=0.5pt, parsep=0pt]
+  \small\color{darkcharcoal}
+}{%
+  \end{itemize}\vspace{1pt}
+}
+
+\newcommand{\skill}[2]{\textbf{\color{teal}#1:} & \small\color{darkcharcoal}#2 \\[2pt]}
+
+\begin{document}
+
+%=== HEADER BLOCK (dark background) ===
+\noindent
+\colorbox{headerbg}{%
+  \begin{minipage}{\dimexpr\linewidth\relax}
+    \vspace{6pt}
+    \begin{tabularx}{\linewidth}{@{\hspace{6pt}}Xr@{\hspace{6pt}}}
+      {\color{white}\fontsize{22}{28}\selectfont\textbf{Mohamed Fuad}} &
+      \begin{minipage}[b]{0.45\linewidth}
+        \raggedleft
+        {\color{white!85!headerbg}\scriptsize
+          Tel: 080-7535-2988\\[2pt]
+          Email: \href{mailto:mohamed.fuad.jp@gmail.com}{\color{white!80!headerbg}mohamed.fuad.jp@gmail.com}\\[2pt]
+          GitHub: \href{https://github.com/MohamedFuad16}{\color{white!80!headerbg}github.com/MohamedFuad16}\\[2pt]
+          LinkedIn: \href{https://linkedin.com/in/mohamed-fuad-6b8483278}{\color{white!80!headerbg}linkedin.com/in/mohamed-fuad}\\[2pt]
+          Location: \color{white!80!headerbg}Setagaya, Tokyo, Japan
+        }
+      \end{minipage}\\[3pt]
+      {\color{white!80!headerbg}\normalsize ICT Student $\cdot$ Software Developer $\cdot$ Open Source Contributor} & \\
+    \end{tabularx}
+    \vspace{4pt}
+  \end{minipage}%
+}
+
+\vspace{2pt}
+
+%=== PROFILE ===
+\section{Profile}
+{\small\color{darkcharcoal}
+Highly motivated 3rd-year B.Sc. ICT student at Tokai University. Skilled in TypeScript, React, Node.js, and native Swift/macOS utilities. Builds practical AI-enabled learning tools and mobile PWA applications. Trilingual communicator (English, Japanese JLPT N2, Tamil) combining software engineering execution with precise communication.
+}
+
+\vspace{1pt}\accentrule
+
+%=== EDUCATION ===
+\section{Education}
+
+\entry{Tokai University}{Bachelor of Science in ICT}{School of Information Science \& Technology, Tokyo, Japan}{Apr 2024 -- Mar 2028}
+\begin{cvbullets}
+  \item 3rd Year, expected graduation March 2028
+  \item Coursework: Data Structures, Algorithms, Networks, Database Systems, OS, Software Engineering
+\end{cvbullets}
+
+\accentrule
+
+%=== EXPERIENCE ===
+\section{Experience}
+
+\entry{Altius Link (formerly KDDI Evolva)}{Translation Specialist}{Tokyo, Japan}{Jun 2023 -- Present}
+\begin{cvbullets}
+  \item Translate customer communications for users of KDDI services, supporting bilingual customer service
+  \item Apply precise wording, cultural nuance, and professional communication under real customer-facing conditions
+\end{cvbullets}
+
+\entry{Hotel SUI Akasaka}{Front Desk Associate}{Tokyo, Japan}{Apr 2023 -- Jul 2023}
+\begin{cvbullets}
+  \item Handled guest inquiries, reservations, check-in support, and front-desk service in English/Japanese environments
+\end{cvbullets}
+
+\entry{Japan Airlines}{Immigration Specialist at Haneda Airport}{Tokyo, Japan}{Feb 2023 -- Apr 2023}
+\begin{cvbullets}
+  \item Assisted document registration, web-verification workflows, and passenger guidance using English/Japanese
+\end{cvbullets}
+
+\accentrule
+
+%=== PROJECTS ===
+\section{Projects}
+
+\projentry{Tutor-System $|$ \small\color{midgray}\href{https://github.com/MohamedFuad16/Tutor-System}{github.com/.../Tutor-System}}{TypeScript, React 19, OpenRouter, Deepgram, Dexie, Express}{2025}
+\begin{cvbullets}
+  \item Built an AI learning interface for PDF reading, source-aware tutor chat, voice tutoring, and concept revision
+\end{cvbullets}
+
+\projentry{TokaiHub $|$ \small\color{midgray}\href{https://github.com/MohamedFuad16/TokaiHub}{github.com/.../TokaiHub}}{TypeScript, React, Tailwind CSS, AWS Amplify, Cognito, PWA}{2025}
+\begin{cvbullets}
+  \item Developed a central student portal PWA for Tokai University with mobile-first UI and bilingual support
+\end{cvbullets}
+
+\projentry{WebDrop $|$ \small\color{midgray}\href{https://github.com/MohamedFuad16/WebDrop}{github.com/.../WebDrop}}{HTML, CSS, JavaScript, Node.js, WebRTC, OPFS, Service Worker}{2024 -- 2025}
+\begin{cvbullets}
+  \item Built a mobile-first nearby file-sharing app using WebRTC \texttt{RTCDataChannel} and OPFS chunked streaming
+\end{cvbullets}
+
+\projentry{Codex Account Switcher $|$ \small\color{midgray}\href{https://github.com/MohamedFuad16/Codex-Acc-Switcher}{github.com/.../Codex-Acc-Switcher}}{Swift, AppKit, macOS Menu Bar, Process Control}{2025}
+\begin{cvbullets}
+  \item Created a native macOS menu-bar utility to switch active Codex profiles and hot-swap session tokens
+\end{cvbullets}
+
+\accentrule
+
+%=== SKILLS ===
+\section{Technical Skills}
+
+\begin{tabular}{@{}p{0.18\linewidth}p{0.80\linewidth}@{}}
+  \skill{Languages}{TypeScript, JavaScript, Python, Swift, HTML/CSS, SQL, Java, C, Bash/Shell}
+  \skill{Frameworks}{React, Node.js, Express, Flask, Tailwind CSS, SwiftUI, PWA, NumPy, Pandas}
+  \skill{Tools}{Git \& GitHub, AWS (Amplify/Cognito/SES), Docker, SQLite, MySQL, VS Code, Vim}
+  \skill{Concepts}{RESTful APIs, OOP, Design Patterns, Data Structures, WebRTC, Network Protocols, Agile}
+  \skill{Languages}{English (Professional) $\cdot$ Japanese (Business, JLPT N2) $\cdot$ Tamil (Native)}
+\end{tabular}
+
+\accentrule
+
+%=== ACTIVITIES ===
+\section{Activities}
+
+\begin{tabularx}{\linewidth}{@{}Xr@{}}
+  \textbf{\color{darkcharcoal}IEEE Student Member} --- Tokai University Student Branch & \textcolor{midgray}{\small 2024 -- Present}\\
+  \textbf{\color{darkcharcoal}Open Source Contributor} --- \href{https://github.com/MohamedFuad16}{\color{teal}github.com/MohamedFuad16} & \textcolor{midgray}{\small 2024 -- Present}\\
+\end{tabularx}
+
+\end{document}
