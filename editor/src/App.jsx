@@ -423,7 +423,7 @@ function normalizeResume(data) {
 export default function App() {
    const [resume,    setResume]    = useState(null);
   const [template,  setTemplate]  = useState('en_01');
-  const [lang,      setLang]      = useState('en');
+  const [lang,      setLang]      = useState(() => localStorage.getItem('resume-studio-language') || 'en');
   const [autoCompile, setAutoCompile] = useState(true);
   const [pdfSrc,    setPdfSrc]    = useState(null);
   const [compiling, setCompiling] = useState(false);
@@ -453,6 +453,11 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem('resume-studio-language', lang);
+    document.documentElement.lang = lang;
+  }, [lang]);
 
   // AI Application Assistant states
   const [sidebarTab, setSidebarTab] = useState('editor'); // editor | chat
@@ -954,7 +959,7 @@ export default function App() {
     <div className="shell">
       {isOffline && (
         <div data-testid="offline-banner" className="offline-banner" style={{ background: 'var(--err)', color: 'white', padding: '8px', textAlign: 'center', fontSize: '12px', fontWeight: 'bold', zIndex: 1000 }}>
-          You are currently offline. Changes will be saved once you reconnect.
+          {isJa ? '現在オフラインです。再接続後に変更を保存します。' : 'You are currently offline. Changes will be saved once you reconnect.'}
         </div>
       )}
 
@@ -969,7 +974,7 @@ export default function App() {
           <span className="tb-home"><I n="user" s={12} /> {isJa ? '履歴書スタジオ' : 'Resume Studio'}</span>
         </div>
 
-        <nav className="top-nav" aria-label="Primary">
+        <nav className="top-nav" aria-label={isJa ? 'メインナビゲーション' : 'Primary navigation'}>
           <button
             type="button"
             className={`top-nav-btn ${appView === 'dashboard' ? 'active' : ''}`}

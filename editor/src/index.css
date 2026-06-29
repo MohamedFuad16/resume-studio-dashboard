@@ -5837,9 +5837,9 @@ body,
 .intern-results { min-width: 0; overflow-x: auto; }
 .intern-table-head,
 .intern-row {
-  min-width: 1360px;
-  grid-template-columns: 42px minmax(315px, 2fr) 78px minmax(170px, 1fr) minmax(215px, 1.18fr) minmax(190px, 1.05fr) minmax(132px, .78fr) 132px 84px 36px;
-  column-gap: 18px;
+  min-width: 1180px;
+  grid-template-columns: 34px minmax(240px, 1.7fr) 64px minmax(132px, .9fr) minmax(148px, 1fr) minmax(126px, .9fr) 108px 104px 62px 32px;
+  column-gap: 12px;
   cursor: pointer;
 }
 
@@ -5901,8 +5901,8 @@ body,
 .internship-radar.ja .intern-language,
 .internship-radar.ja .intern-duration,
 .internship-radar.ja .intern-deadline {
-  font-size: 10.7px;
-  line-height: 1.38;
+  font-size: 11px;
+  line-height: 1.44;
   letter-spacing: -0.01em;
 }
 

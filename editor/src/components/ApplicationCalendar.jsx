@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { statusLabel } from '../hooks/useApplicationTracker.js';
 import { CompanyLogo } from './CompanyLogo.jsx';
+import { displayCompany, displayRole, formatDisplayDeadline } from '../utils/internshipDisplay.js';
 
 const pad = value => String(value).padStart(2, '0');
 const toDateKey = date => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
@@ -199,7 +200,7 @@ export function ApplicationCalendar({ records, addMilestone, removeMilestone, is
         <form className="calendar-form" onSubmit={submitEvent}>
           <div className="calendar-form-title"><strong>{t.addTitle}</strong><button type="button" onClick={() => setShowForm(false)} aria-label={t.cancel}><X size={16} /></button></div>
           {records.length ? <>
-            <label><span>{t.role}</span><select value={draft.recordId} onChange={event => setDraft(current => ({ ...current, recordId: event.target.value }))}>{records.map(record => <option key={record.internshipId} value={record.internshipId}>{record.company} — {record.role}</option>)}</select></label>
+            <label><span>{t.role}</span><select value={draft.recordId} onChange={event => setDraft(current => ({ ...current, recordId: event.target.value }))}>{records.map(record => <option key={record.internshipId} value={record.internshipId}>{displayCompany(record, isJa)} — {displayRole(record.role, isJa)}</option>)}</select></label>
             <label><span>{t.event}</span><select value={draft.kind} onChange={event => setDraft(current => ({ ...current, kind: event.target.value }))}><option value="interview">{t.interview}</option><option value="application-submitted">{t.submitted}</option><option value="follow-up">{t.followUp}</option><option value="other">{t.other}</option></select></label>
             <label><span>{t.date}</span><input type="date" required value={draft.date} onChange={event => setDraft(current => ({ ...current, date: event.target.value }))} /></label>
             <label><span>{t.time}</span><input type="time" value={draft.time} onChange={event => setDraft(current => ({ ...current, time: event.target.value }))} /></label>
@@ -230,12 +231,14 @@ export function ApplicationCalendar({ records, addMilestone, removeMilestone, is
                 <div className="calendar-day-events">
                   {dayEvents.slice(0, limit).map(event => {
                     const item = { id: event.internshipId, company: event.company, role: event.role, url: event.applyUrl, companyDomain: event.companyDomain, logoUrl: event.logoUrl };
-                    const label = `${event.company} — ${event.title || eventLabel(event.kind, t)}`;
+                    const companyLabel = displayCompany(item, isJa);
+                    const roleLabel = displayRole(event.role, isJa);
+                    const label = `${companyLabel} — ${event.title || eventLabel(event.kind, t)}`;
                     return (
                       <button type="button" className={`calendar-event kind-${event.kind}`} key={event.id} onClick={() => setSelected(event)} aria-label={label} title={label}>
                         <CompanyLogo item={item} size="sm" />
-                        <span className="calendar-event-company">{event.company}</span>
-                        <span className="calendar-event-tooltip"><b>{event.company}</b><span>{event.role}</span><em>{event.time ? `${event.time} · ` : ''}{event.title || eventLabel(event.kind, t)}</em><small>{t.currentStatus}: {statusLabel(event.status, isJa)}</small></span>
+                        <span className="calendar-event-company">{companyLabel}</span>
+                        <span className="calendar-event-tooltip"><b>{companyLabel}</b><span>{roleLabel}</span><em>{event.time ? `${event.time} · ` : ''}{event.title || eventLabel(event.kind, t)}</em><small>{t.currentStatus}: {statusLabel(event.status, isJa)}</small></span>
                       </button>
                     );
                   })}
@@ -252,7 +255,7 @@ export function ApplicationCalendar({ records, addMilestone, removeMilestone, is
       {selected ? (
         <div className="calendar-selected" role="status">
           <CompanyLogo item={{ id: selected.internshipId, company: selected.company, role: selected.role, url: selected.applyUrl, companyDomain: selected.companyDomain, logoUrl: selected.logoUrl }} size="lg" />
-          <div><strong>{selected.company}</strong><span>{selected.role}</span><small><CalendarDays size={13} />{selected.date}{selected.time ? ` · ${selected.time}` : ''}<Clock3 size={13} />{selected.title || eventLabel(selected.kind, t)} · {statusLabel(selected.status, isJa)}</small></div>
+          <div><strong>{displayCompany(selected, isJa)}</strong><span>{displayRole(selected.role, isJa)}</span><small><CalendarDays size={13} />{formatDisplayDeadline(selected.date, isJa)}{selected.time ? ` · ${selected.time}` : ''}<Clock3 size={13} />{selected.title || eventLabel(selected.kind, t)} · {statusLabel(selected.status, isJa)}</small></div>
           <div className="calendar-selected-actions">
             {selected.applyUrl ? <a href={selected.applyUrl} target="_blank" rel="noreferrer">{t.open}<ExternalLink size={13} /></a> : null}
             {selected.removable ? <button type="button" onClick={() => { removeMilestone(selected.internshipId, selected.id); setSelected(null); }}><Trash2 size={13} />{t.remove}</button> : null}

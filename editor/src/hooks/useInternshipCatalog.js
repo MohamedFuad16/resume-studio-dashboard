@@ -8,11 +8,9 @@ let catalogRequest = null;
 
 function normalizeCatalog(items) {
   const seenIds = new Set();
-  const seenUrls = new Set();
   return (Array.isArray(items) ? items : []).filter(item => {
-    if (!item?.id || seenIds.has(item.id) || (item.url && seenUrls.has(item.url))) return false;
+    if (!item?.id || seenIds.has(item.id)) return false;
     seenIds.add(item.id);
-    if (item.url) seenUrls.add(item.url);
     return true;
   });
 }

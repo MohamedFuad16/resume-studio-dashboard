@@ -16,7 +16,7 @@ import { APPLICATION_STATUSES, statusLabel, useApplicationTracker } from '../hoo
 import { useInternshipCatalog } from '../hooks/useInternshipCatalog.js';
 import { ApplicationCalendar } from './ApplicationCalendar.jsx';
 import { CompanyLogo } from './CompanyLogo.jsx';
-import { displayCompany } from '../utils/internshipDisplay.js';
+import { displayCompany, displayRole, displayValue, formatDisplayDeadline } from '../utils/internshipDisplay.js';
 import { prepareProfilePhoto } from '../utils/imageUpload.js';
 
 const STATUS_ICONS = {
@@ -27,16 +27,14 @@ const STATUS_ICONS = {
 };
 
 const dashboardValue = (value, isJa) => {
-  if (!isJa || !value) return value;
-  return String(value)
-    .replace(/^Not stated$/i, '記載なし')
-    .replace(/remote within Japan/gi, '日本国内リモート')
-    .replace(/\bShibuya\b/gi, '渋谷')
-    .replace(/\bRoppongi\b/gi, '六本木')
-    .replace(/\bMinato\b/gi, '港区')
-    .replace(/\bTokyo\b/gi, '東京')
-    .replace(/\bJapan\b/gi, '日本')
-    .replace(/\bOn-site\b/gi, '出社');
+  return displayValue(value, isJa);
+};
+
+const graduationValue = (value, isJa) => {
+  if (!isJa) return value;
+  const months = { Jan: '1月', Feb: '2月', Mar: '3月', Apr: '4月', May: '5月', Jun: '6月', Jul: '7月', Aug: '8月', Sep: '9月', Oct: '10月', Nov: '11月', Dec: '12月' };
+  const match = String(value || '').match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})(?:\s+\(Expected\))?$/i);
+  return match ? `${match[2]}年${months[match[1].slice(0, 1).toUpperCase() + match[1].slice(1, 3).toLowerCase()]}（予定）` : displayValue(value, true).replace(/\s*\(Expected\)$/i, '（予定）');
 };
 
 const copy = {
@@ -215,7 +213,7 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
           <div>
             <h1>{name}</h1>
             {profileLocation ? <p><MapPin size={15} /> {dashboardValue(profileLocation, isJa)}</p> : null}
-            {institution || graduation ? <p><GraduationCap size={15} /> {[institution, graduation ? t.graduation(graduation) : ''].filter(Boolean).join(' · ')}</p> : null}
+            {institution || graduation ? <p><GraduationCap size={15} /> {[institution, graduation ? t.graduation(graduationValue(graduation, isJa)) : ''].filter(Boolean).join(' · ')}</p> : null}
           </div>
         </div>
 
@@ -230,7 +228,7 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
         </div>
       </section>
 
-      <section className="pipeline-strip" aria-label="Application pipeline">
+      <section className="pipeline-strip" aria-label={t.pipeline}>
         <div className="pipeline-title"><BriefcaseBusiness size={19} /><span><b>{t.pipeline}</b><small>{t.rolesTracked(records.length)}</small></span></div>
         {APPLICATION_STATUSES.map(item => {
           const Icon = STATUS_ICONS[item.value];
@@ -247,10 +245,10 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
               const item = catalog.find(entry => entry.id === record.internshipId) || record;
               return (
                 <article className="application-row" key={record.internshipId}>
-                  <span className="application-company"><CompanyLogo item={item} /><span><b>{displayCompany(item, isJa)}</b><small>{record.role}</small></span></span>
+                  <span className="application-company"><CompanyLogo item={item} /><span><b>{displayCompany(item, isJa)}</b><small>{displayRole(item.role || record.role, isJa)}</small></span></span>
                   <span><MapPin size={13} />{dashboardValue(record.location, isJa)}</span>
-                  <span className="application-deadline">{dashboardValue(record.deadline, isJa)}</span>
-                  <select value={record.status} onChange={event => updateStatus(item, event.target.value)} aria-label={`Status for ${record.company}`}>
+                  <span className="application-deadline">{formatDisplayDeadline(record.deadline, isJa)}</span>
+                  <select value={record.status} onChange={event => updateStatus(item, event.target.value)} aria-label={isJa ? `${record.company}の応募状況` : `Status for ${record.company}`}>
                     {APPLICATION_STATUSES.map(status => <option value={status.value} key={status.value}>{statusLabel(status.value, isJa)}</option>)}
                   </select>
                   <a href={record.applyUrl} target="_blank" rel="noreferrer">{t.continue} <ArrowRight size={14} /></a>
@@ -286,7 +284,7 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
             {tokyoMatches.map(item => (
               <button type="button" key={item.id} onClick={onOpenRadar}>
                 <CompanyLogo item={item} />
-                <span><b>{displayCompany(item, isJa)}</b><small>{item.role}</small><em><MapPin size={11} />{dashboardValue(item.location, isJa)}</em></span>
+                <span><b>{displayCompany(item, isJa)}</b><small>{displayRole(item.role, isJa)}</small><em><MapPin size={11} />{dashboardValue(item.location, isJa)}</em></span>
                 <strong>{item.score}%</strong>
               </button>
             ))}

@@ -18,6 +18,7 @@ import {
   internships as seedInternships,
 } from './seeds/internships.js';
 import { enrichSeedInternships } from './seeds/internship-enrichment.js';
+import { japanWideResearchInternships } from './seeds/japan-wide-research-2026-06-29.js';
 import {
   sendRequestError,
   validateApplication,
@@ -47,25 +48,36 @@ const profileKey = id => `profile:${sanitizeProfileId(id)}`;
 const trackerKey = id => `tracker:${sanitizeProfileId(id)}`;
 const applicationsKey = id => `applications:${sanitizeProfileId(id)}`;
 const INTERNSHIP_CATALOG_KEY = 'internships:catalog';
+const seedInternshipCatalog = [...seedInternships, ...japanWideResearchInternships];
 
 function mergeInternships(...groups) {
   const byId = new Map();
-  const seenUrls = new Set();
   for (const item of groups.flat()) {
-    if (!item?.id || byId.has(item.id) || (item.url && seenUrls.has(item.url))) continue;
+    if (!item?.id || byId.has(item.id)) continue;
     byId.set(item.id, item);
-    if (item.url) seenUrls.add(item.url);
   }
   return [...byId.values()];
 }
 
 async function readInternshipCatalog() {
   const stored = await store.getJson(INTERNSHIP_CATALOG_KEY, null);
-  if (Array.isArray(stored) && stored.length) return stored;
+  const seedCatalog = enrichSeedInternships(seedInternshipCatalog).map(validateInternship);
+  if (Array.isArray(stored) && stored.length) {
+    const seedIds = new Set(seedCatalog.map(item => item.id));
+    const liveResearch = stored.filter(item => item?.prestigeTier === 'Live company research').map(validateInternship);
+    const nonSeedStored = stored
+      .filter(item => item?.prestigeTier !== 'Live company research' && !seedIds.has(item?.id))
+      .map(validateInternship);
+    const catalog = mergeInternships(liveResearch, seedCatalog, nonSeedStored);
+    if (catalog.length !== stored.length || JSON.stringify(catalog) !== JSON.stringify(stored)) {
+      await store.setJson(INTERNSHIP_CATALOG_KEY, catalog);
+    }
+    return catalog;
+  }
   const legacyCustom = await store.getJson('customInternships', []);
   const catalog = mergeInternships(
     Array.isArray(legacyCustom) ? legacyCustom.map(validateInternship) : [],
-    enrichSeedInternships(seedInternships).map(validateInternship),
+    seedCatalog,
   );
   await store.setJson(INTERNSHIP_CATALOG_KEY, catalog);
   return catalog;

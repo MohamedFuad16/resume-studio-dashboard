@@ -1,6 +1,6 @@
 export const INTERNSHIP_RESEARCH_DATE = '27 Jun 2026';
 
-export const INTERNSHIP_RESEARCH_NOTE = 'Dataset generated from official company/program/ATS pages verified on 27 Jun 2026; no unverified filler was added to reach 200.';
+export const INTERNSHIP_RESEARCH_NOTE = 'Dataset generated from official company/program/ATS pages verified on 27 Jun 2026 and expanded with Japan-first official ATS research on 29 Jun 2026; no unverified filler was added to reach 200.';
 
 export const internships = [
   {
@@ -793,6 +793,42 @@ export const internships = [
     "logoUrl": "https://www.nvidia.com/content/nvidiaGDC/us/en_US/about-nvidia/legal-info/logo-brand-usage/_jcr_content/root/responsivegrid/nv_container_392921705/nv_container_412055486/nv_image.coreimg.svg/1776076920317/nvidia-logo-horz.svg",
     "verifiedDate": "2026-06-27",
     "prestigeTier": "Global elite tech",
+    "deadlineType": "Not stated"
+  },
+  {
+    "id": "tenstorrent-meti-risc-v-internship-2026",
+    "company": "Tenstorrent",
+    "role": "METI Internship Program - RISC V Course",
+    "location": "Tokyo, Japan",
+    "region": "Japan",
+    "country": "Japan",
+    "city": "Tokyo",
+    "workMode": "On-site / not explicitly stated",
+    "language": "Advanced communication skills in both Japanese and English",
+    "languageType": "Bilingual",
+    "duration": "Not stated",
+    "deadline": "Not stated",
+    "deadlineDate": null,
+    "compensation": "Not stated",
+    "track": "Systems / AI Hardware",
+    "score": 72,
+    "priority": true,
+    "workAuth": "EE/CS or related academic background; Linux and Python programming; advanced Japanese and English communication; export-control eligibility required",
+    "reasons": [
+      "CS/ICT academic background",
+      "Python and Linux fundamentals",
+      "Systems and AI hardware exposure",
+      "Japan-based bilingual technical role"
+    ],
+    "fitNote": "Japan-based METI internship posting for Tenstorrent's RISC-V / AI accelerator work, with Python/Linux and bilingual communication requirements.",
+    "url": "https://job-boards.greenhouse.io/tenstorrentunlisted/jobs/4998825007",
+    "source": "Official Greenhouse/ATS posting",
+    "sourceUrl": "https://job-boards.greenhouse.io/tenstorrentunlisted/jobs/4998825007",
+    "companyUrl": "https://tenstorrent.com/",
+    "companyDomain": "tenstorrent.com",
+    "logoUrl": "https://www.google.com/s2/favicons?domain_url=https://tenstorrent.com&sz=128",
+    "verifiedDate": "2026-06-29",
+    "prestigeTier": "Reputed AI hardware company",
     "deadlineType": "Not stated"
   },
   {

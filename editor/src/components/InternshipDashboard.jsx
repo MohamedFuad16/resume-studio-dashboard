@@ -23,7 +23,7 @@ import { internshipApi } from '../api/client.js';
 import { APPLICATION_STATUSES, statusLabel, useApplicationTracker } from '../hooks/useApplicationTracker.js';
 import { notifyCatalogChange, useInternshipCatalog } from '../hooks/useInternshipCatalog.js';
 import { CompanyLogo } from './CompanyLogo.jsx';
-import { displayCompany, internshipDetails } from '../utils/internshipDisplay.js';
+import { displayCompany, displayRole, displayValue, internshipDetails } from '../utils/internshipDisplay.js';
 
 const DESKTOP_PAGE_SIZE = 14;
 const MOBILE_PAGE_SIZE = 6;
@@ -75,7 +75,7 @@ const copy = {
     process: 'Application procedure',
     source: 'Research source',
     compensation: 'Compensation',
-    verifiedSmall: date => `Link verified ${date || INTERNSHIP_RESEARCH_DATE}. Openings can close without notice.`,
+    verifiedSmall: date => `Link verified ${date || TODAY}. Openings can close without notice.`,
     noMatches: 'No internships match these filters',
     noMatchesSub: 'Clear a filter or search another technology.',
     reset: 'Reset filters',
@@ -90,6 +90,11 @@ const copy = {
     liveNoCoding: 'Coding test not published',
     showing: (start, end, total) => `Showing ${start}-${end} of ${total}`,
     page: (page, count) => `Page ${page} of ${count}`,
+    summaryLabel: 'Internship research summary',
+    detailLabel: company => `${company} internship details`,
+    saveLabel: (company, saved) => `${saved ? 'Remove' : 'Save'} ${company} internship`,
+    previousPage: 'Previous page',
+    nextPage: 'Next page',
     disclaimer: 'Research is a point-in-time shortlist, not an offer of eligibility. Re-check dates, student status, and visa/work-authorization terms on the employer page before applying.',
     track: 'Track',
     notTracked: 'Not tracked',
@@ -140,7 +145,7 @@ const copy = {
     process: '応募フロー',
     source: '情報源',
     compensation: '待遇',
-    verifiedSmall: date => `リンク確認日: ${date || INTERNSHIP_RESEARCH_DATE}。募集は予告なく終了する場合があります。`,
+    verifiedSmall: date => `リンク確認日: ${date || TODAY}。募集は予告なく終了する場合があります。`,
     noMatches: '条件に合う募集がありません',
     noMatchesSub: '条件を減らすか、別のキーワードで検索してください。',
     reset: '条件をリセット',
@@ -155,6 +160,11 @@ const copy = {
     liveNoCoding: 'コーディングテスト未掲載',
     showing: (start, end, total) => `${total}件中 ${start}-${end}件を表示`,
     page: (page, count) => `${page}/${count}ページ`,
+    summaryLabel: 'インターン調査サマリー',
+    detailLabel: company => `${company}のインターン詳細`,
+    saveLabel: (company, saved) => saved ? `${company}を保存済みから削除` : `${company}を保存`,
+    previousPage: '前のページ',
+    nextPage: '次のページ',
     disclaimer: 'このリストは調査時点の候補です。応募前に企業ページで締切、学生条件、ビザ・就労条件を必ず確認してください。',
     track: '管理',
     notTracked: '未管理',
@@ -179,8 +189,9 @@ const matchLabel = score => {
 const locationPriority = item => {
   if (/Tokyo|東京/i.test(item.location)) return 0;
   if (item.region === 'Japan' || item.country === 'Japan') return 1;
-  if (item.region === 'APAC') return 2;
-  return 3;
+  if (isRemoteRole(item)) return 2;
+  if (item.region === 'APAC') return 3;
+  return 4;
 };
 
 const JA_TRACK_LABELS = {
@@ -204,6 +215,7 @@ const JA_TRACK_LABELS = {
   'Machine Learning / Platform': '機械学習 / プラットフォーム',
   'Security Engineering': 'セキュリティエンジニアリング',
   'Systems / Graphics': 'システム / グラフィックス',
+  'Systems / AI Hardware': 'システム / AIハードウェア',
   'Python / Mission Operations': 'Python / ミッション運用',
   'Python / Test Infrastructure': 'Python / テスト基盤',
   'Enterprise Architecture / Cloud': 'エンタープライズアーキテクチャ / クラウド',
@@ -217,117 +229,14 @@ const JA_TRACK_LABELS = {
   'Product / Technical Operations': 'プロダクト / 技術運用',
   'Data': 'データ',
   'Sales / Business': 'セールス / ビジネス',
+  'Sales': 'セールス',
+  'Mobile Engineering': 'モバイルエンジニアリング',
+  'Product Engineering': 'プロダクトエンジニアリング',
 };
 
-const jaDisplay = value => {
-  if (!value) return value;
-  return String(value)
-    .replace(/Not stated;\s*/gi, '記載なし・')
-    .replace(/Listed under Students: Internships\. Detailed eligibility 記載なし・\.?/gi, 'Students: Internshipsに掲載。詳細な応募条件は記載なし。')
-    .replace(/;\s*$/g, '')
-    .replace(/(\d+)\s+weekly hours listed/gi, '週$1時間と記載')
-    .replace(/(\d+)\s+hours listed/gi, '$1時間と記載')
-    .replace(/Listed under Students: Internships\. Detailed eligibility not stated\.?/gi, 'Students: Internshipsに掲載。詳細な応募条件は記載なし。')
-    .replace(/Re-check eligibility on the official page/gi, '公式ページで応募条件を再確認')
-    .replace(/Apply online/gi, 'オンライン応募')
-    .replace(/Document screening/gi, '書類選考')
-    .replace(/Technical \/ team interview/gi, '技術・チーム面接')
-    .replace(/Result notification/gi, '結果連絡')
-    .replace(/Cloud \/ product engineering/gi, 'クラウド・プロダクト開発')
-    .replace(/Japan-based official opening/gi, '日本勤務地の公式募集')
-    .replace(/No coding test stated on the official page/gi, '公式ページにコーディングテストの記載なし')
-    .replace(/^Not stated$/i, '記載なし')
-    .replace(/^Official company\/program page$/i, '企業・プログラム公式ページ')
-    .replace(/^Official company careers page$/i, '企業公式採用ページ')
-    .replace(/^Official careers page$/i, '公式採用ページ')
-    .replace(/^English \(fluent\); Japanese not required$/i, '英語（流暢）必須・日本語不問')
-    .replace(/^English business level; Japanese not required$/i, '英語ビジネスレベル必須・日本語不問')
-    .replace(/^English business; Japanese conversational$/i, '英語ビジネスレベル・日本語会話レベル')
-    .replace(/^English business level; Japanese not required for Rakuten Pay System track$/i, '英語ビジネスレベル必須・Rakuten Pay System職種は日本語不問')
-    .replace(/^English and Japanese business level$/i, '英語・日本語ビジネスレベル')
-    .replace(/^English or Japanese CEFR B2$/i, '英語または日本語CEFR B2以上')
-    .replace(/^Strong English required$/i, '高い英語力必須')
-    .replace(/^English or Japanese CEFR B2; some teams require Japanese B2$/i, '英語または日本語CEFR B2以上（一部チームは日本語B2必須）')
-    .replace(/^English CEFR B2 or higher; Japanese CEFR B2 or higher for some teams$/i, '英語CEFR B2以上・一部チームは日本語CEFR B2以上')
-    .replace(/^Marketplace: Japanese and English CEFR B1; Fintech requires Japanese C1$/i, 'マーケットプレイス: 日本語・英語CEFR B1・Fintechは日本語C1必須')
-    .replace(/^Japanese and English used; exact level not stated$/i, '日本語・英語使用・レベル記載なし')
-    .replace(/^English technical communication required$/i, '技術コミュニケーション英語必須')
-    .replace(/^English-first; Japanese helpful$/i, '英語中心・日本語があると尚可')
-    .replace(/^English required; Japanese helpful$/i, '英語必須・日本語があると尚可')
-    .replace(/^Bilingual$/i, 'バイリンガル')
-    .replace(/^English-first$/i, '英語中心')
-    .replace(/^Remote$/i, 'リモート')
-    .replace(/^Hybrid$/i, 'ハイブリッド')
-    .replace(/remote within Japan/gi, '日本国内リモート')
-    .replace(/Rakuten Crimson House/gi, '楽天クリムゾンハウス')
-    .replace(/\bNihonbashi\b/gi, '日本橋')
-    .replace(/\bShibuya\b/gi, '渋谷')
-    .replace(/\bRoppongi\b/gi, '六本木')
-    .replace(/\bMinato-ku\b/gi, '港区')
-    .replace(/\bTokyo\b/gi, '東京')
-    .replace(/\bJapan\b/gi, '日本')
-    .replace(/\bOn-site\b/gi, '出社')
-    .replace(/^5 weeks$/i, '5週間')
-    .replace(/^4-6 weeks$/i, '4〜6週間')
-    .replace(/^2-3 months encouraged; 20\+ hours\/week$/i, '2〜3か月推奨・週20時間以上')
-    .replace(/^6 months required; 1 year preferred, starting August 2026$/i, '6か月必須・1年推奨、2026年8月開始')
-    .replace(/^6 months required; 1 year preferred, starting Fall\/Winter 2026$/i, '6か月必須・1年推奨、2026年秋冬開始')
-    .replace(/^6 months to 1 year$/i, '6か月〜1年')
-    .replace(/^1-4 months \(20\+ business days\), July-October 2026$/i, '1〜4か月（20営業日以上）、2026年7〜10月')
-    .replace(/^Unpaid; monthly subsidy, airfare and other support provided$/i, '無給・月額補助、航空券などの支援あり')
-    .replace(/^Paid$/i, '有給')
-    .replace(/^Paid; amount based on skills and experience$/i, '有給・スキルと経験により決定')
-    .replace(/^Generally JPY ([\d,]+)\/hour$/i, '通常 時給$1円')
-    .replace(/^JPY ([\d,]+)\/hour$/i, '時給$1円')
-    .replace(/^Competitive pay$/i, '高水準の報酬')
-    .replace(/^Official Workable posting$/i, 'Workable公式掲載')
-    .replace(/^Official Workday posting$/i, 'Workday公式掲載')
-    .replace(/^Official Lever\/ATS posting$/i, 'Lever/ATS公式掲載')
-    .replace(/^Official Greenhouse\/ATS posting$/i, 'Greenhouse/ATS公式掲載')
-    .replace(/^Official Ashby\/ATS posting$/i, 'Ashby/ATS公式掲載')
-    .replace(/US Salary Range/gi, '米国給与範囲')
-    .replace(/salary range/gi, '給与範囲')
-    .replace(/Compensation & Flexibility/gi, '報酬・柔軟性')
-    .replace(/Compensation range/gi, '報酬範囲')
-    .replace(/Additional Information Compensation/gi, '追加情報・報酬')
-    .replace(/Hourly Rate/gi, '時給')
-    .replace(/hourly rate/gi, '時給')
-    .replace(/weekly pay range/gi, '週給範囲')
-    .replace(/fully remote \(within the U\.S\.\)/gi, '米国内フルリモート')
-    .replace(/^Frontend application training in TypeScript and React or Vue, followed by a DevOps project\.$/i, 'TypeScriptとReactまたはVueによるフロントエンド研修の後、DevOpsプロジェクトに取り組みます。')
-    .replace(/^Exact React 19 and TypeScript fit$/i, 'React・TypeScript経験と高い親和性')
-    .replace(/^Strong mobile-first UI portfolio$/i, 'モバイルファーストUIの実装実績を示せる')
-    .replace(/^AWS and full-stack breadth$/i, 'AWSとフルスタック開発の幅を活かせる')
-    .replace(/^English-first Tokyo program$/i, '東京開催の英語中心プログラム')
-    .replace(/^Third-year undergraduate or higher; React or Vue with TypeScript; Unix-like environment knowledge; At least three listed cloud\/full-stack\/testing\/UI skills$/i, '学部3年生以上、ReactまたはVueとTypeScript、Unix系環境の知識、クラウド・フルスタック・テスト・UI系スキルのうち3つ以上が目安');
-};
-
-const displayValue = (value, isJa) => isJa ? jaDisplay(value) : value;
-const displayRole = (role, isJa) => {
-  if (!isJa) return role;
-  return jaDisplay(role)
-    .replace(/Applications Engineer/gi, 'アプリケーションエンジニア')
-    .replace(/AI & Data Division/gi, 'AI・データ部門')
-    .replace(/Cloud Management/gi, 'クラウド管理')
-    .replace(/Class of 2028 Software Engineer Internship/gi, '2028年卒 ソフトウェアエンジニアインターン')
-    .replace(/Class of 2028 Security Engineer Internship/gi, '2028年卒 セキュリティエンジニアインターン')
-    .replace(/Class of 2028 UI\/UX Designer Internship/gi, '2028年卒 UI/UXデザイナーインターン')
-    .replace(/Ground Systems \/ Testing Infrastructure Intern/gi, '地上システム・テスト基盤インターン')
-    .replace(/Mission Operations Intern \(Full Time\)/gi, 'ミッション運用インターン（フルタイム）')
-    .replace(/Graphics Engineer Intern, Tegra System Software/gi, 'グラフィックスエンジニアインターン、Tegraシステムソフトウェア')
-    .replace(/Business Internship/gi, 'ビジネスインターン')
-    .replace(/AI Manga Translation/gi, 'AIマンガ翻訳')
-    .replace(/Front-End Pathway/gi, 'フロントエンドコース')
-    .replace(/Front End Pathway/gi, 'フロントエンドコース')
-    .replace(/Frontend Pathway/gi, 'フロントエンドコース')
-    .replace(/Full-Stack Pathway/gi, 'フルスタックコース')
-    .replace(/Full Stack Pathway/gi, 'フルスタックコース')
-    .replace(/Global Internship Program/gi, 'グローバルインターンシッププログラム')
-    .replace(/Summer 2026/gi, '2026年夏');
-};
 const trackLabel = (value, isJa) => isJa ? (JA_TRACK_LABELS[value] || value) : value;
 const formatVerifiedDate = (date, isJa) => {
-  if (!date) return INTERNSHIP_RESEARCH_DATE;
+  if (!date) return TODAY;
   if (isJa) return date;
   const parsed = new Date(`${date}T12:00:00`);
   if (Number.isNaN(parsed.getTime())) return date;
@@ -439,8 +348,6 @@ const isJapanBased = item => item.region === 'Japan'
   || item.country === 'Japan'
   || /\b(?:Japan|Tokyo|Osaka|Kyoto|Yokohama|Fukuoka|Nagoya|日本|東京|大阪|京都)\b/i.test(`${item.location || ''} ${item.city || ''}`);
 const isRemoteRole = item => /remote|リモート/i.test(`${item.location || ''} ${item.workMode || ''}`);
-const isJapanOrRemote = item => isJapanBased(item) || isRemoteRole(item);
-
 const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEditor, isJa = false }) => {
   const t = copy[isJa ? 'ja' : 'en'];
   const details = internshipDetails(item);
@@ -452,7 +359,7 @@ const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEditor, i
   const durationParts = splitDuration(item.duration, isJa);
   const locationParts = splitLocation(item.location, isJa);
   return (
-  <aside className="intern-detail drawer" role="dialog" aria-modal="true" aria-label={`${companyName} internship details`}>
+  <aside className="intern-detail drawer" role="dialog" aria-modal="true" aria-label={t.detailLabel(companyName)}>
     <div className="intern-detail-head">
       <CompanyLogo item={item} size="lg" />
       <div className="intern-detail-title">
@@ -481,28 +388,28 @@ const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEditor, i
       <h3>{t.fitHeading}</h3>
       <p className="intern-fit-note">{fitNoteDisplay(item, isJa)}</p>
       <ul className="intern-reasons">
-        {(item.reasons || []).map(reason => <li key={reason}><span><Check size={13} /></span>{reasonDisplay(reason, isJa)}</li>)}
+        {(item.reasons || []).map((reason, index) => <li key={`${reason}-${index}`}><span><Check size={13} /></span>{reasonDisplay(reason, isJa)}</li>)}
       </ul>
     </section>
 
     <section className="intern-detail-section">
       <h3>{t.techStack}</h3>
       <div className="intern-chip-list">
-        {details.techStack.map(tech => <span key={tech}>{displayValue(tech, isJa)}</span>)}
+        {details.techStack.map((tech, index) => <span key={`${tech}-${index}`}>{displayValue(tech, isJa)}</span>)}
       </div>
     </section>
 
     <section className="intern-detail-section intern-eligibility">
       <h3>{t.eligibility}</h3>
       <ul className="intern-check-list">
-        {eligibility.map(entry => <li key={entry}><ShieldCheck size={15} />{displayValue(entry, isJa)}</li>)}
+        {eligibility.map((entry, index) => <li key={`${entry}-${index}`}><ShieldCheck size={15} />{displayValue(entry, isJa)}</li>)}
       </ul>
     </section>
 
     <section className="intern-detail-section">
       <h3>{t.process}</h3>
       <ol className="intern-process-list">
-        {process.map(step => <li key={step}>{displayValue(step, isJa)}</li>)}
+        {process.map((step, index) => <li key={`${step}-${index}`}>{displayValue(step, isJa)}</li>)}
       </ol>
     </section>
 
@@ -553,7 +460,7 @@ function CompanyResearchPanel({ company, t, isJa, job, results, error, onStart, 
                 <CompanyLogo item={result} />
                 <div>
                   <strong>{displayCompany(result, isJa)}</strong>
-                  <span>{result.role}</span>
+                  <span>{displayRole(result.role, isJa)}</span>
                   <small>{displayValue(result.location, isJa)} · {displayValue(result.duration, isJa)} · {codingTestLabel(result.codingTest, isJa, t.liveNoCoding)}</small>
                 </div>
                 <a href={result.url} target="_blank" rel="noreferrer">{isJa ? '確認' : 'View'} <ExternalLink size={13} /></a>
@@ -593,8 +500,8 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
   const [addingId, setAddingId] = useState('');
   const autoResearchStarted = useRef(new Set());
 
-  const eligibleCatalog = useMemo(() => catalog.filter(isJapanOrRemote), [catalog]);
-  const regions = ['All', 'Japan', 'Remote'];
+  const eligibleCatalog = catalog;
+  const regions = ['All', 'Japan', 'Remote', 'Global'];
   const tracks = useMemo(() => ['All', ...new Set(eligibleCatalog.map(item => item.track).filter(Boolean))], [eligibleCatalog]);
   const savedCount = records.filter(record => record.status === 'saved').length;
   const dynamicStats = useMemo(() => ({
@@ -625,7 +532,10 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
       const status = statusFor(item.id);
       const haystack = [item.company, item.role, item.location, item.track, item.language, item.codingTest, ...(item.reasons || [])].join(' ').toLowerCase();
       return (!needle || haystack.includes(needle))
-        && (region === 'All' || (region === 'Japan' ? isJapanBased(item) : isRemoteRole(item)))
+        && (region === 'All'
+          || (region === 'Japan' ? isJapanBased(item)
+            : region === 'Remote' ? isRemoteRole(item)
+            : !isJapanBased(item) && !isRemoteRole(item)))
         && (track === 'All' || item.track === track)
         && (language === 'All' || item.languageType === language)
         && (statusFilter === 'All' || status === statusFilter)
@@ -761,7 +671,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
         <button type="button" className="intern-editor-link" onClick={onOpenEditor}>{t.tune} <ArrowUpRight size={15} /></button>
       </section>
 
-      <section className="intern-summary" aria-label="Internship research summary">
+      <section className="intern-summary" aria-label={t.summaryLabel}>
         <div><MapPin size={20} /><strong>{dynamicStats.tokyo}</strong><span>{t.tokyo}</span></div>
         <div><Star size={20} /><strong>{dynamicStats.japan}</strong><span>{t.japan}</span></div>
         <div><Globe2 size={20} /><strong>{dynamicStats.englishFirst}</strong><span>{t.english}</span></div>
@@ -774,8 +684,8 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
           <label className="intern-search"><Search size={18} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder={t.search} aria-label={t.search} />{query ? <button type="button" onClick={() => setQuery('')} aria-label={t.clear}><X size={15} /></button> : null}</label>
           <div className="intern-filter-row">
             <span className="intern-filter-label"><Filter size={15} /> {t.filters}</span>
-            <select value={region} onChange={event => setRegion(event.target.value)} aria-label={t.allLocations}>{regions.map(option => <option key={option}>{option === 'All' ? t.allLocations : option === 'Japan' ? (isJa ? '日本' : 'Japan') : (isJa ? 'リモート' : 'Remote')}</option>)}</select>
-            <select value={track} onChange={event => setTrack(event.target.value)} aria-label={t.allTracks}>{tracks.map(option => <option key={option}>{option === 'All' ? t.allTracks : trackLabel(option, isJa)}</option>)}</select>
+            <select value={region} onChange={event => setRegion(event.target.value)} aria-label={t.allLocations}>{regions.map(option => <option key={option} value={option}>{option === 'All' ? t.allLocations : option === 'Japan' ? (isJa ? '日本' : 'Japan') : option === 'Remote' ? (isJa ? 'リモート' : 'Remote') : (isJa ? 'グローバル' : 'Global')}</option>)}</select>
+            <select value={track} onChange={event => setTrack(event.target.value)} aria-label={t.allTracks}>{tracks.map(option => <option key={option} value={option}>{option === 'All' ? t.allTracks : trackLabel(option, isJa)}</option>)}</select>
             <select value={language} onChange={event => setLanguage(event.target.value)} aria-label={t.allLanguages}><option value="All">{t.allLanguages}</option><option value="English-first">{t.english}</option><option value="Bilingual">{isJa ? 'バイリンガル' : 'Bilingual'}</option></select>
             <select value={deadlineFilter} onChange={event => setDeadlineFilter(event.target.value)} aria-label={t.allDeadlines}><option value="All">{t.allDeadlines}</option><option value="7 days">{t.next7}</option><option value="30 days">{t.next30}</option><option value="Not stated">{t.notStated}</option></select>
             <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} aria-label={t.allStatuses}><option value="All">{t.allStatuses}</option>{APPLICATION_STATUSES.map(option => <option key={option.value} value={option.value}>{statusLabel(option.value, isJa)}</option>)}</select>
@@ -834,13 +744,13 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
                     <span className={`intern-deadline ${deadlineClass(item)}`} data-label={t.deadline}>{formatDeadline(item.deadline, isJa)}</span>
                     <select className={`intern-row-status ${status || 'untracked'}`} value={status} onClick={event => event.stopPropagation()} onChange={event => updateStatus(item, event.target.value)} aria-label={`${t.status}: ${displayCompany(item, isJa)}`}><option value="">{t.track}</option>{APPLICATION_STATUSES.map(option => <option key={option.value} value={option.value}>{statusLabel(option.value, isJa)}</option>)}</select>
                     <a className="intern-apply" href={item.url} target="_blank" rel="noreferrer" onClick={event => { event.stopPropagation(); onApply(item); }}>{t.apply} <ExternalLink size={13} /></a>
-                    <button type="button" className={`intern-bookmark ${status === 'saved' ? 'active' : ''}`} onClick={event => { event.stopPropagation(); toggleSaved(item); }} aria-label={`${status === 'saved' ? 'Remove' : 'Save'} ${item.company} internship`}>{status === 'saved' ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}</button>
+                    <button type="button" className={`intern-bookmark ${status === 'saved' ? 'active' : ''}`} onClick={event => { event.stopPropagation(); toggleSaved(item); }} aria-label={t.saveLabel(displayCompany(item, isJa), status === 'saved')}>{status === 'saved' ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}</button>
                   </article>
                 </React.Fragment>;
               })}
             </div>
             {!pageItems.length ? <div className="intern-empty"><Search size={22} /><strong>{t.noMatches}</strong><span>{t.noMatchesSub}</span><button type="button" onClick={clearFilters}>{t.reset}</button></div> : null}
-            <footer className="intern-pagination"><span>{t.showing(start, end, filtered.length)}</span><div><button type="button" onClick={() => setPage(value => Math.max(1, value - 1))} disabled={page === 1} aria-label="Previous page"><ChevronLeft size={16} /></button><span>{t.page(page, pageCount)}</span><button type="button" onClick={() => setPage(value => Math.min(pageCount, value + 1))} disabled={page === pageCount} aria-label="Next page"><ChevronRight size={16} /></button></div></footer>
+            <footer className="intern-pagination"><span>{t.showing(start, end, filtered.length)}</span><div><button type="button" onClick={() => setPage(value => Math.max(1, value - 1))} disabled={page === 1} aria-label={t.previousPage}><ChevronLeft size={16} /></button><span>{t.page(page, pageCount)}</span><button type="button" onClick={() => setPage(value => Math.min(pageCount, value + 1))} disabled={page === pageCount} aria-label={t.nextPage}><ChevronRight size={16} /></button></div></footer>
           </div>
         </div>
         {selected ? (
