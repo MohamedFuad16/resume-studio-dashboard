@@ -1,0 +1,90 @@
+{
+  "_meta": {
+    "generated": "2026-06-29",
+    "tool": "madge (src: --extensions js,jsx; server: default) + manual merge",
+    "root": "editor/",
+    "note": "Deterministic file-based import graph (not vector/GraphRAG). Paths are relative to editor/src and editor/server respectively.",
+    "command": "npx madge editor/src --extensions js,jsx --json ; npx madge editor/server --json"
+  },
+  "client": {
+    "base": "editor/src",
+    "graph": {
+      "main.jsx": ["App.jsx"],
+      "App.jsx": [
+        "api/client.js",
+        "components/InternshipDashboard.jsx",
+        "components/ProfileDashboard.jsx",
+        "components/sections.jsx",
+        "components/ui.jsx",
+        "index.css",
+        "utils/helpers.js"
+      ],
+      "components/ProfileDashboard.jsx": [
+        "components/ApplicationCalendar.jsx",
+        "components/CompanyLogo.jsx",
+        "hooks/useApplicationTracker.js",
+        "hooks/useInternshipCatalog.js",
+        "utils/imageUpload.js",
+        "utils/internshipDisplay.js"
+      ],
+      "components/InternshipDashboard.jsx": [
+        "api/client.js",
+        "components/CompanyLogo.jsx",
+        "hooks/useApplicationTracker.js",
+        "hooks/useInternshipCatalog.js",
+        "utils/internshipDisplay.js"
+      ],
+      "components/ApplicationCalendar.jsx": [
+        "components/CompanyLogo.jsx",
+        "hooks/useApplicationTracker.js",
+        "utils/internshipDisplay.js"
+      ],
+      "components/sections.jsx": [
+        "components/ui.jsx",
+        "utils/imageUpload.js"
+      ],
+      "components/CompanyLogo.jsx": [],
+      "components/ui.jsx": [],
+      "hooks/useApplicationTracker.js": ["api/client.js"],
+      "hooks/useInternshipCatalog.js": ["api/client.js"],
+      "utils/internshipDisplay.js": [],
+      "utils/imageUpload.js": [],
+      "utils/helpers.js": [],
+      "api/client.js": [],
+      "index.css": []
+    }
+  },
+  "server": {
+    "base": "editor/server",
+    "graph": {
+      "index.js": [
+        "internship-research.js",
+        "resume-chat.js",
+        "seeds/internship-enrichment.js",
+        "seeds/internships.js",
+        "seeds/japan-wide-research-2026-06-29.js",
+        "storage.js",
+        "templates.js",
+        "validation.js"
+      ],
+      "test-ja-compilation.js": ["templates.js"],
+      "internship-research.js": [],
+      "resume-chat.js": [],
+      "seeds/internship-enrichment.js": [],
+      "seeds/internships.js": [],
+      "seeds/japan-wide-research-2026-06-29.js": [],
+      "storage.js": [],
+      "templates.js": [],
+      "validation.js": [],
+      "mcp-server.js": [],
+      "register-mcp.js": [],
+      "test-mcp.js": []
+    }
+  },
+  "boundary": {
+    "note": "Client reaches the server only over HTTP via editor/src/api/client.js -> /api/* (no static import edges).",
+    "edges": [
+      "editor/src/api/client.js --HTTP--> editor/server/index.js (/api/*)"
+    ]
+  }
+}

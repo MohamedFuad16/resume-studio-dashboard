@@ -1,0 +1,89 @@
+// Module dependency graph for editor/ (client + server)
+// Generated 2026-06-29 via madge + manual merge. Deterministic file-based imports.
+// Render: dot -Tsvg agent/graph/dependencies.dot -o agent/graph/dependencies.svg
+digraph editor_deps {
+  rankdir=LR;
+  node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=10];
+
+  subgraph cluster_client {
+    label = "editor/src (React client)";
+    color = "#2563eb"; fontcolor = "#2563eb"; style = rounded;
+    node [fillcolor="#e0ecff"];
+
+    "main.jsx";
+    "App.jsx";
+    "components/ProfileDashboard.jsx";
+    "components/InternshipDashboard.jsx";
+    "components/ApplicationCalendar.jsx";
+    "components/CompanyLogo.jsx";
+    "components/sections.jsx";
+    "components/ui.jsx";
+    "hooks/useApplicationTracker.js";
+    "hooks/useInternshipCatalog.js";
+    "utils/internshipDisplay.js";
+    "utils/imageUpload.js";
+    "utils/helpers.js";
+    "api/client.js";
+    "index.css";
+
+    "main.jsx" -> "App.jsx";
+    "App.jsx" -> "api/client.js";
+    "App.jsx" -> "components/InternshipDashboard.jsx";
+    "App.jsx" -> "components/ProfileDashboard.jsx";
+    "App.jsx" -> "components/sections.jsx";
+    "App.jsx" -> "components/ui.jsx";
+    "App.jsx" -> "utils/helpers.js";
+    "App.jsx" -> "index.css";
+
+    "components/ProfileDashboard.jsx" -> "components/ApplicationCalendar.jsx";
+    "components/ProfileDashboard.jsx" -> "components/CompanyLogo.jsx";
+    "components/ProfileDashboard.jsx" -> "hooks/useApplicationTracker.js";
+    "components/ProfileDashboard.jsx" -> "hooks/useInternshipCatalog.js";
+    "components/ProfileDashboard.jsx" -> "utils/imageUpload.js";
+    "components/ProfileDashboard.jsx" -> "utils/internshipDisplay.js";
+
+    "components/InternshipDashboard.jsx" -> "api/client.js";
+    "components/InternshipDashboard.jsx" -> "components/CompanyLogo.jsx";
+    "components/InternshipDashboard.jsx" -> "hooks/useApplicationTracker.js";
+    "components/InternshipDashboard.jsx" -> "hooks/useInternshipCatalog.js";
+    "components/InternshipDashboard.jsx" -> "utils/internshipDisplay.js";
+
+    "components/ApplicationCalendar.jsx" -> "components/CompanyLogo.jsx";
+    "components/ApplicationCalendar.jsx" -> "hooks/useApplicationTracker.js";
+    "components/ApplicationCalendar.jsx" -> "utils/internshipDisplay.js";
+
+    "components/sections.jsx" -> "components/ui.jsx";
+    "components/sections.jsx" -> "utils/imageUpload.js";
+
+    "hooks/useApplicationTracker.js" -> "api/client.js";
+    "hooks/useInternshipCatalog.js" -> "api/client.js";
+  }
+
+  subgraph cluster_server {
+    label = "editor/server (Express)";
+    color = "#16a34a"; fontcolor = "#16a34a"; style = rounded;
+    node [fillcolor="#dcfce7"];
+
+    "server/index.js";
+    "server/templates.js";
+    "server/storage.js";
+    "server/validation.js";
+    "server/resume-chat.js";
+    "server/internship-research.js";
+    "server/seeds/internships.js";
+    "server/seeds/japan-wide-research-2026-06-29.js";
+    "server/seeds/internship-enrichment.js";
+
+    "server/index.js" -> "server/templates.js";
+    "server/index.js" -> "server/storage.js";
+    "server/index.js" -> "server/validation.js";
+    "server/index.js" -> "server/resume-chat.js";
+    "server/index.js" -> "server/internship-research.js";
+    "server/index.js" -> "server/seeds/internships.js";
+    "server/index.js" -> "server/seeds/japan-wide-research-2026-06-29.js";
+    "server/index.js" -> "server/seeds/internship-enrichment.js";
+  }
+
+  // Client <-> server boundary (HTTP, not a static import)
+  "api/client.js" -> "server/index.js" [label="HTTP /api/*", style=dashed, color="#9333ea", fontcolor="#9333ea"];
+}

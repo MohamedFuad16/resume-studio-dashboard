@@ -1,0 +1,15 @@
+---
+description: Project knowledge base lives in agent/. Read it first.
+alwaysApply: true
+---
+
+This project uses a structured **agent knowledge base** in `agent/`.
+
+- ALWAYS read `agent/agent.md` first and follow its routing table to the file
+  relevant to the task (architecture, setup, api, components, data, conventions,
+  tests, errors, secrets).
+- Before changing a module, consult `agent/graph/` (graph.md + dependencies.json/.dot
+  + architecture.svg) for dependency/impact analysis.
+- After making changes, keep `agent/state.md` updated (current state + a dated entry)
+  and append an ADR to `agent/decisions.md` for notable decisions. Record bugs in
+  `agent/errors.md`. Never commit secrets — see `agent/secrets.md`.
