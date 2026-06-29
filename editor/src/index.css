@@ -5837,9 +5837,9 @@ body,
 .intern-results { min-width: 0; overflow-x: auto; }
 .intern-table-head,
 .intern-row {
-  min-width: 1180px;
-  grid-template-columns: 42px minmax(260px, 1.9fr) 78px minmax(142px, 1fr) minmax(155px, 1.1fr) minmax(135px, .95fr) minmax(116px, .8fr) 102px 68px 34px;
-  column-gap: 14px;
+  min-width: 1360px;
+  grid-template-columns: 42px minmax(315px, 2fr) 78px minmax(170px, 1fr) minmax(215px, 1.18fr) minmax(190px, 1.05fr) minmax(132px, .78fr) 132px 84px 36px;
+  column-gap: 18px;
   cursor: pointer;
 }
 
@@ -5888,13 +5888,23 @@ body,
   min-width: 0;
   overflow-wrap: normal;
   word-break: normal;
-  line-height: 1.35;
+  line-height: 1.38;
 }
 
 .intern-location,
 .intern-language { align-items: flex-start; }
 .intern-duration,
 .intern-deadline { overflow-wrap: normal; word-break: normal; }
+.internship-radar.ja .intern-company-cell strong { font-size: 12.8px; line-height: 1.25; }
+.internship-radar.ja .intern-role-stack { gap: 3px; }
+.internship-radar.ja .intern-location,
+.internship-radar.ja .intern-language,
+.internship-radar.ja .intern-duration,
+.internship-radar.ja .intern-deadline {
+  font-size: 10.7px;
+  line-height: 1.38;
+  letter-spacing: -0.01em;
+}
 
 .intern-detail-backdrop {
   position: fixed;

@@ -248,6 +248,10 @@ const jaDisplay = value => {
     .replace(/^English or Japanese CEFR B2$/i, '英語または日本語CEFR B2以上')
     .replace(/^Strong English required$/i, '高い英語力必須')
     .replace(/^English or Japanese CEFR B2; some teams require Japanese B2$/i, '英語または日本語CEFR B2以上（一部チームは日本語B2必須）')
+    .replace(/^English CEFR B2 or higher; Japanese CEFR B2 or higher for some teams$/i, '英語CEFR B2以上・一部チームは日本語CEFR B2以上')
+    .replace(/^Marketplace: Japanese and English CEFR B1; Fintech requires Japanese C1$/i, 'マーケットプレイス: 日本語・英語CEFR B1・Fintechは日本語C1必須')
+    .replace(/^Japanese and English used; exact level not stated$/i, '日本語・英語使用・レベル記載なし')
+    .replace(/^English technical communication required$/i, '技術コミュニケーション英語必須')
     .replace(/^English-first; Japanese helpful$/i, '英語中心・日本語があると尚可')
     .replace(/^English required; Japanese helpful$/i, '英語必須・日本語があると尚可')
     .replace(/^Bilingual$/i, 'バイリンガル')
@@ -255,6 +259,8 @@ const jaDisplay = value => {
     .replace(/^Remote$/i, 'リモート')
     .replace(/^Hybrid$/i, 'ハイブリッド')
     .replace(/remote within Japan/gi, '日本国内リモート')
+    .replace(/Rakuten Crimson House/gi, '楽天クリムゾンハウス')
+    .replace(/\bNihonbashi\b/gi, '日本橋')
     .replace(/\bShibuya\b/gi, '渋谷')
     .replace(/\bRoppongi\b/gi, '六本木')
     .replace(/\bMinato-ku\b/gi, '港区')
@@ -265,6 +271,8 @@ const jaDisplay = value => {
     .replace(/^4-6 weeks$/i, '4〜6週間')
     .replace(/^2-3 months encouraged; 20\+ hours\/week$/i, '2〜3か月推奨・週20時間以上')
     .replace(/^6 months required; 1 year preferred, starting August 2026$/i, '6か月必須・1年推奨、2026年8月開始')
+    .replace(/^6 months required; 1 year preferred, starting Fall\/Winter 2026$/i, '6か月必須・1年推奨、2026年秋冬開始')
+    .replace(/^6 months to 1 year$/i, '6か月〜1年')
     .replace(/^1-4 months \(20\+ business days\), July-October 2026$/i, '1〜4か月（20営業日以上）、2026年7〜10月')
     .replace(/^Unpaid; monthly subsidy, airfare and other support provided$/i, '無給・月額補助、航空券などの支援あり')
     .replace(/^Paid$/i, '有給')
@@ -295,6 +303,28 @@ const jaDisplay = value => {
 };
 
 const displayValue = (value, isJa) => isJa ? jaDisplay(value) : value;
+const displayRole = (role, isJa) => {
+  if (!isJa) return role;
+  return jaDisplay(role)
+    .replace(/Applications Engineer/gi, 'アプリケーションエンジニア')
+    .replace(/AI & Data Division/gi, 'AI・データ部門')
+    .replace(/Cloud Management/gi, 'クラウド管理')
+    .replace(/Class of 2028 Software Engineer Internship/gi, '2028年卒 ソフトウェアエンジニアインターン')
+    .replace(/Class of 2028 Security Engineer Internship/gi, '2028年卒 セキュリティエンジニアインターン')
+    .replace(/Class of 2028 UI\/UX Designer Internship/gi, '2028年卒 UI/UXデザイナーインターン')
+    .replace(/Ground Systems \/ Testing Infrastructure Intern/gi, '地上システム・テスト基盤インターン')
+    .replace(/Mission Operations Intern \(Full Time\)/gi, 'ミッション運用インターン（フルタイム）')
+    .replace(/Graphics Engineer Intern, Tegra System Software/gi, 'グラフィックスエンジニアインターン、Tegraシステムソフトウェア')
+    .replace(/Business Internship/gi, 'ビジネスインターン')
+    .replace(/AI Manga Translation/gi, 'AIマンガ翻訳')
+    .replace(/Front-End Pathway/gi, 'フロントエンドコース')
+    .replace(/Front End Pathway/gi, 'フロントエンドコース')
+    .replace(/Frontend Pathway/gi, 'フロントエンドコース')
+    .replace(/Full-Stack Pathway/gi, 'フルスタックコース')
+    .replace(/Full Stack Pathway/gi, 'フルスタックコース')
+    .replace(/Global Internship Program/gi, 'グローバルインターンシッププログラム')
+    .replace(/Summer 2026/gi, '2026年夏');
+};
 const trackLabel = (value, isJa) => isJa ? (JA_TRACK_LABELS[value] || value) : value;
 const formatVerifiedDate = (date, isJa) => {
   if (!date) return INTERNSHIP_RESEARCH_DATE;
@@ -308,7 +338,9 @@ const splitRole = role => {
   const [lead, ...rest] = String(role || '').split(/\s[-–—]\s/);
   if (!rest.length) return [String(role || '').trim()];
   const detail = rest.join(' – ').trim();
-  const detailParts = detail.length > 30
+  const detailParts = detail.includes('、')
+    ? detail.split(/、\s*/).map(part => part.trim()).filter(Boolean)
+    : detail.length > 30
     ? detail.split(/,\s+(?=[A-Z])/).map(part => part.trim()).filter(Boolean)
     : [detail];
   return [lead.trim(), ...detailParts];
@@ -355,6 +387,15 @@ const splitLanguage = (value, isJa) => {
     if (/英語または日本語.*CEFR\s*B2/i.test(formatted)) {
       return ['英語 CEFR B2 以上', formatted.includes('チーム') ? '日本語 CEFR B2 以上（一部チームで必須）' : '日本語 CEFR B2 以上'];
     }
+    if (formatted.startsWith('マーケットプレイス:')) {
+      return ['マーケットプレイス: 日本語・英語 CEFR B1', 'フィンテックは日本語 C1 必須'];
+    }
+    if (formatted === '日本語・英語使用・レベル記載なし') {
+      return ['日本語・英語使用', 'レベル記載なし'];
+    }
+    if (formatted.includes('・一部チーム')) {
+      return formatted.split(/・(?=一部チーム)/).filter(Boolean);
+    }
     const markers = ['・日本語', '・Rakuten'];
     const marker = markers.find(candidate => formatted.includes(candidate));
     if (marker) return [formatted.slice(0, formatted.indexOf(marker)), formatted.slice(formatted.indexOf(marker) + 1)];
@@ -377,7 +418,7 @@ const splitLanguage = (value, isJa) => {
 const splitDuration = (value, isJa) => {
   const formatted = String(displayValue(value, isJa) || '');
   if (!formatted) return [];
-  if (isJa) return formatted.split(/[、,]\s*/).filter(Boolean);
+  if (isJa) return formatted.split(/[、,]\s*|・(?=1年|週|2026年|\d)/).filter(Boolean);
   return formatted.split(/[,;]\s*/).filter(Boolean);
 };
 
@@ -406,7 +447,7 @@ const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEditor, i
   const companyName = displayCompany(item, isJa);
   const eligibility = isJa ? details.eligibilityJa : details.eligibility;
   const process = isJa ? details.processJa : details.process;
-  const [roleLead, ...roleDetails] = splitRole(item.role);
+  const [roleLead, ...roleDetails] = splitRole(displayRole(item.role, isJa));
   const languageParts = splitLanguage(item.language, isJa);
   const durationParts = splitDuration(item.duration, isJa);
   const locationParts = splitLocation(item.location, isJa);
@@ -714,7 +755,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
   const end = Math.min(page * pageSize, filtered.length);
 
   return (
-    <main className="internship-radar">
+    <main className={`internship-radar ${isJa ? 'ja' : 'en'}`}>
       <section className="intern-heading">
         <div><h1>{t.title}</h1><p><ShieldCheck size={16} /> {t.verified(dynamicStats.total, dynamicStats.target, formatVerifiedDate(latestVerifiedDate, isJa))}</p></div>
         <button type="button" className="intern-editor-link" onClick={onOpenEditor}>{t.tune} <ArrowUpRight size={15} /></button>
@@ -766,7 +807,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
             <div className="intern-rows" role="list">
               {pageItems.map((item, index) => {
                 const status = statusFor(item.id);
-                const [roleLead, ...roleDetails] = splitRole(item.role);
+                const [roleLead, ...roleDetails] = splitRole(displayRole(item.role, isJa));
                 const languageParts = splitLanguage(item.language, isJa);
                 const durationParts = splitDuration(item.duration, isJa);
                 const locationParts = splitLocation(item.location, isJa);
