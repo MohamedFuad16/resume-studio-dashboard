@@ -5573,6 +5573,7 @@ body,
 .calendar-event.kind-interview { border-color: #bfdbfe; background: #eff6ff; }
 .calendar-event.kind-deadline { border-color: #fecaca; background: #fff7f7; }
 .calendar-event.kind-follow-up { border-color: #fde68a; background: #fffbea; }
+.calendar-event.kind-applied { border-color: #bbf7d0; background: #f0fdf4; }
 .calendar-event .company-logo { width: 22px; height: 22px; border-radius: 999px; font-size: 6px; }
 .calendar-event-company {
   overflow: hidden;
@@ -5844,7 +5845,8 @@ body,
 .intern-filter-row select:focus-visible,
 .intern-sort select:focus-visible,
 .intern-row-status:focus-visible,
-.intern-status-control select:focus-visible {
+.intern-status-control select:focus-visible,
+.application-row select:focus-visible {
   outline: none;
   border-color: var(--intern-blue);
   box-shadow: 0 0 0 3px rgba(10, 87, 255, .12);
@@ -5852,7 +5854,8 @@ body,
 
 /* Size status selects to their content so the chevron sits beside the label (no mid gap) */
 .intern-row-status,
-.intern-status-control select {
+.intern-status-control select,
+.application-row select {
   width: auto;
   min-width: 0;
   max-width: 100%;

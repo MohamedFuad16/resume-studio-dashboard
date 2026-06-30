@@ -44,6 +44,29 @@ const SOFT_FAIL_STATUSES = new Set([401, 403, 405, 408, 429, 999]);
 // expired-job landing page. Treated as a hard failure (the apply link is dead).
 const DEAD_REDIRECT_RE = /[?&](error|not_found)=true\b|\/not[-_]?found\b|job[-_]?not[-_]?found/i;
 
+// Heuristic for "the apply URL points at a generic careers/program landing page
+// rather than the specific posting for THAT role". This is a SOFT signal only:
+// it never fails the run, it just surfaces entries worth a manual deep-link check.
+// Hosts that are ATS/job-boards and therefore always deep-link to one posting.
+const SPECIFIC_HOST_RE = /(greenhouse\.io|lever\.co|myworkdayjobs\.com|ashbyhq\.com|workable\.com|jobvite\.com|smartrecruiters\.com|rippling\.com|oraclecloud\.com|talentio\.com|wantedly\.com)/i;
+// Query params that identify a single posting (e.g. ?gh_jid=, ?id=, ?jobId=).
+const SPECIFIC_QUERY_RE = /[?&](id|jid|gh_jid|jobid|job_id|posting|req|requisition|position_?id)=/i;
+
+// Returns true when `rawUrl` looks like a generic landing page (bare domain, or a
+// path made up only of words like /careers, /recruit, /internship with no job
+// id/slug). Conservative on purpose: any digit-bearing path segment, known ATS
+// host, or job-id query param is treated as a specific posting (no warning).
+function looksGenericApplyUrl(rawUrl) {
+  let url;
+  try { url = new URL(rawUrl); } catch { return false; }
+  const segments = url.pathname.split('/').filter(Boolean);
+  if (segments.length === 0) return true;            // bare domain / root path
+  if (SPECIFIC_HOST_RE.test(url.hostname)) return false;
+  if (SPECIFIC_QUERY_RE.test(url.search)) return false;
+  if (segments.some(seg => /\d/.test(seg))) return false; // a segment carries an id/slug
+  return true;                                       // only generic landing words remain
+}
+
 function shapeErrors(item) {
   const errors = [];
   const warnings = [];
@@ -80,6 +103,7 @@ function shapeErrors(item) {
   if (!item.region) warnings.push('missing region');
   if (!item.location) warnings.push('missing location');
   if (!item.track) warnings.push('missing track');
+  if (item.url && looksGenericApplyUrl(item.url)) warnings.push(`generic-apply-url: ${item.url}`);
   return { errors, warnings };
 }
 
@@ -221,6 +245,17 @@ function printText({ formatResults, roundTrip, links, hardFail }) {
   }
   console.log(`\n[1] Formatting: ${formatResults.length} entries · ${formatErrors} error(s) · ${formatWarnings} warning(s)`);
   if (!formatErrors) console.log('    ✓ all entries pass validation.js + shape checks');
+
+  // Soft (non-failing) heuristic: apply URLs that look like generic landing pages
+  // rather than the specific posting for that role. Informational only.
+  const genericUrlEntries = formatResults.filter(e => e.warnings.some(w => w.startsWith('generic-apply-url:')));
+  if (genericUrlEntries.length) {
+    console.log(`\n[1b] Likely-generic apply URLs (soft · ${genericUrlEntries.length}) — verify these deep-link to the specific posting:`);
+    for (const entry of genericUrlEntries) {
+      const url = (entry.warnings.find(w => w.startsWith('generic-apply-url:')) || '').replace('generic-apply-url: ', '');
+      console.log(`    ⚠ ${entry.id} (${entry.company})  ${url}`);
+    }
+  }
 
   console.log(`\n[2] DB round-trip (${roundTrip.backend}): ${roundTrip.ok ? '✓ pass' : '✗ FAIL'} — ${roundTrip.count} entries${roundTrip.ok ? '' : ` — ${roundTrip.mismatch}`}`);
 

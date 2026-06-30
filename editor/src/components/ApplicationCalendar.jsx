@@ -27,10 +27,18 @@ const addDays = (date, amount) => {
 };
 const startOfWeek = date => addDays(date, -((date.getDay() + 6) % 7));
 
+const APPLIED_STATUSES = new Set(['applying', 'applied', 'interview']);
+const appliedDateKey = record => {
+  const stamp = record.updatedAt || record.createdAt;
+  if (!stamp) return null;
+  const date = new Date(stamp);
+  return Number.isNaN(date.getTime()) ? null : toDateKey(date);
+};
+
 const copy = {
   en: {
     title: 'Application timeline',
-    subtitle: 'Exact deadlines and the interviews or follow-ups you schedule.',
+    subtitle: 'Exact deadlines, your active applications, and the interviews or follow-ups you schedule.',
     month: 'Month',
     week: 'Week',
     today: 'Today',
@@ -44,8 +52,9 @@ const copy = {
     save: 'Add to calendar',
     cancel: 'Cancel',
     empty: 'No application events in this view.',
-    emptySub: 'Track an internship with an exact deadline or schedule an interview or follow-up.',
+    emptySub: 'Track an internship with an exact deadline, mark one as applied, or schedule an interview or follow-up.',
     deadline: 'Application deadline',
+    applied: 'Application',
     interview: 'Interview',
     submitted: 'Application submitted',
     followUp: 'Follow-up',
@@ -53,12 +62,12 @@ const copy = {
     currentStatus: 'Current status',
     open: 'Open application',
     remove: 'Remove event',
-    sourceNote: 'Deadline dates come from tracked employer records. Interviews and follow-ups are only shown when you add an exact date.',
+    sourceNote: 'Deadline dates come from tracked employer records. Applications without an exact deadline appear on the day you applied. Interviews and follow-ups are only shown when you add an exact date.',
     noTracked: 'Track an internship first, then add its interview or follow-up here.',
   },
   ja: {
     title: '応募タイムライン',
-    subtitle: '正確な締切と、登録した面接・フォローアップを表示します。',
+    subtitle: '正確な締切・進行中の応募・登録した面接やフォローアップを表示します。',
     month: '月',
     week: '週',
     today: '今日',
@@ -72,8 +81,9 @@ const copy = {
     save: 'カレンダーに追加',
     cancel: 'キャンセル',
     empty: 'この期間に応募予定はありません。',
-    emptySub: '締切日のある募集を管理するか、面接・フォローアップを追加してください。',
+    emptySub: '締切日のある募集を管理するか、応募済みにするか、面接・フォローアップを追加してください。',
     deadline: '応募締切',
+    applied: '応募',
     interview: '面接',
     submitted: '応募完了',
     followUp: 'フォローアップ',
@@ -81,13 +91,14 @@ const copy = {
     currentStatus: '現在の状況',
     open: '応募ページを開く',
     remove: '予定を削除',
-    sourceNote: '締切は管理中の企業情報から表示します。面接・フォローアップは正確な日付を追加した場合のみ表示します。',
+    sourceNote: '締切は管理中の企業情報から表示します。締切のない応募は、応募した日に表示します。面接・フォローアップは正確な日付を追加した場合のみ表示します。',
     noTracked: '先にインターンを管理対象に追加すると、面接やフォローアップを登録できます。',
   },
 };
 
 function eventLabel(kind, t) {
   if (kind === 'deadline') return t.deadline;
+  if (kind === 'applied') return t.applied;
   if (kind === 'interview') return t.interview;
   if (kind === 'application-submitted') return t.submitted;
   if (kind === 'follow-up') return t.followUp;
@@ -106,7 +117,8 @@ function calendarEvents(records, t) {
       logoUrl: record.logoUrl,
     };
     const events = [];
-    if (/^\d{4}-\d{2}-\d{2}$/.test(record.deadlineDate || '')) {
+    const hasDeadlineDate = /^\d{4}-\d{2}-\d{2}$/.test(record.deadlineDate || '');
+    if (hasDeadlineDate) {
       events.push({
         ...shared,
         id: `${record.internshipId}-deadline`,
@@ -117,6 +129,20 @@ function calendarEvents(records, t) {
         deadlineText: record.deadline,
         removable: false,
       });
+    }
+    if (!hasDeadlineDate && APPLIED_STATUSES.has(record.status)) {
+      const appliedDate = appliedDateKey(record);
+      if (appliedDate) {
+        events.push({
+          ...shared,
+          id: `${record.internshipId}-applied`,
+          kind: 'applied',
+          date: appliedDate,
+          time: null,
+          title: t.applied,
+          removable: false,
+        });
+      }
     }
     for (const milestone of Array.isArray(record.milestones) ? record.milestones : []) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(milestone.date || '')) continue;

@@ -18,6 +18,29 @@ The full change set (radar WIP + BUG-001 + cleanup + the `agent/` KB + root poin
 committed and pushed to `origin/main` this session.
 
 ## Recent changes
+- **2026-06-30 — Application-tracker UX fixes + catalog CI + apply-URL audit (2 parallel
+  workers + coordinator recovery).** (1) **Recent applications = applied-only**
+  (`ProfileDashboard.jsx`): the list now filters to applied-type statuses
+  `{applying, applied, interview}`, so "Saved"/untracked items no longer appear; a new
+  **"Not applied"** option (`value=""` → `updateStatus(item,'')` untracks) lets the user
+  change applied→not-applied and the row drops off immediately (derived from tracker state).
+  (2) **Calendar no longer shows only Rakuten** (`ApplicationCalendar.jsx`): it previously
+  emitted events only for records with an exact `deadlineDate` (just the 2 Rakuten roles had
+  one); applied-type records without a deadline now get a distinct green "applied" pill on
+  the day applied (`updatedAt||createdAt`), alongside all deadlines/milestones (no duplicate
+  for deadline-dated rows). (3) **Selector gap** (`index.css`): `.application-row select`
+  joined the content-sized select rule (`width:auto`), removing the big text↔chevron gap in
+  the Saved/Applied dropdowns. (4) **GitHub Actions** (`.github/workflows/validate-catalog.yml`):
+  runs `validate:catalog` + `validate:catalog:links` on push/PR to `editor/**`, a daily
+  06:00 UTC cron, and manual dispatch (Node 20) — the automated daily gate ADR-0009
+  anticipated. (5) **Validator heuristic** (`validate-catalog.js`): new soft (non-failing)
+  `generic-apply-url` warning + `[1b]` report flagged **14** likely-generic apply URLs.
+  (6) **Apply-URL audit** (seeds): replacing those 14 generic landings with the specific
+  posting page per role where one exists (genuine single-program pages stay flagged) — run
+  in a fresh lean worker. Verified: `npm run build` green, `validate:catalog` 183 entries /
+  0 errors / DB ok. PROCESS NOTE: a single combined worker hit `resource_exhausted` twice on
+  the link audit; recovered by shipping the 5 complete fixes first and re-scoping the URL
+  audit to the validator's `[1b]` worklist. See ADR-0010, BUG-004.
 - **2026-06-30 — Internship catalog overhaul + automated validation.** (1) **Expiry
   filter:** the radar now auto-hides internships whose `deadlineDate` is before today
   UNLESS the user has applied (tracker status in `{applying, applied, interview}`); no-deadline

@@ -1,0 +1,60 @@
+# Validates the internship catalog (seed format + schema, duplicate detection,
+# DB save→load round-trip) and checks that every apply/source URL is live.
+# The validator (editor/server/validate-catalog.js) exits non-zero on hard
+# failures, which fails the job.
+name: Validate Catalog
+
+on:
+  # Run on every push and PR that touches the editor app (where the seeds and
+  # validator live), so broken catalog data is caught before it merges.
+  push:
+    paths:
+      - 'editor/**'
+  pull_request:
+    paths:
+      - 'editor/**'
+  # Daily link-liveness sweep (06:00 UTC) so dead/expired apply URLs surface even
+  # without a code change.
+  schedule:
+    - cron: '0 6 * * *'
+  # Allow manual runs from the Actions tab.
+  workflow_dispatch:
+
+jobs:
+  validate-catalog:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        # All steps run inside editor/ (where package.json + the validator live).
+        working-directory: editor
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          # Cache npm downloads keyed to the editor lockfile for faster installs.
+          cache: npm
+          cache-dependency-path: editor/package-lock.json
+
+      - name: Install dependencies
+        # Prefer a clean, reproducible install from the lockfile; fall back to
+        # npm install only if no lockfile is present.
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      # Format/schema checks, duplicate detection, and the DB round-trip. Fails
+      # the job (non-zero exit) on any hard error.
+      - name: Validate catalog (format + DB round-trip)
+        run: npm run validate:catalog
+
+      # Adds HTTP link-liveness checks for every apply/source URL. Hard failures
+      # (404/410/5xx/DNS/timeout) fail the job; bot-wall statuses are warnings.
+      - name: Validate catalog links (liveness)
+        run: npm run validate:catalog:links

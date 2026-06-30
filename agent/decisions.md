@@ -163,3 +163,35 @@ Reverse-engineered from the codebase on 2026-06-29. Newest at the bottom.
   data should be appended as a dated seed + must pass `validate:catalog:links`. Expiry
   filtering means the visible count < total seed count by design. The Vercel project is
   CLI-deploy-only (no GitHub auto-deploy) — ship with `vercel --prod --yes` from `editor/`.
+
+---
+## ADR-0010 — Recent-applications = applied-only; calendar surfaces applied apps; catalog CI gate
+- **Date:** 2026-06-30
+- **Status:** Accepted
+- **Context:** "Recent applications" listed every tracked record (including "Saved"), with no
+  way to set an item back to not-applied; the application calendar appeared to show only
+  "Rakuten Group" because it rendered events solely for records carrying an exact
+  `deadlineDate` (only the 2 Rakuten roles had one); the Saved/Applied status `<select>`s had
+  a large text↔chevron gap; the daily catalog validator (ADR-0009) was still a manual command;
+  and some apply `url`s pointed at generic careers/program landings rather than the specific
+  posting for that role.
+- **Decision:** (a) "Recent applications" filters to applied-type statuses
+  `{applying, applied, interview}`; a "Not applied" option (`value=""`) untracks via the
+  existing `updateStatus(internship, '')` path, so the row leaves the list reactively. (b)
+  Applied-type records lacking an exact deadline render a distinct **green "applied" pill** on
+  the applied date (`updatedAt`→`createdAt`) in addition to all deadline/milestone events;
+  deadline-dated records are unchanged (no duplicate pill) — gated on "no deadline date". (c)
+  `.application-row select` joins the shared content-sized select rule (`width:auto`) so the
+  chevron sits beside the label. (d) Add `.github/workflows/validate-catalog.yml` (push/PR on
+  `editor/**`, daily 06:00 UTC cron, manual dispatch; Node 20) running both validate scripts
+  as the automated gate. (e) `validate-catalog.js` gains a **soft** `generic-apply-url`
+  heuristic (`[1b]` report) that flags likely-landing-page URLs without failing CI; apply URLs
+  are then audited toward the specific posting, flagging companies whose only real application
+  page is a single program page (common for JP new-grad/intern programs) rather than inventing
+  deep links.
+- **Consequences:** The dashboard's application surfaces are now genuinely application-centric
+  and self-cleaning, and the calendar reflects real activity (not just dated deadlines). CI
+  blocks broken catalog data on every editor change and sweeps dead links daily. The
+  generic-URL check is advisory only. Calendar form `<select>`s deliberately keep native
+  appearance (they must line up with sibling date/time inputs) — only the `appearance:none`
+  content selects were content-sized.

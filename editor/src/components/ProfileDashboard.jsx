@@ -26,6 +26,8 @@ const STATUS_ICONS = {
   interview: CalendarClock,
 };
 
+const APPLIED_STATUSES = new Set(['applying', 'applied', 'interview']);
+
 const dashboardValue = (value, isJa) => {
   return displayValue(value, isJa);
 };
@@ -54,6 +56,7 @@ const copy = {
     companyRole: 'Company & role',
     deadline: 'Deadline',
     status: 'Status',
+    notApplied: 'Not applied',
     nextStep: 'Next step',
     continue: 'Continue',
     noApps: 'No applications tracked yet',
@@ -86,6 +89,7 @@ const copy = {
     companyRole: '企業・職種',
     deadline: '締切',
     status: '状況',
+    notApplied: '未応募',
     nextStep: '次の対応',
     continue: '続きへ',
     noApps: '管理中の応募はありません',
@@ -172,7 +176,10 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
   const { records, counts, updateStatus, addMilestone, removeMilestone } = useApplicationTracker(activeProfile);
   const { catalog } = useInternshipCatalog();
   const completion = profileCompletion(resume);
-  const recent = records.slice(0, 5);
+  const recent = useMemo(
+    () => records.filter(record => APPLIED_STATUSES.has(record.status)).slice(0, 5),
+    [records],
+  );
   const tokyoMatches = useMemo(() => catalog.filter(item => /Tokyo|東京/i.test(item.location)).slice(0, 4), [catalog]);
   const name = isJa
     ? (resume.personal?.nameJa || resume.personal?.nameEn || '名前未設定')
@@ -242,7 +249,8 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
           <div className="application-list">
             <div className="application-list-head"><span>{t.companyRole}</span><span>{isJa ? '場所' : 'Location'}</span><span>{t.deadline}</span><span>{t.status}</span><span>{t.nextStep}</span></div>
             {recent.length ? recent.map(record => {
-              const item = catalog.find(entry => entry.id === record.internshipId) || record;
+              const item = catalog.find(entry => entry.id === record.internshipId)
+                || { ...record, id: record.internshipId, url: record.applyUrl };
               return (
                 <article className="application-row" key={record.internshipId}>
                   <span className="application-company"><CompanyLogo item={item} /><span><b>{displayCompany(item, isJa)}</b><small>{displayRole(item.role || record.role, isJa)}</small></span></span>
@@ -250,6 +258,7 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
                   <span className="application-deadline">{formatDisplayDeadline(record.deadline, isJa)}</span>
                   <select value={record.status} onChange={event => updateStatus(item, event.target.value)} aria-label={isJa ? `${record.company}の応募状況` : `Status for ${record.company}`}>
                     {APPLICATION_STATUSES.map(status => <option value={status.value} key={status.value}>{statusLabel(status.value, isJa)}</option>)}
+                    <option value="">{t.notApplied}</option>
                   </select>
                   <a href={record.applyUrl} target="_blank" rel="noreferrer">{t.continue} <ArrowRight size={14} /></a>
                 </article>

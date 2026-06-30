@@ -2,6 +2,21 @@
 
 ## Fixed
 
+### BUG-004 — Application calendar shows only "Rakuten Group" — FIXED 2026-06-30
+- **Date:** 2026-06-30 · **File:** `editor/src/components/ApplicationCalendar.jsx`
+- **Symptom:** The calendar/timeline displayed only the two Rakuten roles, even though
+  several other internships were tracked/applied (NVIDIA, ispace, HENNGE, …).
+- **Root cause:** `calendarEvents()` only pushed an event when `record.deadlineDate` matched
+  `YYYY-MM-DD`. Only the 2 Rakuten roles had an exact deadline; every other record (including
+  applied ones) had `deadlineDate: null` ("Not stated"), so they produced no events. Event ids
+  are unique (`${id}-deadline`, milestone ids) — there was **no** company-dedupe bug.
+- **Fix:** applied-type records `{applying, applied, interview}` without a deadline now emit a
+  green "applied" marker on the applied date (`record.updatedAt || createdAt`), in addition to
+  all deadline + milestone events. Also hardened `ProfileDashboard.jsx`'s off-catalog record
+  fallback so untracking a record not in the loaded catalog resolves `.id`/`.url` correctly.
+  See ADR-0010.
+- **Verified:** `npm run build` green.
+
 ### BUG-003 — Duplicated eligibility bullets + untranslated JA strings — FIXED 2026-06-30
 - **Date:** 2026-06-30 · **Files:** `editor/src/utils/internshipDisplay.js`,
   `editor/server/seeds/internships.js`
@@ -89,3 +104,9 @@ covering the real shell: language switcher, rapid toggle stability, and dashboar
 - **Prod durability:** Without `BLOB_READ_WRITE_TOKEN`, Vercel writes are ephemeral.
 - **Research jobs are in-memory:** `/api/internships/research-company/:jobId` returns
   404 after a server restart.
+- **Large research+edit worker tasks can hit `resource_exhausted`:** the internship apply-link
+  audit overran an agent's context twice when research-subagent fan-out + seed edits +
+  validation were combined in one worker. Mitigation: ship the already-complete sub-fixes
+  first, then run the link audit as a small pre-scoped worklist (the validator's `[1b]`
+  generic-apply-url list) in a fresh lean worker, and have research subagents return only
+  compact `id → url` verdicts (never page dumps).
