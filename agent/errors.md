@@ -2,6 +2,39 @@
 
 ## Fixed
 
+### BUG-005 — "Validate Catalog" CI flaky-fails on Nuro `UND_ERR_SOCKET` — FIXED 2026-06-30
+- **Date:** 2026-06-30 · **Files:** `editor/server/validate-catalog.js`,
+  `editor/server/seeds/internships.js`
+- **Symptom:** The `Validate Catalog` GitHub Action failed on `main` (eae7ca8). The
+  link-liveness step reported exactly **1 broken** URL —
+  `https://nuro.ai/careersitem?gh_jid=7594577` (`global-035`, Nuro Data Scientist Intern)
+  with `✗ BROKEN UND_ERR_SOCKET` — while everything else passed (183 entries, 0 format
+  errors, DB ok, 179/180 links). The same URL passed **180/180 locally**.
+- **Root cause:** `UND_ERR_SOCKET` is a transport-level connection reset (undici "other
+  side closed"), here triggered by Nuro's anti-bot layer hanging up on GitHub runner IPs —
+  **not** a dead posting. Confirmed live via Nuro's Greenhouse board API
+  (`boards-api.greenhouse.io/v1/boards/nuro/jobs/7594577` → "Data Scientist Intern", updated
+  2026-06-26) and HTTP 200 from `nuro.ai`/`www.nuro.ai`. The old `checkUrl` treated **all**
+  pre-HTTP network errors as HARD failures and did no retries, so any single anti-bot/flaky
+  reset failed the whole daily run.
+- **Fix:** (1) Kept the verified-live URL, bumped `global-035` `verifiedDate`
+  2026-06-27→2026-06-30. (2) `checkUrl` now **retries** transport-level errors
+  (`VALIDATE_LINK_RETRIES`=2, linear backoff `VALIDATE_LINK_RETRY_BACKOFF_MS`=600ms) with
+  fuller browser-like headers (`LIVENESS_HEADERS`: UA + Accept + Sec-Fetch/
+  Upgrade-Insecure-Requests). New `classifyNetworkError` downgrades **persistent**
+  resets/timeouts (`UND_ERR_SOCKET`, `ECONNRESET`, `ETIMEDOUT`, undici connect/headers/body
+  timeouts, "socket hang up"/"other side closed", `EAI_AGAIN`) to a **SOFT warning**; genuine
+  dead links stay **HARD** — DNS-not-found (`ENOTFOUND`), non-HTTPS/malformed, dead redirects,
+  HTTP 4xx/5xx (HTTP responses are never retried, returned immediately). Exit-code contract
+  unchanged (non-zero only on hard failures); soft-print omits a `(0)` status.
+- **Verified:** `validate:catalog` 184 entries / 0 errors / DB ok; `validate:catalog:links`
+  **181/181 ok · 0 broken** (exit 0); `npm run build` green. Logic unit-checked with mocked
+  fetch: `UND_ERR_SOCKET` & "socket hang up" → soft (`hard:false`); `ENOTFOUND` & HTTP 404 →
+  hard. See ADR-0011.
+- **Note:** If Nuro persistently resets the runner even after retries, it will show as a
+  single SOFT `⚠ network reset after 3 tries (UND_ERR_SOCKET)` warning — informational, does
+  not fail CI. Tune `VALIDATE_LINK_RETRIES`/`VALIDATE_LINK_RETRY_BACKOFF_MS` if needed.
+
 ### BUG-004 — Application calendar shows only "Rakuten Group" — FIXED 2026-06-30
 - **Date:** 2026-06-30 · **File:** `editor/src/components/ApplicationCalendar.jsx`
 - **Symptom:** The calendar/timeline displayed only the two Rakuten roles, even though

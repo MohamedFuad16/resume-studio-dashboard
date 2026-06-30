@@ -18,6 +18,29 @@ The full change set (radar WIP + BUG-001 + cleanup + the `agent/` KB + root poin
 committed and pushed to `origin/main` this session.
 
 ## Recent changes
+- **2026-06-30 — "Validate Catalog" CI fix: Nuro re-verified live + link-checker hardened
+  against anti-bot socket resets.** The new `.github/workflows/validate-catalog.yml` was
+  failing on `main` (eae7ca8): the link-liveness step found exactly **1 broken** URL —
+  `https://nuro.ai/careersitem?gh_jid=7594577` (`global-035`, Nuro Data Scientist Intern)
+  with `UND_ERR_SOCKET` — even though it passed 180/180 locally. **Root cause:** a
+  transport-level connection reset from GitHub runner IPs (anti-bot/flaky network), NOT a
+  dead posting. Verified the posting is **live** via Nuro's Greenhouse board API
+  (`boards-api.greenhouse.io/v1/boards/nuro/jobs/7594577` → "Data Scientist Intern", updated
+  2026-06-26) and both `nuro.ai`/`www.nuro.ai` return HTTP 200; the canonical Greenhouse URL
+  just 302s back to `www.nuro.ai`, so swapping URLs wouldn't help CI. **Fix:** (1) kept the
+  verified-live URL, bumped `global-035` `verifiedDate` 2026-06-27→2026-06-30
+  (`server/seeds/internships.js`). (2) Hardened `server/validate-catalog.js`: `checkUrl` now
+  retries transport-level errors (2 retries, linear backoff, env-tunable
+  `VALIDATE_LINK_RETRIES`/`VALIDATE_LINK_RETRY_BACKOFF_MS`), sends fuller browser-like headers
+  (UA + Accept + Sec-Fetch/Upgrade-Insecure-Requests via `LIVENESS_HEADERS`), and a new
+  `classifyNetworkError` downgrades **persistent** resets/timeouts (`UND_ERR_SOCKET`,
+  `ECONNRESET`, `ETIMEDOUT`, undici timeouts, "socket hang up", `EAI_AGAIN`) to a **soft
+  warning**, while DNS-not-found (`ENOTFOUND`), non-HTTPS, dead redirects, and HTTP
+  4xx/5xx stay **hard** failures. Soft-print now omits a `(0)` status. Exit-code contract
+  unchanged (non-zero only on hard failures). Verified: `validate:catalog` 184 entries / 0
+  errors / DB ok; `validate:catalog:links` **181/181 ok · 0 broken** (exit 0); `npm run build`
+  green (~340 KB). Logic unit-checked via mocked fetch (UND_ERR_SOCKET & "socket hang up" →
+  soft; ENOTFOUND & HTTP 404 → hard). See BUG-005, ADR-0011.
 - **2026-06-30 — Application-tracker UX fixes + catalog CI + apply-URL audit (2 parallel
   workers + coordinator recovery).** (1) **Recent applications = applied-only**
   (`ProfileDashboard.jsx`): the list now filters to applied-type statuses

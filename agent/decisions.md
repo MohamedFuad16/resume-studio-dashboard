@@ -195,3 +195,31 @@ Reverse-engineered from the codebase on 2026-06-29. Newest at the bottom.
   generic-URL check is advisory only. Calendar form `<select>`s deliberately keep native
   appearance (they must line up with sibling date/time inputs) — only the `appearance:none`
   content selects were content-sized.
+
+---
+## ADR-0011 — Link-liveness checker tolerates transient/anti-bot transport errors (retry + soft-classify)
+- **Date:** 2026-06-30
+- **Status:** Accepted
+- **Context:** The ADR-0010 "Validate Catalog" Action failed on `main` because the
+  link-liveness step flagged Nuro's `…/careersitem?gh_jid=7594577` as `✗ BROKEN
+  UND_ERR_SOCKET`, while the posting was demonstrably **live** (Greenhouse board API + HTTP
+  200 in a browser; passed 180/180 locally). The reset only happened from GitHub runner IPs
+  (anti-bot / flaky network). The original `checkUrl` did **no retries** and treated **every**
+  pre-HTTP network error as a HARD failure, so one transport-level reset failed the whole
+  daily sweep — a false positive that would recur and erode trust in the gate.
+- **Decision:** Keep CI strict on genuinely dead links but resilient to transport flakiness.
+  `checkUrl` retries transport-level errors (env-tunable `VALIDATE_LINK_RETRIES`=2, linear
+  `VALIDATE_LINK_RETRY_BACKOFF_MS`=600ms) and sends fuller browser-like headers
+  (`LIVENESS_HEADERS`). `classifyNetworkError` splits errors: **transient** (retry, then
+  SOFT-warn if persistent) = `UND_ERR_SOCKET`, `ECONNRESET`, `ETIMEDOUT`, undici
+  connect/headers/body timeouts, `AbortError` timeout, `EAI_AGAIN`, and "socket hang up"/
+  "other side closed" messages; **hard** = DNS-not-found (`ENOTFOUND`), non-HTTPS/malformed,
+  dead redirects, and any HTTP 4xx/5xx (HTTP responses are definitive → never retried,
+  returned immediately). Existing soft/hard semantics for HTTP statuses are untouched, and the
+  exit-code contract is unchanged (non-zero only on hard failures).
+- **Consequences:** The daily sweep no longer flaky-fails on anti-bot connection resets, yet
+  still hard-fails on truly dead postings (404/410/5xx/DNS-not-found/non-HTTPS/dead-redirect).
+  A host that persistently resets the runner shows as one informational `⚠ network reset after
+  N tries (CODE)` soft warning. Trade-off: a posting that goes dead **only** via socket reset
+  (rare) would soft-warn instead of hard-fail; the conservative default keeps unknown/ambiguous
+  network errors HARD. Retries add a little wall-clock time only when errors occur.

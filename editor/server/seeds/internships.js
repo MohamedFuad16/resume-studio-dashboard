@@ -1814,7 +1814,7 @@ export const internships = [
     "companyUrl": "https://nuro.ai",
     "companyDomain": "nuro.ai",
     "logoUrl": "https://nuro.ai/_nuxt/icons/icon_64x64.bccc78.png",
-    "verifiedDate": "2026-06-27",
+    "verifiedDate": "2026-06-30",
     "prestigeTier": "1",
     "deadlineType": "Not stated"
   },

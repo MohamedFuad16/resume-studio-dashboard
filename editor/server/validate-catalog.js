@@ -10,8 +10,11 @@
 //                    structural equality so we know data is "properly formatted,
 //                    sent, and received" with no corruption.
 //   3. LINK LIVENESS (optional, network) — `--links` or VALIDATE_LINKS=1 fetches
-//                    every apply/source URL (GET, follow redirects) and flags
-//                    4xx/5xx/timeouts/non-HTTPS/malformed.
+//                    every apply/source URL (GET, follow redirects, browser-like
+//                    headers) and flags 4xx/5xx/non-HTTPS/malformed/dead-redirects.
+//                    Transport-level errors (socket resets, timeouts) are retried; if
+//                    they persist they become a SOFT warning (anti-bot/flaky network),
+//                    not a hard failure, so the daily CI sweep isn't flaky.
 //
 // Usage:
 //   node server/validate-catalog.js            # formatting + DB round-trip
@@ -19,8 +22,9 @@
 //   node server/validate-catalog.js --links --json > report.json
 //
 // Exit code is 0 only when there are no hard failures, so it is safe to wire into
-// CI / the daily ingestion flow. Link "warnings" (e.g. 401/403/405/429 bot walls)
-// do not fail the run; hard link failures (404/410/5xx/DNS/timeout) do.
+// CI / the daily ingestion flow. Link "warnings" (401/403/405/429 bot walls, and
+// connection resets/timeouts that persist after retries) do not fail the run; hard
+// link failures (404/410/5xx, DNS not-found, non-HTTPS, dead redirects) do.
 import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -34,12 +38,66 @@ const CHECK_LINKS = ARGS.has('--links') || process.env.VALIDATE_LINKS === '1';
 const AS_JSON = ARGS.has('--json');
 const LINK_TIMEOUT_MS = Number(process.env.VALIDATE_LINK_TIMEOUT_MS || 15000);
 const LINK_CONCURRENCY = Number(process.env.VALIDATE_LINK_CONCURRENCY || 8);
+// Retries for transport-level (not HTTP) errors so the daily CI sweep isn't flaky
+// when an anti-bot host resets the connection from a runner IP. Total attempts =
+// 1 + LINK_RETRIES; backoff grows linearly per retry.
+const LINK_RETRIES = Number(process.env.VALIDATE_LINK_RETRIES || 2);
+const LINK_RETRY_BACKOFF_MS = Number(process.env.VALIDATE_LINK_RETRY_BACKOFF_MS || 600);
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const LANGUAGE_TYPES = new Set(['English-first', 'Bilingual']);
 const STRING_ARRAY_FIELDS = ['reasons', 'eligibility', 'eligibilityJa', 'techStack', 'applicationProcess', 'applicationProcessJa'];
 // Hosts known to bot-wall automated GETs; a non-2xx from these is a warning, not a failure.
 const SOFT_FAIL_STATUSES = new Set([401, 403, 405, 408, 429, 999]);
+// Transport-level (pre-HTTP) error codes that are transient and/or symptomatic of an
+// anti-bot connection reset from a CI/runner IP rather than a dead posting. These are
+// retried, and if they STILL fail after retries they are downgraded to a SOFT warning
+// (the URL was reachable when verified in a browser; it just hung up on the runner).
+const TRANSIENT_NET_CODES = new Set([
+  'UND_ERR_SOCKET',          // undici: socket closed unexpectedly / "other side closed"
+  'UND_ERR_CONNECT_TIMEOUT',
+  'UND_ERR_HEADERS_TIMEOUT',
+  'UND_ERR_BODY_TIMEOUT',
+  'ECONNRESET',              // peer reset the connection
+  'ETIMEDOUT',               // connection/read timed out at the socket layer
+  'EPIPE',                   // broken pipe mid-request
+  'EAI_AGAIN',               // transient DNS resolution failure (name server busy)
+]);
+// DNS "this host does not exist" — the domain is genuinely gone → HARD failure.
+const DEAD_NET_CODES = new Set(['ENOTFOUND']);
+// Browser-like request headers so liveness GETs look like a real navigation and are
+// less likely to trip anti-bot connection resets.
+const LIVENESS_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9,ja;q=0.8',
+  'Upgrade-Insecure-Requests': '1',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Sec-Fetch-User': '?1',
+};
+
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Classify a thrown fetch/network error into { transient, note }. Transient errors are
+// retried and (if persistent) reported as soft warnings; non-transient ones (DNS
+// not-found, unknown errors) stay hard failures, preserving prior conservative behavior.
+function classifyNetworkError(error) {
+  if (error?.name === 'AbortError') {
+    return { transient: true, note: `timeout >${LINK_TIMEOUT_MS}ms` };
+  }
+  // undici surfaces the underlying system error on error.cause.
+  const code = error?.cause?.code || error?.code || '';
+  const message = String(error?.cause?.message || error?.message || '');
+  if (DEAD_NET_CODES.has(code)) {
+    return { transient: false, note: `DNS not found (${code})` };
+  }
+  if (TRANSIENT_NET_CODES.has(code) || /socket hang up|other side closed|terminated/i.test(message)) {
+    return { transient: true, note: code || message || 'connection reset' };
+  }
+  return { transient: false, note: code || message || 'network error' };
+}
 // ATS "soft 404" signatures: the URL returns 200 but redirects to a not-found /
 // expired-job landing page. Treated as a hard failure (the apply link is dead).
 const DEAD_REDIRECT_RE = /[?&](error|not_found)=true\b|\/not[-_]?found\b|job[-_]?not[-_]?found/i;
@@ -172,32 +230,40 @@ async function dbRoundTrip(validated) {
 
 async function checkUrl(url) {
   if (!/^https:\/\//i.test(url)) return { url, ok: false, hard: true, status: 0, note: 'not HTTPS / malformed' };
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), LINK_TIMEOUT_MS);
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9,ja;q=0.8',
-      },
-    });
-    const status = response.status;
-    if (status >= 200 && status < 400 && DEAD_REDIRECT_RE.test(response.url || '')) {
-      return { url, ok: false, hard: true, status, note: 'dead/expired (redirects to not-found page)', finalUrl: response.url };
+  let lastTransient = 'network error';
+  // Total attempts = 1 + LINK_RETRIES. Any genuine HTTP response (incl. 4xx/5xx and
+  // soft bot-walls) is a definitive answer and returns immediately; only transport-level
+  // resets/timeouts are retried, then downgraded to a soft warning if still failing.
+  for (let attempt = 0; attempt <= LINK_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), LINK_TIMEOUT_MS);
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        redirect: 'follow',
+        signal: controller.signal,
+        headers: LIVENESS_HEADERS,
+      });
+      const status = response.status;
+      if (status >= 200 && status < 400 && DEAD_REDIRECT_RE.test(response.url || '')) {
+        return { url, ok: false, hard: true, status, note: 'dead/expired (redirects to not-found page)', finalUrl: response.url };
+      }
+      if (status >= 200 && status < 400) return { url, ok: true, hard: false, status, note: 'ok', finalUrl: response.url };
+      if (SOFT_FAIL_STATUSES.has(status)) return { url, ok: false, hard: false, status, note: 'blocked/needs manual check', finalUrl: response.url };
+      return { url, ok: false, hard: true, status, note: `HTTP ${status}`, finalUrl: response.url };
+    } catch (error) {
+      const { transient, note } = classifyNetworkError(error);
+      if (!transient) return { url, ok: false, hard: true, status: 0, note };
+      lastTransient = note;
+      if (attempt < LINK_RETRIES) await delay(LINK_RETRY_BACKOFF_MS * (attempt + 1));
+    } finally {
+      clearTimeout(timer);
     }
-    if (status >= 200 && status < 400) return { url, ok: true, hard: false, status, note: 'ok', finalUrl: response.url };
-    if (SOFT_FAIL_STATUSES.has(status)) return { url, ok: false, hard: false, status, note: 'blocked/needs manual check', finalUrl: response.url };
-    return { url, ok: false, hard: true, status, note: `HTTP ${status}`, finalUrl: response.url };
-  } catch (error) {
-    const note = error.name === 'AbortError' ? `timeout >${LINK_TIMEOUT_MS}ms` : (error.cause?.code || error.message || 'network error');
-    return { url, ok: false, hard: true, status: 0, note };
-  } finally {
-    clearTimeout(timer);
   }
+  // Persistent transport-level reset/timeout after retries: the link was verified live
+  // in a browser, so this is almost certainly an anti-bot/flaky-network block on the
+  // runner, not a dead posting → SOFT warning (does not fail CI).
+  return { url, ok: false, hard: false, status: 0, note: `network reset after ${LINK_RETRIES + 1} tries (${lastTransient})` };
 }
 
 async function mapPool(items, size, worker) {
@@ -269,7 +335,7 @@ function printText({ formatResults, roundTrip, links, hardFail }) {
       l.usedBy.forEach(u => console.log(`        used by ${u.id} (${u.company}) [${u.kind}]`));
     }
     for (const l of soft) {
-      console.log(`    ⚠ ${l.note} (${l.status})  ${l.url}`);
+      console.log(`    ⚠ ${l.note}${l.status ? ` (${l.status})` : ''}  ${l.url}`);
       l.usedBy.forEach(u => console.log(`        used by ${u.id} (${u.company}) [${u.kind}]`));
     }
   } else {
