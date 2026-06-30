@@ -110,3 +110,29 @@ Reverse-engineered from the codebase on 2026-06-29. Newest at the bottom.
   thin — it asserts shell/navigation, not deep data flows. Grow it as the UI stabilizes
   (radar filtering/sorting, tracker status). Avoids the trap of re-asserting a UI contract
   that was never shipped.
+
+---
+## ADR-0008 — One shrink-safe radar grid + shared select styling; JA résumé redesign
+- **Date:** 2026-06-30
+- **Status:** Accepted
+- **Context:** The Internship Radar table forced a horizontal scrollbar and several
+  `<select>`s rendered with uneven internal spacing (the per-row status select showed a
+  large mid-gap). The deadline/source banner in the calendar looked off-brand. Separately,
+  the three Japanese résumé templates (`genJa01/02/03` in `server/templates.js`) looked
+  unpolished. Investigation found **four** drifted `.intern-table-head,.intern-row` grid
+  definitions in `index.css`; the winning one set `min-width:1180px` with
+  `.intern-results{overflow-x:auto}` — the true cause of the overflow.
+- **Decision:** (a) Collapse the radar grid to a single fluid `minmax(0,…)`/`fr` template
+  (no `min-width`, no `overflow-x`), with `min-width:0` on the flex/grid ancestors so it
+  always fits ≥~1024px and degrades through the existing mobile breakpoints. (b) Normalize
+  every radar/dashboard `<select>` via one rule: `appearance:none` + a shared SVG chevron,
+  consistent padding, and content-sized width for status selects. (c) Restyle
+  `.calendar-source-note` as an on-brand info notice. (d) Redesign the three JA résumés to
+  top-Japanese-company standards (proper rirekisho conventions for `genJa01`; conservative
+  modern one-pagers for `genJa02`/`genJa03`), keeping page counts 2/1/1 and routing all
+  Japanese text through `escJa`; EN templates and `generateLatex` left untouched.
+- **Consequences:** The radar fits the viewport (verified 1024–1440 + mobile via headless
+  Chromium); selects look uniform; the banner matches the design system; the JA résumés are
+  recruiter-presentable. CSS is the single source for radar layout (avoid re-adding
+  per-breakpoint grid overrides — extend the one template). Future JA résumé tweaks must
+  recompile with Tectonic and re-check page counts.

@@ -18,6 +18,49 @@ The full change set (radar WIP + BUG-001 + cleanup + the `agent/` KB + root poin
 committed and pushed to `origin/main` this session.
 
 ## Recent changes
+- **2026-06-30 — Radar UI fixes + Japanese résumé redesign (2 parallel workers).**
+  (1) **Internship Radar layout** (`editor/src/index.css`, no JSX changes): the radar
+  table's horizontal scroll was caused by a late grid block with `min-width:1180px`
+  paired with `.intern-results{overflow-x:auto}`; there were **four** drifted
+  `.intern-table-head,.intern-row` grid definitions. Reconciled them all to one
+  shrink-safe fluid grid (`32px minmax(0,2fr) 68px minmax(0,1fr) … 106px 66px 32px`,
+  `column-gap:12px`), removed the `min-width`/`overflow-x`, added `min-width:0` to
+  `.intern-content/.intern-results/.intern-rows`, and dropped the dead 1450/1250px
+  language-hide overrides. Verified zero horizontal overflow at 1024/1280/1440 (+ mobile
+  860/768/560/390) via headless Chromium. (2) **Selector spacing:** consolidated all
+  radar/dashboard `<select>`s (`.intern-filter-row select`, `.intern-sort select`,
+  `.intern-row-status`, `.intern-status-control select`, `.application-row select`) to a
+  shared `appearance:none` + custom-chevron rule; the row status select now sizes to
+  content (`width:auto`) so the "Applying" mid-gap is gone. (3) **Calendar source banner:**
+  restyled `.calendar-source-note` into an on-brand info notice (subtle blue tint, soft
+  border, radius, aligned brand-blue icon) for both EN/JA. (4) **Japanese résumés
+  redesigned** (`editor/server/templates.js`, `genJa01/02/03` only — EN templates and the
+  `generateLatex` signature untouched): `genJa01` 履歴書 → clean JIS-style rirekisho
+  (side-by-side identity table + bordered 4cm×3cm photo box + 年/月 学歴・職歴 timeline,
+  page 2 with 免許・資格 / 学業・ゼミ / 自己PR・ガクチカ / 本人希望記入欄); `genJa02`
+  インターン応募シート → polished one-pager with accent section rules; `genJa03` 職務経歴書
+  → refined full-bleed dark-sidebar + content layout. Recompiled with Tectonic: clean, 0
+  errors/overfull, page counts 2/1/1. Verified: `npm run build` green (bundle ~329 KB).
+- **2026-06-29 — HENNGE CV + cover letter revision pass.** Verbatim rewrite of both
+  `en/01_jakes_clean.tex` and `en/05_cover_letter_hennge.tex`: removed em-dashes,
+  reformatted the phone number to `+81 80-7535-2988` international format, added spacing
+  in the Education/Experience headings, reordered Projects (WebDrop 2026 current, Agent
+  Swarm 2026, Tutor-System 2026, TokaiHub 2025), strengthened the WebDrop bullets, and
+  rewrote the cover letter in a more natural student voice (dropped the "37-tool"
+  phrasing). To keep the CV at one page, applied all three spacing fallbacks
+  (`\resumeSubheading` `\vspace{-5pt}`, `\resumeItemListStart` `[topsep=1pt]`, Summary
+  `\vspace{3pt}`). Recompiled with Tectonic to `output/Mohamed_Fuad_CV.pdf` +
+  `en_01_jakes_clean.pdf` and `output/Mohamed_Fuad_Cover_Letter.pdf` +
+  `en_05_cover_letter_hennge.pdf`; both verified at exactly 1 page, previews rendered to
+  `output/preview/cv.png` and `cl.png`.
+- **2026-06-29 — HENNGE cover letter + CV emphasis pass.** Added an English cover letter
+  (`en/05_cover_letter_hennge.tex`) for the HENNGE Global Internship Program and applied
+  light AI/agent-orchestration emphasis edits to `en/01_jakes_clean.tex` (added a Summary
+  section, added the Agent Swarm project, sharpened the Tutor-System bullets, added an
+  "AI & Agents" skills line, and removed the Codex Account Switcher project). Compiled both
+  with Tectonic to upload-ready PDFs in `output/` (`Mohamed_Fuad_Cover_Letter.pdf`,
+  `Mohamed_Fuad_CV.pdf`); to keep the CV to one page the Activities section was removed.
+  Both PDFs verified at exactly 1 page.
 - **2026-06-29 — Finalize/cleanup pass (session: finalize worker).** (1) **JA-translation
   unified** — moved the comprehensive `jaDisplay`/`displayValue`/`displayRole` chain into
   the single `utils/internshipDisplay.js`; `InternshipDashboard.jsx` now imports it and

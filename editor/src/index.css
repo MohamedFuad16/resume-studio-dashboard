@@ -3442,9 +3442,9 @@ body,
 .intern-table-head,
 .intern-row {
   display: grid;
-  grid-template-columns: 42px minmax(180px, 1.55fr) 72px minmax(92px, 0.9fr) 92px 90px 94px minmax(110px, 1fr) 64px 34px;
+  grid-template-columns: 32px minmax(0, 2fr) 68px minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, .9fr) minmax(0, .9fr) 106px 66px 32px;
   align-items: center;
-  column-gap: 10px;
+  column-gap: 12px;
 }
 
 .intern-table-head {
@@ -3782,22 +3782,11 @@ body,
 .intern-lang-note { display: none; }
 
 @media (max-width: 1450px) {
-  .intern-content { grid-template-columns: minmax(0, 1fr) 310px; }
-  .intern-table-head,
-  .intern-row {
-    grid-template-columns: 36px minmax(170px, 1.45fr) 64px minmax(88px, 0.8fr) 78px 78px 82px minmax(96px, 0.8fr) 58px 30px;
-    column-gap: 7px;
-  }
   .intern-summary > div { padding: 0 16px; }
 }
 
 @media (max-width: 1250px) {
   .internship-radar { padding: 22px; }
-  .intern-content { grid-template-columns: minmax(0, 1fr) 300px; }
-  .intern-table-head,
-  .intern-row { grid-template-columns: 34px minmax(170px, 1.4fr) 60px minmax(90px, 0.8fr) 78px 78px minmax(94px, 0.8fr) 56px 30px; }
-  .intern-table-head > :nth-child(5),
-  .intern-row > .intern-language { display: none; }
   .intern-toolbar { grid-template-columns: minmax(220px, 320px) minmax(0, 1fr) auto; gap: 10px; }
 }
 
@@ -4123,7 +4112,7 @@ body,
 .intern-summary > div span { color: #727f93; }
 .intern-content { grid-template-columns: minmax(0, 1fr) 390px; }
 .intern-table-head,
-.intern-row { grid-template-columns: 38px minmax(250px, 1.65fr) 72px minmax(126px, .95fr) minmax(150px, 1.1fr) minmax(118px, .85fr) minmax(112px, .8fr) 94px 62px 32px; column-gap: 12px; }
+.intern-row { grid-template-columns: 32px minmax(0, 2fr) 68px minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, .9fr) minmax(0, .9fr) 106px 66px 32px; column-gap: 12px; }
 .intern-row { min-height: 96px; padding-block: 14px; }
 .intern-company-mark { display: none; }
 .intern-row-status { width: 100%; }
@@ -4845,8 +4834,8 @@ body,
 
 .intern-table-head,
 .intern-row {
-  grid-template-columns: 38px minmax(240px, 1.65fr) 68px minmax(116px, .95fr) minmax(132px, 1fr) minmax(104px, .8fr) minmax(108px, .8fr) 94px 62px 32px;
-  column-gap: 10px;
+  grid-template-columns: 32px minmax(0, 2fr) 68px minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, .9fr) minmax(0, .9fr) 106px 66px 32px;
+  column-gap: 12px;
 }
 
 .intern-table-head { padding-inline: 14px; }
@@ -5794,19 +5783,20 @@ body,
   width: 100%;
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: 9px;
   box-sizing: border-box;
-  margin: 14px 0 0;
-  padding: 10px 12px;
-  border: 1px solid #e1e7f0;
-  border-radius: 10px;
-  background: #f8fafc;
-  color: #68758a;
-  font-size: 10.5px;
-  line-height: 1.45;
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid #dce6f4;
+  border-radius: 14px;
+  background: #f4f8ff;
+  color: #5d6b82;
+  font-size: 12px;
+  font-weight: 560;
+  line-height: 1.5;
 }
 
-.calendar-source-note svg { flex: 0 0 auto; margin-top: 1px; color: #52719f; }
+.calendar-source-note svg { flex: 0 0 auto; margin-top: 2px; color: #3f6bd6; }
 
 .calendar-view-switch { min-height: 42px; box-sizing: border-box; }
 .calendar-add { min-height: 42px; padding-inline: 18px; }
@@ -5828,17 +5818,54 @@ body,
 }
 
 .intern-toolbar .intern-sort select {
-  width: 210px;
-  min-width: 210px;
+  width: auto;
+  min-width: 0;
   min-height: 42px;
 }
 
-.intern-content { display: block; min-height: 660px; }
-.intern-results { min-width: 0; overflow-x: auto; }
+/* Radar & dashboard selects — uniform custom chevron, padding, and sizing */
+.intern-filter-row select,
+.intern-sort select,
+.intern-row-status,
+.intern-status-control select,
+.application-row select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0 30px 0 11px;
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 10px 6px;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.intern-filter-row select:focus-visible,
+.intern-sort select:focus-visible,
+.intern-row-status:focus-visible,
+.intern-status-control select:focus-visible {
+  outline: none;
+  border-color: var(--intern-blue);
+  box-shadow: 0 0 0 3px rgba(10, 87, 255, .12);
+}
+
+/* Size status selects to their content so the chevron sits beside the label (no mid gap) */
+.intern-row-status,
+.intern-status-control select {
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+  justify-self: start;
+}
+
+.intern-content { display: block; min-width: 0; min-height: 660px; }
+.intern-results { min-width: 0; }
+.intern-rows { min-width: 0; }
 .intern-table-head,
 .intern-row {
-  min-width: 1180px;
-  grid-template-columns: 34px minmax(240px, 1.7fr) 64px minmax(132px, .9fr) minmax(148px, 1fr) minmax(126px, .9fr) 108px 104px 62px 32px;
+  min-width: 0;
+  grid-template-columns: 32px minmax(0, 2fr) 68px minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, .9fr) minmax(0, .9fr) 106px 66px 32px;
   column-gap: 12px;
   cursor: pointer;
 }

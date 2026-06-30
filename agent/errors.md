@@ -2,6 +2,22 @@
 
 ## Fixed
 
+### BUG-002 — Internship Radar table forces a horizontal scrollbar — FIXED 2026-06-30
+- **Date:** 2026-06-30 · **File:** `editor/src/index.css`
+- **Symptom:** The radar results table overflowed the viewport and showed an unwanted
+  horizontal scrollbar; some `<select>`s (esp. the per-row status select) had a large gap
+  between the label and the dropdown chevron.
+- **Root cause:** Four drifted `.intern-table-head,.intern-row` `grid-template-columns`
+  definitions existed; the *winning* late block set `min-width: 1180px` together with
+  `.intern-results { overflow-x: auto }`, forcing overflow. Status selects used
+  `width:100%` (native select right-aligns the chevron → big middle gap).
+- **Fix:** Collapsed to one shrink-safe fluid grid (`minmax(0,…)`/`fr`, `column-gap:12px`),
+  removed `min-width`/`overflow-x`, added `min-width:0` to grid ancestors, dropped dead
+  1450/1250px overrides; normalized all selects with a shared `appearance:none` + custom
+  chevron rule and content-sized width for status selects. See ADR-0008.
+- **Verified:** `npm run build` green; headless Chromium shows
+  `scrollWidth - clientWidth === 0` at 1024/1280/1440 + mobile widths.
+
 ### BUG-001 — Track filter returns no results in Japanese mode
 - **Date:** 2026-06-29 · **File:** `editor/src/components/InternshipDashboard.jsx`
 - **Symptom:** In JA (`?lang`/JA toggle), choosing any value in the **Track** filter
