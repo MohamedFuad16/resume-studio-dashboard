@@ -3847,17 +3847,6 @@ body,
     grid-row: 1;
   }
 
-  .nav-profile-switcher {
-    grid-column: 1 / -1;
-    grid-row: 3;
-    justify-self: start;
-    flex-wrap: wrap;
-  }
-
-  .nav-profile-switcher .nav-profile-select {
-    max-width: 100%;
-  }
-
   .top-nav {
     grid-column: 1 / -1;
     grid-row: 2;
@@ -5597,6 +5586,16 @@ body,
 }
 .calendar-day.today .calendar-day-number { background: #0b5cff; color: #fff; box-shadow: 0 0 0 2px rgba(11, 92, 255, .15); }
 
+.calendar-grid.week .calendar-day-number {
+  width: auto;
+  min-width: 0;
+  height: auto;
+  min-height: 24px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  line-height: 1;
+}
+
 .calendar-day-events {
   display: grid;
   gap: 5px;
@@ -5639,7 +5638,9 @@ body,
   z-index: 20;
   left: 10px;
   bottom: calc(100% + 8px);
-  width: 230px;
+  width: auto;
+  min-width: 200px;
+  max-width: 260px;
   display: none;
   padding: 10px;
   border: 1px solid #d9e3f2;
@@ -5660,6 +5661,9 @@ body,
   font-size: 10px;
   font-style: normal;
   line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .calendar-more {
@@ -5729,6 +5733,9 @@ body,
 @media (max-width: 1050px) {
   .calendar-form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .calendar-form label:first-of-type {
+    grid-column: 1 / -1;
   }
   .calendar-form-note,
   .calendar-form-submit { grid-column: 1 / -1; }
@@ -5886,6 +5893,10 @@ body,
   padding: 0 30px 0 11px;
   border: 1px solid #d5ddea;
   border-radius: 7px;
+  color: #34445e;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 650;
   background-color: #fff;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
@@ -6053,9 +6064,11 @@ body,
 }
 
 .intern-detail-meta .intern-meta-token svg { color: #65758c; }
-.intern-detail-meta .intern-meta-token.language b {
+.intern-detail-meta .intern-meta-token.language {
   white-space: normal;
   overflow-wrap: anywhere;
+}
+.intern-detail-meta .intern-meta-token.language b {
   color: #0b5cff;
   font-size: 8px;
   letter-spacing: .03em;
