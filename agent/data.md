@@ -10,6 +10,7 @@ Blob snapshots. All writes pass `server/validation.js`.
 {
   "personal": {              // a.k.a. personalInfo in some legacy paths
     "nameEn", "nameJa", "furigana", "dob", "address",
+    "postalCode",            // optional string; ≤16 chars, [0-9A-Za-z spaces/-] (validation.js)
     "email", "phone", "github", "linkedin",
     "photoDataUrl"           // data:image/(png|jpeg|webp); <6MB, validated
   },

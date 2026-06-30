@@ -15,11 +15,39 @@ import { CompanyLogo } from './CompanyLogo.jsx';
 import { displayCompany, displayRole, formatDisplayDeadline } from '../utils/internshipDisplay.js';
 
 const pad = value => String(value).padStart(2, '0');
+const TIME_ZONE = 'Asia/Tokyo';
+
+// `en-CA` renders dates as YYYY-MM-DD, and `timeZone` pins the calendar day to Tokyo.
+// This keeps a late-night ISO instant (stored in UTC) from bleeding onto the wrong
+// local day regardless of where the runtime's clock is.
+const TOKYO_DATE_KEY = new Intl.DateTimeFormat('en-CA', {
+  timeZone: TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+// Asia/Tokyo day key for a real instant (Date or ISO/epoch stamp); null when missing
+// or unparseable. Use this for anything derived from a timestamp ("now", applied-at…)
+// so the day is resolved in Tokyo, not in the host timezone.
+const instantDateKey = value => {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : TOKYO_DATE_KEY.format(date);
+};
+
+// Day key for a calendar cell built from explicit Y/M/D (constructed at local noon),
+// so reading the same local fields round-trips without any TZ shift.
 const toDateKey = date => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 const parseDateKey = key => {
   const [year, month, day] = String(key || '').split('-').map(Number);
   return new Date(year, month - 1, day, 12);
 };
+
+// Local-noon Date whose Y/M/D equal "today" in Asia/Tokyo. Anchoring the grid to this
+// keeps the rendered month and the today highlight in agreement even off-Tokyo.
+const tokyoTodayAnchor = () => parseDateKey(instantDateKey(new Date()));
+
 const addDays = (date, amount) => {
   const next = new Date(date);
   next.setDate(next.getDate() + amount);
@@ -28,12 +56,11 @@ const addDays = (date, amount) => {
 const startOfWeek = date => addDays(date, -((date.getDay() + 6) % 7));
 
 const APPLIED_STATUSES = new Set(['applying', 'applied', 'interview']);
-const appliedDateKey = record => {
-  const stamp = record.updatedAt || record.createdAt;
-  if (!stamp) return null;
-  const date = new Date(stamp);
-  return Number.isNaN(date.getTime()) ? null : toDateKey(date);
-};
+// Prefer a dedicated applied-at when present, then the record's createdAt (when the
+// application was first tracked). `updatedAt` is intentionally last: it moves on every
+// edit (status change, milestone add), which previously dragged the "applied" marker
+// onto a later day. The key is always resolved in Asia/Tokyo (see instantDateKey).
+const appliedDateKey = record => instantDateKey(record.appliedAt || record.createdAt || record.updatedAt);
 
 const copy = {
   en: {
@@ -56,6 +83,7 @@ const copy = {
     deadline: 'Application deadline',
     applied: 'Application',
     interview: 'Interview',
+    codingTest: 'Coding test',
     submitted: 'Application submitted',
     followUp: 'Follow-up',
     other: 'Other',
@@ -85,6 +113,7 @@ const copy = {
     deadline: '応募締切',
     applied: '応募',
     interview: '面接',
+    codingTest: 'コーディングテスト',
     submitted: '応募完了',
     followUp: 'フォローアップ',
     other: 'その他',
@@ -100,6 +129,7 @@ function eventLabel(kind, t) {
   if (kind === 'deadline') return t.deadline;
   if (kind === 'applied') return t.applied;
   if (kind === 'interview') return t.interview;
+  if (kind === 'coding-test') return t.codingTest;
   if (kind === 'application-submitted') return t.submitted;
   if (kind === 'follow-up') return t.followUp;
   return t.other;
@@ -161,7 +191,7 @@ export function ApplicationCalendar({ records, addMilestone, removeMilestone, is
   const t = isJa ? copy.ja : copy.en;
   const locale = isJa ? 'ja-JP' : 'en-US';
   const [view, setView] = useState('month');
-  const [anchor, setAnchor] = useState(() => new Date());
+  const [anchor, setAnchor] = useState(() => tokyoTodayAnchor());
   const [selected, setSelected] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [draft, setDraft] = useState({ recordId: '', kind: 'interview', date: '', time: '', title: '' });
@@ -181,7 +211,7 @@ export function ApplicationCalendar({ records, addMilestone, removeMilestone, is
     return Array.from({ length: daysInMonth }, (_, index) => new Date(anchor.getFullYear(), anchor.getMonth(), index + 1, 12));
   }, [anchor, view]);
 
-  const todayKey = toDateKey(new Date());
+  const todayKey = instantDateKey(new Date());
   const title = view === 'month'
     ? new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(anchor)
     : `${new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(dates[0])} – ${new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', year: 'numeric' }).format(dates[6])}`;
@@ -227,7 +257,7 @@ export function ApplicationCalendar({ records, addMilestone, removeMilestone, is
           <div className="calendar-form-title"><strong>{t.addTitle}</strong><button type="button" onClick={() => setShowForm(false)} aria-label={t.cancel}><X size={16} /></button></div>
           {records.length ? <>
             <label><span>{t.role}</span><select value={draft.recordId} onChange={event => setDraft(current => ({ ...current, recordId: event.target.value }))}>{records.map(record => <option key={record.internshipId} value={record.internshipId}>{displayCompany(record, isJa)} — {displayRole(record.role, isJa)}</option>)}</select></label>
-            <label><span>{t.event}</span><select value={draft.kind} onChange={event => setDraft(current => ({ ...current, kind: event.target.value }))}><option value="interview">{t.interview}</option><option value="application-submitted">{t.submitted}</option><option value="follow-up">{t.followUp}</option><option value="other">{t.other}</option></select></label>
+            <label><span>{t.event}</span><select value={draft.kind} onChange={event => setDraft(current => ({ ...current, kind: event.target.value }))}><option value="interview">{t.interview}</option><option value="coding-test">{t.codingTest}</option><option value="application-submitted">{t.submitted}</option><option value="follow-up">{t.followUp}</option><option value="other">{t.other}</option></select></label>
             <label><span>{t.date}</span><input type="date" required value={draft.date} onChange={event => setDraft(current => ({ ...current, date: event.target.value }))} /></label>
             <label><span>{t.time}</span><input type="time" value={draft.time} onChange={event => setDraft(current => ({ ...current, time: event.target.value }))} /></label>
             <label className="calendar-form-note"><span>{t.note}</span><input value={draft.title} onChange={event => setDraft(current => ({ ...current, title: event.target.value }))} placeholder={isJa ? '例：技術面接' : 'Example: Technical interview'} /></label>
@@ -239,7 +269,7 @@ export function ApplicationCalendar({ records, addMilestone, removeMilestone, is
       <div className="calendar-nav">
         <button type="button" onClick={() => shift(-1)} aria-label={isJa ? '前へ' : 'Previous period'}><ChevronLeft size={16} /></button>
         <strong>{title}</strong>
-        <button type="button" className="calendar-today" onClick={() => setAnchor(new Date())}>{t.today}</button>
+        <button type="button" className="calendar-today" onClick={() => setAnchor(tokyoTodayAnchor())}>{t.today}</button>
         <button type="button" onClick={() => shift(1)} aria-label={isJa ? '次へ' : 'Next period'}><ChevronRight size={16} /></button>
       </div>
 

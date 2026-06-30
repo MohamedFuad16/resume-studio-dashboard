@@ -1,6 +1,6 @@
-# Resume Studio
+# Internship Portal
 
-Resume Studio is a bilingual resume editor and internship tracker for Mohamed Fuad.
+Internship Portal (インターンポータル) is a bilingual internship tracker and résumé editor.
 
 ## Data storage
 

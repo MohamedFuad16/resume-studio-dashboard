@@ -1,10 +1,10 @@
-import { spawn } from 'child_process';
-import fs from 'fs/promises';
-import os from 'os';
-import path from 'path';
+import OpenAI from 'openai';
 
 const VALID_SECTIONS = new Set(['personal', 'summary', 'education', 'experience', 'projects', 'skills', 'activities']);
 const PATCHABLE_KEYS = new Set(['personal', 'summary', 'summaryEn', 'summaryJa', 'japanese', 'education', 'experience', 'projects', 'skills', 'activities']);
+const DEFAULT_MODEL = 'openai/gpt-5-mini';
+const ENGINE_LABEL = 'OpenRouter LLM';
+let warnedNoKey = false;
 
 const clone = value => JSON.parse(JSON.stringify(value));
 
@@ -144,7 +144,7 @@ function parseJsonResponse(raw) {
   try { return JSON.parse(trimmed); } catch {
     const start = trimmed.indexOf('{');
     const end = trimmed.lastIndexOf('}');
-    if (start < 0 || end <= start) throw new Error('Codex did not return a structured edit');
+    if (start < 0 || end <= start) throw new Error('The resume model did not return a structured edit');
     return JSON.parse(trimmed.slice(start, end + 1));
   }
 }
@@ -165,7 +165,7 @@ function validateResult(result, original) {
     changedSections,
     focusSection: VALID_SECTIONS.has(result.focusSection) ? result.focusSection : (changedSections[0] || 'summary'),
     message: String(result.message || 'Applied the requested resume changes.'),
-    engine: 'Codex LLM',
+    engine: ENGINE_LABEL,
     type: changedSections.length ? 'edit' : 'conversation',
   };
 }
@@ -196,52 +196,60 @@ function validatePatchResult(result, original) {
     changedSections,
     focusSection: VALID_SECTIONS.has(result.focusSection) ? result.focusSection : (changedSections[0] || 'summary'),
     message: String(result.message || (changedSections.length ? 'Applied the requested resume changes.' : 'No resume fields were changed.')),
-    engine: 'Codex LLM',
+    engine: ENGINE_LABEL,
     type: changedSections.length ? 'edit' : 'conversation',
   };
 }
 
-async function runCodexPrompt(prompt, rootDir) {
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'resume-chat-'));
-  const outputFile = path.join(tempDir, 'result.json');
-  try {
-    await new Promise((resolve, reject) => {
-      const child = spawn('codex', [
-      'exec', '--ephemeral', '--sandbox', 'read-only', '--skip-git-repo-check', '--ignore-rules',
-      '--color', 'never', '-C', rootDir, '-o', outputFile, '-',
-      ], { stdio: ['pipe', 'pipe', 'pipe'] });
-      let stderr = '';
-      let stdout = '';
-      child.stderr.on('data', chunk => { stderr += chunk.toString(); });
-      child.stdout.on('data', chunk => { stdout += chunk.toString(); });
-      const timer = setTimeout(() => {
-        child.kill('SIGTERM');
-        reject(new Error('Codex CLI timed out'));
-      }, Number(process.env.RESUME_CHAT_CODEX_TIMEOUT_MS || 90000));
-      child.on('error', error => {
-        clearTimeout(timer);
-        reject(error);
-      });
-      child.on('exit', code => {
-        clearTimeout(timer);
-        if (code === 0) resolve();
-        else {
-          const usefulError = stderr.split('\n').reverse().find(line => line.trim() && !/\bWARN\b|^hook:/i.test(line));
-          reject(new Error(usefulError || stdout.split('\n').reverse().find(Boolean) || `Codex CLI exited with code ${code}`));
-        }
-      });
-      child.stdin.end(prompt);
-    });
-    const raw = await fs.readFile(outputFile, 'utf8');
-    if (!raw.trim()) throw new Error('Codex returned an empty response');
-    return raw.trim();
-  } finally {
-    fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+// Builds an OpenAI-SDK client pointed at OpenRouter. Throws a clearly-worded,
+// taggable error when the key is missing so callers can fall back to local edits.
+function getOpenRouterClient() {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    const error = new Error('OPENROUTER_API_KEY is not set');
+    error.code = 'OPENROUTER_API_KEY_MISSING';
+    throw error;
   }
+  return new OpenAI({
+    baseURL: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
+    apiKey,
+    maxRetries: 1,
+    defaultHeaders: {
+      'HTTP-Referer': process.env.RESUME_STUDIO_APP_ORIGIN || 'https://editor-omega-two.vercel.app',
+      'X-Title': 'Internship Portal',
+    },
+  });
 }
 
-async function runCodexEdit(resume, instruction, language, rootDir) {
-  const prompt = `You are the resume-editing LLM inside Resume Studio. Apply the user's natural-language request to CURRENT_RESUME and return ONLY a valid JSON object with exactly these keys: message, focusSection, changedSections, updates.
+// Resume chat / Generate-draft use the plain model (no web search); strip any
+// `:online` suffix an operator may have set on the shared OPENROUTER_MODEL.
+function chatModel() {
+  return (process.env.OPENROUTER_MODEL || DEFAULT_MODEL).replace(/:online$/, '');
+}
+
+async function runOpenAiPrompt(prompt, { json = false } = {}) {
+  const client = getOpenRouterClient();
+  const timeoutMs = Number(process.env.RESUME_CHAT_CODEX_TIMEOUT_MS || 90000);
+  const response = await client.chat.completions.create(
+    {
+      model: chatModel(),
+      messages: [{ role: 'user', content: prompt }],
+      ...(json ? { response_format: { type: 'json_object' } } : {}),
+    },
+    { timeout: timeoutMs },
+  );
+  const content = response?.choices?.[0]?.message?.content;
+  const text = typeof content === 'string'
+    ? content
+    : Array.isArray(content)
+      ? content.map(part => (typeof part === 'string' ? part : part?.text || '')).join('')
+      : '';
+  if (!text.trim()) throw new Error('The resume model returned an empty response');
+  return text.trim();
+}
+
+async function runOpenAiEdit(resume, instruction, language) {
+  const prompt = `You are the resume-editing LLM inside Internship Portal. Apply the user's natural-language request to CURRENT_RESUME and return ONLY a valid JSON object with exactly these keys: message, focusSection, changedSections, updates.
 
 Rules:
 - updates must contain only changed top-level fields. Allowed keys: personal, summary, summaryEn, summaryJa, japanese, education, experience, projects, skills, activities.
@@ -259,11 +267,11 @@ LANGUAGE: ${language}
 USER REQUEST: ${instruction}
 CURRENT_RESUME:
 ${JSON.stringify(resume)}`;
-  const raw = await runCodexPrompt(prompt, rootDir);
+  const raw = await runOpenAiPrompt(prompt, { json: true });
   return validatePatchResult(parseJsonResponse(raw), resume);
 }
 
-async function runCodexConversation(resume, instruction, language, rootDir) {
+async function runOpenAiConversation(resume, instruction, language) {
   const context = {
     personal: resume.personal,
     summary: language === 'ja' ? (resume.summaryJa || resume.japanese?.summary || resume.summary) : (resume.summaryEn || resume.summary),
@@ -272,20 +280,20 @@ async function runCodexConversation(resume, instruction, language, rootDir) {
     projects: (resume.projects || []).map(item => ({ title: item.title, tech: item.tech, bullets: (item.bullets || []).slice(0, 2) })).slice(0, 5),
     skills: resume.skills,
   };
-  const prompt = `You are the conversational Codex resume agent inside Resume Studio. Answer the user's message naturally and concisely in ${language === 'ja' ? 'Japanese' : 'English'}.
+  const prompt = `You are the conversational resume agent inside Internship Portal. Answer the user's message naturally and concisely in ${language === 'ja' ? 'Japanese' : 'English'}.
 
 You can discuss this resume, suggest improvements, explain strategy, and tell the user how to request an edit. Use only the supplied resume facts; never invent experience, metrics, credentials, or eligibility. Keep the answer under 140 words. Return plain text only.
 
 USER MESSAGE: ${instruction}
 RESUME CONTEXT:
 ${JSON.stringify(context)}`;
-  const message = await runCodexPrompt(prompt, rootDir);
+  const message = await runOpenAiPrompt(prompt, { json: false });
   return {
     resume,
     changedSections: [],
     focusSection: 'summary',
     message,
-    engine: 'Codex LLM',
+    engine: ENGINE_LABEL,
     type: 'conversation',
   };
 }
@@ -298,13 +306,21 @@ export async function runResumeChat({ resume, instruction, language = 'en', root
   const local = applyLocalEdit(resume, instruction, language);
   const complex = /(improve|rewrite|tailor|fine[ -]?tune|shorten|professional|impact|job description|target role|自然|改善|書き直|整え|応募先)/i.test(instruction);
   const conversationOnly = isConversationOnly(instruction);
-  const useCodex = process.env.RESUME_CHAT_ENGINE !== 'local';
+  // Use the OpenRouter LLM unless explicitly forced local OR no API key is set
+  // (graceful degradation to the deterministic engine below).
+  const forcedLocal = process.env.RESUME_CHAT_ENGINE === 'local';
+  const hasKey = !!process.env.OPENROUTER_API_KEY;
+  if (!forcedLocal && !hasKey && !warnedNoKey) {
+    warnedNoKey = true;
+    console.warn('[resume-chat] OPENROUTER_API_KEY is not set; using the deterministic local engine. Set it in editor/.env.local and in Vercel to enable AI resume edits.');
+  }
+  const useOpenAi = !forcedLocal && hasKey;
 
-  if (useCodex) {
+  if (useOpenAi) {
     try {
       return conversationOnly
-        ? await runCodexConversation(resume, instruction, language, rootDir)
-        : await runCodexEdit(resume, instruction, language, rootDir);
+        ? await runOpenAiConversation(resume, instruction, language)
+        : await runOpenAiEdit(resume, instruction, language);
     } catch (error) {
       if (local.changedSections.length) return { ...local, engine: 'Instant local fallback', type: 'edit' };
       if (complex) return { ...applyHeuristicFineTune(resume, instruction, language), engine: 'Structured local fallback', type: 'edit' };
@@ -312,7 +328,7 @@ export async function runResumeChat({ resume, instruction, language = 'en', root
         resume,
         changedSections: [],
         focusSection: 'summary',
-        message: `${buildConversationReply(resume, instruction, language)} ${language === 'ja' ? '（Codexへの接続を再試行してください。）' : '(The Codex connection was unavailable; please retry.)'}`,
+        message: `${buildConversationReply(resume, instruction, language)} ${language === 'ja' ? '（AIへの接続を再試行してください。）' : '(The AI service was unavailable; please retry.)'}`,
         engine: language === 'ja' ? 'ローカル予備応答' : 'Local fallback',
         type: 'conversation',
       };

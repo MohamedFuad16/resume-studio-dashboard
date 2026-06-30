@@ -123,12 +123,110 @@ export function Inp({ label, value, onChange, placeholder, type = 'text', ...pro
   );
 }
 
+/* Shared auto-growing textarea: height tracks content (scrollHeight) on mount,
+   on every value change, and on input. Brand-new behavior → inline height is set
+   imperatively; the namespaced `.autosize-textarea` class hides the scrollbar/resize
+   handle (see CSS SPEC). A min-height floor is supplied by the caller. */
+function AutoTextarea({ value, onChange, className = '', style, ...props }) {
+  const ref = useRef(null);
+  const resize = el => {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  };
+  useEffect(() => { resize(ref.current); }, [value]);
+  return (
+    <textarea
+      ref={ref}
+      className={`autosize-textarea ${className}`.trim()}
+      value={value || ''}
+      onChange={e => { onChange(e.target.value); resize(e.target); }}
+      style={style}
+      {...props}
+    />
+  );
+}
+
 export function Txta({ label, value, onChange, placeholder, rows = 3, className = '', ...props }) {
   return (
     <div className="f">
       {label && <Lbl t={label} />}
-      <textarea className={`fta ${className}`.trim()} value={value || ''} onChange={e => onChange(e.target.value)}
+      <AutoTextarea className={`fta ${className}`.trim()} value={value} onChange={onChange}
         placeholder={placeholder || ''} style={{ minHeight: `${rows * 20}px` }} {...props} />
+    </div>
+  );
+}
+
+/* ── Native month picker with optional "ongoing" toggle ──── */
+const MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// Parse any stored date string ("Apr 2024", "2024-04", "2024年4月", …) → "YYYY-MM"
+// for the native <input type="month"> value. Returns '' when no month is present.
+export function toMonthValue(str) {
+  if (!str) return '';
+  const s = String(str).trim();
+  const map = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+  let m = s.match(/^(\d{4})[-/](\d{1,2})/);
+  if (m) return `${m[1]}-${String(Math.min(12, Math.max(1, +m[2]))).padStart(2, '0')}`;
+  m = s.match(/^(\d{4})年\s*(\d{1,2})月/);
+  if (m) return `${m[1]}-${String(Math.min(12, Math.max(1, +m[2]))).padStart(2, '0')}`;
+  m = s.match(/^([A-Za-z]{3,})\s*(\d{4})/);
+  if (m && map[m[1].toLowerCase().slice(0, 3)]) return `${m[2]}-${String(map[m[1].toLowerCase().slice(0, 3)]).padStart(2, '0')}`;
+  m = s.match(/^(\d{4})\s*([A-Za-z]{3,})/);
+  if (m && map[m[2].toLowerCase().slice(0, 3)]) return `${m[1]}-${String(map[m[2].toLowerCase().slice(0, 3)]).padStart(2, '0')}`;
+  return '';
+}
+
+// "YYYY-MM" → canonical human display "Mon YYYY" (e.g. "Apr 2024"). Stored verbatim;
+// the EN résumé template prints it as-is and the JA template re-parses it via parseDateJa.
+export function formatMonthDisplay(yyyymm) {
+  const m = String(yyyymm || '').match(/^(\d{4})-(\d{2})$/);
+  if (!m) return '';
+  return `${MONTHS_EN[Math.min(12, Math.max(1, +m[2])) - 1]} ${m[1]}`;
+}
+
+export function MonthInput({ label, value, onChange, ongoingMode, isJa = false, placeholder }) {
+  const raw = (value || '').trim();
+  const monthVal = toMonthValue(raw);
+  const isPresent = /^(present|現在)$/i.test(raw);
+  const isExpected = /\(expected\)|予定/i.test(raw);
+  const ongoingOn = ongoingMode === 'present' ? isPresent : ongoingMode === 'expected' ? isExpected : false;
+
+  const emit = (mv, ongoing) => {
+    if (ongoingMode === 'present') {
+      if (ongoing) return onChange('Present');
+      return onChange(mv ? formatMonthDisplay(mv) : '');
+    }
+    if (ongoingMode === 'expected') {
+      if (!mv) return onChange('');
+      return onChange(formatMonthDisplay(mv) + (ongoing ? ' (Expected)' : ''));
+    }
+    return onChange(mv ? formatMonthDisplay(mv) : '');
+  };
+
+  const ongoingLabel = ongoingMode === 'present'
+    ? (isJa ? '現在' : 'Present')
+    : (isJa ? '卒業予定' : 'Expected');
+
+  return (
+    <div className="f month-field">
+      {label && <Lbl t={label} />}
+      <div className="month-field-row">
+        <input
+          className="fi month-input"
+          type="month"
+          value={monthVal}
+          placeholder={placeholder || ''}
+          disabled={ongoingMode === 'present' && ongoingOn}
+          onChange={e => emit(e.target.value, ongoingOn)}
+        />
+        {ongoingMode && (
+          <label className="month-ongoing">
+            <input type="checkbox" checked={ongoingOn} onChange={e => emit(monthVal, e.target.checked)} />
+            <span>{ongoingLabel}</span>
+          </label>
+        )}
+      </div>
     </div>
   );
 }
@@ -144,7 +242,7 @@ export function Bullets({ items, onChange }) {
       <div className="bullet-stack">
         {items.map((b, i) => (
           <div key={i} className="bullet-row">
-            <textarea className="fta bullet-textarea" value={b} onChange={e => upd(i, e.target.value)}
+            <AutoTextarea className="fta bullet-textarea" value={b} onChange={v => upd(i, v)}
               placeholder={`Point ${i + 1}…`} />
             <button className="bullet-del" onClick={() => del(i)} title="Remove">
               <I n="x" s={11} />
@@ -162,6 +260,7 @@ export function TagInput({ label, value, onChange, placeholder, suggestions = []
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const ref = useRef();
+  const inputRef = useRef();
 
 
 
@@ -217,21 +316,25 @@ export function TagInput({ label, value, onChange, placeholder, suggestions = []
 
 
   return (
-    <div className="f tag-inp-container" ref={ref}>
+    <div className="f tag-inp-container tag-multiselect" ref={ref}>
       {label && <Lbl t={label} />}
-      <div className={`tag-inp-box ${open ? 'focus' : ''}`} onClick={() => setOpen(true)}>
-        <div className="tag-pills">
+      <div
+        className={`tag-inp-box tag-ms-box ${open ? 'focus' : ''}`}
+        onClick={() => { setOpen(true); inputRef.current?.focus(); }}
+      >
+        <div className="tag-pills tag-ms-pills">
           {tags.map((tag, i) => (
             <span key={i} className="tag-pill">
-              {tag}
+              <span className="tag-pill-label">{tag}</span>
               <button type="button" className="tag-pill-remove" onClick={(e) => { e.stopPropagation(); removeTag(i); }}>
                 <I n="x" s={10} />
               </button>
             </span>
           ))}
           <input
+            ref={inputRef}
             type="text"
-            className="tag-inp-field"
+            className="tag-inp-field tag-ms-field"
             value={query}
             onChange={e => { setQuery(e.target.value); setOpen(true); }}
             onKeyDown={handleKeyDown}
@@ -239,12 +342,18 @@ export function TagInput({ label, value, onChange, placeholder, suggestions = []
             onFocus={() => setOpen(true)}
           />
         </div>
-        <div className="tag-inp-chevron" onClick={(e) => { e.stopPropagation(); setOpen(!open); }}>
-          <I n="chev" s={11} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
-        </div>
+        <button
+          type="button"
+          className="field-chevron"
+          aria-label="Toggle options"
+          tabIndex={-1}
+          onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}
+        >
+          <I n="chev" s={12} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+        </button>
       </div>
       {open && (filteredSuggestions.length > 0 || (query.trim() && !tags.some(t => t.toLowerCase() === query.trim().toLowerCase()))) && (
-        <div className="tag-dropdown">
+        <div className="tag-dropdown tag-ms-dropdown">
           {visibleSuggestions.map((s, idx) => (
             <div key={idx} className="tag-dropdown-item" onClick={() => addTag(s)}>
               {s}
@@ -281,25 +390,30 @@ export function SuggestInput({ label, value, onChange, placeholder, suggestions 
   );
 
   return (
-    <div className="f tag-inp-container" ref={ref}>
+    <div className="f tag-inp-container suggest-field" ref={ref}>
       {label && <Lbl t={label} />}
-      <div className={`tag-inp-box ${open ? 'focus' : ''}`} style={{ padding: 0 }}>
+      <div className={`tag-inp-box suggest-box ${open ? 'focus' : ''}`}>
         <input
-          className="tag-inp-field"
+          className="tag-inp-field suggest-input"
           type="text"
           value={value || ''}
           onChange={e => { onChange(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
           placeholder={placeholder || ''}
-          style={{ padding: '8px 12px', flex: 1, minWidth: '0' }}
           {...props}
         />
-        <div className="tag-inp-chevron" onClick={(e) => { e.stopPropagation(); setOpen(!open); }} style={{ paddingRight: '12px' }}>
-          <I n="chev" s={11} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
-        </div>
+        <button
+          type="button"
+          className="field-chevron"
+          aria-label="Toggle suggestions"
+          tabIndex={-1}
+          onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}
+        >
+          <I n="chev" s={12} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+        </button>
       </div>
       {open && filtered.length > 0 && (
-        <div className="tag-dropdown">
+        <div className="tag-dropdown suggest-dropdown">
           {filtered.map((s, idx) => (
             <div key={idx} className="tag-dropdown-item" onClick={() => { onChange(s); setOpen(false); }}>
               {s}

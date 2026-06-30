@@ -1,12 +1,11 @@
-import { spawn } from 'child_process';
 import { createHash } from 'crypto';
 import fs from 'fs/promises';
-import os from 'os';
-import path from 'path';
 import { fileURLToPath } from 'url';
+import OpenAI from 'openai';
 
 const SCHEMA_FILE = fileURLToPath(new URL('./internship-search.schema.json', import.meta.url));
 const BLOCKED_JOB_DOMAINS = /(?:indeed|glassdoor|linkedin|ziprecruiter|simplyhired)\./i;
+const DEFAULT_MODEL = 'openai/gpt-5-mini';
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const slugify = value => String(value || '')
@@ -109,41 +108,116 @@ function fallbackCompanyName(value) {
   return trimmed;
 }
 
-async function runCodexSearch(prompt, rootDir) {
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'internship-research-'));
-  const outputFile = path.join(tempDir, 'result.json');
+// Builds an OpenAI-SDK client pointed at OpenRouter. Throws a clearly-worded,
+// taggable error when the key is missing so callers can degrade gracefully.
+function getOpenRouterClient() {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    const error = new Error(
+      'Live internship research is unavailable because OPENROUTER_API_KEY is not set. '
+      + 'Add it to editor/.env.local for local dev and to the Vercel project environment for production, then retry.',
+    );
+    error.code = 'OPENROUTER_API_KEY_MISSING';
+    throw error;
+  }
+  return new OpenAI({
+    baseURL: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
+    apiKey,
+    maxRetries: 1,
+    defaultHeaders: {
+      'HTTP-Referer': process.env.RESUME_STUDIO_APP_ORIGIN || 'https://editor-omega-two.vercel.app',
+      'X-Title': 'Internship Portal',
+    },
+  });
+}
+
+let schemaCache = null;
+async function loadSearchSchema() {
+  if (!schemaCache) {
+    const raw = JSON.parse(await fs.readFile(SCHEMA_FILE, 'utf8'));
+    delete raw.$schema; // Not part of the API json_schema payload.
+    schemaCache = raw;
+  }
+  return schemaCache;
+}
+
+// The research call gets OpenRouter web search via the `:online` model suffix
+// (a still-supported shortcut for the web plugin). If the operator already
+// pinned a fully-qualified slug/variant we leave it untouched.
+function researchModel() {
+  const base = process.env.OPENROUTER_MODEL || DEFAULT_MODEL;
+  return base.includes(':') ? base : `${base}:online`;
+}
+
+function extractContent(response) {
+  const content = response?.choices?.[0]?.message?.content;
+  if (typeof content === 'string' && content.trim()) return content;
+  if (Array.isArray(content)) {
+    const text = content.map(part => (typeof part === 'string' ? part : part?.text || '')).join('').trim();
+    if (text) return text;
+  }
+  throw new Error('Research model returned an empty response');
+}
+
+// Detects routes/models that reject strict json_schema so we can retry with
+// plain json_object mode (handled by the tolerant parseResult below).
+function isStructuredOutputRejection(error) {
+  const status = error?.status;
+  const message = String(error?.message || '').toLowerCase();
+  return status === 400 || status === 404
+    || /json_schema|response_format|structured|schema|strict|not support|no endpoints/.test(message);
+}
+
+async function runOpenAiSearch(prompt, { timeoutMs }) {
+  const client = getOpenRouterClient();
+  const schema = await loadSearchSchema();
+  const model = researchModel();
+  const messages = [
+    {
+      role: 'system',
+      content: 'You are a live internship research agent for Internship Portal. Use web search to find only '
+        + 'currently open, official postings. Respond with ONLY a JSON object that conforms to this JSON '
+        + `schema — no prose, no markdown fences:\n${JSON.stringify(schema)}`,
+    },
+    { role: 'user', content: prompt },
+  ];
   try {
-    await new Promise((resolve, reject) => {
-      const child = spawn('codex', [
-        '--search', 'exec', '--ignore-user-config', '--ephemeral', '--sandbox', 'read-only',
-        '--skip-git-repo-check', '--ignore-rules', '--color', 'never',
-        '--output-schema', SCHEMA_FILE, '-C', rootDir, '-o', outputFile, '-',
-      ], { stdio: ['pipe', 'pipe', 'pipe'] });
-      let stderr = '';
-      let stdout = '';
-      child.stderr.on('data', chunk => { stderr += chunk.toString(); });
-      child.stdout.on('data', chunk => { stdout += chunk.toString(); });
-      const timer = setTimeout(() => {
-        child.kill('SIGTERM');
-        reject(new Error('Company research timed out after two minutes'));
-      }, Number(process.env.INTERNSHIP_RESEARCH_TIMEOUT_MS || 120000));
-      child.on('error', error => {
-        clearTimeout(timer);
-        reject(error);
-      });
-      child.on('exit', code => {
-        clearTimeout(timer);
-        if (code === 0) resolve();
-        else {
-          const useful = stderr.split('\n').reverse().find(line => line.trim() && !/\bWARN\b|^hook:/i.test(line));
-          reject(new Error(useful || stdout.split('\n').reverse().find(Boolean) || `Research agent exited with code ${code}`));
-        }
-      });
-      child.stdin.end(prompt);
+    const response = await client.chat.completions.create(
+      {
+        model,
+        messages,
+        response_format: { type: 'json_schema', json_schema: { name: 'internship_search', strict: true, schema } },
+      },
+      { timeout: timeoutMs },
+    );
+    return extractContent(response);
+  } catch (error) {
+    if (!isStructuredOutputRejection(error)) throw error;
+    const response = await client.chat.completions.create(
+      { model, messages, response_format: { type: 'json_object' } },
+      { timeout: timeoutMs },
+    );
+    return extractContent(response);
+  }
+}
+
+// Post-result verification: confirm the official posting URL actually resolves
+// live (2xx/3xx, redirects followed) so the UI never surfaces a stale/fake link.
+async function verifyUrlLive(url, timeoutMs) {
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      redirect: 'follow',
+      signal: AbortSignal.timeout(timeoutMs),
+      headers: {
+        'user-agent': 'Mozilla/5.0 (compatible; ResumeStudioBot/1.0; +https://editor-omega-two.vercel.app)',
+        accept: 'text/html,application/xhtml+xml',
+      },
     });
-    return await fs.readFile(outputFile, 'utf8');
-  } finally {
-    fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    try { await response.body?.cancel(); } catch { /* best-effort: avoid downloading the body */ }
+    return response.status >= 200 && response.status < 400;
+  } catch {
+    return false;
   }
 }
 
@@ -157,7 +231,7 @@ export async function researchCompanyInternships({ company, resume, rootDir }) {
     graduation: 'March 2028',
     location: 'Tokyo, Japan',
   };
-  const prompt = `Act as a current internship research sub-agent for Resume Studio. Today is ${verifiedDate}. Search the live web for currently open internships or student programs at the company named below.
+  const prompt = `Act as a current internship research sub-agent for Internship Portal. Today is ${verifiedDate}. Search the live web for currently open internships or student programs at the company named below.
 
 Company: ${company}
 Candidate profile: ${JSON.stringify(profile)}
@@ -178,17 +252,34 @@ Evidence rules:
 - Never invent deadlines, duration, language, compensation, eligibility, or stages. Use "Not stated" when absent.
 - If no qualifying opening is verified, return an empty results array and say so in summary.
 - Return at most 8 results matching the provided output schema.`;
+  const timeoutMs = Number(process.env.INTERNSHIP_RESEARCH_TIMEOUT_MS || 120000);
   let parsed;
   try {
-    parsed = parseResult(await runCodexSearch(prompt, rootDir));
+    parsed = parseResult(await runOpenAiSearch(prompt, { timeoutMs }));
   } catch (error) {
+    if (error.code === 'OPENROUTER_API_KEY_MISSING') {
+      console.warn('[internship-research] OPENROUTER_API_KEY is not set; live research disabled. Set it in editor/.env.local and in Vercel.');
+    }
     throw new Error(`Live research agent failed: ${error.message}`);
   }
   const officialCompany = fallbackCompanyName(parsed.company || company);
   const normalizedResults = (Array.isArray(parsed.results) ? parsed.results : [])
     .map((result, index) => normalizeResult(officialCompany, result, index, verifiedDate))
-    .filter(Boolean);
-  const results = normalizedResults;
+    .filter(Boolean)
+    .slice(0, 8);
+
+  // Verify every candidate posting is a live page before accepting it.
+  const linkTimeoutMs = Number(process.env.INTERNSHIP_RESEARCH_LINK_TIMEOUT_MS || 8000);
+  const liveness = await Promise.all(normalizedResults.map(result => verifyUrlLive(result.url, linkTimeoutMs)));
+  const results = normalizedResults.filter((_, index) => liveness[index]);
+
+  if (normalizedResults.length > 0 && results.length === 0) {
+    throw new Error(
+      'Live research found postings, but none of their official URLs responded as live (they may have just closed). '
+      + 'Please try again shortly.',
+    );
+  }
+
   return {
     company: officialCompany,
     searchedAt: new Date().toISOString(),

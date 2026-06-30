@@ -2,6 +2,9 @@ const FORBIDDEN_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 const TRACKER_STATUSES = new Set(['saved', 'applying', 'applied', 'interview']);
 const DATA_IMAGE = /^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=\s]+$/i;
 const PROFILE_ID = /^[a-zA-Z0-9_-]{1,80}$/;
+// Postal/zip code: optional. Lenient enough for JP (123-4567) and other regions
+// (letters/digits/spaces/hyphens). Empty string is allowed (field is optional).
+const POSTAL_CODE = /^[0-9A-Za-z][0-9A-Za-z\s-]{0,15}$/;
 
 export class RequestValidationError extends Error {
   constructor(message, status = 400) {
@@ -70,7 +73,20 @@ export function validateResume(value) {
   for (const [key, label] of [['github', 'GitHub URL'], ['linkedin', 'LinkedIn URL']]) {
     if (personal[key]) cleanHttpsUrl(personal[key], label);
   }
+  // Optional `personal.postalCode` — normalize on whichever personal block(s) exist
+  // (canonical `personal`, plus legacy `personalInfo`). Absent => untouched.
+  normalizePostalCode(resume.personal);
+  normalizePostalCode(resume.personalInfo);
   return resume;
+}
+
+function normalizePostalCode(block) {
+  if (!isRecord(block) || block.postalCode === undefined) return;
+  const code = cleanString(block.postalCode, 'Postal code', 16);
+  if (code && !POSTAL_CODE.test(code)) {
+    throw new RequestValidationError('Postal code may only contain letters, numbers, spaces, and hyphens.');
+  }
+  block.postalCode = code;
 }
 
 export function validateTracker(value) {

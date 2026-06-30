@@ -223,3 +223,42 @@ Reverse-engineered from the codebase on 2026-06-29. Newest at the bottom.
   N tries (CODE)` soft warning. Trade-off: a posting that goes dead **only** via socket reset
   (rare) would soft-warn instead of hard-fail; the conservative default keeps unknown/ambiguous
   network errors HARD. Retries add a little wall-clock time only when errors occur.
+
+---
+## ADR-0012 — Multi-profile support: configurable default/protection, robust sample seeding, `personal.postalCode`, EN branding
+- **Date:** 2026-07-01
+- **Status:** Accepted
+- **Context:** The store only force-seeded `mohamed_fuad`, so a fresh/partial DB showed a
+  single sample (the only other profile file was a scratch `temp.json` with `nameEn:"fdf"`).
+  The delete route hardcoded the `mohamed_fuad` guard, and several paths hardcoded that id as
+  the fallback. The app is being rebranded from "Resume Studio"/"Resume Editor" to "Internship
+  Portal", and an upcoming form wave needs a `personal.postalCode` field that the server must
+  accept/normalize without stripping it from existing profiles. This is Wave 1 (server only);
+  client wiring (`App.jsx`) follows in a later wave.
+- **Decision:** (a) **Sample seeding** — introduce `SAMPLE_PROFILE_IDS`
+  (`['mohamed_fuad','aiko_tanaka']`) and `ensureSampleProfiles()` which calls the idempotent
+  `readProfile(id)` per sample (writes to KV only when the `profile:<id>` key is missing AND
+  `server/profiles/<id>.json` exists). Wired into `initPersistentStore()` and the empty-store
+  branch of `listProfiles()`, so both demo people appear on a fresh DB and a missing second
+  sample is back-filled on boot even if the primary already exists. (b) **Second sample**
+  `aiko_tanaka` is a polished, distinct bilingual CS grad student, matching the exact JSON
+  shape of `mohamed_fuad.json`; the scratch `temp.json` is deleted (no leftover "fdf"). (c)
+  **Configurable identity/protection** — `DEFAULT_PROFILE_ID` (env `RESUME_DEFAULT_PROFILE_ID`)
+  replaces hardcoded fallbacks in `sanitizeProfileId`/`readProfile`; `PROTECTED_PROFILE_IDS`
+  (env `RESUME_PROTECTED_PROFILE_IDS`, comma-separated; default = the primary) gates DELETE.
+  `deleteProfile` continues to remove `profile:`/`tracker:`/`applications:` keys together (no
+  orphans). (d) **`personal.postalCode`** — optional string normalized in `validation.js`
+  (`normalizePostalCode`: trim, ≤16 chars, `^[0-9A-Za-z][0-9A-Za-z\s-]{0,15}$`) on both the
+  canonical `personal` and legacy `personalInfo` blocks; absent ⇒ untouched (back-compat),
+  invalid ⇒ 400. (e) **Branding** — only user-visible/API/log strings in `index.js` change to
+  "Internship Portal"; internal storage identifiers (`resume-studio.sqlite`, the Blob key,
+  `RESUME_STUDIO_*` env names) are intentionally left as-is to avoid breaking persistence.
+- **Consequences:** The app ships with two distinct sample people and self-heals seeding on
+  boot; the "undeletable" profile and default are now config-driven rather than hardcoded.
+  Creating a new profile is just a POST to `/api/resume?profile=<newId>` (existing contract,
+  no new route). `postalCode` is stored under `personal` and survives read/normalize. Branding
+  is split: user-facing copy renamed, durable keys frozen — renaming those keys later would
+  require a data migration. NEXT WAVE (`App.jsx`): add a `postalCode` input to the personal
+  section + wizard `personal` defaults; the in-UI delete guard (`if (id === 'mohamed_fuad')`)
+  and the `'mohamed_fuad'` URL/default fallbacks should track `DEFAULT_PROFILE_ID`; a "create
+  profile" UI can POST any new id.

@@ -23,21 +23,44 @@ import { internshipApi } from '../api/client.js';
 import { APPLICATION_STATUSES, statusLabel, useApplicationTracker } from '../hooks/useApplicationTracker.js';
 import { notifyCatalogChange, useInternshipCatalog } from '../hooks/useInternshipCatalog.js';
 import { CompanyLogo } from './CompanyLogo.jsx';
-import { displayCompany, displayRole, displayValue, internshipDetails } from '../utils/internshipDisplay.js';
+import InterviewDateModal from './InterviewDateModal.jsx';
+import { displayCompany, displayRole, displayValue, internshipDetails, splitLanguageRequirement } from '../utils/internshipDisplay.js';
 
 const DESKTOP_PAGE_SIZE = 14;
 const MOBILE_PAGE_SIZE = 6;
-const TODAY = new Date().toISOString().slice(0, 10);
+const NOW = new Date();
+const TODAY = NOW.toISOString().slice(0, 10);
 const DISPLAY_DATE_FORMAT = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
-// Statuses that mean the user is actively pursuing the role, so an expired listing
-// must stay visible for them to keep tracking it. "saved" / untracked do not count.
+// Statuses that mean the user has already engaged the role from the tracker. These
+// now live on the dashboard, so the radar hides them entirely. "saved" / untracked
+// do not count and keep showing (subject to the deadline-expiry rule below).
 const APPLIED_TYPE_STATUSES = new Set(['applying', 'applied', 'interview']);
-const isExpiredDeadline = item => Boolean(item.deadlineDate) && item.deadlineDate < TODAY;
-// Auto-hide rule: a listing whose deadline has already passed is hidden UNLESS the
-// user is applying/applied/interviewing. Listings with no deadlineDate ("Not
-// stated") are always shown. Keeps EN + JA identical (compares raw deadlineDate).
-const isVisibleForDeadline = (item, status) => !isExpiredDeadline(item) || APPLIED_TYPE_STATUSES.has(status);
+// Resolve a listing's deadline to a full JST INSTANT. A timed deadline carries an
+// "HH:MM JST" suffix (e.g. "2026-06-30 09:00 JST"); otherwise we treat end-of-day
+// (23:59:59) in JST. Returns null for "Not stated" listings (no deadlineDate).
+const deadlineInstant = item => {
+  const date = item?.deadlineDate;
+  if (!date) return null;
+  const timed = String(item.deadline || '').match(/(\d{4}-\d{2}-\d{2})\s+(\d{1,2}):(\d{2})\s*JST/i);
+  if (timed && timed[1] === date) {
+    const [, isoDate, hour, minute] = timed;
+    return new Date(`${isoDate}T${hour.padStart(2, '0')}:${minute}:00+09:00`);
+  }
+  return new Date(`${date}T23:59:59+09:00`);
+};
+const isExpiredDeadline = item => {
+  const cutoff = deadlineInstant(item);
+  return Boolean(cutoff) && cutoff < NOW;
+};
+// Radar visibility rule:
+//  1. Applied-type listings (applying/applied/interview) are hidden from the radar
+//     entirely — the user tracks those from the dashboard now.
+//  2. Remaining listings (saved / untracked) are hidden once their full deadline
+//     INSTANT has passed in JST (so a 2026-06-30 09:00 JST deadline is already
+//     expired at 2026-07-01 00:00 JST).
+//  3. Listings with no deadlineDate ("Not stated") always show (unless applied).
+const isVisibleInRadar = (item, status) => !APPLIED_TYPE_STATUSES.has(status) && !isExpiredDeadline(item);
 
 const copy = {
   en: {
@@ -182,9 +205,13 @@ const copy = {
   },
 };
 
+// Urgency styling shares the SAME JST-instant semantics as visibility (deadlineInstant
+// + NOW), so the badge and the auto-hide rule never disagree about whether a deadline
+// has effectively passed. "Not stated" listings carry no urgency class.
 const deadlineClass = item => {
-  if (!item.deadlineDate) return '';
-  const days = Math.ceil((new Date(`${item.deadlineDate}T23:59:59`) - new Date(`${TODAY}T00:00:00`)) / 86400000);
+  const cutoff = deadlineInstant(item);
+  if (!cutoff) return '';
+  const days = Math.ceil((cutoff - NOW) / 86400000);
   return days <= 7 ? 'urgent' : days <= 21 ? 'soon' : '';
 };
 
@@ -298,41 +325,6 @@ const reasonDisplay = (reason, isJa) => {
   return rules.find(([pattern]) => pattern.test(text))?.[1] || 'プロジェクト経験と募集要件に共通点がある';
 };
 
-const splitLanguage = (value, isJa) => {
-  const formatted = String(displayValue(value, isJa) || '');
-  if (!formatted) return [];
-  if (isJa) {
-    if (/英語または日本語.*CEFR\s*B2/i.test(formatted)) {
-      return ['英語 CEFR B2 以上', formatted.includes('チーム') ? '日本語 CEFR B2 以上（一部チームで必須）' : '日本語 CEFR B2 以上'];
-    }
-    if (formatted.startsWith('マーケットプレイス:')) {
-      return ['マーケットプレイス: 日本語・英語 CEFR B1', 'フィンテックは日本語 C1 必須'];
-    }
-    if (formatted === '日本語・英語使用・レベル記載なし') {
-      return ['日本語・英語使用', 'レベル記載なし'];
-    }
-    if (formatted.includes('・一部チーム')) {
-      return formatted.split(/・(?=一部チーム)/).filter(Boolean);
-    }
-    const markers = ['・日本語', '・Rakuten'];
-    const marker = markers.find(candidate => formatted.includes(candidate));
-    if (marker) return [formatted.slice(0, formatted.indexOf(marker)), formatted.slice(formatted.indexOf(marker) + 1)];
-    return formatted.split(/[;；]\s*/).filter(Boolean);
-  }
-  if (/English\s+or\s+Japanese.*CEFR\s*B2/i.test(formatted)) {
-    return [
-      'English CEFR B2 accepted',
-      /some teams require Japanese B2/i.test(formatted)
-        ? 'Japanese CEFR B2 accepted; some teams require Japanese B2'
-        : 'Japanese CEFR B2 accepted',
-    ];
-  }
-  return formatted
-    .replace(/\s+(?=Japanese\b)/i, '; ')
-    .split(/;\s*/)
-    .filter(Boolean);
-};
-
 const splitDuration = (value, isJa) => {
   const formatted = String(displayValue(value, isJa) || '');
   if (!formatted) return [];
@@ -364,7 +356,7 @@ const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEditor, i
   const eligibility = isJa ? details.eligibilityJa : details.eligibility;
   const process = isJa ? details.processJa : details.process;
   const [roleLead, ...roleDetails] = splitRole(displayRole(item.role, isJa));
-  const languageParts = splitLanguage(item.language, isJa);
+  const languageParts = splitLanguageRequirement(item.language, isJa);
   const durationParts = splitDuration(item.duration, isJa);
   const locationParts = splitLocation(item.location, isJa);
   return (
@@ -488,7 +480,7 @@ function CompanyResearchPanel({ company, t, isJa, job, results, error, onStart, 
 
 export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
   const t = isJa ? copy.ja : copy.en;
-  const { records, statusFor, updateStatus } = useApplicationTracker(activeProfile);
+  const { records, statusFor, updateStatus, addMilestone } = useApplicationTracker(activeProfile);
   const { catalog, meta, refresh: refreshCatalog } = useInternshipCatalog();
   const [query, setQuery] = useState('');
   const [region, setRegion] = useState('All');
@@ -507,13 +499,16 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
   const [researchError, setResearchError] = useState('');
   const [addedResearchIds, setAddedResearchIds] = useState(() => new Set());
   const [addingId, setAddingId] = useState('');
+  const [interviewTarget, setInterviewTarget] = useState(null);
   const autoResearchStarted = useRef(new Set());
 
   const eligibleCatalog = catalog;
-  // Expired-and-not-being-applied-to listings are removed up front so they drop out
-  // of the table, the summary stat cards, the track filter, and live-search gating.
+  // The post-filter visible set: applied-type listings and time-expired listings are
+  // removed up front so they drop out of the table AND of everything derived below —
+  // the summary stat cards (dynamicStats), the track filter options, and the
+  // live-search gating — keeping every count consistent with what's actually shown.
   const visibleCatalog = useMemo(
-    () => eligibleCatalog.filter(item => isVisibleForDeadline(item, statusFor(item.id))),
+    () => eligibleCatalog.filter(item => isVisibleInRadar(item, statusFor(item.id))),
     [eligibleCatalog, statusFor],
   );
   const regions = ['All', 'Japan', 'Remote', 'Global'];
@@ -666,6 +661,22 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
     if (!current || current === 'saved') updateStatus(item, 'applying');
   };
   const toggleSaved = item => updateStatus(item, statusFor(item.id) === 'saved' ? '' : 'saved');
+  // Choosing "Interview" defers the status write until the user supplies a date in the
+  // shared modal; every other status change applies immediately as before.
+  const handleStatusSelect = (item, status) => {
+    if (status === 'interview') {
+      setInterviewTarget(item);
+      return;
+    }
+    updateStatus(item, status);
+  };
+  const confirmInterviewDate = value => {
+    if (!interviewTarget) return;
+    const [date, time] = String(value || '').trim().split(/[ T]/);
+    updateStatus(interviewTarget, 'interview');
+    addMilestone(interviewTarget.id, { kind: 'interview', date, time: time || null });
+    setInterviewTarget(null);
+  };
   const reviewPriorities = () => {
     setPriorityOnly(true);
     setSavedOnly(false);
@@ -733,7 +744,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
               {pageItems.map((item, index) => {
                 const status = statusFor(item.id);
                 const [roleLead, ...roleDetails] = splitRole(displayRole(item.role, isJa));
-                const languageParts = splitLanguage(item.language, isJa);
+                const languageParts = splitLanguageRequirement(item.language, isJa);
                 const durationParts = splitDuration(item.duration, isJa);
                 const locationParts = splitLocation(item.location, isJa);
                 return <React.Fragment key={item.id}>
@@ -757,7 +768,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
                     <span className="intern-language" data-label={t.language}><Globe2 size={13} /><span className="intern-language-stack">{languageParts.map(part => <span key={part}>{part}</span>)}</span></span>
                     <span className="intern-duration" data-label={t.duration}><span className="intern-duration-stack">{durationParts.map(part => <span key={part}>{part}</span>)}</span></span>
                     <span className={`intern-deadline ${deadlineClass(item)}`} data-label={t.deadline}>{formatDeadline(item.deadline, isJa)}</span>
-                    <select className={`intern-row-status ${status || 'untracked'}`} value={status} onClick={event => event.stopPropagation()} onChange={event => updateStatus(item, event.target.value)} aria-label={`${t.status}: ${displayCompany(item, isJa)}`}><option value="">{t.track}</option>{APPLICATION_STATUSES.map(option => <option key={option.value} value={option.value}>{statusLabel(option.value, isJa)}</option>)}</select>
+                    <select className={`intern-row-status ${status || 'untracked'}`} value={status} onClick={event => event.stopPropagation()} onChange={event => handleStatusSelect(item, event.target.value)} aria-label={`${t.status}: ${displayCompany(item, isJa)}`}><option value="">{t.track}</option>{APPLICATION_STATUSES.map(option => <option key={option.value} value={option.value}>{statusLabel(option.value, isJa)}</option>)}</select>
                     <a className="intern-apply" href={item.url} target="_blank" rel="noreferrer" onClick={event => { event.stopPropagation(); onApply(item); }}>{t.apply} <ExternalLink size={13} /></a>
                     <button type="button" className={`intern-bookmark ${status === 'saved' ? 'active' : ''}`} onClick={event => { event.stopPropagation(); toggleSaved(item); }} aria-label={t.saveLabel(displayCompany(item, isJa), status === 'saved')}>{status === 'saved' ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}</button>
                   </article>
@@ -770,10 +781,17 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
         </div>
         {selected ? (
           <div className="intern-detail-backdrop" role="presentation" onClick={event => { if (event.target === event.currentTarget) setSelectedId(''); }}>
-            <DetailPanel item={selected} status={statusFor(selected.id)} onStatus={updateStatus} onApply={onApply} onClose={() => setSelectedId('')} onOpenEditor={onOpenEditor} isJa={isJa} />
+            <DetailPanel item={selected} status={statusFor(selected.id)} onStatus={handleStatusSelect} onApply={onApply} onClose={() => setSelectedId('')} onOpenEditor={onOpenEditor} isJa={isJa} />
           </div>
         ) : null}
       </section>
+      <InterviewDateModal
+        open={Boolean(interviewTarget)}
+        applicationLabel={interviewTarget ? `${displayCompany(interviewTarget, isJa)} — ${displayRole(interviewTarget.role, isJa)}` : ''}
+        isJa={isJa}
+        onConfirm={confirmInterviewDate}
+        onCancel={() => setInterviewTarget(null)}
+      />
       <p className="intern-disclaimer">{t.disclaimer}</p>
       <span className="intern-lang-note" aria-hidden="true">{isJa ? 'JA' : 'EN'}</span>
     </main>

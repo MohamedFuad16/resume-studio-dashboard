@@ -85,6 +85,50 @@ const MONTH_NUM = {
 };
 const MONTH_NAMES = 'January|February|March|April|May|June|July|August|September|October|November|December';
 
+// Language-proficiency scales: CEFR (A1–C2) is the correct scale for ENGLISH;
+// Japanese proficiency is conventionally expressed on the JLPT scale (N1–N5).
+// Any Japanese requirement quoted in CEFR is mapped to its closest JLPT level so
+// the UI never shows a Japanese requirement on the (wrong) CEFR scale.
+const CEFR_TO_JLPT = { C2: 'N1', C1: 'N1', B2: 'N2', B1: 'N3', A2: 'N4', A1: 'N5' };
+const CEFR_LEVELS = 'A1|A2|B1|B2|C1|C2';
+
+function cefrToJlpt(level) {
+  return CEFR_TO_JLPT[String(level || '').toUpperCase()] || null;
+}
+
+// True when a clause bundles English AND Japanese around one shared level
+// (e.g. "English or Japanese CEFR B2"). Rewriting JLPT inline there would wrongly
+// strip CEFR from the English side, so such clauses are left for the dedicated
+// language splitter (`splitLanguageRequirement`) which separates the two first.
+function mentionsBothLanguagesEn(text) {
+  return /\b(?:English\s+(?:and|or)\s+Japanese|Japanese\s+(?:and|or)\s+English|both\s+Japanese\s+and\s+English|both\s+English\s+and\s+Japanese)\b/i.test(text);
+}
+function mentionsBothLanguagesJa(text) {
+  return /英語または日本語|日本語または英語|日本語・英語|英語・日本語|日本語と英語|英語と日本語|日本語\s*および\s*英語|英語\s*および\s*日本語/.test(text);
+}
+
+// Rewrite an English-source Japanese proficiency that is (incorrectly) quoted on
+// the CEFR scale into JLPT, e.g. "Japanese CEFR B2" / "Japanese B2" →
+// "Japanese JLPT N2". English CEFR levels are intentionally left untouched.
+function jlptifyJapaneseEn(text) {
+  const str = String(text ?? '');
+  if (mentionsBothLanguagesEn(str)) return str;
+  return str.replace(new RegExp(`\\bJapanese\\s+(?:CEFR\\s+)?(${CEFR_LEVELS})\\b`, 'gi'), (match, level) => {
+    const jlpt = cefrToJlpt(level);
+    return jlpt ? `Japanese JLPT ${jlpt}` : match;
+  });
+}
+
+// Japanese-mode counterpart: "日本語 CEFR B2" / "日本語B2" → "日本語 JLPT N2".
+function jlptifyJapaneseJa(text) {
+  const str = String(text ?? '');
+  if (mentionsBothLanguagesJa(str)) return str;
+  return str.replace(new RegExp(`日本語\\s*(?:CEFR\\s*)?(${CEFR_LEVELS})`, 'g'), (match, level) => {
+    const jlpt = cefrToJlpt(level);
+    return jlpt ? `日本語 JLPT ${jlpt}` : match;
+  });
+}
+
 // Single source of truth for EN→JA string localization shared by every dashboard
 // (ProfileDashboard, InternshipDashboard, ApplicationCalendar). Previously this
 // regex chain was duplicated inline inside InternshipDashboard.jsx and drifted.
@@ -489,6 +533,61 @@ export function formatDisplayDeadline(value, isJa = false) {
   return String(displayValue(value, isJa) || '').replace(/\s+JST\b/gi, '').trim();
 }
 
+// Single source of truth for the per-language requirement bullets rendered by the
+// radar table and detail drawer. English proficiency stays on the CEFR scale;
+// Japanese proficiency is normalized to JLPT. A trailing qualifier (after "; ")
+// such as "some teams require Japanese B2" is returned as its OWN clean item so
+// it renders on a separate line instead of a cramped run-on. Output is deduped.
+export function splitLanguageRequirement(value, isJa = false) {
+  const source = String(value || '').trim();
+  if (!source) return [];
+
+  // "English or Japanese CEFR <level>[; some teams require Japanese <level>]"
+  const orMatch = source.match(new RegExp(`^English or Japanese CEFR (${CEFR_LEVELS})(?:;\\s*some teams require Japanese (${CEFR_LEVELS}))?$`, 'i'));
+  if (orMatch) {
+    const enLevel = orMatch[1].toUpperCase();
+    const jlpt = cefrToJlpt(enLevel);
+    const items = isJa
+      ? [`英語 CEFR ${enLevel} 相当`, `日本語 JLPT ${jlpt} 相当`]
+      : [`English CEFR ${enLevel} accepted`, `Japanese JLPT ${jlpt} accepted`];
+    if (orMatch[2]) {
+      const teamJlpt = cefrToJlpt(orMatch[2]);
+      items.push(isJa ? `一部チームは日本語 JLPT ${teamJlpt} 必須` : `Some teams require Japanese JLPT ${teamJlpt}`);
+    }
+    return dedupeList(items);
+  }
+
+  // "Marketplace: Japanese and English CEFR <level>; Fintech requires Japanese <level>"
+  const marketMatch = source.match(new RegExp(`^Marketplace: Japanese and English CEFR (${CEFR_LEVELS});\\s*Fintech requires Japanese (${CEFR_LEVELS})$`, 'i'));
+  if (marketMatch) {
+    const enLevel = marketMatch[1].toUpperCase();
+    const jlpt = cefrToJlpt(enLevel);
+    const fintechJlpt = cefrToJlpt(marketMatch[2]);
+    return dedupeList(isJa
+      ? [`マーケットプレイス: 英語 CEFR ${enLevel} 相当`, `マーケットプレイス: 日本語 JLPT ${jlpt} 相当`, `フィンテックは日本語 JLPT ${fintechJlpt} 必須`]
+      : [`Marketplace: English CEFR ${enLevel} accepted`, `Marketplace: Japanese JLPT ${jlpt} accepted`, `Fintech requires Japanese JLPT ${fintechJlpt}`]);
+  }
+
+  // Generic (no CEFR levels). For JA, translate the whole string first so the
+  // anchored jaDisplay phrases fire (no bare English leaks), then split on the
+  // JA clause markers. For EN, split English/Japanese clauses on "; ".
+  if (isJa) {
+    const formatted = jlptifyJapaneseJa(jaDisplay(source));
+    if (formatted === '日本語・英語使用・レベル記載なし') return ['日本語・英語使用', 'レベル記載なし'];
+    if (formatted.includes('・一部チーム')) return dedupeList(formatted.split(/・(?=一部チーム)/).filter(Boolean));
+    const marker = ['・日本語', '・Rakuten'].find(candidate => formatted.includes(candidate));
+    if (marker) return dedupeList([formatted.slice(0, formatted.indexOf(marker)), formatted.slice(formatted.indexOf(marker) + 1)]);
+    return dedupeList(formatted.split(/[;；]\s*/).map(part => part.trim()).filter(Boolean));
+  }
+  return dedupeList(
+    jlptifyJapaneseEn(source)
+      .replace(/\s+(?=Japanese\b)/i, '; ')
+      .split(/;\s*/)
+      .map(part => part.trim())
+      .filter(Boolean),
+  );
+}
+
 function genericAboutJa(item) {
   const field = TRACK_LABELS_JA[item.track] || '専門分野';
   return `${field}の実務を通じて、企業のプロダクトや業務に関わるインターンです。具体的な担当内容は公式募集ページで確認してください。`;
@@ -583,6 +682,20 @@ function dedupeList(list) {
   return out;
 }
 
+// Split each bullet on a "; " qualifier boundary so a trailing clause (e.g.
+// "...; some teams require Japanese N2") becomes its OWN clean list item instead
+// of a cramped run-on line. Entries without "; " pass through unchanged. Run
+// before dedupe so the new items are still de-duplicated case-insensitively.
+function splitListEntries(list) {
+  if (!Array.isArray(list)) return list;
+  return list.flatMap(entry =>
+    String(entry ?? '')
+      .split(/;\s+/)
+      .map(part => part.trim())
+      .filter(Boolean),
+  );
+}
+
 export function internshipDetails(item) {
   const stack = Array.isArray(item.techStack) && item.techStack.length
     ? item.techStack
@@ -604,9 +717,11 @@ export function internshipDetails(item) {
     about: item.about || item.fitNote,
     aboutJa: item.aboutJa || item.fitNoteJa || genericAboutJa(item),
     techStack: dedupeList(stack),
-    eligibility: dedupeList(eligibility),
-    eligibilityJa: dedupeList(eligibilityJa),
-    process: dedupeList(process),
-    processJa: dedupeList(processJa),
+    // Split "; " qualifiers into their own bullets, normalize any Japanese
+    // proficiency quoted in CEFR to JLPT (English stays CEFR), then dedupe.
+    eligibility: dedupeList(splitListEntries(eligibility).map(jlptifyJapaneseEn)),
+    eligibilityJa: dedupeList(splitListEntries(eligibilityJa).map(jlptifyJapaneseJa)),
+    process: dedupeList(splitListEntries(process)),
+    processJa: dedupeList(splitListEntries(processJa)),
   };
 }

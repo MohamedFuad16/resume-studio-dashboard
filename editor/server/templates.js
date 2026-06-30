@@ -541,145 +541,159 @@ function japaneseQualificationRows(r, minimumRows = 0) {
 }
 
 function genJa01(r, options = {}) {
+  // Note: Jake's-clean is a photoless single-column layout, so `options.photoFile`
+  // is intentionally unused here; the parameter is kept so the dispatch signature
+  // (generateLatex → genJa01(resume, options)) stays intact.
   const p = r.personal;
   const s = r.skills;
   const j = r.japanese || {};
   const js = j.skills || s;
 
-  const dob = formatIsoDateJa(p.dob);
-  let age = '';
-  if (p.dob) {
-    const dobDate = new Date(p.dob);
-    if (!isNaN(dobDate.getTime())) {
-      const diffMs = Date.now() - dobDate.getTime();
-      const ageDate = new Date(diffMs);
-      age = Math.abs(ageDate.getUTCFullYear() - 1970);
-    }
-  }
+  const dateRange = (start, end) => {
+    const startJa = formatMonthJa(start);
+    const expected = /expected|予定/i.test(String(end || ''));
+    const endJa = formatMonthJa(end, { expected });
+    if (startJa && endJa) return `${startJa} -- ${endJa}`;
+    return startJa || endJa || '';
+  };
 
-  const asOf = formatIsoDateJa(j.asOfDate || new Date().toISOString().slice(0, 10));
-  const timelineRows = japaneseTimelineRows(r, 18);
-  const qualRows = japaneseQualificationRows(r, 5);
-  const photoBlock = options.photoFile
-    ? `{\\color{gridcolor}\\setlength{\\fboxsep}{0pt}\\fbox{\\includegraphics[width=3cm,height=4cm,keepaspectratio]{\\detokenize{${options.photoFile}}}}}`
-    : `{\\color{gridcolor}\\setlength{\\fboxsep}{3pt}\\fbox{\\begin{minipage}[c][3.68cm][c]{2.75cm}\\centering\\color{photogray}\\small 写真貼付\\\\[13pt]\\footnotesize 縦4cm × 横3cm\\\\[13pt]\\scriptsize 正面・上半身・脱帽\\end{minipage}}}`;
+  const edu = (r.education || []).filter(e => e.institutionJa || e.institution).map(e => {
+    const bullets = japaneseBullets(e);
+    return `
+    \\resumeSubheading
+      {${escJa(e.institutionJa || e.institution)}}{${escJa(e.location || '')}}
+      {${escJa(e.degreeJa || e.degree || '')}}{${dateRange(e.startDate, e.endDate)}}` +
+      (bullets.length > 0 ? `
+      \\resumeItemListStart
+        ${bullets.map(b => `\\resumeItem{${escJa(b)}}`).join('\n        ')}
+      \\resumeItemListEnd` : '');
+  }).join('\n');
 
-  return `%====================================================================
-% 学校指定 履歴書 — ${escJa(p.nameJa || p.nameEn)}
-%====================================================================
-\\documentclass[11pt, a4paper]{article}
+  const exp = (j.experience || r.experience || []).filter(e => e.companyJa || e.company).map(e => {
+    const bullets = japaneseBullets(e);
+    return `
+    \\resumeSubheading
+      {${escJa(e.companyJa || e.company)}}{${dateRange(e.startDate, e.endDate)}}
+      {${escJa(e.roleJa || e.role || '')}}{}` +
+      (bullets.length > 0 ? `
+      \\resumeItemListStart
+        ${bullets.map(b => `\\resumeItem{${escJa(b)}}`).join('\n        ')}
+      \\resumeItemListEnd` : '');
+  }).join('\n');
+
+  const proj = (r.projects || []).filter(pr => pr.title).map(pr => {
+    const bullets = japaneseBullets(pr);
+    return `
+      \\resumeProjectHeading
+          {\\textbf{${escJa(pr.title)}} $|$ \\emph{${esc(pr.tech || '')}}}{${escJa(pr.year || '')}}` +
+      (bullets.length > 0 ? `
+          \\resumeItemListStart
+            ${bullets.map(b => `\\resumeItem{${escJa(b)}}`).join('\n            ')}
+          \\resumeItemListEnd` : '');
+  }).join('\n');
+
+  const acts = (r.activities || []).filter(a => a.titleJa || a.title).map(a => {
+    const bullets = japaneseBullets(a);
+    return `
+    \\resumeSubheading
+      {${escJa(a.titleJa || a.title)}}{}
+      {${escJa(a.orgJa || a.org || '')}}{${dateRange(a.startDate, a.endDate)}}` +
+      (bullets.length > 0 ? `
+      \\resumeItemListStart
+        ${bullets.map(b => `\\resumeItem{${escJa(b)}}`).join('\n        ')}
+      \\resumeItemListEnd` : '');
+  }).join('\n');
+
+  const langText = (j.languages && j.languages.length ? j.languages : [s.spoken || '']).filter(Boolean).map(escJa).join('　／　');
+  const concepts = escJa(js.concepts || s.concepts || '');
+  const skillRows = [
+    `\\textbf{言語}{：${escJa(js.languages || '')}}`,
+    `\\textbf{フレームワーク・ライブラリ}{：${escJa(js.frameworks || '')}}`,
+    `\\textbf{ツール・データベース}{：${escJa(js.tools || '')}}`,
+  ];
+  if (concepts) skillRows.push(`\\textbf{専門知識}{：${concepts}}`);
+  if (langText) skillRows.push(`\\textbf{語学}{：${langText}}`);
+
+  return `%========================
+% Jake's Clean (JA) — ${escJa(p.nameJa || p.nameEn)}
+%========================
+\\documentclass[a4paper,11pt]{article}
 \\usepackage{fontspec}
 \\usepackage{xeCJK}
 \\usepackage{geometry}
+\\usepackage{titlesec}
 \\usepackage{xcolor}
-\\usepackage[bookmarks=false]{hyperref}
+\\usepackage{enumitem}
+\\usepackage[hidelinks,bookmarks=false]{hyperref}
 \\usepackage{tabularx}
-\\usepackage{array}
-\\usepackage{multirow}
-\\usepackage{colortbl}
-\\usepackage{graphicx}
 \\setCJKmainfont{Hiragino Kaku Gothic ProN W3}[BoldFont={Hiragino Kaku Gothic ProN W6}]
 \\setCJKsansfont{Hiragino Kaku Gothic ProN W3}[BoldFont={Hiragino Kaku Gothic ProN W6}]
 \\setmainfont{Avenir Next}
-\\geometry{a4paper,top=1.05cm,bottom=1.05cm,left=1.35cm,right=1.35cm}
+\\geometry{a4paper,top=1.2cm,bottom=1.2cm,left=1.5cm,right=1.5cm}
 \\hypersetup{hidelinks}
 \\pagestyle{empty}
+\\definecolor{accent}{RGB}{37, 99, 170}
+\\urlstyle{same}
+\\raggedbottom
+\\raggedright
 \\setlength{\\parindent}{0pt}
-\\setlength{\\arrayrulewidth}{0.5pt}
-\\renewcommand{\\arraystretch}{1.3}
-
-\\definecolor{gridcolor}{RGB}{150, 162, 178}     % Crisp slate gridlines
-\\definecolor{bannercolor}{RGB}{236, 241, 247}    % Soft label / header tint
-\\definecolor{titlecolor}{RGB}{22, 40, 70}        % Deep navy for titles
-\\definecolor{accent}{RGB}{37, 99, 170}           % Conservative blue accent
-\\definecolor{photogray}{RGB}{150, 160, 172}      % Muted gray for photo placeholder
-
-\\arrayrulecolor{gridcolor}
-\\newcommand{\\lbl}[1]{\\cellcolor{bannercolor}\\textbf{#1}}
-
+\\setlength{\\tabcolsep}{0in}
+\\titleformat{\\section}{\\vspace{-2pt}\\large\\bfseries\\raggedright}{}{0em}{}[\\color{black}\\titlerule \\vspace{-4pt}]
+\\newcommand{\\resumeItem}[1]{\\item\\small{#1}}
+\\newcommand{\\resumeSubheading}[4]{%
+  \\vspace{-1pt}\\item
+    \\begin{tabular*}{0.97\\textwidth}[t]{l@{\\extracolsep{\\fill}}r}
+      \\textbf{#1} & {\\small #2} \\\\
+      {\\small\\color{accent} #3} & {\\small #4} \\\\
+    \\end{tabular*}\\vspace{-5pt}
+}
+\\newcommand{\\resumeProjectHeading}[2]{%
+    \\item
+    \\begin{tabular*}{0.97\\textwidth}{l@{\\extracolsep{\\fill}}r}
+      \\small#1 & {\\small #2} \\\\
+    \\end{tabular*}\\vspace{-5pt}
+}
+\\renewcommand\\labelitemii{$\\vcenter{\\hbox{\\tiny$\\bullet$}}$}
+\\newcommand{\\resumeSubHeadingListStart}{\\begin{itemize}[leftmargin=0.15in, label={}, topsep=3pt]}
+\\newcommand{\\resumeSubHeadingListEnd}{\\end{itemize}}
+\\newcommand{\\resumeItemListStart}{\\begin{itemize}[leftmargin=1.3em, itemsep=1.5pt, topsep=2pt, parsep=0pt]}
+\\newcommand{\\resumeItemListEnd}{\\end{itemize}\\vspace{-4pt}}
 \\begin{document}
-% ==================== PAGE 1 ====================
-\\noindent{\\hfill\\small\\textcolor{titlecolor}{${asOf}　現在}}
 \\begin{center}
-  {\\LARGE\\bfseries\\textcolor{titlecolor}{履　歴　書}}\\\\[3pt]
-  {\\footnotesize\\textcolor{accent}{学校指定様式}}
-\\end{center}
-\\vspace{7pt}
-
-\\noindent
-\\begin{minipage}[t]{\\dimexpr\\linewidth-3.45cm\\relax}
-\\renewcommand{\\arraystretch}{1.0}%
-\\begin{tabularx}{\\linewidth}{|p{2.5cm}|X|}
-\\hline
-\\lbl{ふりがな} & \\rule[-0.34cm]{0pt}{0.66cm}{\\small ${escJa(p.furigana)}} \\\\ \\hline
-\\lbl{氏\\quad 名} & \\rule[-0.46cm]{0pt}{1.04cm}{\\LARGE\\bfseries ${escJa(p.nameJa || p.nameEn)}} \\\\ \\hline
-\\lbl{生年月日} & \\rule[-0.34cm]{0pt}{0.74cm}${dob}　（満 ${age} 歳）\\hfill 性別　男 ・ 女 \\\\ \\hline
-\\lbl{現住所} & \\rule[-0.30cm]{0pt}{0.66cm}〒　${escJa(p.address)} \\\\ \\hline
-\\lbl{連絡先} & \\rule[-0.30cm]{0pt}{0.66cm}Tel：${esc(p.phone)}\\quad E-mail：${esc(p.email)} \\\\ \\hline
-\\end{tabularx}
-\\end{minipage}\\hfill
-\\begin{minipage}[t]{3.3cm}
-\\vspace{0pt}\\centering
-${photoBlock}
-\\end{minipage}
-
-\\vspace{11pt}
-{\\setlength{\\extrarowheight}{12pt}\\renewcommand{\\arraystretch}{1.1}%
-\\begin{tabularx}{\\linewidth}{|>{\\centering\\arraybackslash}p{1.7cm}|>{\\centering\\arraybackslash}p{1.0cm}|X|}
-\\hline
-\\rowcolor{bannercolor}
-\\textbf{年} & \\textbf{月} & \\multicolumn{1}{c|}{\\textbf{学　歴 ・ 職　歴}} \\\\ \\hline
-${timelineRows}
-\\end{tabularx}}
-
-\\newpage
-
-% ==================== PAGE 2 ====================
-\\begin{center}
-  {\\large\\bfseries\\textcolor{titlecolor}{履　歴　書（2／2）}}
-\\end{center}
-\\vspace{8pt}
-
-{\\setlength{\\extrarowheight}{9pt}\\renewcommand{\\arraystretch}{1.1}%
-\\begin{tabularx}{\\linewidth}{|>{\\centering\\arraybackslash}p{1.7cm}|>{\\centering\\arraybackslash}p{1.0cm}|X|}
-\\hline
-\\rowcolor{bannercolor}
-\\textbf{年} & \\textbf{月} & \\multicolumn{1}{c|}{\\textbf{免　許 ・ 資　格}} \\\\ \\hline
-${qualRows}
-\\end{tabularx}}
-
-\\vspace{13pt}
-\\begin{tabularx}{\\linewidth}{|X|}
-\\hline
-\\rowcolor{bannercolor}\\rule{0pt}{2.7ex}\\textbf{学業・ゼミ・研究分野（得意な科目・関心領域）} \\\\ \\hline
-\\parbox[t][4.4cm][t]{\\dimexpr\\linewidth-2\\tabcolsep\\relax}{%
-  \\vspace{6pt}\\hspace{2pt}\\fontsize{10}{16.5}\\selectfont ${escJa(j.academicFocus || j.summary || r.summary || '')}\\par
-} \\\\ \\hline
-\\end{tabularx}
-
-\\vspace{13pt}
-\\begin{tabularx}{\\linewidth}{|X|}
-\\hline
-\\rowcolor{bannercolor}\\rule{0pt}{2.7ex}\\textbf{自己PR・学生時代に力を入れたこと（ガクチカ）} \\\\ \\hline
-\\parbox[t][9.5cm][t]{\\dimexpr\\linewidth-2\\tabcolsep\\relax}{%
-  \\vspace{6pt}\\hspace{2pt}\\fontsize{10}{16.5}\\selectfont ${escJa(j.selfPr || j.summary || r.summary || '')}
-
-  \\vspace{10pt}\\hspace{2pt}{\\bfseries\\textcolor{accent}{主な技術スキル}}\\\\[2pt]
-  \\hspace{2pt}\\textbf{言語：}${escJa(js.languages)}\\\\[2pt]
-  \\hspace{2pt}\\textbf{フレームワーク：}${escJa(js.frameworks)}\\\\[2pt]
-  \\hspace{2pt}\\textbf{開発環境・基盤：}${escJa(js.tools)}\\par
-} \\\\ \\hline
-\\end{tabularx}
-
-\\vspace{13pt}
-\\begin{tabularx}{\\linewidth}{|X|}
-\\hline
-\\rowcolor{bannercolor}\\rule{0pt}{2.7ex}\\textbf{本人希望記入欄（希望職種・勤務地など）} \\\\ \\hline
-\\parbox[t][1.9cm][t]{\\dimexpr\\linewidth-2\\tabcolsep\\relax}{%
-  \\vspace{6pt}\\hspace{2pt}\\fontsize{10}{16.5}\\selectfont 貴社の規定に従います。ソフトウェアエンジニア（フロントエンド／フルスタック）として、開発業務に携わることを希望いたします。\\par
-} \\\\ \\hline
-\\end{tabularx}
-
+    {\\small ${escJa(p.furigana || '')}}\\\\[2pt]
+    {\\Huge\\bfseries ${escJa(p.nameJa || p.nameEn)}}\\\\[5pt]
+    \\small
+    Tel: ${esc(p.phone)} $|$
+    \\href{mailto:${p.email}}{\\underline{${esc(p.email)}}} $|$
+    \\href{${p.linkedin}}{\\underline{LinkedIn}} $|$
+    \\href{${p.github}}{\\underline{GitHub}}
+\\end{center}` +
+(edu ? `
+\\section{学歴}
+  \\resumeSubHeadingListStart
+    ${edu}
+  \\resumeSubHeadingListEnd` : '') +
+(exp ? `
+\\section{職歴}
+  \\resumeSubHeadingListStart
+    ${exp}
+  \\resumeSubHeadingListEnd` : '') +
+(proj ? `
+\\section{開発実績・プロジェクト}
+    \\resumeSubHeadingListStart
+      ${proj}
+    \\resumeSubHeadingListEnd` : '') + `
+\\section{技術スキル}
+ \\begin{itemize}[leftmargin=0.15in, label={}]
+    \\small{\\item{
+     ${skillRows.join(' \\\\\n     ')}
+    }}
+ \\end{itemize}` +
+(acts ? `
+\\section{課外活動}
+  \\resumeSubHeadingListStart
+    ${acts}
+  \\resumeSubHeadingListEnd` : '') + `
 \\end{document}
 `;
 }
@@ -694,20 +708,20 @@ function genJa02(r) {
   const githubHandle = (p.github || '').replace(/^https?:\/\/(www\.)?github\.com\//, '').replace(/\/$/, '');
 
   const projects = (r.projects || []).slice(0, 4).map(project => `
-\\noindent{\\bfseries ${escJa(project.title)}}\\hfill{\\footnotesize\\textcolor{textmuted}{${escJa(project.year || '')}}}\\\\[1pt]
+\\noindent{\\bfseries ${escJa(project.title)}}\\hfill{\\footnotesize\\textcolor{textmuted}{${escJa(project.year || '')}}}\\\\[2pt]
 {\\footnotesize\\textcolor{accent}{${escJa(project.tech || '')}}}
-\\begin{itemize}[leftmargin=1.25em, itemsep=1pt, topsep=1.5pt, parsep=0pt]
-\\fontsize{9}{12.5}\\selectfont
+\\begin{itemize}[leftmargin=1.3em, itemsep=2pt, topsep=3pt, parsep=0pt]
+\\fontsize{9}{12.6}\\selectfont
   ${japaneseBullets(project).slice(0, 2).map(b => `\\item ${escJa(b)}`).join('\n  ')}
-\\end{itemize}`).join('\n\\vspace{1.5pt}\n');
+\\end{itemize}`).join('\n\\vspace{4pt}\n');
 
   const experiences = (j.experience || r.experience || []).filter(e => e.companyJa || e.company).slice(0, 3).map(exp => `
-\\noindent{\\bfseries ${escJa(exp.companyJa || exp.company)}}\\hfill{\\footnotesize\\textcolor{textmuted}{${formatMonthJa(exp.startDate)} － ${formatMonthJa(exp.endDate)}}}\\\\[1pt]
+\\noindent{\\bfseries ${escJa(exp.companyJa || exp.company)}}\\hfill{\\footnotesize\\textcolor{textmuted}{${formatMonthJa(exp.startDate)} － ${formatMonthJa(exp.endDate)}}}\\\\[2pt]
 {\\footnotesize\\textcolor{accent}{${escJa(exp.roleJa || exp.role || '')}}}
-\\begin{itemize}[leftmargin=1.25em, itemsep=1pt, topsep=1.5pt, parsep=0pt]
-\\fontsize{9}{12.5}\\selectfont
+\\begin{itemize}[leftmargin=1.3em, itemsep=2pt, topsep=3pt, parsep=0pt]
+\\fontsize{9}{12.6}\\selectfont
   ${japaneseBullets(exp).slice(0, 1).map(b => `\\item ${escJa(b)}`).join('\n  ')}
-\\end{itemize}`).join('\n\\vspace{1.5pt}\n');
+\\end{itemize}`).join('\n\\vspace{4pt}\n');
 
   const qualText = japaneseQualifications(r).slice(0, 4).map(q => `${escJa(q.year || '')}年${escJa(q.month || '')}月　${escJa(q.name || '')}`).join('　／　');
   const langText = (j.languages && j.languages.length ? j.languages : [js.spoken || s.spoken || '']).map(escJa).join('　／　');
@@ -727,7 +741,7 @@ function genJa02(r) {
 \\setCJKmainfont{Hiragino Kaku Gothic ProN W3}[BoldFont={Hiragino Kaku Gothic ProN W6}]
 \\setCJKsansfont{Hiragino Kaku Gothic ProN W3}[BoldFont={Hiragino Kaku Gothic ProN W6}]
 \\setmainfont{Avenir Next}
-\\geometry{a4paper,top=1.05cm,bottom=1.05cm,left=1.5cm,right=1.5cm}
+\\geometry{a4paper,top=1.05cm,bottom=1.05cm,left=1.1cm,right=1.1cm}
 \\hypersetup{hidelinks,colorlinks=true,urlcolor=accent}
 \\pagestyle{empty}
 \\setlength{\\parindent}{0pt}
@@ -748,7 +762,7 @@ function genJa02(r) {
 \\noindent
 \\begin{minipage}[b]{0.62\\linewidth}
   {\\footnotesize\\textcolor{textmuted}{${escJa(p.furigana || '')}}}\\\\[3pt]
-  {\\fontsize{24}{26}\\selectfont\\bfseries\\textcolor{ink}{${escJa(p.nameJa || p.nameEn)}}}\\\\[5pt]
+  {\\fontsize{21}{25}\\selectfont\\bfseries\\textcolor{ink}{${escJa(p.nameJa || p.nameEn)}}}\\\\[4pt]
   {\\textcolor{accent}{\\bfseries インターン応募シート}}\\,{\\footnotesize\\textcolor{textmuted}{／ Application Sheet}}
 \\end{minipage}\\hfill
 \\begin{minipage}[b]{0.36\\linewidth}
@@ -757,25 +771,25 @@ function genJa02(r) {
   E-mail：${esc(p.email)}\\\\[3pt]
   TEL：${esc(p.phone)}\\\\[3pt]
   GitHub：${esc(githubHandle)}\\par}
-\\end{minipage}\\\\[5pt]
+\\end{minipage}\\\\[4pt]
 {\\color{accent}\\hrule height 1.3pt}
 
-\\vspace{8pt}
+\\vspace{7pt}
 \\noindent\\fcolorbox{line}{accentsoft}{\\begin{minipage}{\\dimexpr\\linewidth-2\\fboxsep-2\\fboxrule\\relax}
-\\vspace{6pt}
+\\vspace{4pt}
 \\hspace{3pt}{\\bfseries\\textcolor{accent}{応募職種}}\\hspace{8pt}ソフトウェアエンジニア（フロントエンド／フルスタック／AIプロダクト）\\\\[5pt]
 \\hspace{3pt}{\\bfseries\\textcolor{accent}{在籍}}\\hspace{20pt}${escJa(edu.institutionJa || edu.institution || '')}　${escJa(edu.degreeJa || edu.degree || '')}\\\\[5pt]
 \\hspace{3pt}{\\bfseries\\textcolor{accent}{卒業予定}}\\hspace{8pt}${formatMonthJa(edu.endDate)}
-\\vspace{6pt}
+\\vspace{4pt}
 \\end{minipage}}
 
 \\jasec{自己紹介・応募動機}
-{\\fontsize{9.5}{13.8}\\selectfont ${escJa(j.summary || r.summaryJa || r.summary || '')}\\par}
+{\\fontsize{9}{13.2}\\selectfont ${escJa(j.summary || r.summaryJa || r.summary || '')}\\par}
 
 \\jasec{技術スタック}
 \\begin{tabularx}{\\linewidth}{@{}>{\\bfseries\\color{ink}}p{3.4cm} X@{}}
-言語 & ${escJa(js.languages || '')}\\\\[3pt]
-フレームワーク & ${escJa(js.frameworks || '')}\\\\[3pt]
+言語 & ${escJa(js.languages || '')}\\\\[4pt]
+フレームワーク & ${escJa(js.frameworks || '')}\\\\[4pt]
 開発基盤・ツール & ${escJa(js.tools || '')}\\\\
 \\end{tabularx}
 
@@ -787,7 +801,7 @@ ${experiences}
 
 \\jasec{資格・語学}
 \\begin{tabularx}{\\linewidth}{@{}>{\\bfseries\\color{ink}}p{3.4cm} X@{}}
-資格 & ${qualText || '—'}\\\\[3pt]
+資格 & ${qualText || '—'}\\\\[4pt]
 語学 & ${langText}\\\\
 \\end{tabularx}
 
@@ -806,11 +820,11 @@ function genJa03(r) {
 
   const rightEntry = (title, meta, sub, bullets) => `
     \\noindent\\begin{minipage}[t]{\\linewidth}
-      {\\fontsize{10}{12.5}\\selectfont\\bfseries\\textcolor{titleink}{${title}}}\\hfill{\\fontsize{8.2}{10}\\selectfont\\textcolor{metacolor}{${meta}}}\\par\\vspace{1.5pt}
+      {\\fontsize{10}{12.5}\\selectfont\\bfseries\\textcolor{titleink}{${title}}}\\hfill{\\fontsize{8.2}{10}\\selectfont\\textcolor{metacolor}{${meta}}}\\par\\vspace{2pt}
       {\\fontsize{8.5}{11}\\selectfont\\textcolor{accentink}{${sub}}}\\par` +
-    (bullets.length > 0 ? `\\vspace{2pt}
-      \\begin{itemize}[leftmargin=1.25em, itemsep=1.5pt, topsep=1pt, parsep=0pt]
-        \\fontsize{8.6}{12}\\selectfont\\color{bodycolor}
+    (bullets.length > 0 ? `\\vspace{2.5pt}
+      \\begin{itemize}[leftmargin=1.25em, itemsep=2pt, topsep=1.5pt, parsep=0pt]
+        \\fontsize{8.7}{12.6}\\selectfont\\color{bodycolor}
         ${bullets.map(b => `\\item ${escJa(b)}`).join('\n        ')}
       \\end{itemize}` : '\\vspace{1pt}') + `
     \\end{minipage}\\par\\vspace{8pt}`;
@@ -887,8 +901,8 @@ function genJa03(r) {
 \\noindent
 % ---------------- Dark sidebar ----------------
 \\colorbox{darksidebar}{%
-  \\begin{minipage}[t][\\paperheight][t]{0.345\\paperwidth}
-    \\hspace{0.9cm}\\begin{minipage}[t]{\\dimexpr0.345\\paperwidth-1.7cm\\relax}
+  \\begin{minipage}[t][\\paperheight][t]{0.30\\paperwidth}
+    \\hspace{0.85cm}\\begin{minipage}[t]{\\dimexpr0.30\\paperwidth-1.6cm\\relax}
       \\vspace*{1.25cm}
       {\\fontsize{19}{23}\\selectfont\\textbf{\\textcolor{white}{${esc(j.nameEn || p.nameEn)}}}}\\par\\vspace{4pt}
       {\\fontsize{11}{14}\\selectfont\\textcolor{leftaccent}{\\textbf{${escJa(p.nameJa || p.nameEn)}}}}\\par\\vspace{2pt}
@@ -904,30 +918,30 @@ function genJa03(r) {
       \\sideitem{LinkedIn}{\\href{${p.linkedin}}{\\textcolor{lightgray}{in/${esc(linkedinHandle)}}}}
 
       \\leftsection{学歴}
-      {\\fontsize{8.6}{12.5}\\selectfont
+      {\\fontsize{8.6}{12.5}\\selectfont\\raggedright
       \\textcolor{white}{\\textbf{${escJa(edu0.institutionJa || edu0.institution || '')}}}\\par\\vspace{2pt}
       \\textcolor{lightgray}{${escJa(edu0.degreeJa || edu0.degree || '')}}\\par\\vspace{3pt}
       \\textcolor{sidebarsoft}{${formatMonthJa(edu0.startDate || '')} － ${formatMonthJa(edu0.endDate || '', { expected: true })}}\\par}
 
       \\leftsection{技術スキル}
-      {\\fontsize{8.3}{12}\\selectfont
+      {\\fontsize{8.3}{12}\\selectfont\\raggedright
       \\textcolor{leftaccent}{\\textbf{言語}}\\par\\vspace{1pt}\\textcolor{lightgray}{${escJa(js.languages)}}\\par\\vspace{5pt}
       \\textcolor{leftaccent}{\\textbf{フレームワーク}}\\par\\vspace{1pt}\\textcolor{lightgray}{${escJa(js.frameworks)}}\\par\\vspace{5pt}
       \\textcolor{leftaccent}{\\textbf{ツール・開発環境}}\\par\\vspace{1pt}\\textcolor{lightgray}{${escJa(js.tools)}}\\par}
 
       \\leftsection{語学}
-      {\\fontsize{8.6}{13}\\selectfont\\textcolor{lightgray}{${langList.join('\\\\\n      \\vspace{2pt}\n      ')}}\\par}
+      {\\fontsize{8.6}{13}\\selectfont\\raggedright\\textcolor{lightgray}{${langList.join('\\\\\n      \\vspace{2pt}\n      ')}}\\par}
     \\end{minipage}
   \\end{minipage}%
 }%
 \\hspace{0.5cm}%
 % ---------------- Right content column ----------------
-\\begin{minipage}[t][\\paperheight][t]{\\dimexpr0.655\\paperwidth-1.6cm\\relax}
+\\begin{minipage}[t][\\paperheight][t]{\\dimexpr0.70\\paperwidth-1.6cm\\relax}
   \\vspace*{1.25cm}
   \\color{bodycolor}
 
   \\rightsection{自己紹介}
-  {\\fontsize{9.2}{14}\\selectfont ${escJa(j.summary || r.summary || '')}\\par}
+  {\\fontsize{9.3}{14}\\selectfont ${escJa(j.summary || r.summary || '')}\\par}
 
   \\rightsection{開発実績・プロジェクト}
   ${projList}

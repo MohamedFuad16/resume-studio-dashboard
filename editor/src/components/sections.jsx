@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sec, Inp, Txta, Bullets, I, TagInput, SuggestInput } from './ui.jsx';
+import { Sec, Inp, Txta, Bullets, I, TagInput, SuggestInput, MonthInput } from './ui.jsx';
 import { prepareProfilePhoto } from '../utils/imageUpload.js';
 
 function GithubMark() {
@@ -17,16 +17,53 @@ export function PersonalSec({ data: d, onChange, isJa }) {
   const emailLocal = emailParts[0] || '';
   const emailDomain = emailParts.slice(1).join('@') || 'gmail.com';
   const emailDomains = ['gmail.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'yahoo.com', 'tokai.ac.jp'];
-  const [zip, setZip] = React.useState('');
   const [lookupState, setLookupState] = React.useState('idle');
+  const [nameEnError, setNameEnError] = React.useState(false);
   const linkedinOk = !d.linkedin || /^https:\/\/(www\.)?linkedin\.com\/in\/[A-Za-z0-9_-]+\/?$/.test(d.linkedin.trim());
   const githubOk = !d.github || /^https:\/\/(www\.)?github\.com\/[A-Za-z0-9_-]+\/?$/.test(d.github.trim());
+
+  // Postal code now persists on `personal.postalCode` (server validates this field).
+  const postalCode = d.postalCode || '';
+  // ID photo can live under either key; treat both as "a photo is present".
+  const photoUrl = d.photoDataUrl || d.photo || '';
+
+  // Full name (English) must be Latin only — keep invalid (e.g. Japanese) values from saving.
+  const NAME_EN_OK = /^[A-Za-z .,'\-]*$/;
+  const setNameEn = v => {
+    if (!NAME_EN_OK.test(v)) {
+      setNameEnError(true);
+      return; // do NOT persist the invalid value
+    }
+    setNameEnError(false);
+    s('nameEn', v);
+  };
+
+  // Phone: count digits only (ignore spaces/hyphens); Japanese mobile/landline = 11 digits.
+  const phoneDigits = (d.phone || '').replace(/\D/g, '');
+  const phoneOk = !d.phone || phoneDigits.length === 11;
+
+  const removePhoto = () => {
+    const next = { ...d, photoDataUrl: '' };
+    if ('photo' in next) next.photo = '';
+    onChange(next);
+  };
+  const handlePhotoFile = async e => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      s('photoDataUrl', await prepareProfilePhoto(file));
+    } catch (error) {
+      window.alert(error.message || 'Could not upload photo.');
+    }
+  };
+
   const setEmail = (local, domain) => {
     const safeLocal = local.replace(/@/g, '').trim();
     s('email', safeLocal ? `${safeLocal}@${domain}` : '');
   };
   const lookupZip = async () => {
-    const digits = zip.replace(/\D/g, '');
+    const digits = postalCode.replace(/\D/g, '');
     if (digits.length !== 7) {
       setLookupState('error');
       return;
@@ -57,8 +94,8 @@ export function PersonalSec({ data: d, onChange, isJa }) {
           <div className="flds">
             <div className="photo-field">
               <div className="photo-preview">
-                {d.photoDataUrl ? (
-                  <img src={d.photoDataUrl} alt="" />
+                {photoUrl ? (
+                  <img src={photoUrl} alt="" />
                 ) : (
                   <span>{isJa ? '写真' : 'Photo'}</span>
                 )}
@@ -66,33 +103,63 @@ export function PersonalSec({ data: d, onChange, isJa }) {
               <div className="photo-copy">
                 <span className="photo-kicker">{isJa ? '証明写真（任意）' : 'ID photo (optional)'}</span>
                 <small>{isJa ? '証明写真の標準比率（縦4：横3）。JPEG・PNG・WebPに対応。' : 'Standard portrait ratio: 4 high × 3 wide. JPEG, PNG, or WebP.'}</small>
-                <label className="photo-upload">
-                  <I n="file" s={12} />
-                  {isJa ? '証明写真を追加' : 'Add ID photo'}
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={async e => {
-                      const file = e.target.files?.[0];
-                      e.target.value = '';
-                      if (!file) return;
-                      try {
-                        s('photoDataUrl', await prepareProfilePhoto(file));
-                      } catch (error) {
-                        window.alert(error.message || 'Could not upload photo.');
-                      }
-                    }}
-                  />
-                </label>
+                {photoUrl ? (
+                  <div className="photo-actions">
+                    <label className="photo-upload">
+                      <I n="sync" s={12} />
+                      {isJa ? '写真を変更' : 'Replace photo'}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={handlePhotoFile}
+                      />
+                    </label>
+                    <button type="button" className="photo-remove" onClick={removePhoto}>
+                      <I n="x" s={12} />
+                      {isJa ? '写真を削除' : 'Remove photo'}
+                    </button>
+                  </div>
+                ) : (
+                  <label className="photo-upload">
+                    <I n="file" s={12} />
+                    {isJa ? '証明写真を追加' : 'Add ID photo'}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handlePhotoFile}
+                    />
+                  </label>
+                )}
               </div>
             </div>
             <div className="row2">
-              <Inp label={isJa ? "氏名（英語）" : "Full name"} name="fullName" value={d.nameEn} onChange={v => s('nameEn', v)} placeholder="Mohamed Fuad" />
-              <Inp label={isJa ? "氏名（日本語）" : "Japanese name"} name="fullNameJa" value={d.nameJa} onChange={v => s('nameJa', v)} placeholder="モハメド フアド" />
+              <div className="f">
+                <span className="fl">{isJa ? "氏名（英語）" : "Full name"}</span>
+                <input
+                  className={`fi ${nameEnError ? 'invalid' : ''}`}
+                  name="fullName"
+                  value={d.nameEn || ''}
+                  onChange={e => setNameEn(e.target.value)}
+                  placeholder="Mohamed Fuad"
+                  lang="en"
+                  autoComplete="name"
+                />
+                {nameEnError && <small className="field-error">{isJa ? '英字（ローマ字）で入力してください。日本語氏名は下の欄へ。' : 'Use English (Latin) letters only. Enter your Japanese name below.'}</small>}
+              </div>
+              <Inp label={isJa ? "氏名（日本語）" : "Japanese name"} name="fullNameJa" value={d.nameJa} onChange={v => s('nameJa', v)} placeholder="モハメド フアド" lang="ja" />
             </div>
             <div className="row2">
-              <Inp label={isJa ? "ふりがな" : "Furigana"} name="furigana" value={d.furigana} onChange={v => s('furigana', v)} placeholder="もはめど ふあど" />
-              <Inp label={isJa ? "生年月日" : "Date of birth"} name="dob" value={d.dob} onChange={v => s('dob', v)} placeholder="2004-02-28" />
+              <Inp label={isJa ? "ふりがな" : "Furigana"} name="furigana" value={d.furigana} onChange={v => s('furigana', v)} placeholder="もはめど ふあど" lang="ja" />
+              <div className="f">
+                <span className="fl">{isJa ? "生年月日" : "Date of birth"}</span>
+                <input
+                  className="fi"
+                  type="date"
+                  name="dob"
+                  value={d.dob || ''}
+                  onChange={e => s('dob', e.target.value)}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -105,7 +172,18 @@ export function PersonalSec({ data: d, onChange, isJa }) {
           </div>
           <div className="flds">
             <div className="row2">
-              <Inp label={isJa ? "電話番号" : "Phone"} name="phone" value={d.phone} onChange={v => s('phone', v)} placeholder="080-0000-0000" />
+              <div className="f">
+                <span className="fl">{isJa ? "電話番号" : "Phone"}</span>
+                <input
+                  className={`fi ${phoneOk ? '' : 'invalid'}`}
+                  name="phone"
+                  value={d.phone || ''}
+                  onChange={e => s('phone', e.target.value)}
+                  placeholder="080-0000-0000"
+                  inputMode="tel"
+                />
+                {!phoneOk && <small className="field-error">{isJa ? '電話番号は11桁で入力してください（現在 ' + phoneDigits.length + ' 桁）。' : `Enter an 11-digit Japanese phone number (currently ${phoneDigits.length} digits).`}</small>}
+              </div>
               <div className="f">
                 <span className="fl">{isJa ? "メールアドレス" : "Email"}</span>
                 <div className="email-split">
@@ -126,7 +204,7 @@ export function PersonalSec({ data: d, onChange, isJa }) {
             <div className="zip-lookup">
               <div className="f">
                 <span className="fl">{isJa ? "郵便番号" : "Postal code"}</span>
-                <input className="fi" value={zip} onChange={e => setZip(e.target.value)} placeholder="154-0000" inputMode="numeric" />
+                <input className="fi" name="postalCode" value={postalCode} onChange={e => s('postalCode', e.target.value)} placeholder="154-0000" inputMode="numeric" />
               </div>
               <button type="button" className="btn" onClick={lookupZip} disabled={lookupState === 'loading'}>
                 <I n="sync" s={12} style={{ animation: lookupState === 'loading' ? 'spin 0.6s linear infinite' : 'none' }} />
@@ -205,6 +283,9 @@ export function SummarySec({ data, onChange, isJa, resume }) {
 /* ── Education ──────────────────────────────────────────── */
 export function EducationSec({ data, onChange, isJa }) {
   const set = (i, k, v) => onChange(data.map((e, x) => x === i ? { ...e, [k]: v } : e));
+  // Single merged update so multi-field edits don't stomp each other via stale `data`
+  // closures (fixes the degree/institution "snap-back" bug — see report / ADR).
+  const upd = (i, patch) => onChange(data.map((e, x) => x === i ? { ...e, ...patch } : e));
   const add = () => onChange([...data, { school: '', schoolJa: '', institution: '', institutionJa: '', location: '', degree: '', degreeJa: '', startDate: '', endDate: '', bullets: [] }]);
   const del = i => onChange(data.filter((_, x) => x !== i));
   const move = (i, dir) => {
@@ -265,25 +346,25 @@ export function EducationSec({ data, onChange, isJa }) {
               {isJa ? (
                 <>
                   <div className="row2">
-                    <SuggestInput label="学校名" name={`education.${i}.school`} value={e.schoolJa || e.school || e.institutionJa} onChange={v => { set(i, 'schoolJa', v); set(i, 'school', v); set(i, 'institution', v); set(i, 'institutionJa', v); }} suggestions={INSTITUTIONS_JA} placeholder="東海大学..." />
-                    <SuggestInput label="学部・学科・専攻" name={`education.${i}.degree`} value={e.degreeJa || e.degree} onChange={v => { set(i, 'degreeJa', v); set(i, 'degree', v); }} suggestions={DEGREES_JA} placeholder="情報通信学部 情報通信学科..." />
+                    <SuggestInput label="学校名" name={`education.${i}.school`} value={e.schoolJa || e.school || e.institutionJa} onChange={v => upd(i, { schoolJa: v, school: v, institution: v, institutionJa: v })} suggestions={INSTITUTIONS_JA} placeholder="東海大学..." />
+                    <SuggestInput label="学部・学科・専攻" name={`education.${i}.degree`} value={e.degreeJa || e.degree} onChange={v => upd(i, { degreeJa: v, degree: v })} suggestions={DEGREES_JA} placeholder="情報通信学部 情報通信学科..." />
                   </div>
                   <div className="row3">
                     <SuggestInput label="所在地" name={`education.${i}.location`} value={e.location} onChange={v => set(i, 'location', v)} suggestions={LOCATIONS} placeholder="東京都世田谷区..." />
-                    <Inp label="入学年月" name={`education.${i}.startDate`} value={e.startDate} onChange={v => set(i, 'startDate', v)} placeholder="2024-04" />
-                    <Inp label="卒業・修了予定年月" name={`education.${i}.endDate`} value={e.endDate} onChange={v => set(i, 'endDate', v)} placeholder="2028-03" />
+                    <MonthInput label="入学年月" value={e.startDate} onChange={v => set(i, 'startDate', v)} isJa />
+                    <MonthInput label="卒業・修了予定年月" value={e.endDate} onChange={v => set(i, 'endDate', v)} ongoingMode="expected" isJa />
                   </div>
                 </>
               ) : (
                 <>
                   <div className="row2">
-                    <SuggestInput label="Institution" name={`education.${i}.school`} value={e.school || e.institution} onChange={v => { set(i, 'school', v); set(i, 'institution', v); }} suggestions={INSTITUTIONS_EN} placeholder="Tokai University..." />
+                    <SuggestInput label="Institution" name={`education.${i}.school`} value={e.school || e.institution} onChange={v => upd(i, { school: v, institution: v })} suggestions={INSTITUTIONS_EN} placeholder="Tokai University..." />
                     <SuggestInput label="Degree / Program" name={`education.${i}.degree`} value={e.degree} onChange={v => set(i, 'degree', v)} suggestions={DEGREES_EN} placeholder="Bachelor of Science..." />
                   </div>
                   <div className="row3">
                     <SuggestInput label="Location" name={`education.${i}.location`} value={e.location} onChange={v => set(i, 'location', v)} suggestions={LOCATIONS} placeholder="Tokyo, Japan..." />
-                    <Inp label="Start" name={`education.${i}.startDate`} value={e.startDate} onChange={v => set(i, 'startDate', v)} placeholder="Apr 2024" />
-                    <Inp label="End" name={`education.${i}.endDate`} value={e.endDate} onChange={v => set(i, 'endDate', v)} placeholder="Mar 2028" />
+                    <MonthInput label="Start" value={e.startDate} onChange={v => set(i, 'startDate', v)} />
+                    <MonthInput label="End" value={e.endDate} onChange={v => set(i, 'endDate', v)} ongoingMode="expected" />
                   </div>
                 </>
               )}
@@ -302,6 +383,8 @@ export function EducationSec({ data, onChange, isJa }) {
 /* ── Experience ─────────────────────────────────────────── */
 export function ExperienceSec({ data, onChange, isJa }) {
   const set = (i, k, v) => onChange(data.map((e, x) => x === i ? { ...e, [k]: v } : e));
+  // Single merged update (see EducationSec) — avoids the stale-closure double-set bug.
+  const upd = (i, patch) => onChange(data.map((e, x) => x === i ? { ...e, ...patch } : e));
   const add = () => onChange([...data, { company: '', companyJa: '', role: '', roleJa: '', location: '', startDate: '', endDate: '', description: '', bullets: [] }]);
   const del = i => onChange(data.filter((_, x) => x !== i));
   const move = (i, dir) => {
@@ -362,13 +445,13 @@ export function ExperienceSec({ data, onChange, isJa }) {
               {isJa ? (
                 <>
                   <div className="row2">
-                    <SuggestInput label="企業・組織名" name={`experience.${i}.company`} value={e.companyJa || e.company} onChange={v => { set(i, 'companyJa', v); set(i, 'company', v); }} suggestions={COMPANIES_JA} placeholder="アルティウスリンク株式会社..." />
-                    <SuggestInput label="役職・職種" name={`experience.${i}.role`} value={e.roleJa || e.role} onChange={v => { set(i, 'roleJa', v); set(i, 'role', v); }} suggestions={ROLES_JA} placeholder="技術サポート..." />
+                    <SuggestInput label="企業・組織名" name={`experience.${i}.company`} value={e.companyJa || e.company} onChange={v => upd(i, { companyJa: v, company: v })} suggestions={COMPANIES_JA} placeholder="アルティウスリンク株式会社..." />
+                    <SuggestInput label="役職・職種" name={`experience.${i}.role`} value={e.roleJa || e.role} onChange={v => upd(i, { roleJa: v, role: v })} suggestions={ROLES_JA} placeholder="技術サポート..." />
                   </div>
                   <div className="row3">
                     <SuggestInput label="所在地" name={`experience.${i}.location`} value={e.location} onChange={v => set(i, 'location', v)} suggestions={LOCATIONS} placeholder="東京都世田谷区..." />
-                    <Inp label="開始年月" name={`experience.${i}.startDate`} value={e.startDate} onChange={v => set(i, 'startDate', v)} placeholder="2024-05" />
-                    <Inp label="終了年月" name={`experience.${i}.endDate`} value={e.endDate} onChange={v => set(i, 'endDate', v)} placeholder="2025-05" />
+                    <MonthInput label="開始年月" value={e.startDate} onChange={v => set(i, 'startDate', v)} isJa />
+                    <MonthInput label="終了年月" value={e.endDate} onChange={v => set(i, 'endDate', v)} ongoingMode="present" isJa />
                   </div>
                 </>
               ) : (
@@ -379,8 +462,8 @@ export function ExperienceSec({ data, onChange, isJa }) {
                   </div>
                   <div className="row3">
                     <SuggestInput label="Location" name={`experience.${i}.location`} value={e.location} onChange={v => set(i, 'location', v)} suggestions={LOCATIONS} placeholder="Tokyo, Japan..." />
-                    <Inp label="Start" name={`experience.${i}.startDate`} value={e.startDate} onChange={v => set(i, 'startDate', v)} placeholder="Jun 2023" />
-                    <Inp label="End" name={`experience.${i}.endDate`} value={e.endDate} onChange={v => set(i, 'endDate', v)} placeholder="Present" />
+                    <MonthInput label="Start" value={e.startDate} onChange={v => set(i, 'startDate', v)} />
+                    <MonthInput label="End" value={e.endDate} onChange={v => set(i, 'endDate', v)} ongoingMode="present" />
                   </div>
                 </>
               )}
@@ -407,6 +490,8 @@ export function ExperienceSec({ data, onChange, isJa }) {
 /* ── Projects ───────────────────────────────────────────── */
 export function ProjectsSec({ data, onChange, isJa }) {
   const set = (i, k, v) => onChange(data.map((e, x) => x === i ? { ...e, [k]: v } : e));
+  // Single merged update (see EducationSec) — avoids the stale-closure double-set bug.
+  const upd = (i, patch) => onChange(data.map((e, x) => x === i ? { ...e, ...patch } : e));
   const add = () => onChange([...data, { title: '', name: '', tech: '', role: '', year: '', bullets: [] }]);
   const del = i => onChange(data.filter((_, x) => x !== i));
   const move = (i, dir) => {
@@ -467,18 +552,18 @@ export function ProjectsSec({ data, onChange, isJa }) {
               {isJa ? (
                 <>
                   <div className="row2">
-                    <Inp label="プロジェクト名" name={`projects.${i}.name`} value={p.name || p.title} onChange={v => { set(i, 'name', v); set(i, 'title', v); }} placeholder="Tutor-System..." />
+                    <Inp label="プロジェクト名" name={`projects.${i}.name`} value={p.name || p.title} onChange={v => upd(i, { name: v, title: v })} placeholder="Tutor-System..." />
                     <SuggestInput label="実施年" name={`projects.${i}.year`} value={p.year} onChange={v => set(i, 'year', v)} suggestions={YEARS} placeholder="2025..." />
                   </div>
-                  <TagInput label="役割・使用技術" name={`projects.${i}.role`} value={p.role || p.tech} onChange={v => { set(i, 'role', v); set(i, 'tech', v); }} suggestions={TECH_SUGGESTIONS} placeholder="Select or type technologies..." />
+                  <TagInput label="役割・使用技術" name={`projects.${i}.role`} value={p.role || p.tech} onChange={v => upd(i, { role: v, tech: v })} suggestions={TECH_SUGGESTIONS} placeholder="Select or type technologies..." />
                 </>
               ) : (
                 <>
                   <div className="row2">
-                    <Inp label="Title" name={`projects.${i}.name`} value={p.title || p.name} onChange={v => { set(i, 'title', v); set(i, 'name', v); }} placeholder="Tutor-System..." />
+                    <Inp label="Title" name={`projects.${i}.name`} value={p.title || p.name} onChange={v => upd(i, { title: v, name: v })} placeholder="Tutor-System..." />
                     <SuggestInput label="Year" name={`projects.${i}.year`} value={p.year} onChange={v => set(i, 'year', v)} suggestions={YEARS} placeholder="2025..." />
                   </div>
-                  <TagInput label="Role / Technologies" name={`projects.${i}.role`} value={p.tech || p.role} onChange={v => { set(i, 'tech', v); set(i, 'role', v); }} suggestions={TECH_SUGGESTIONS} placeholder="Select or type technologies..." />
+                  <TagInput label="Role / Technologies" name={`projects.${i}.role`} value={p.tech || p.role} onChange={v => upd(i, { tech: v, role: v })} suggestions={TECH_SUGGESTIONS} placeholder="Select or type technologies..." />
                 </>
               )}
               <Bullets items={p.bullets || []} onChange={b => set(i, 'bullets', b)} />
@@ -591,18 +676,31 @@ export function ActivitiesSec({ data, onChange, isJa }) {
 }
 
 /* ── Suggestions lists ──────────────────────────────────── */
+// Curated ~50 institutions: Japan's top national/private universities followed by
+// globally top-ranked schools. INSTITUTIONS_EN / INSTITUTIONS_JA are kept index-parallel.
 export const INSTITUTIONS_EN = [
   "Tokai University",
   "The University of Tokyo",
+  "Kyoto University",
+  "Osaka University",
+  "Tohoku University",
+  "Nagoya University",
+  "Hokkaido University",
+  "Kyushu University",
+  "Tokyo Institute of Technology",
+  "University of Tsukuba",
+  "Kobe University",
+  "Hitotsubashi University",
+  "Waseda University",
+  "Keio University",
+  "Sophia University",
   "Tokyo Metropolitan University",
   "Tokyo University of Science",
   "Tokyo University of Foreign Studies",
   "Tokyo University of Agriculture and Technology",
   "Tokyo Medical and Dental University",
-  "Hitotsubashi University",
   "Ochanomizu University",
   "Gakushuin University",
-  "Sophia University",
   "Meiji University",
   "Aoyama Gakuin University",
   "Rikkyo University",
@@ -621,26 +719,43 @@ export const INSTITUTIONS_EN = [
   "Kogakuin University",
   "Tokyo Polytechnic University",
   "Digital Hollywood University",
-  "Kyoto University",
-  "Waseda University",
-  "Keio University",
-  "Tokyo Institute of Technology",
-  "Osaka University",
-  "Tohoku University"
+  "Massachusetts Institute of Technology (MIT)",
+  "Stanford University",
+  "Harvard University",
+  "California Institute of Technology (Caltech)",
+  "University of California, Berkeley",
+  "Carnegie Mellon University",
+  "University of Oxford",
+  "University of Cambridge",
+  "ETH Zurich",
+  "National University of Singapore",
+  "Tsinghua University",
+  "Nanyang Technological University"
 ];
 
 export const INSTITUTIONS_JA = [
   "東海大学",
   "東京大学",
+  "京都大学",
+  "大阪大学",
+  "東北大学",
+  "名古屋大学",
+  "北海道大学",
+  "九州大学",
+  "東京工業大学",
+  "筑波大学",
+  "神戸大学",
+  "一橋大学",
+  "早稲田大学",
+  "慶應義塾大学",
+  "上智大学",
   "東京都立大学",
   "東京理科大学",
   "東京外国語大学",
   "東京農工大学",
   "東京医科歯科大学",
-  "一橋大学",
   "お茶の水女子大学",
   "学習院大学",
-  "上智大学",
   "明治大学",
   "青山学院大学",
   "立教大学",
@@ -659,12 +774,18 @@ export const INSTITUTIONS_JA = [
   "工学院大学",
   "東京工芸大学",
   "デジタルハリウッド大学",
-  "京都大学",
-  "早稲田大学",
-  "慶應義塾大学",
-  "東京工業大学",
-  "大阪大学",
-  "東北大学"
+  "マサチューセッツ工科大学（MIT）",
+  "スタンフォード大学",
+  "ハーバード大学",
+  "カリフォルニア工科大学（Caltech）",
+  "カリフォルニア大学バークレー校",
+  "カーネギーメロン大学",
+  "オックスフォード大学",
+  "ケンブリッジ大学",
+  "チューリッヒ工科大学（ETH）",
+  "シンガポール国立大学",
+  "清華大学",
+  "南洋理工大学"
 ];
 
 export const DEGREES_EN = [

@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   ArrowRight,
   Bookmark,
@@ -16,8 +16,10 @@ import { APPLICATION_STATUSES, statusLabel, useApplicationTracker } from '../hoo
 import { useInternshipCatalog } from '../hooks/useInternshipCatalog.js';
 import { ApplicationCalendar } from './ApplicationCalendar.jsx';
 import { CompanyLogo } from './CompanyLogo.jsx';
+import InterviewDateModal from './InterviewDateModal.jsx';
 import { displayCompany, displayRole, displayValue, formatDisplayDeadline } from '../utils/internshipDisplay.js';
 import { prepareProfilePhoto } from '../utils/imageUpload.js';
+import { resolveTechList } from '../utils/techIcons.js';
 
 const STATUS_ICONS = {
   saved: Bookmark,
@@ -115,45 +117,6 @@ function LinkedinMark() {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.45 20.45h-3.56v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.34V8.98h3.42v1.57h.05c.47-.9 1.64-1.85 3.37-1.85 3.61 0 4.27 2.37 4.27 5.46v6.29ZM5.32 7.41a2.07 2.07 0 1 1 0-4.13 2.07 2.07 0 0 1 0 4.13ZM7.1 20.45H3.54V8.98H7.1v11.47Z" /></svg>;
 }
 
-const TECH_ICON_ALIASES = {
-  'typescript': { slug: 'typescript', label: 'TypeScript' },
-  'javascript': { slug: 'javascript', label: 'JavaScript' },
-  'react': { slug: 'react', label: 'React' },
-  'react 19': { slug: 'react', label: 'React 19' },
-  'tailwind css': { slug: 'tailwindcss', label: 'Tailwind CSS' },
-  'html': { slug: 'html5', label: 'HTML5' },
-  'css': { slug: 'css', label: 'CSS' },
-  'node.js': { slug: 'nodedotjs', label: 'Node.js' },
-  'express': { slug: 'express', label: 'Express' },
-  'swift': { slug: 'swift', label: 'Swift' },
-  'appkit': { slug: 'apple', label: 'Apple / AppKit' },
-  'aws amplify': { asset: '/brand/aws-amplify.svg', key: 'aws-amplify', label: 'AWS Amplify' },
-  'cognito': { asset: '/brand/amazon-cognito.svg', key: 'amazon-cognito', label: 'Amazon Cognito' },
-  'vite': { asset: '/brand/vite.svg', key: 'vite', label: 'Vite' },
-  'deepgram': { slug: 'deepgram', label: 'Deepgram' },
-  'openrouter': { slug: 'openrouter', label: 'OpenRouter' },
-  'indexeddb': { slug: 'sqlite', label: 'IndexedDB' },
-  'dexie/indexeddb': { slug: 'sqlite', label: 'Dexie / IndexedDB' },
-  'webrtc': { slug: 'webrtc', label: 'WebRTC' },
-  'macos menu bar': { slug: 'apple', label: 'Apple / macOS' },
-};
-
-function projectTechnologies(project) {
-  return String(project.tech || '')
-    .split(',')
-    .map(value => value.trim())
-    .filter(Boolean)
-    .map(value => {
-      const normalized = value.toLowerCase().replace(/\s+/g, ' ');
-      const match = TECH_ICON_ALIASES[normalized]
-        || Object.entries(TECH_ICON_ALIASES).find(([key]) => normalized.includes(key))?.[1];
-      return match ? { ...match, key: match.key || match.slug } : null;
-    })
-    .filter(Boolean)
-    .filter((tech, index, items) => items.findIndex(candidate => candidate.key === tech.key) === index)
-    .slice(0, 6);
-}
-
 function profileCompletion(resume) {
   const checks = [
     resume.personal?.nameEn || resume.personal?.nameJa,
@@ -173,6 +136,7 @@ function profileCompletion(resume) {
 export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeChange, isJa, activeProfile }) {
   const t = isJa ? copy.ja : copy.en;
   const fileRef = useRef(null);
+  const [interviewPending, setInterviewPending] = useState(null);
   const { records, counts, updateStatus, addMilestone, removeMilestone } = useApplicationTracker(activeProfile);
   const { catalog } = useInternshipCatalog();
   const completion = profileCompletion(resume);
@@ -204,6 +168,25 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
     } catch (error) {
       window.alert(error.message || 'Could not upload profile photo.');
     }
+  };
+
+  const onStatusChange = (item, value) => {
+    if (value === 'interview') {
+      setInterviewPending(item);
+      return;
+    }
+    updateStatus(item, value);
+  };
+
+  const onInterviewConfirm = value => {
+    const item = interviewPending;
+    if (!item) return;
+    const [date, time = ''] = String(value || '').trim().split(/[ T]/);
+    updateStatus(item, 'interview');
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      addMilestone(item.id, { kind: 'interview', date, time: time || null });
+    }
+    setInterviewPending(null);
   };
 
   return (
@@ -256,7 +239,7 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
                   <span className="application-company"><CompanyLogo item={item} /><span><b>{displayCompany(item, isJa)}</b><small>{displayRole(item.role || record.role, isJa)}</small></span></span>
                   <span><MapPin size={13} />{dashboardValue(record.location, isJa)}</span>
                   <span className="application-deadline">{formatDisplayDeadline(record.deadline, isJa)}</span>
-                  <select value={record.status} onChange={event => updateStatus(item, event.target.value)} aria-label={isJa ? `${record.company}の応募状況` : `Status for ${record.company}`}>
+                  <select value={record.status} onChange={event => onStatusChange(item, event.target.value)} aria-label={isJa ? `${record.company}の応募状況` : `Status for ${record.company}`}>
                     {APPLICATION_STATUSES.map(status => <option value={status.value} key={status.value}>{statusLabel(status.value, isJa)}</option>)}
                     <option value="">{t.notApplied}</option>
                   </select>
@@ -273,9 +256,9 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
             {projects.map(project => (
               <a className="project-card" key={project.title} href={project.link} target="_blank" rel="noreferrer" aria-label={`${t.viewProject}: ${project.title}`} aria-disabled={project.link ? undefined : true} onClick={project.link ? undefined : event => event.preventDefault()}>
                 <span className="project-tech-icons" aria-label={isJa ? '使用技術' : 'Technologies used'}>
-                  {projectTechnologies(project).map(tech => (
-                    <span className="project-tech-icon" key={`${project.title}-${tech.label}`} title={tech.label}>
-                      <img src={tech.asset || `https://cdn.simpleicons.org/${tech.slug}`} alt={tech.label} loading="lazy" />
+                  {resolveTechList(project.tech).slice(0, 6).map(t => (
+                    <span className="project-tech-icon" key={t.key} title={t.label}>
+                      <img src={t.src} alt={t.label} loading="lazy" onError={e=>{e.currentTarget.src=t.fallbackSrc;}} />
                     </span>
                   ))}
                 </span>
@@ -303,6 +286,14 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
         </aside>
       </div>
       <ApplicationCalendar records={records} addMilestone={addMilestone} removeMilestone={removeMilestone} isJa={isJa} />
+      <InterviewDateModal
+        open={Boolean(interviewPending)}
+        applicationLabel={interviewPending ? `${displayCompany(interviewPending, isJa)} — ${displayRole(interviewPending.role, isJa)}` : ''}
+        initialDate=""
+        isJa={isJa}
+        onConfirm={onInterviewConfirm}
+        onCancel={() => setInterviewPending(null)}
+      />
     </main>
   );
 }

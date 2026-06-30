@@ -1,0 +1,238 @@
+{
+  "personal": {
+    "nameEn": "Aiko Tanaka",
+    "nameJa": "田中 愛子",
+    "furigana": "たなか あいこ",
+    "dob": "2002-09-15",
+    "address": "東京都渋谷区",
+    "postalCode": "150-0002",
+    "phone": "070-4821-6390",
+    "email": "aiko.tanaka.dev@gmail.com",
+    "linkedin": "https://linkedin.com/in/aiko-tanaka-dev",
+    "github": "https://github.com/aiko-tanaka"
+  },
+  "summary": "Master's student in Information Science and Technology at the University of Tokyo (expected March 2027), with a B.E. in Computer Science from Waseda University. I specialize in machine learning and backend engineering, building recommendation systems and data pipelines in Python, PyTorch, and Go. My experience includes a backend internship at Rakuten and an ML internship at Mercari, where I shipped models and APIs into production. I am a native Japanese speaker with business-level English (TOEIC 950) seeking software engineering and ML internships where I can turn research into reliable products.",
+  "summaryEn": "Master's student in Information Science and Technology at the University of Tokyo (expected March 2027), with a B.E. in Computer Science from Waseda University. I specialize in machine learning and backend engineering, building recommendation systems and data pipelines in Python, PyTorch, and Go. My experience includes a backend internship at Rakuten and an ML internship at Mercari, where I shipped models and APIs into production. I am a native Japanese speaker with business-level English (TOEIC 950) seeking software engineering and ML internships where I can turn research into reliable products.",
+  "summaryJa": "東京大学大学院情報理工学系研究科の修士課程に在学し（2027年3月修了見込み）、早稲田大学で情報理工学（コンピュータサイエンス）の学士号を取得しました。機械学習とバックエンド開発を専門とし、Python、PyTorch、Goを用いた推薦システムやデータパイプラインの構築に取り組んでいます。楽天でのバックエンド開発インターン、メルカリでの機械学習インターンを通じて、モデルとAPIを本番環境へ実装した経験があります。研究成果を信頼性の高いプロダクトへ落とし込めるソフトウェアエンジニア／機械学習エンジニアを目指しています。",
+  "japanese": {
+    "nameEn": "Aiko Tanaka",
+    "asOfDate": "2026-06-30",
+    "summary": "東京大学大学院情報理工学系研究科の修士課程に在学し（2027年3月修了見込み）、早稲田大学で情報理工学（コンピュータサイエンス）の学士号を取得しました。機械学習とバックエンド開発を専門とし、Python、PyTorch、Goを用いた推薦システムやデータパイプラインの構築に取り組んでいます。",
+    "academicFocus": "機械学習、自然言語処理、推薦システム、分散システム、データベース、確率統計などを履修・研究しています。修士研究では大規模ECサイト向けの推薦モデルの公平性に取り組み、学外ではKaggleコンペティションや競技プログラミングにも継続的に参加しています。",
+    "selfPr": "私の強みは、研究で得た知見を実運用に耐えるシステムへ落とし込む力です。メルカリのインターンでは、出品カテゴリ推定モデルを改善し、オフライン評価の精度向上だけでなく、推論APIのレイテンシ削減まで一貫して担当しました。楽天では、決済関連マイクロサービスのバックエンドをGoで開発し、テストカバレッジと可観測性の向上に貢献しました。チームでの議論を大切にし、データに基づいて意思決定を行いながら、着実に価値を届けます。",
+    "experience": [
+      {
+        "company": "Mercari, Inc.",
+        "companyJa": "株式会社メルカリ",
+        "role": "Machine Learning Engineer Intern",
+        "roleJa": "機械学習エンジニア インターン",
+        "startDate": "Aug 2025",
+        "endDate": "Present",
+        "bulletsJa": [
+          "出品カテゴリ自動推定モデルをPyTorchで改善し、オフライン評価のF1スコアを向上。",
+          "推論APIをVertex AI上に展開し、p95レイテンシの削減とコスト最適化に貢献。"
+        ]
+      },
+      {
+        "company": "Rakuten Group, Inc.",
+        "companyJa": "楽天グループ株式会社",
+        "role": "Backend Engineer Intern",
+        "roleJa": "バックエンドエンジニア インターン",
+        "startDate": "Jul 2024",
+        "endDate": "Sep 2024",
+        "bulletsJa": [
+          "決済関連マイクロサービスのAPIをGoで開発し、テストカバレッジと可観測性を改善。",
+          "PostgreSQLのクエリ最適化により主要エンドポイントの応答時間を短縮。"
+        ]
+      }
+    ],
+    "qualifications": [
+      {
+        "year": "2024",
+        "month": "11",
+        "name": "TOEIC L&R 950点"
+      },
+      {
+        "year": "2023",
+        "month": "4",
+        "name": "基本情報技術者試験 合格"
+      }
+    ],
+    "skills": {
+      "languages": "Python, Go, TypeScript, SQL, R, C++",
+      "frameworks": "PyTorch, TensorFlow, scikit-learn, FastAPI, React, Next.js",
+      "tools": "Docker, Kubernetes, GCP (Vertex AI/BigQuery), PostgreSQL, Git, Airflow"
+    },
+    "languages": [
+      "日本語: 母語",
+      "英語: ビジネスレベル（TOEIC 950）",
+      "韓国語: 日常会話レベル"
+    ]
+  },
+  "education": [
+    {
+      "institution": "The University of Tokyo",
+      "institutionJa": "東京大学大学院",
+      "school": "Graduate School of Information Science and Technology",
+      "schoolJa": "情報理工学系研究科",
+      "degree": "Master of Science — Information Science and Technology",
+      "degreeJa": "情報理工学系研究科 修士課程（在学中）",
+      "location": "Tokyo, Japan",
+      "startDate": "Apr 2025",
+      "endDate": "Mar 2027 (Expected)",
+      "bullets": [
+        "Research focus: fairness in large-scale recommender systems",
+        "Relevant coursework: Machine Learning, Natural Language Processing, Distributed Systems, Probability & Statistics"
+      ]
+    },
+    {
+      "institution": "Waseda University",
+      "institutionJa": "早稲田大学",
+      "school": "School of Fundamental Science and Engineering",
+      "schoolJa": "基幹理工学部",
+      "degree": "Bachelor of Engineering — Computer Science and Engineering",
+      "degreeJa": "基幹理工学部 情報理工学科（学士）",
+      "location": "Tokyo, Japan",
+      "startDate": "Apr 2021",
+      "endDate": "Mar 2025",
+      "bullets": [
+        "Graduated with a thesis on graph-based recommendation models",
+        "Relevant coursework: Algorithms, Operating Systems, Databases, Linear Algebra, Optimization"
+      ]
+    }
+  ],
+  "experience": [
+    {
+      "company": "Mercari, Inc.",
+      "companyJa": "株式会社メルカリ",
+      "role": "Machine Learning Engineer Intern",
+      "roleJa": "機械学習エンジニア インターン",
+      "location": "Tokyo, Japan",
+      "startDate": "Aug 2025",
+      "endDate": "Present",
+      "bullets": [
+        "Improved an item-category classification model in PyTorch, raising offline F1 on the production evaluation set.",
+        "Deployed the inference API on Vertex AI, reducing p95 latency and serving cost."
+      ],
+      "description": "Improved an item-category classification model in PyTorch and deployed the inference API on Vertex AI, reducing p95 latency and serving cost."
+    },
+    {
+      "company": "Rakuten Group, Inc.",
+      "companyJa": "楽天グループ株式会社",
+      "role": "Backend Engineer Intern",
+      "roleJa": "バックエンドエンジニア インターン",
+      "location": "Tokyo, Japan",
+      "startDate": "Jul 2024",
+      "endDate": "Sep 2024",
+      "bullets": [
+        "Built payment-service APIs in Go and improved test coverage and observability.",
+        "Optimized PostgreSQL queries to cut response time on key endpoints."
+      ],
+      "description": "Built payment-service APIs in Go, improved test coverage and observability, and optimized PostgreSQL queries to cut response time on key endpoints."
+    }
+  ],
+  "projects": [
+    {
+      "title": "KanjiFlow",
+      "name": "KanjiFlow",
+      "tech": "Python, FastAPI, PyTorch, Next.js, PostgreSQL",
+      "role": "Python, FastAPI, PyTorch, Next.js, PostgreSQL",
+      "year": "2025",
+      "bullets": [
+        "Built an adaptive kanji study app that schedules reviews with a spaced-repetition model tuned per learner.",
+        "Served personalized review batches through a FastAPI backend with a Next.js progressive web client."
+      ],
+      "bulletsJa": [
+        "学習者ごとに最適化した間隔反復モデルで復習をスケジューリングする漢字学習アプリを開発。",
+        "FastAPIバックエンドとNext.js製PWAクライアントで、個別最適化された復習バッチを提供。"
+      ],
+      "description": "Built an adaptive kanji study app that schedules reviews with a spaced-repetition model tuned per learner, served through a FastAPI backend and a Next.js progressive web client.",
+      "link": "https://github.com/aiko-tanaka/kanjiflow"
+    },
+    {
+      "title": "ShiftMate",
+      "name": "ShiftMate",
+      "tech": "Go, TypeScript, React, PostgreSQL, Docker",
+      "role": "Go, TypeScript, React, PostgreSQL, Docker",
+      "year": "2024",
+      "bullets": [
+        "Created a part-time shift-scheduling tool that solves staffing constraints with a heuristic optimizer.",
+        "Designed a Go REST API and a React dashboard used by a campus café team of 20."
+      ],
+      "bulletsJa": [
+        "ヒューリスティック最適化でシフトの人員制約を解消する、アルバイト向けシフト調整ツールを開発。",
+        "Go製RESTAPIとReactダッシュボードを設計し、学内カフェの20名規模チームで運用。"
+      ],
+      "description": "Created a part-time shift-scheduling tool that solves staffing constraints with a heuristic optimizer, exposed via a Go REST API and a React dashboard used by a 20-person campus café team.",
+      "link": "https://github.com/aiko-tanaka/shiftmate"
+    },
+    {
+      "title": "FairRec",
+      "name": "FairRec",
+      "tech": "Python, PyTorch, BigQuery, Airflow",
+      "role": "Python, PyTorch, BigQuery, Airflow",
+      "year": "2025",
+      "bullets": [
+        "Prototyped a fairness-aware recommendation model and an Airflow pipeline for reproducible offline evaluation.",
+        "Benchmarked exposure-fairness metrics on a public e-commerce dataset for my master's research."
+      ],
+      "bulletsJa": [
+        "公平性を考慮した推薦モデルと、再現可能なオフライン評価のためのAirflowパイプラインを試作。",
+        "公開ECデータセット上で露出公平性の指標をベンチマークし、修士研究に活用。"
+      ],
+      "description": "Prototyped a fairness-aware recommendation model and an Airflow pipeline for reproducible offline evaluation, benchmarking exposure-fairness metrics on a public e-commerce dataset for master's research.",
+      "link": "https://github.com/aiko-tanaka/fairrec"
+    }
+  ],
+  "skills": {
+    "languages": "Python, Go, TypeScript, SQL, R, C++, Java",
+    "frameworks": "PyTorch, TensorFlow, scikit-learn, FastAPI, React, Next.js, NumPy, Pandas",
+    "tools": "Docker, Kubernetes, GCP (Vertex AI/BigQuery), PostgreSQL, Git, Airflow, Linux",
+    "concepts": "Machine Learning, NLP, Recommender Systems, MLOps, Data Pipelines, Distributed Systems",
+    "spoken": "Japanese (Native), English (Business — TOEIC 950), Korean (Conversational)"
+  },
+  "activities": [
+    {
+      "title": "Kaggle Competitions Expert",
+      "org": "Kaggle",
+      "location": "Online",
+      "startDate": "2023",
+      "endDate": "Present",
+      "bullets": [
+        "Achieved Expert tier with top-10% finishes in tabular and NLP competitions."
+      ],
+      "titleJa": "Kaggle コンペティション Expert",
+      "orgJa": "Kaggle",
+      "bulletsJa": [
+        "テーブルデータおよびNLPコンペティションで上位10%入賞し、Expertティアを達成。"
+      ]
+    },
+    {
+      "title": "Competitive Programming Club",
+      "org": "Waseda University",
+      "location": "Tokyo, Japan",
+      "startDate": "2021",
+      "endDate": "2025",
+      "bullets": [
+        "Participated in ICPC regional contests and led weekly algorithm study sessions."
+      ],
+      "titleJa": "競技プログラミングサークル",
+      "orgJa": "早稲田大学",
+      "bulletsJa": [
+        "ICPC地区予選に出場し、週次のアルゴリズム勉強会を主導。"
+      ]
+    }
+  ],
+  "personalInfo": {
+    "fullName": "Aiko Tanaka",
+    "fullNameJa": "田中 愛子",
+    "furigana": "たなか あいこ",
+    "dob": "2002-09-15",
+    "address": "東京都渋谷区",
+    "postalCode": "150-0002",
+    "phone": "070-4821-6390",
+    "email": "aiko.tanaka.dev@gmail.com",
+    "linkedin": "https://linkedin.com/in/aiko-tanaka-dev",
+    "github": "https://github.com/aiko-tanaka"
+  }
+}

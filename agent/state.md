@@ -1,23 +1,60 @@
 # Project state
 
 ## Current state summary
-Two-track résumé project. **Track A — Resume Studio** (`editor/`): React 18 + Vite
+Two-track résumé project. **Track A — Internship Portal** (`editor/`): React 18 + Vite
 client and an ESM Node/Express server with sql.js (SQLite) KV storage (Vercel Blob in
 prod), Tectonic-based LaTeX compile, an internship radar/tracker, an application
-calendar, and an AI application assistant. **Track B**: static LaTeX résumés (`en/`,
-`ja/`) compiled by `build_all.sh` to `output/`, validated by a Python/PyMuPDF suite
-(`tests/`). The latest work is a Japan-first internship expansion — a new dated seed file
-(`server/seeds/japan-wide-research-2026-06-29.js`), the catalog merge now dedups by `id`
-only, broader EN/JA display localization, a new `Global` region filter, and language
-persistence in `localStorage` — plus a finalize/cleanup pass: the JA-translation helpers
-are unified into one module, the half-translated `Not stated; …` string is fixed, and the
-drifted form-first E2E spec was replaced by a green dashboard-shell smoke suite.
-`npm run build` is green (bundle ~329 KB, down ~7 KB after dedup); the server boots and
-`/api/internships` returns a valid, dedup'd catalog; `npm run test:e2e` is green (4/4).
-The full change set (radar WIP + BUG-001 + cleanup + the `agent/` KB + root pointers) was
-committed and pushed to `origin/main` this session.
+calendar, and an AI application assistant (OpenRouter `gpt-5-mini`). **Track B**: static
+LaTeX résumés (`en/`, `ja/`) compiled by `build_all.sh` to `output/`. Latest mega-update
+(2026-07-01): rebranded to **Internship Portal**, nav-bar multi-user switcher (Mohamed +
+Aiko Tanaka), editor form overhaul, radar hides applied+expired, calendar TZ/coding-test,
+OpenRouter AI agents, JA resume #1 Jake's-clean, consolidated CSS. `npm run build` green
+(~353 KB); `validate:catalog` 184 entries / 0 errors.
 
 ## Recent changes
+- **2026-07-01 — Internship Portal mega-update (Waves 1–3, coordinator ship).** Full
+  user-requested overhaul across dashboard, radar, calendar, editor, server, and templates.
+  **Branding:** "Resume Studio" → **Internship Portal** (EN/JA nav, index.html, README,
+  server status, LLM prompts). **Multi-user:** nav-bar `ProfileSwitcher` (switch/create/delete);
+  second sample `aiko_tanaka`; server seeds both profiles; delete removes tracker/applications
+  KV; `personal.postalCode` persisted. **Dashboard:** recent-apps applied-only + interview
+  modal; tech icons via `techIcons.js` (never null). **Calendar:** Asia/Tokyo applied-date
+  fix; coding-test event type; today-circle + form select CSS. **Radar:** hide applied-type +
+  JST time-expired; JLPT via `splitLanguageRequirement`; interview modal. **Editor:** ID photo
+  replace/remove, EN-only name, DOB/phone/postal validation, month pickers, degree stale-state
+  fix, skills multiselect redesign, autosize textareas. **AI:** OpenRouter `openai/gpt-5-mini`
+  (+ `:online` for research) replaces broken `codex` CLI; URL verification on research results.
+  **JA resumes:** `genJa01` rebuilt as Jake's-clean JA layout; genJa02/03 spacing. **CSS:** dual
+  `.application-row select` fix, nav switcher, form chevrons/skills/calendar pills. Verified:
+  build green, validate:catalog 184/0 errors. Ship: commit + push + `vercel --prod`.
+- **2026-07-01 — Profiles wave 1 (server-side): 2nd sample person, robust seeding,
+  configurable delete protection w/ full KV cleanup, `personal.postalCode`, EN branding.**
+  Server-only changes (`editor/server/index.js`, `validation.js`, `profiles/*.json`); client
+  wiring is a later wave; left uncommitted for the coordinator. (1) **Second sample profile**
+  `aiko_tanaka` (Aiko Tanaka / 田中 愛子) — a polished, distinct bilingual CS grad student
+  (Univ. of Tokyo M.S. + Waseda B.E., ML/backend focus: PyTorch, Go, recommender systems;
+  Mercari + Rakuten internships) matching the EXACT shape of `mohamed_fuad.json`. Replaced the
+  scratch `temp.json` (`nameEn:"fdf"`), which was deleted. (2) **Seeding** now force-seeds BOTH
+  samples via `SAMPLE_PROFILE_IDS = ['mohamed_fuad','aiko_tanaka']` + a new `ensureSampleProfiles()`
+  (idempotent `readProfile` per id — only writes when KV key missing AND `<id>.json` exists),
+  wired into `initPersistentStore()` and the empty-store branch of `listProfiles()`. On a fresh
+  DB GET `/api/profiles` lists both. (3) **Delete protection** is now configurable:
+  `DEFAULT_PROFILE_ID` (env `RESUME_DEFAULT_PROFILE_ID`, default `mohamed_fuad`) + a
+  `PROTECTED_PROFILE_IDS` set (env `RESUME_PROTECTED_PROFILE_IDS`, comma-sep, default = the
+  primary). `sanitizeProfileId`/`readProfile` now key off `DEFAULT_PROFILE_ID`. `deleteProfile`
+  already removed `profile:`/`tracker:`/`applications:` keys — verified no orphans
+  (KV dump before delete = 3 keys, after = 0). (4) **Create-user**: confirmed POST
+  `/api/resume?profile=<newId>` (and `/api/save`) creates a brand-new profile that then appears
+  in `/api/profiles` — no contract change needed. (5) **`personal.postalCode`**: optional string
+  added to schema via `validation.js` `normalizePostalCode()` (trim, ≤16 chars, regex
+  `^[0-9A-Za-z][0-9A-Za-z\s-]{0,15}$`); normalizes both `personal` and legacy `personalInfo`
+  blocks, absent ⇒ untouched (existing profiles unaffected). Bad code ⇒ HTTP 400. (6) **Branding**:
+  user-visible/API/log strings in `index.js` "Resume Studio"/"Resume Editor" → "Internship Portal"
+  (status messages + 2 boot logs); internal storage keys (`resume-studio.sqlite`, blob key,
+  `RESUME_STUDIO_*` envs) deliberately UNCHANGED to preserve persistence. Verified: server boots
+  clean on a throwaway data dir, `/api/profiles` lists both, delete cleans all KV keys + keeps
+  primary protected (400), postalCode round-trips, `npm run build` green (~340 KB). **NEXT-WAVE
+  (App.jsx) wiring needed** — see notes below. See ADR-0012.
 - **2026-06-30 — "Validate Catalog" CI fix: Nuro re-verified live + link-checker hardened
   against anti-bot socket resets.** The new `.github/workflows/validate-catalog.yml` was
   failing on `main` (eae7ca8): the link-liveness step found exactly **1 broken** URL —

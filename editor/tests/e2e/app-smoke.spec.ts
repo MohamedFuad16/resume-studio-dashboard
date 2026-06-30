@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Smoke coverage for the CURRENT dashboard-first Resume Studio shell.
+ * Smoke coverage for the CURRENT dashboard-first Internship Portal shell.
  *
  * The previous `editor.spec.ts` (~59 cases) was written against an idealized
  * form-first UI with a `/api/resume` → `personalInfo` contract that the shipped
@@ -11,7 +11,7 @@ import { test, expect } from '@playwright/test';
  * behaviours that exercised the real shell survived; they are preserved below
  * alongside a few structural navigation checks. See agent/tests.md.
  */
-test.describe('Resume Studio — app shell', () => {
+test.describe('Internship Portal — app shell', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
   });

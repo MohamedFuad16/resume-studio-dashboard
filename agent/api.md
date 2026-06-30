@@ -15,7 +15,7 @@ Client wrappers live in `editor/src/api/client.js`.
 | POST | `/api/resume?profile=` | Write résumé (validated). |
 | POST | `/api/save?profile=` | Back-compat autosave alias for POST `/api/resume`. |
 | GET | `/api/profiles` | List known profiles. |
-| DELETE | `/api/profiles/:id` | Delete a profile (default `mohamed_fuad` protected). |
+| DELETE | `/api/profiles/:id` | Delete a profile + its `tracker:`/`applications:` keys (protected set is configurable via `RESUME_PROTECTED_PROFILE_IDS`; defaults to the primary `mohamed_fuad`). |
 | GET | `/api/tracker?profile=` | Application tracker map (internshipId → record). |
 | POST | `/api/tracker?profile=` | Replace tracker map (validated). |
 | GET | `/api/internships` | `{ items, meta }` — merged internship catalog. |
@@ -46,6 +46,10 @@ Valid compile/export templates (`VALID_TEMPLATES`): `en_01..en_04`, `ja_01..ja_0
   detail overrides at read time.
 - **Profiles**: JSON under `server/profiles/` seed the store on first read; runtime
   state lives in the KV store (`storage.js`). Local mirror: `editor/resume.json`.
+  Sample profiles in `SAMPLE_PROFILE_IDS` (`mohamed_fuad`, `aiko_tanaka`) are force-seeded
+  on boot via `ensureSampleProfiles()` (only when their `profile:<id>` key is missing AND
+  `<id>.json` exists) so a fresh DB lists both. New profiles are created by POST
+  `/api/resume?profile=<newId>` (no dedicated create route).
 
 ## External connectors (no secrets — see `agent/secrets.md`)
 - **Tectonic** (`TECTONIC_PATH`): child process for LaTeX→PDF (compile/export).

@@ -2875,12 +2875,32 @@ body,
   white-space: nowrap;
 }
 
-.profile-command {
+.nav-profile-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
   flex: 0 0 auto;
 }
 
-.profile-command .profile-select-input {
-  max-width: 170px;
+.nav-profile-switcher .nav-profile-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--t3);
+}
+
+.nav-profile-switcher .nav-profile-select {
+  max-width: 180px;
+}
+
+.nav-profile-switcher .nav-profile-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nav-profile-switcher .nav-profile-delete {
+  padding: 5px 8px;
 }
 
 .template-command {
@@ -3827,10 +3847,32 @@ body,
     grid-row: 1;
   }
 
+  .nav-profile-switcher {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-self: start;
+    flex-wrap: wrap;
+  }
+
+  .nav-profile-switcher .nav-profile-select {
+    max-width: 100%;
+  }
+
   .top-nav {
     grid-column: 1 / -1;
     grid-row: 2;
     justify-self: start;
+  }
+
+  .nav-profile-switcher {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-self: start;
+    flex-wrap: wrap;
+  }
+
+  .nav-profile-switcher .nav-profile-select {
+    max-width: 100%;
   }
 
   .internship-radar {
@@ -4067,7 +4109,6 @@ body,
 .application-company small { overflow: hidden; color: #748095; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .application-row > span:not(.application-company) { display: flex; align-items: center; gap: 5px; }
 .application-deadline { color: #c66a1b; font-weight: 700; }
-.application-row select,
 .intern-row-status,
 .intern-status-control select { min-height: 32px; padding: 0 8px; border: 1px solid #d5ddea; border-radius: 7px; background: #fff; color: #34445e; font: inherit; font-size: 10px; font-weight: 650; }
 .application-row a { display: inline-flex; align-items: center; gap: 4px; color: var(--career-blue); font-weight: 750; text-decoration: none; }
@@ -4367,7 +4408,6 @@ body,
   }
 
   .editor-command-group,
-  .profile-command,
   .template-command {
     width: 100%;
   }
@@ -4464,7 +4504,7 @@ body,
 .item,
 .pg-block,
 .active-section-card {
-  overflow-x: hidden;
+  min-width: 0;
 }
 
 .tag-inp-box {
@@ -4495,8 +4535,8 @@ body,
 
 .bullet-row .fta {
   min-height: 70px !important;
-  max-height: 130px;
-  overflow-y: auto;
+  max-height: none;
+  overflow-y: hidden;
 }
 
 .bullet-del {
@@ -4884,6 +4924,8 @@ body,
   min-width: 0;
   display: block;
   line-height: 1.32;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .intern-match strong { font-size: 16px; line-height: 1; }
@@ -5433,7 +5475,7 @@ body,
 
 .calendar-form {
   display: grid;
-  grid-template-columns: minmax(220px, 1.5fr) minmax(140px, .8fr) 150px 130px minmax(180px, 1fr) auto;
+  grid-template-columns: minmax(280px, 2fr) minmax(140px, .8fr) 150px 130px minmax(180px, 1fr) auto;
   gap: 10px;
   margin-top: 16px;
   padding: 13px;
@@ -5471,6 +5513,11 @@ body,
   font-size: 11px;
   font-weight: 640;
   padding: 0 10px;
+  text-overflow: ellipsis;
+}
+
+.calendar-form select option {
+  text-overflow: ellipsis;
 }
 
 .calendar-form-submit {
@@ -5539,14 +5586,16 @@ body,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 26px;
-  height: 24px;
+  min-width: 28px;
+  height: 28px;
+  margin: 2px 0 4px;
+  padding: 0 4px;
   border-radius: 999px;
   color: #172033;
   font-size: 11px;
   font-weight: 840;
 }
-.calendar-day.today .calendar-day-number { background: #0b5cff; color: #fff; }
+.calendar-day.today .calendar-day-number { background: #0b5cff; color: #fff; box-shadow: 0 0 0 2px rgba(11, 92, 255, .15); }
 
 .calendar-day-events {
   display: grid;
@@ -5574,6 +5623,7 @@ body,
 .calendar-event.kind-deadline { border-color: #fecaca; background: #fff7f7; }
 .calendar-event.kind-follow-up { border-color: #fde68a; background: #fffbea; }
 .calendar-event.kind-applied { border-color: #bbf7d0; background: #f0fdf4; }
+.calendar-event.kind-coding-test { border-color: #e9d5ff; background: #faf5ff; }
 .calendar-event .company-logo { width: 22px; height: 22px; border-radius: 999px; font-size: 6px; }
 .calendar-event-company {
   overflow: hidden;
@@ -5832,7 +5882,10 @@ body,
 .application-row select {
   appearance: none;
   -webkit-appearance: none;
+  min-height: 32px;
   padding: 0 30px 0 11px;
+  border: 1px solid #d5ddea;
+  border-radius: 7px;
   background-color: #fff;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
@@ -5916,8 +5969,9 @@ body,
 .intern-duration-stack > span {
   display: block;
   min-width: 0;
-  overflow-wrap: normal;
+  overflow-wrap: anywhere;
   word-break: normal;
+  white-space: normal;
   line-height: 1.38;
 }
 
@@ -6000,6 +6054,8 @@ body,
 
 .intern-detail-meta .intern-meta-token svg { color: #65758c; }
 .intern-detail-meta .intern-meta-token.language b {
+  white-space: normal;
+  overflow-wrap: anywhere;
   color: #0b5cff;
   font-size: 8px;
   letter-spacing: .03em;
@@ -6042,10 +6098,15 @@ body,
 }
 
 /* Editor form rhythm: compact, consistent and aligned across sections. */
+.autosize-textarea {
+  resize: none;
+  overflow: hidden;
+}
+
 .summary-textarea {
   min-height: 112px !important;
-  height: 112px;
-  max-height: 180px;
+  height: auto;
+  max-height: none;
   padding: 11px 13px;
   line-height: 1.55;
 }
@@ -6059,10 +6120,11 @@ body,
 .bullet-row .fta,
 .bullet-row .bullet-textarea {
   min-height: 52px !important;
-  max-height: 112px;
+  max-height: none;
   padding: 9px 11px;
   line-height: 1.45;
-  resize: vertical;
+  resize: none;
+  overflow: hidden;
 }
 
 .bullet-del {
@@ -6081,10 +6143,158 @@ body,
 .skills-selector-grid .tag-inp-container:last-child { grid-column: 1 / -1; }
 .skills-selector-grid .tag-inp-box {
   min-height: 54px;
-  max-height: 116px;
+  max-height: none;
   padding: 8px 10px;
   border-radius: 10px;
   background: #fbfcfe;
+}
+
+.tag-inp-box.tag-ms-box {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+  max-height: none;
+  overflow: visible;
+  padding-right: 4px;
+  gap: 6px;
+  position: relative;
+}
+
+.tag-ms-pills {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.tag-ms-box .field-chevron {
+  align-self: flex-start;
+  padding-top: 8px;
+}
+
+.tag-ms-field {
+  flex: 1 0 90px;
+  min-width: 90px;
+}
+
+.tag-pill-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag-ms-dropdown {
+  z-index: 200;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.skills-selector-grid .tag-inp-box.tag-ms-box {
+  max-height: none;
+}
+
+.field-chevron {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  padding: 0 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--t3);
+}
+
+.field-chevron:hover {
+  color: var(--t1);
+}
+
+.tag-inp-box.suggest-box {
+  align-items: center;
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+}
+
+.suggest-input.tag-inp-field {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  text-overflow: ellipsis;
+}
+
+.suggest-dropdown {
+  z-index: 200;
+}
+
+.month-field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.month-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.month-input:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.month-ongoing {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--t2);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.month-ongoing input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: var(--blue);
+}
+
+.photo-actions {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.photo-remove {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid var(--b0);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--err);
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.photo-remove:hover {
+  background: var(--red-dim);
+  border-color: var(--err);
 }
 .skills-selector-grid .tag-pill {
   min-height: 24px;
@@ -6097,6 +6307,12 @@ body,
   font-weight: 700;
 }
 .skills-selector-grid .tag-inp-field { min-width: 120px; padding: 4px 2px; }
+
+@media (max-width: 520px) {
+  .nav-profile-switcher .nav-profile-btn-label {
+    display: none;
+  }
+}
 
 /* Keep a whole A4 preview visible on a typical Mac viewport. */
 .preview .pdf-frame {

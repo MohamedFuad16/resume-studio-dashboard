@@ -1,7 +1,7 @@
 {
   "name": "resume-editor",
   "version": "1.0.0",
-  "description": "Form-based resume editor with LaTeX compilation using Tectonic",
+  "description": "Internship Portal — bilingual internship tracker and résumé editor with LaTeX compilation",
   "main": "server/index.js",
   "type": "module",
   "scripts": {
@@ -21,6 +21,7 @@
     "cors": "^2.8.5",
     "express": "^4.19.2",
     "lucide-react": "^0.395.0",
+    "openai": "^6.45.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "sql.js": "^1.14.1",

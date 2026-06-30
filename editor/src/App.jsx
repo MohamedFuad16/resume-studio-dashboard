@@ -5,6 +5,7 @@ import { debounce, TEMPLATES } from './utils/helpers.js';
 import { I, Toasts, ExportMenu, TagInput, SuggestInput } from './components/ui.jsx';
 import { InternshipDashboard } from './components/InternshipDashboard.jsx';
 import { ProfileDashboard } from './components/ProfileDashboard.jsx';
+import { ProfileSwitcher } from './components/ProfileSwitcher.jsx';
 import {
   PersonalSec, SummarySec, EducationSec,
   ExperienceSec, ProjectsSec, SkillsSec, ActivitiesSec,
@@ -294,6 +295,7 @@ function normalizeResume(data) {
   const furigana = p.furigana || pi.furigana || '';
   const dob = p.dob || pi.dob || '';
   const address = p.address || pi.address || '';
+  const postalCode = p.postalCode || pi.postalCode || '';
   const phone = p.phone || pi.phone || '';
   const email = p.email || pi.email || '';
   const linkedin = p.linkedin || pi.linkedin || '';
@@ -306,6 +308,7 @@ function normalizeResume(data) {
     furigana,
     dob,
     address,
+    postalCode,
     phone,
     email,
     linkedin,
@@ -319,6 +322,7 @@ function normalizeResume(data) {
     furigana,
     dob,
     address,
+    postalCode,
     phone,
     email,
     linkedin,
@@ -331,7 +335,10 @@ function normalizeResume(data) {
       const inst = e.institution || e.school || '';
       const instJa = e.institutionJa || e.schoolJa || e.school || e.institution || '';
       const deg = e.degree || '';
-      const degJa = e.degreeJa || e.degree || '';
+      // Keep degree (EN) and degreeJa independent. Backfilling degreeJa from degree
+      // let a stale degreeJa mask an updated degree (the "Bachelor of Engineering ->
+      // Bachelor of Science" bug). Empty stays empty.
+      const degJa = e.degreeJa || '';
       const loc = e.location || '';
       const start = e.startDate || '';
       const end = e.endDate || '';
@@ -663,25 +670,32 @@ export default function App() {
     }
   };
 
+  const openProfileWizard = () => {
+    setWizardStep('start');
+    setWizardData(null);
+    setShowWizard(true);
+  };
+
   const handleDeleteProfile = async (id, e) => {
     if (e) e.stopPropagation();
-    if (id === 'mohamed_fuad') {
-      toast(isJa ? '既定の履歴書は削除できません' : 'Cannot delete the default profile', 'error');
-      return;
-    }
     const confirmMessage = isJa
-      ? `履歴書「${id}」を削除しますか？この操作は元に戻せません。`
-      : `Delete resume profile "${id}"? This cannot be undone.`;
+      ? `ユーザー「${id}」を削除しますか？この操作は元に戻せません。`
+      : `Delete user profile "${id}"? This cannot be undone.`;
     if (!window.confirm(confirmMessage)) return;
     try {
       await profileApi.remove(id);
-      toast(isJa ? `履歴書を削除しました: ${id}` : `Deleted resume: ${id}`, 'success');
+      toast(isJa ? `ユーザーを削除しました: ${id}` : `Deleted user: ${id}`, 'success');
       fetchProfiles();
       if (activeProfile === id) {
+        // mohamed_fuad remains the default fallback profile.
         handleSwitchProfile('mohamed_fuad');
       }
-    } catch {
-      toast(isJa ? `履歴書を削除できませんでした: ${id}` : `Failed to delete resume: ${id}`, 'error');
+    } catch (err) {
+      // The server is the source of truth for delete protection: it returns HTTP 400
+      // (e.g. "Cannot delete the default profile.") for protected profiles. Surface
+      // that message instead of hard-blocking specific ids on the client.
+      const fallback = isJa ? `ユーザーを削除できませんでした: ${id}` : `Failed to delete user: ${id}`;
+      toast(err?.message || fallback, 'error');
     }
   };
 
@@ -971,7 +985,7 @@ export default function App() {
           <span className="light green" />
         </div>
         <div className="tb-brand">
-          <span className="tb-home"><I n="user" s={12} /> {isJa ? '履歴書スタジオ' : 'Resume Studio'}</span>
+          <span className="tb-home"><I n="user" s={12} /> {isJa ? 'インターンポータル' : 'Internship Portal'}</span>
         </div>
 
         <nav className="top-nav" aria-label={isJa ? 'メインナビゲーション' : 'Primary navigation'}>
@@ -1020,6 +1034,16 @@ export default function App() {
           </span>
         </div>
 
+        {/* User/profile switcher — visible across all views */}
+        <ProfileSwitcher
+          profiles={profiles}
+          activeId={activeProfile}
+          isJa={isJa}
+          onSwitch={handleSwitchProfile}
+          onNew={openProfileWizard}
+          onDelete={handleDeleteProfile}
+        />
+
         {/* Right: Actions and Status */}
         <div className="tb-actions">
           {appView === 'editor' && (
@@ -1048,42 +1072,6 @@ export default function App() {
       ) : (
         <>
           <div className="editor-commandbar">
-            <div className="editor-command-group profile-command">
-              <span className="command-label">{isJa ? '選択中の履歴書' : 'Current resume'}</span>
-              <select
-                className="profile-select-input"
-                value={activeProfile}
-                onChange={e => handleSwitchProfile(e.target.value)}
-              >
-                {profiles.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.name || p.id}
-                  </option>
-                ))}
-              </select>
-              <button
-                className="btn btn-new-profile"
-                onClick={() => {
-                  setWizardStep('start');
-                  setWizardData(null);
-                  setShowWizard(true);
-                }}
-                title={isJa ? '新しい履歴書を作成' : 'Create new resume'}
-              >
-                <I n="plus" s={11} /> {isJa ? '新規' : 'New resume'}
-              </button>
-              {activeProfile !== 'mohamed_fuad' && (
-                <button
-                  className="btn btn-delete-profile"
-                  onClick={e => handleDeleteProfile(activeProfile, e)}
-                  title={isJa ? 'この履歴書を削除' : 'Delete active resume'}
-                >
-                  <I n="x" s={11} />
-                  {isJa ? '削除' : 'Delete'}
-                </button>
-              )}
-            </div>
-
             <div className="editor-command-group template-command">
               <span className="command-label">{isJa ? 'テンプレート' : 'Template'}</span>
               <div className="tb-tabs">
@@ -1394,7 +1382,7 @@ export default function App() {
                       className="wizard-opt-btn"
                       onClick={() => {
                         setWizardData({
-                          personal: { nameEn: '', nameJa: '', furigana: '', dob: '', address: '', phone: '', email: '', linkedin: '', github: '' },
+                          personal: { nameEn: '', nameJa: '', furigana: '', dob: '', address: '', postalCode: '', phone: '', email: '', linkedin: '', github: '' },
                           summary: '',
                           education: [],
                           experience: [],
@@ -2244,7 +2232,11 @@ export default function App() {
                         const pid = wizardData._profileId;
                         const data = { ...wizardData };
                         delete data._profileId;
-                        
+
+                        // Guarantee new profiles carry personal.postalCode (server validates it),
+                        // including the PDF-import path which does not seed the field.
+                        data.personal = { ...data.personal, postalCode: data.personal?.postalCode || '' };
+
                         if (!data.personal.nameEn.trim()) {
                           toast('Full name is required', 'error');
                           return;

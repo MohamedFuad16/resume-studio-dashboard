@@ -112,7 +112,14 @@ export function useApplicationTracker(profileId) {
   }, [commit, replaceTracker]);
 
   const statusFor = useCallback(id => tracker[id]?.status || '', [tracker]);
-  const addMilestone = useCallback((internshipId, milestone) => {
+  // Contract: addMilestone(internship, { kind, date, time?, note? }).
+  // `internship` may be the internship/record object or a bare id string, so both the
+  // calendar (passes record.internshipId) and the radar/recent-apps status flows (pass
+  // the internship object) work. `note` is accepted as an alias for `title`.
+  const addMilestone = useCallback((internship, milestone) => {
+    const internshipId = internship && typeof internship === 'object'
+      ? (internship.internshipId || internship.id)
+      : internship;
     const current = trackerRef.current;
     const record = current[internshipId];
     if (!record || !/^\d{4}-\d{2}-\d{2}$/.test(milestone?.date || '')) return;
@@ -123,7 +130,7 @@ export function useApplicationTracker(profileId) {
         milestones: [...(Array.isArray(record.milestones) ? record.milestones : []), {
           id: milestone.id || globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
           kind: milestone.kind || 'other', date: milestone.date, time: milestone.time || null,
-          timeZone: 'Asia/Tokyo', title: milestone.title || '', createdAt: new Date().toISOString(),
+          timeZone: 'Asia/Tokyo', title: milestone.title || milestone.note || '', createdAt: new Date().toISOString(),
         }],
         updatedAt: new Date().toISOString(),
       },

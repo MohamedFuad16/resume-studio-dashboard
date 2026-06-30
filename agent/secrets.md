@@ -16,11 +16,23 @@ Secret / sensitive:
 Configuration (not secret, but environment-specific):
 - `PORT` (default `5005`) — Express port (`server/index.js`).
 - `RESUME_STUDIO_DATA_DIR` (default `server/.data`) — local SQLite dir.
-- `RESUME_STUDIO_DB_BLOB_KEY` (default `resume-studio/resume-studio.sqlite`) — Blob key.
+- `RESUME_STUDIO_DB_BLOB_KEY` (default `resume-studio/resume-studio.sqlite`) — Blob key
+  (internal id; user-facing name is Internship Portal).
 - `TECTONIC_PATH` (default `/opt/homebrew/bin/tectonic`) — LaTeX engine path.
-- `RESUME_CHAT_ENGINE` (`local` to force deterministic edits; otherwise Codex CLI),
-  `RESUME_CHAT_CODEX_TIMEOUT_MS` (default `90000`) — `server/resume-chat.js`.
-- `INTERNSHIP_RESEARCH_TIMEOUT_MS` (default `120000`) — `server/internship-research.js`.
+- `OPENROUTER_API_KEY` — OpenRouter API key for AI resume chat and live internship
+  research (`server/resume-chat.js`, `server/internship-research.js`). **Secret.**
+- `OPENROUTER_BASE_URL` (default `https://openrouter.ai/api/v1`) — OpenRouter API base URL.
+- `OPENROUTER_MODEL` — model id for chat/research (each connector may append `:online` for
+  web search). Defaults are defined in the server modules.
+- `RESUME_CHAT_ENGINE` (`local` to force deterministic edits without OpenRouter),
+  `RESUME_CHAT_CODEX_TIMEOUT_MS` (default `90000`) — request timeout for resume chat
+  (`server/resume-chat.js`). **Codex CLI is obsolete** for chat; OpenRouter is used when
+  `OPENROUTER_API_KEY` is set.
+- `INTERNSHIP_RESEARCH_TIMEOUT_MS` (default `120000`) — overall research request timeout
+  (`server/internship-research.js`). **Codex CLI is obsolete** for research; OpenRouter is
+  used when `OPENROUTER_API_KEY` is set.
+- `INTERNSHIP_RESEARCH_LINK_TIMEOUT_MS` (default `8000`) — per-link fetch timeout during
+  research result validation (`server/internship-research.js`).
 - `RESUME_STUDIO_APP_ORIGIN`, `VERCEL_URL`, `VERCEL_PROJECT_PRODUCTION_URL` — CORS
   allow-list (`server/index.js`).
 - `VERCEL` — set by the platform; toggles ephemeral storage / local mirroring.
@@ -29,5 +41,6 @@ Configuration (not secret, but environment-specific):
 
 ## Rules
 - Never hardcode tokens; read from `process.env`. Keep `.env.local` and `.vercel/`
-  out of git (already git-ignored). The `resume-chat`/`internship-research` connectors
-  rely on a locally authenticated Codex CLI, not on committed API keys.
+  out of git (already git-ignored). Set `OPENROUTER_API_KEY` in `editor/.env.local`
+  (local) and in Vercel project settings (production). Without it, resume chat falls
+  back to the deterministic local engine and live internship research is disabled.

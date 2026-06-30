@@ -42,7 +42,22 @@ const internshipResearchByCompany = new Map();
 const RESEARCH_CACHE_MS = 15 * 60 * 1000;
 const VALID_TEMPLATES = new Set(['en_01', 'en_02', 'en_03', 'en_04', 'ja_01', 'ja_02', 'ja_03']);
 
-const sanitizeProfileId = value => String(value || 'mohamed_fuad').replace(/[^a-zA-Z0-9_-]/g, '') || 'mohamed_fuad';
+// Primary profile used as the read/write fallback everywhere a profile id is omitted.
+const DEFAULT_PROFILE_ID = process.env.RESUME_DEFAULT_PROFILE_ID || 'mohamed_fuad';
+// Sample profiles shipped as JSON in server/profiles and force-seeded on boot so a
+// fresh store always lists demo data. Each is only seeded when its KV key is missing
+// and its <id>.json file exists (see ensureSampleProfiles / readProfile).
+const SAMPLE_PROFILE_IDS = ['mohamed_fuad', 'aiko_tanaka'];
+// Profiles the DELETE route refuses to remove. Configurable via env (comma-separated);
+// defaults to protecting only the primary profile.
+const PROTECTED_PROFILE_IDS = new Set(
+  (process.env.RESUME_PROTECTED_PROFILE_IDS || DEFAULT_PROFILE_ID)
+    .split(',')
+    .map(id => id.trim())
+    .filter(Boolean),
+);
+
+const sanitizeProfileId = value => String(value || DEFAULT_PROFILE_ID).replace(/[^a-zA-Z0-9_-]/g, '') || DEFAULT_PROFILE_ID;
 const profileKey = id => `profile:${sanitizeProfileId(id)}`;
 const trackerKey = id => `tracker:${sanitizeProfileId(id)}`;
 const applicationsKey = id => `applications:${sanitizeProfileId(id)}`;
@@ -113,7 +128,7 @@ async function writeCustomInternships(items) {
   }
 }
 
-async function readProfile(profileId = 'mohamed_fuad') {
+async function readProfile(profileId = DEFAULT_PROFILE_ID) {
   const id = sanitizeProfileId(profileId);
   const stored = await store.getJson(profileKey(id), null);
   if (stored) return stored;
@@ -123,7 +138,7 @@ async function readProfile(profileId = 'mohamed_fuad') {
     await store.setJson(profileKey(id), parsed);
     return parsed;
   } catch {
-    if (id === 'mohamed_fuad') {
+    if (id === DEFAULT_PROFILE_ID) {
       let defaultData;
       try {
         defaultData = JSON.parse(await fs.readFile(DATA_FILE, 'utf8'));
@@ -155,8 +170,17 @@ async function listProfiles() {
       return { id, name: value.personal?.nameEn || value.personalInfo?.fullName || id, fileName: `${id}.json` };
     });
   }
-  await readProfile('mohamed_fuad');
+  await ensureSampleProfiles();
   return listProfiles();
+}
+
+// Force-seed each shipped sample profile whose KV key is missing but whose
+// <id>.json file exists. Idempotent: readProfile returns stored data untouched
+// when present and only writes to the store when seeding from disk.
+async function ensureSampleProfiles() {
+  for (const sampleId of SAMPLE_PROFILE_IDS) {
+    await readProfile(sampleId);
+  }
 }
 
 async function deleteProfile(profileId) {
@@ -247,9 +271,9 @@ async function initPersistentStore() {
         if (error.code !== 'ENOENT') console.error('Could not migrate profile files:', error.message);
       }
     }
-    await readProfile('mohamed_fuad');
+    await ensureSampleProfiles();
     await readInternshipCatalog();
-    console.log(`✅ Resume Studio store ready (${store.backend})`);
+    console.log(`✅ Internship Portal store ready (${store.backend})`);
   } catch (e) {
     console.error('Error initializing persistence:', e);
   }
@@ -309,14 +333,14 @@ app.get('/api/status', async (req, res) => {
     await store.init();
     res.json({
       status: 'ok',
-      message: 'Resume Editor backend is running.',
+      message: 'Internship Portal backend is running.',
       storage: store.backend,
       persistent: store.backend === 'vercel-blob-sqlite' || store.backend === 'local-sqlite',
     });
   } catch (error) {
     res.status(500).json({
       status: 'error',
-      message: 'Resume Studio storage did not initialize.',
+      message: 'Internship Portal storage did not initialize.',
       error: error.message,
     });
   }
@@ -462,7 +486,7 @@ app.get('/api/profiles', async (req, res) => {
 app.delete('/api/profiles/:id', async (req, res) => {
   try {
     const id = validateProfileId(req.params.id);
-    if (id === 'mohamed_fuad') {
+    if (PROTECTED_PROFILE_IDS.has(id)) {
       return res.status(400).json({ error: 'Cannot delete the default profile.' });
     }
     await deleteProfile(id);
@@ -690,7 +714,7 @@ app.post('/api/applications', async (req, res) => {
 const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isDirectRun) {
   app.listen(PORT, () => {
-    console.log(`✅ Resume Editor backend on http://localhost:${PORT}`);
+    console.log(`✅ Internship Portal backend on http://localhost:${PORT}`);
   });
 }
 
