@@ -136,3 +136,30 @@ Reverse-engineered from the codebase on 2026-06-29. Newest at the bottom.
   recruiter-presentable. CSS is the single source for radar layout (avoid re-adding
   per-breakpoint grid overrides — extend the one template). Future JA résumé tweaks must
   recompile with Tectonic and re-check page counts.
+
+---
+## ADR-0009 — Internship catalog: shared seed builder + automated validator + expiry filter
+- **Date:** 2026-06-30
+- **Status:** Accepted
+- **Context:** The catalog grew (now 183 entries, 83 Japan-based) and the user needs daily
+  ingestion to be trustworthy: properly-formatted entries, working apply links, and correct
+  DB persistence — plus the radar should stop showing dead (past-deadline) opportunities the
+  user never applied to, and JA mode had untranslated strings and duplicated eligibility
+  bullets.
+- **Decision:** (a) Centralize seed assembly in `editor/server/seeds/catalog.js`
+  (`buildSeedCatalog()`), imported by BOTH the server (`index.js` `readInternshipCatalog`)
+  and the validator, so they can't drift. (b) Add `editor/server/validate-catalog.js` (npm
+  `validate:catalog` / `validate:catalog:links`) as the automated daily/CI gate: schema/format
+  (reuses `validation.js`, flags duplicate ids + duplicated list items), DB round-trip via
+  `storage.js` (forced local sqlite, save→load equality), and optional link liveness (8-way
+  concurrency, soft-fail for 401/403/405/429 bot-walls, hard-fail for 404/410/5xx/DNS/timeout/
+  non-HTTPS/dead-redirect). Non-zero exit on hard failure. (c) Radar expiry: hide
+  `deadlineDate < today` unless tracker status ∈ {applying, applied, interview}; "Not stated"
+  always shows; stat cards derive from the visible set. (d) De-dupe eligibility at the
+  render source (`internshipDetails`), not per-seed. (e) New verified internships go in a
+  date-stamped seed file with INLINE JA fields (self-localizing) so `internshipDisplay.js`
+  maps don't have to grow per entry.
+- **Consequences:** One command verifies the whole catalog before/after ingestion; new daily
+  data should be appended as a dated seed + must pass `validate:catalog:links`. Expiry
+  filtering means the visible count < total seed count by design. The Vercel project is
+  CLI-deploy-only (no GitHub auto-deploy) — ship with `vercel --prod --yes` from `editor/`.

@@ -10,6 +10,8 @@
     "dev": "concurrently --kill-others \"npm run dev:client\" \"npm run dev:server\"",
     "build": "vite build",
     "preview": "vite preview",
+    "validate:catalog": "node server/validate-catalog.js",
+    "validate:catalog:links": "node server/validate-catalog.js --links",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },

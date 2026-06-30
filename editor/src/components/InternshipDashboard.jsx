@@ -30,6 +30,15 @@ const MOBILE_PAGE_SIZE = 6;
 const TODAY = new Date().toISOString().slice(0, 10);
 const DISPLAY_DATE_FORMAT = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
+// Statuses that mean the user is actively pursuing the role, so an expired listing
+// must stay visible for them to keep tracking it. "saved" / untracked do not count.
+const APPLIED_TYPE_STATUSES = new Set(['applying', 'applied', 'interview']);
+const isExpiredDeadline = item => Boolean(item.deadlineDate) && item.deadlineDate < TODAY;
+// Auto-hide rule: a listing whose deadline has already passed is hidden UNLESS the
+// user is applying/applied/interviewing. Listings with no deadlineDate ("Not
+// stated") are always shown. Keeps EN + JA identical (compares raw deadlineDate).
+const isVisibleForDeadline = (item, status) => !isExpiredDeadline(item) || APPLIED_TYPE_STATUSES.has(status);
+
 const copy = {
   en: {
     title: 'Japan-first internship matches',
@@ -501,16 +510,22 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
   const autoResearchStarted = useRef(new Set());
 
   const eligibleCatalog = catalog;
+  // Expired-and-not-being-applied-to listings are removed up front so they drop out
+  // of the table, the summary stat cards, the track filter, and live-search gating.
+  const visibleCatalog = useMemo(
+    () => eligibleCatalog.filter(item => isVisibleForDeadline(item, statusFor(item.id))),
+    [eligibleCatalog, statusFor],
+  );
   const regions = ['All', 'Japan', 'Remote', 'Global'];
-  const tracks = useMemo(() => ['All', ...new Set(eligibleCatalog.map(item => item.track).filter(Boolean))], [eligibleCatalog]);
+  const tracks = useMemo(() => ['All', ...new Set(visibleCatalog.map(item => item.track).filter(Boolean))], [visibleCatalog]);
   const savedCount = records.filter(record => record.status === 'saved').length;
   const dynamicStats = useMemo(() => ({
-    total: eligibleCatalog.length,
-    target: Math.max(meta.target || 200, eligibleCatalog.length),
-    tokyo: eligibleCatalog.filter(item => /Tokyo|東京/i.test(item.location)).length,
-    japan: eligibleCatalog.filter(isJapanBased).length,
-    englishFirst: eligibleCatalog.filter(item => item.languageType === 'English-first').length,
-  }), [eligibleCatalog, meta.target]);
+    total: visibleCatalog.length,
+    target: Math.max(meta.target || 200, visibleCatalog.length),
+    tokyo: visibleCatalog.filter(item => /Tokyo|東京/i.test(item.location)).length,
+    japan: visibleCatalog.filter(isJapanBased).length,
+    englishFirst: visibleCatalog.filter(item => item.languageType === 'English-first').length,
+  }), [visibleCatalog, meta.target]);
   const latestVerifiedDate = useMemo(() => {
     const dates = catalog
       .map(item => item.verifiedDate)
@@ -522,13 +537,13 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
   const hasCatalogTextMatch = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return false;
-    return eligibleCatalog.some(item => [item.company, item.role, item.track].join(' ').toLowerCase().includes(needle));
-  }, [eligibleCatalog, query]);
+    return visibleCatalog.some(item => [item.company, item.role, item.track].join(' ').toLowerCase().includes(needle));
+  }, [visibleCatalog, query]);
   const canLiveSearchCompany = isCompanyResearchQuery(companyQuery) && !hasCatalogTextMatch;
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    const next = eligibleCatalog.filter(item => {
+    const next = visibleCatalog.filter(item => {
       const status = statusFor(item.id);
       const haystack = [item.company, item.role, item.location, item.track, item.language, item.codingTest, ...(item.reasons || [])].join(' ').toLowerCase();
       return (!needle || haystack.includes(needle))
@@ -558,7 +573,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
       const priorityDelta = locationPriority(a) - locationPriority(b);
       return priorityDelta || Number(Boolean(b.priority)) - Number(Boolean(a.priority)) || b.score - a.score;
     });
-  }, [eligibleCatalog, query, region, track, language, deadlineFilter, statusFilter, sort, priorityOnly, savedOnly, statusFor]);
+  }, [visibleCatalog, query, region, track, language, deadlineFilter, statusFilter, sort, priorityOnly, savedOnly, statusFor]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);

@@ -2,6 +2,24 @@
 
 ## Fixed
 
+### BUG-003 — Duplicated eligibility bullets + untranslated JA strings — FIXED 2026-06-30
+- **Date:** 2026-06-30 · **Files:** `editor/src/utils/internshipDisplay.js`,
+  `editor/server/seeds/internships.js`
+- **Symptom:** The DetailPanel eligibility list repeated the same bullet (esp. in JA, where
+  several distinct EN lines mapped to one generic JA fallback); many entries still showed
+  English in JA mode (bare `English`/`Japanese`, untranslated roles/tracks/dates/places);
+  `global-081` (Geotab) had garbled scraped role/compensation text.
+- **Root cause:** Eligibility was merged/derived at render time without de-duplication; the
+  JA `displayValue/displayRole/jaDisplay` maps were missing many terms; scrape artifacts in
+  one seed entry.
+- **Fix:** `internshipDetails()` now de-dupes `eligibility`/`eligibilityJa` (case-insensitive,
+  trimmed) — 31 entries collapsed, 0 dups remain. Added the missing JA mappings (languages,
+  ~30 role/section terms + fallbacks, month/date phrases, 19 `TRACK_LABELS_JA`, JP places).
+  Cleaned `global-081` role/compensation/fitNote. Verified: `validate:catalog` 0 errors, build
+  green. See ADR-0009.
+- **Note:** The non-displayed `workAuth` field still contains scraped question text on a few
+  US entries (1174/1244/2119/2154) — harmless (not rendered), left as-is.
+
 ### BUG-002 — Internship Radar table forces a horizontal scrollbar — FIXED 2026-06-30
 - **Date:** 2026-06-30 · **File:** `editor/src/index.css`
 - **Symptom:** The radar results table overflowed the viewport and showed an unwanted

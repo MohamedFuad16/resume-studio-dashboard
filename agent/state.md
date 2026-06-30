@@ -18,6 +18,30 @@ The full change set (radar WIP + BUG-001 + cleanup + the `agent/` KB + root poin
 committed and pushed to `origin/main` this session.
 
 ## Recent changes
+- **2026-06-30 — Internship catalog overhaul + automated validation.** (1) **Expiry
+  filter:** the radar now auto-hides internships whose `deadlineDate` is before today
+  UNLESS the user has applied (tracker status in `{applying, applied, interview}`); no-deadline
+  ("Not stated") entries always show. `dynamicStats`/track filter/live-search all derive from
+  the visible set (`InternshipDashboard.jsx`). (2) **Catalog expanded 153 → 183** (Japan-based
+  53 → **83**, English-first **129**): new verified seed file
+  `editor/server/seeds/japan-wide-research-2026-06-30.js` (30 real Tokyo/Japan roles with
+  live official URLs + inline JA fields), assembled via the new
+  `editor/server/seeds/catalog.js` `buildSeedCatalog()` (shared by server + validator). (3)
+  **Automated validator** `editor/server/validate-catalog.js` (npm `validate:catalog` /
+  `validate:catalog:links`): checks formatting/shape (aligned with `validation.js`, incl.
+  duplicate-id + duplicated-list-item detection), DB round-trip through `storage.js`
+  (save→load structural equality), and optional link liveness (GET+redirect, soft vs hard
+  fail). Exits non-zero on hard failure — wire into the daily ingestion/CI. (4) **Eligibility
+  de-dupe** at render source (`internshipDisplay.js` `internshipDetails` → `dedupeList`,
+  case-insensitive; 31 entries collapsed, 0 dups remain). (5) **JA localization** filled in
+  (`internshipDisplay.js`): bare `English`/`Japanese` language values (100 entries), ~30
+  role/section terms + single-word fallbacks, month/date phrases, missing
+  `TRACK_LABELS_JA` (19 tracks), and JP place names. (6) **Data cleanup:** fixed garbled
+  scrape artifacts on `global-081` (Geotab) role/compensation/fitNote. Verified:
+  `validate:catalog(:links)` → 183 entries, 0 errors, DB ok, **177/177 links live**;
+  `npm run build` green. Done by 2 parallel workers (disjoint files) after a first
+  single-worker attempt hit a resource limit. NOTE: this Vercel project does NOT auto-deploy
+  from GitHub — must `vercel --prod --yes` from `editor/` after pushing.
 - **2026-06-30 — Radar UI fixes + Japanese résumé redesign (2 parallel workers).**
   (1) **Internship Radar layout** (`editor/src/index.css`, no JSX changes): the radar
   table's horizontal scroll was caused by a late grid block with `min-width:1180px`

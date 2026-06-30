@@ -15,10 +15,9 @@ import {
   INTERNSHIP_RESEARCH_DATE,
   INTERNSHIP_RESEARCH_NOTE,
   internshipStats as seedInternshipStats,
-  internships as seedInternships,
 } from './seeds/internships.js';
 import { enrichSeedInternships } from './seeds/internship-enrichment.js';
-import { japanWideResearchInternships } from './seeds/japan-wide-research-2026-06-29.js';
+import { seedInternshipCatalog } from './seeds/catalog.js';
 import {
   sendRequestError,
   validateApplication,
@@ -48,7 +47,6 @@ const profileKey = id => `profile:${sanitizeProfileId(id)}`;
 const trackerKey = id => `tracker:${sanitizeProfileId(id)}`;
 const applicationsKey = id => `applications:${sanitizeProfileId(id)}`;
 const INTERNSHIP_CATALOG_KEY = 'internships:catalog';
-const seedInternshipCatalog = [...seedInternships, ...japanWideResearchInternships];
 
 function mergeInternships(...groups) {
   const byId = new Map();

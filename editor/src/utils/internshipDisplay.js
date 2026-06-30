@@ -55,7 +55,35 @@ const TRACK_LABELS_JA = {
   Data: 'データ分野',
   Sales: 'セールス分野',
   'Sales / Business': 'セールス・ビジネス分野',
+  'AI / Machine Learning': 'AI・機械学習',
+  'AI Product / Business Operations': 'AIプロダクト・事業運営',
+  'Cloud / Networking / Security': 'クラウド・ネットワーク・セキュリティ',
+  'Data Engineering': 'データエンジニアリング',
+  'Embedded Software': '組込みソフトウェア',
+  'Enterprise Applications': 'エンタープライズアプリケーション',
+  'Enterprise Architecture / Cloud': 'エンタープライズアーキテクチャ・クラウド',
+  'Frontend / Full-stack': 'フロントエンド・フルスタック',
+  'Full-stack / Ad Technology': 'フルスタック・広告技術',
+  'Machine Learning': '機械学習',
+  'Machine Learning / Platform': '機械学習・プラットフォーム',
+  'Platform Engineering': 'プラットフォームエンジニアリング',
+  'Product / Technical Operations': 'プロダクト・技術運用',
+  'Python / Mission Operations': 'Python・ミッション運用',
+  'Python / Test Infrastructure': 'Python・テスト基盤',
+  'Quality Engineering': '品質エンジニアリング',
+  'Systems / AI Hardware': 'システム・AIハードウェア',
+  'Systems / Graphics': 'システム・グラフィックス',
+  'Technical Product Management': 'テクニカルプロダクトマネジメント',
 };
+
+// Month-name → number map for translating residual "Month YYYY" / "Month-Month
+// YYYY" date phrases in jaDisplay. Used via RegExp callbacks so the conversion
+// is guarded by an adjacent 4-digit year (the word "May" in prose is untouched).
+const MONTH_NUM = {
+  january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
+  july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+};
+const MONTH_NAMES = 'January|February|March|April|May|June|July|August|September|October|November|December';
 
 // Single source of truth for EN→JA string localization shared by every dashboard
 // (ProfileDashboard, InternshipDashboard, ApplicationCalendar). Previously this
@@ -90,6 +118,7 @@ function jaDisplay(value) {
     .replace(/^English \(fluent\); Japanese not required$/i, '英語（流暢）必須・日本語不問')
     .replace(/^English business level; Japanese not required$/i, '英語ビジネスレベル必須・日本語不問')
     .replace(/^English business; Japanese conversational$/i, '英語ビジネスレベル・日本語会話レベル')
+    .replace(/^Japanese business; English conversational$/i, '日本語ビジネスレベル・英語会話レベル')
     .replace(/^English business level; Japanese not required for Rakuten Pay System track$/i, '英語ビジネスレベル必須・Rakuten Pay System職種は日本語不問')
     .replace(/^English and Japanese business level$/i, '英語・日本語ビジネスレベル')
     .replace(/^English or Japanese CEFR B2$/i, '英語または日本語CEFR B2以上')
@@ -114,10 +143,27 @@ function jaDisplay(value) {
     .replace(/remote within Japan/gi, '日本国内リモート')
     .replace(/remote possible/gi, 'リモート可')
     .replace(/remote negotiable/gi, 'リモート応相談')
+    .replace(/remote allowed/gi, 'リモート可')
+    .replace(/partial remote/gi, '一部リモート')
+    .replace(/many full-remote projects/gi, 'フルリモート案件多数')
+    .replace(/full-remote projects/gi, 'フルリモート案件')
     .replace(/mostly remote/gi, 'リモート中心')
     .replace(/Rakuten Crimson House/gi, '楽天クリムゾンハウス')
+    .replace(/Rakuten Pay System/gi, '楽天ペイシステム')
+    .replace(/Rakuten Pay/gi, '楽天ペイ')
+    .replace(/Futako[- ]?Tamagawa/gi, '二子玉川')
     .replace(/\bNihonbashi\b/gi, '日本橋')
     .replace(/\bShibuya\b/gi, '渋谷')
+    .replace(/\bOtemachi\b/gi, '大手町')
+    .replace(/\bAkasaka\b/gi, '赤坂')
+    .replace(/\bSetagaya\b/gi, '世田谷')
+    .replace(/\bNishi[- ]?Shimbashi\b/gi, '西新橋')
+    .replace(/\bNishishimbashi\b/gi, '西新橋')
+    .replace(/\bShimbashi\b/gi, '新橋')
+    .replace(/\bTamachi\b/gi, '田町')
+    .replace(/\bEbisu\b/gi, '恵比寿')
+    .replace(/\bGotanda\b/gi, '五反田')
+    .replace(/\bToranomon\b/gi, '虎ノ門')
     .replace(/\bRoppongi\b/gi, '六本木')
     .replace(/\bBunkyo\b/gi, '文京区')
     .replace(/\bShinagawa\b/gi, '品川')
@@ -129,6 +175,10 @@ function jaDisplay(value) {
     .replace(/\bKyoto\b/gi, '京都')
     .replace(/\bFukuoka\b/gi, '福岡')
     .replace(/\bNagoya\b/gi, '名古屋')
+    .replace(/\bKanda\b/gi, '神田')
+    .replace(/\bNiigata\b/gi, '新潟')
+    .replace(/\bWakayama\b/gi, '和歌山')
+    .replace(/\bMie\b/gi, '三重')
     .replace(/\bOslo\b/gi, 'オスロ')
     .replace(/\bNorway\b/gi, 'ノルウェー')
     .replace(/\bMinato-ku\b/gi, '港区')
@@ -158,6 +208,7 @@ function jaDisplay(value) {
     .replace(/^3\+ months; 2\+ days\/week, 12\+ hours\/week$/i, '3か月以上・週2日以上・週12時間以上')
     .replace(/^Early August-late September 2026; negotiable$/i, '2026年8月上旬〜9月下旬・相談可')
     .replace(/^Flexible; 2-12 months; part-time or full-time$/i, '柔軟・2〜12か月・パートタイムまたはフルタイム')
+    .replace(/^6 months to 1 year, starting July 2026$/i, '6か月〜1年、2026年7月開始')
     .replace(/(\d+)\s*-\s*(\d+)\s*months?/gi, '$1〜$2か月')
     .replace(/(\d+)\s*months?/gi, '$1か月')
     .replace(/(\d+)\s*years?/gi, '$1年')
@@ -189,6 +240,12 @@ function jaDisplay(value) {
     .replace(/^Official Lever\/ATS posting$/i, 'Lever/ATS公式掲載')
     .replace(/^Official Greenhouse\/ATS posting$/i, 'Greenhouse/ATS公式掲載')
     .replace(/^Official Ashby\/ATS posting$/i, 'Ashby/ATS公式掲載')
+    .replace(/^Official HRMOS posting$/i, 'HRMOS公式掲載')
+    .replace(/^Official HERP posting$/i, 'HERP公式掲載')
+    .replace(/^Official Wantedly posting$/i, 'Wantedly公式掲載')
+    .replace(/^Official Greenhouse posting$/i, 'Greenhouse公式掲載')
+    .replace(/^Official Lever posting$/i, 'Lever公式掲載')
+    .replace(/^Official company careers page \(student internships\)$/i, '企業公式採用ページ（学生インターン）')
     .replace(/US Salary Range/gi, '米国給与範囲')
     .replace(/salary range/gi, '給与範囲')
     .replace(/Compensation & Flexibility/gi, '報酬・柔軟性')
@@ -203,7 +260,19 @@ function jaDisplay(value) {
     .replace(/^Strong mobile-first UI portfolio$/i, 'モバイルファーストUIの実装実績を示せる')
     .replace(/^AWS and full-stack breadth$/i, 'AWSとフルスタック開発の幅を活かせる')
     .replace(/^English-first Tokyo program$/i, '東京開催の英語中心プログラム')
-    .replace(/^Third-year undergraduate or higher; React or Vue with TypeScript; Unix-like environment knowledge; At least three listed cloud\/full-stack\/testing\/UI skills$/i, '学部3年生以上、ReactまたはVueとTypeScript、Unix系環境の知識、クラウド・フルスタック・テスト・UI系スキルのうち3つ以上が目安');
+    .replace(/^Third-year undergraduate or higher; React or Vue with TypeScript; Unix-like environment knowledge; At least three listed cloud\/full-stack\/testing\/UI skills$/i, '学部3年生以上、ReactまたはVueとTypeScript、Unix系環境の知識、クラウド・フルスタック・テスト・UI系スキルのうち3つ以上が目安')
+    // Residual "Month YYYY" / "Month-Month YYYY" / "Month to Month YYYY" dates left
+    // in English on newer global roles (e.g. "July-December 2026", "July 2026").
+    // Placed AFTER the anchored ^…$ duration rules above so a full-string match is
+    // never pre-empted; the 4-digit-year guard keeps prose words like "May" intact.
+    .replace(new RegExp(`\\b(${MONTH_NAMES})\\s+to\\s+(${MONTH_NAMES})\\s+(\\d{4})`, 'gi'), (_, a, b, y) => `${y}年${MONTH_NUM[a.toLowerCase()]}〜${MONTH_NUM[b.toLowerCase()]}月`)
+    .replace(new RegExp(`\\b(${MONTH_NAMES})\\s*[-–]\\s*(${MONTH_NAMES})\\s+(\\d{4})`, 'gi'), (_, a, b, y) => `${y}年${MONTH_NUM[a.toLowerCase()]}〜${MONTH_NUM[b.toLowerCase()]}月`)
+    .replace(new RegExp(`\\b(${MONTH_NAMES})\\s+(\\d{4})`, 'gi'), (_, a, y) => `${y}年${MONTH_NUM[a.toLowerCase()]}月`)
+    // Bare language names that are not part of an anchored phrase above (e.g. a
+    // language value of just "English" on most global roles). Case-sensitive so
+    // only the capitalized proper-noun form is touched.
+    .replace(/\bEnglish\b/g, '英語')
+    .replace(/\bJapanese\b/g, '日本語');
 }
 
 export function displayValue(value, isJa = false) {
@@ -257,7 +326,163 @@ export function displayRole(role, isJa = false) {
     .replace(/\bInternship\b/gi, 'インターン')
     .replace(/\bIntern\b/gi, 'インターン')
     .replace(/\bCo-op\b/gi, 'コープ')
-    .replace(/Summer 2026/gi, '2026年夏');
+    .replace(/Summer 2026/gi, '2026年夏')
+    // Role-type nouns and team/division names left in English by the word-level
+    // pass above. Appended last (longest phrases first) so they catch any residue
+    // without disturbing the specific role patterns handled earlier.
+    .replace(/TECH Camp/gi, 'TECHキャンプ')
+    .replace(/Autonomous Driving Engineering Tracks?/gi, '自動運転エンジニアリング職種')
+    .replace(/Autonomous Driving/gi, '自動運転')
+    .replace(/(\d{4})\s+夏/g, '$1年夏')
+    .replace(/Threat Detection and Incident Response/gi, '脅威検知・インシデント対応')
+    .replace(/Integration & Enterprise Architecture/gi, '統合・エンタープライズアーキテクチャ')
+    .replace(/Enterprise Systems Software Engineer/gi, 'エンタープライズシステムソフトウェアエンジニア')
+    .replace(/Hardware Systems Integration/gi, 'ハードウェアシステム統合')
+    .replace(/Production Data Analytics/gi, '生産データ分析')
+    .replace(/Technical Support Engineering/gi, 'テクニカルサポートエンジニアリング')
+    .replace(/Technical Advisor Specialist/gi, 'テクニカルアドバイザー')
+    .replace(/Full[- ]Stack Software Engineer/gi, 'フルスタックソフトウェアエンジニア')
+    .replace(/Frontend Software Engineering/gi, 'フロントエンドソフトウェアエンジニアリング')
+    .replace(/Backend Software Engineering/gi, 'バックエンドソフトウェアエンジニアリング')
+    .replace(/Middleware Software Engineer/gi, 'ミドルウェアソフトウェアエンジニア')
+    .replace(/Systems Research Engineer/gi, 'システムリサーチエンジニア')
+    .replace(/System Infrastructure Engineer/gi, 'システムインフラエンジニア')
+    .replace(/Software QA Engineer/gi, 'ソフトウェアQAエンジニア')
+    .replace(/Machine Learning Engineer/gi, '機械学習エンジニア')
+    .replace(/Embedded C\/C\+\+ Software Developer/gi, '組込みC/C++ソフトウェア開発者')
+    .replace(/Avionics Software/gi, 'アビオニクスソフトウェア')
+    .replace(/Data Engineer \/ Data Scientist/gi, 'データエンジニア / データサイエンティスト')
+    .replace(/Database Analyst/gi, 'データベースアナリスト')
+    .replace(/Data Analytics/gi, 'データ分析')
+    .replace(/Data Analyst/gi, 'データアナリスト')
+    .replace(/AI Data Scientist/gi, 'AIデータサイエンティスト')
+    .replace(/Data Scientist/gi, 'データサイエンティスト')
+    .replace(/Data Science/gi, 'データサイエンス')
+    .replace(/Data Engineering/gi, 'データエンジニアリング')
+    .replace(/Data Engineer/gi, 'データエンジニア')
+    .replace(/Machine Learning/gi, '機械学習')
+    .replace(/Product\/Project Producer/gi, 'プロダクト/プロジェクトプロデューサー')
+    .replace(/Product Manager/gi, 'プロダクトマネージャー')
+    .replace(/Solutions Engineer/gi, 'ソリューションエンジニア')
+    .replace(/AI Engineer/gi, 'AIエンジニア')
+    .replace(/Mission Operations/gi, 'ミッション運用')
+    .replace(/Network Strategy/gi, 'ネットワーク戦略')
+    .replace(/Software Engineering/gi, 'ソフトウェアエンジニアリング')
+    .replace(/Software Engineer/gi, 'ソフトウェアエンジニア')
+    .replace(/Software Development/gi, 'ソフトウェア開発')
+    .replace(/Software Developer/gi, 'ソフトウェア開発者')
+    .replace(/Software Designer/gi, 'ソフトウェアデザイナー')
+    .replace(/Web Developer/gi, 'ウェブ開発者')
+    .replace(/\bDeveloper\b/gi, '開発者')
+    .replace(/\bCoordinator\b/gi, 'コーディネーター')
+    .replace(/Long[- ]?Term/gi, '長期')
+    .replace(/Mobile Engineer/gi, 'モバイルエンジニア')
+    .replace(/Server[- ]Side Engineer/gi, 'サーバーサイドエンジニア')
+    .replace(/\bMobile\b/gi, 'モバイル')
+    // Company / Rakuten division names
+    .replace(/Marketing Cloud Platform/gi, 'マーケティングクラウド基盤')
+    .replace(/Corporate IT Service/gi, 'コーポレートITサービス')
+    .replace(/Corporate IT/gi, 'コーポレートIT')
+    .replace(/Cloud Services/gi, 'クラウドサービス')
+    .replace(/Infrastructure Services/gi, 'インフラサービス')
+    .replace(/Membership Platform/gi, 'メンバーシップ基盤')
+    .replace(/Commerce & Marketing/gi, 'コマース・マーケティング')
+    .replace(/Rakuten Travel/gi, '楽天トラベル')
+    .replace(/Global Ad Division/gi, 'グローバル広告部門')
+    // Season / mode qualifiers left over from the word-level pass
+    .replace(/夏 & Fall 2026/gi, '2026年夏・秋')
+    .replace(/夏 2026/gi, '2026年夏')
+    .replace(/Fall 2026/gi, '2026年秋')
+    .replace(/Spring 2026/gi, '2026年春')
+    .replace(/\bFall\b/gi, '秋')
+    .replace(/Full[- ]Stack/gi, 'フルスタック')
+    .replace(/Front[- ]End/gi, 'フロントエンド')
+    .replace(/Back[- ]End/gi, 'バックエンド')
+    .replace(/\bFrontend\b/gi, 'フロントエンド')
+    .replace(/\bBackend\b/gi, 'バックエンド')
+    .replace(/Part[- ]Time/gi, 'パートタイム')
+    .replace(/Full[- ]Time/gi, 'フルタイム')
+    // Residual role / section terms left in English on newer (mostly global)
+    // entries. displayRole-only, so these never touch about/eligibility/meta text
+    // (which flows through jaDisplay). Multi-word phrases run first so the
+    // single-word fallbacks below cannot pre-empt them. Tech / proper nouns kept in
+    // Latin on purpose (Go, Kotlin, Unity, Android, GPU, MRO, Tegra, DataOps, etc.).
+    .replace(/Information and Communication Technology/gi, '情報通信技術')
+    .replace(/Mapping Autonomous Vehicles/gi, 'マッピング・自動運転車両')
+    .replace(/Big Data Analysis/gi, 'ビッグデータ分析')
+    .replace(/Test Automation/gi, 'テスト自動化')
+    .replace(/Core Algorithms/gi, 'コアアルゴリズム')
+    .replace(/GPU Programming/gi, 'GPUプログラミング')
+    .replace(/Connected Systems/gi, 'コネクテッドシステム')
+    .replace(/Vehicle Controls/gi, '車両制御')
+    .replace(/Client Secrets Management/gi, 'クライアントシークレット管理')
+    .replace(/Service Development/gi, 'サービス開発')
+    .replace(/Trust Platforms/gi, 'トラストプラットフォーム')
+    .replace(/Software Performance at Scale/gi, '大規模ソフトウェアパフォーマンス')
+    .replace(/Business Operations/gi, '事業運営')
+    .replace(/Systems Engineering/gi, 'システムエンジニアリング')
+    .replace(/Android Connectivity/gi, 'Android接続')
+    .replace(/Power Control Center/gi, '電力制御センター')
+    .replace(/Automatic Camera Enforcement/gi, '自動カメラ取締り')
+    .replace(/Emerging Talent/gi, '新卒・若手人材')
+    .replace(/Claim Operations Management/gi, '保険金請求オペレーション管理')
+    .replace(/Operational Technology/gi, '運用技術')
+    .replace(/Digital Ship Analytics/gi, 'デジタル船舶アナリティクス')
+    .replace(/Digital Ship/gi, 'デジタル船舶')
+    .replace(/Facilities MRO Information Systems/gi, '施設MRO情報システム')
+    .replace(/Risk\s*&\s*Fraud/gi, 'リスク・不正対策')
+    .replace(/Global Macro and Strategy team/gi, 'グローバルマクロ・戦略チーム')
+    .replace(/Defense Software/gi, '防衛ソフトウェア')
+    .replace(/Software\/AI Development/gi, 'ソフトウェア・AI開発')
+    .replace(/Technology Solutions/gi, 'テクノロジーソリューション')
+    .replace(/Commercial Banking/gi, 'コマーシャルバンキング')
+    .replace(/Digital Verification/gi, 'デジタル検証')
+    .replace(/Clinical Data/gi, '臨床データ')
+    .replace(/AI Builder/gi, 'AIビルダー')
+    .replace(/\bin Test\b/gi, '（テスト）')
+    // Single-word role / section fallbacks.
+    .replace(/\bApplications?\b/gi, 'アプリケーション')
+    .replace(/\bPlatforms?\b/gi, 'プラットフォーム')
+    .replace(/\bDevelopment\b/gi, '開発')
+    .replace(/\bNetwork\b/gi, 'ネットワーク')
+    .replace(/\bConnectivity\b/gi, '接続')
+    .replace(/\bConnected\b/gi, 'コネクテッド')
+    .replace(/\bVehicles?\b/gi, '車両')
+    .replace(/\bControls?\b/gi, '制御')
+    .replace(/\bSecrets\b/gi, 'シークレット')
+    .replace(/\bClient\b/gi, 'クライアント')
+    .replace(/\bFramework\b/gi, 'フレームワーク')
+    .replace(/\bProgramming\b/gi, 'プログラミング')
+    .replace(/\bAlgorithms?\b/gi, 'アルゴリズム')
+    .replace(/\bPerformance\b/gi, 'パフォーマンス')
+    .replace(/\bVerification\b/gi, '検証')
+    .replace(/\bFocused\b/gi, '重視')
+    .replace(/\bEmbedded\b/gi, '組込み')
+    .replace(/\bDigital\b/gi, 'デジタル')
+    .replace(/\bClinical\b/gi, '臨床')
+    .replace(/\bDefense\b/gi, '防衛')
+    .replace(/\bOperational\b/gi, '運用')
+    .replace(/\bOperations\b/gi, 'オペレーション')
+    .replace(/\bManagement\b/gi, '管理')
+    .replace(/\bSpecialist\b/gi, 'スペシャリスト')
+    .replace(/\bAnalytics\b/gi, 'アナリティクス')
+    .replace(/\bAnalyst\b/gi, 'アナリスト')
+    .replace(/\bProducer\b/gi, 'プロデューサー')
+    .replace(/\bSolutions?\b/gi, 'ソリューション')
+    .replace(/\bTechnology\b/gi, 'テクノロジー')
+    .replace(/\bInformation\b/gi, '情報')
+    .replace(/\bBusiness\b/gi, 'ビジネス')
+    .replace(/\bProduct\b/gi, 'プロダクト')
+    .replace(/\bService\b/gi, 'サービス')
+    .replace(/\bSales\b/gi, 'セールス')
+    .replace(/\bBuilder\b/gi, 'ビルダー')
+    .replace(/\bApprentice\b/gi, 'アプレンティス')
+    .replace(/\bSystems?\b/gi, 'システム')
+    .replace(/\bEngineering\b/gi, 'エンジニアリング')
+    .replace(/\bEngineer\b/gi, 'エンジニア')
+    .replace(/\bData\b/gi, 'データ')
+    .replace(/\bSoftware\b/gi, 'ソフトウェア')
+    .replace(/\bWeb\b/gi, 'ウェブ');
 }
 
 export function formatDisplayDeadline(value, isJa = false) {
@@ -292,11 +517,28 @@ function translateEligibilityJa(value) {
     .replace(/CS or related degree/gi, '情報系または関連分野を専攻')
     .replace(/Japan resident with work authorization/gi, '日本在住で就労資格があること')
     .replace(/Re-check eligibility on the official page/gi, '応募条件は公式募集ページで再確認してください')
+    .replace(/Join Rakuten full-time in 2028/gi, '2028年に楽天へ新卒入社予定')
+    .replace(/Data structures, algorithms and CS fundamentals/gi, 'データ構造・アルゴリズム・CSの基礎')
+    .replace(/Product development and operations experience/gi, 'プロダクト開発・運用の経験')
+    .replace(/Advanced communication skills in both Japanese and English/gi, '日本語・英語両方の高度なコミュニケーション能力')
+    .replace(/advanced Japanese and English communication/gi, '日本語・英語の高度なコミュニケーション能力')
+    .replace(/Communicate with Japanese and overseas stakeholders/gi, '日本語と海外の関係者とのコミュニケーション')
+    .replace(/English technical communication/gi, '技術コミュニケーションレベルの英語')
+    .replace(/technical communication/gi, '技術コミュニケーション')
+    .replace(/Strong English( required)?/gi, '高い英語力必須')
+    .replace(/export[- ]control eligibility/gi, '輸出管理規制上の適格性')
+    .replace(/Portfolio( required)?/gi, 'ポートフォリオ必須')
+    .replace(/20\+\s*hours?\s*(?:per week|\/week|a week)/gi, '週20時間以上')
+    .replace(/RDBMS and SQL basics/gi, 'RDBMSとSQLの基礎')
+    .replace(/Python, Java or TypeScript/gi, 'Python・Java・TypeScript')
     .replace(/English/gi, '英語')
     .replace(/Japanese/gi, '日本語')
     .replace(/required/gi, '必須')
     .replace(/preferred/gi, '歓迎');
-  return translated === text && /[A-Za-z]{4,}/.test(translated)
+  // A run of 3+ consecutive English words means the clause was only partially
+  // translated; render the clean generic pointer instead of a half-English bullet.
+  const stillEnglishProse = /[A-Za-z]{3,}(?:[\s/&.,()-]+[A-Za-z]{2,}){2,}/.test(translated);
+  return (translated === text && /[A-Za-z]{4,}/.test(translated)) || stillEnglishProse
     ? '応募条件の詳細は公式募集ページで確認してください'
     : translated;
 }
@@ -323,6 +565,24 @@ export function brandInfo(item) {
   return COMPANY_DISPLAY[item.company] || { brand: 'default', mark: item.company };
 }
 
+// De-duplicate a rendered bullet list case-insensitively, preserving the first
+// occurrence and order. This prevents repeated eligibility bullets — e.g. several
+// distinct English clauses that all translate to the same generic JA fallback
+// ("応募条件の詳細は公式募集ページで確認してください") would otherwise render as
+// identical repeated lines in Japanese mode.
+function dedupeList(list) {
+  if (!Array.isArray(list)) return list;
+  const seen = new Set();
+  const out = [];
+  for (const entry of list) {
+    const key = String(entry ?? '').trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(entry);
+  }
+  return out;
+}
+
 export function internshipDetails(item) {
   const stack = Array.isArray(item.techStack) && item.techStack.length
     ? item.techStack
@@ -343,10 +603,10 @@ export function internshipDetails(item) {
   return {
     about: item.about || item.fitNote,
     aboutJa: item.aboutJa || item.fitNoteJa || genericAboutJa(item),
-    techStack: stack,
-    eligibility,
-    eligibilityJa,
-    process,
-    processJa,
+    techStack: dedupeList(stack),
+    eligibility: dedupeList(eligibility),
+    eligibilityJa: dedupeList(eligibilityJa),
+    process: dedupeList(process),
+    processJa: dedupeList(processJa),
   };
 }
