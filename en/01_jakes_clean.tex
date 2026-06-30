@@ -1,5 +1,5 @@
 %========================
-% Jake's Clean Resume — Mohamed Fuad
+% Jake's Clean Resume - Mohamed Fuad
 % ATS-Optimized, Single Column, Tectonic-compatible
 %========================
 \documentclass[letterpaper,11pt]{article}
@@ -43,18 +43,18 @@
 }
 
 \newcommand{\resumeSubheading}[4]{
-  \vspace{-2pt}\item
+  \vspace{2pt}\item
     \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
       \textbf{#1} & #2 \\
       \textit{\small#3} & \textit{\small #4} \\
-    \end{tabular*}\vspace{-7pt}
+    \end{tabular*}\vspace{-5pt}
 }
 
 \newcommand{\resumeProjectHeading}[2]{
     \item
     \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
       \small#1 & #2 \\
-    \end{tabular*}\vspace{-7pt}
+    \end{tabular*}\vspace{-5pt}
 }
 
 \newcommand{\resumeSubItem}[1]{\resumeItem{#1}\vspace{-4pt}}
@@ -63,25 +63,29 @@
 
 \newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.15in, label={}]}
 \newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
-\newcommand{\resumeItemListStart}{\begin{itemize}}
-\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+\newcommand{\resumeItemListStart}{\begin{itemize}[topsep=1pt]}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-3pt}}
 
 \begin{document}
 
 \begin{center}
-    {\Huge \scshape Mohamed Fuad} \\ \vspace{1pt}
+    {\Huge \scshape Mohamed Fuad} \\ \vspace{3pt}
     \small
-    Tel: 080-7535-2988 $|$
+    +81 80-7535-2988 $|$
     \href{mailto:mohamed.fuad.jp@gmail.com}{\underline{mohamed.fuad.jp@gmail.com}} $|$
     \href{https://linkedin.com/in/mohamed-fuad-6b8483278}{\underline{linkedin.com/in/mohamed-fuad-6b8483278}} $|$
     \href{https://github.com/MohamedFuad16}{\underline{github.com/MohamedFuad16}}
 \end{center}
 
+\section{Summary}
+\small{Third-year ICT student and full-stack developer focused on AI agent orchestration. I build multi-agent systems, LLM tool-calling, and secure MCP integrations across TypeScript, Python, Node, and AWS, and I work in both English and Japanese (JLPT N2).}
+\vspace{3pt}
+
 \section{Education}
   \resumeSubHeadingListStart
     \resumeSubheading
       {Tokai University}{Tokyo, Japan}
-      {Bachelor of Science --- Information and Communication Technology}{Apr 2024 -- Mar 2028 (Expected)}
+      {Bachelor of Science in Information and Communication Technology}{Apr 2024 -- Mar 2028 (Expected)}
       \resumeItemListStart
         \resumeItem{3rd Year student, School of Information Science and Technology}
         \resumeItem{Relevant Coursework: Data Structures \& Algorithms, Computer Networks, Database Systems, Operating Systems, Software Engineering, Web Programming, Discrete Mathematics}
@@ -97,49 +101,50 @@
         \resumeItem{Translate customer communications for users of KDDI services, supporting bilingual customer service.}
         \resumeItem{Apply precise wording, cultural nuance, and professional communication under real customer-facing conditions.}
       \resumeItemListEnd
-      
+
     \resumeSubheading
       {Front Desk Associate}{Tokyo, Japan}
       {Hotel SUI Akasaka}{Apr 2023 -- Jul 2023}
       \resumeItemListStart
-        \resumeItem{Handled guest inquiries, reservations, check-in support, and front-desk service in English/Japanese environments.}
+        \resumeItem{Handled guest inquiries, reservations, check-in support, and front-desk service in English and Japanese environments.}
       \resumeItemListEnd
 
     \resumeSubheading
       {Immigration Specialist at Haneda Airport}{Tokyo, Japan}
       {Japan Airlines}{Feb 2023 -- Apr 2023}
       \resumeItemListStart
-        \resumeItem{Assisted document registration, web-verification workflows, and passenger guidance using English/Japanese.}
+        \resumeItem{Assisted document registration, web-verification workflows, and passenger guidance using English and Japanese.}
       \resumeItemListEnd
   \resumeSubHeadingListEnd
 
 \section{Projects}
     \resumeSubHeadingListStart
       \resumeProjectHeading
-          {\textbf{Tutor-System} $|$ \emph{TypeScript, React 19, OpenRouter, Deepgram, Dexie/IndexedDB, Express}}{2025}
+          {\textbf{WebDrop} $|$ \emph{JavaScript, WebRTC, OPFS, Web Audio, Device Motion, Service Worker}}{2026}
           \resumeItemListStart
-            \resumeItem{Built an AI learning interface for PDF reading, source-aware tutor chat, voice tutoring, and concept revision.}
-            \resumeItem{Designed around study books, durable chat threads, and evidence-based learning progress.}
+            \resumeItem{Building an AirDrop-style file sharing web app that runs entirely in the browser, with no native install and no manual device selection, using only built-in web platform APIs.}
+            \resumeItem{Pairs nearby phones with a physical ``bump'' detected through the device motion sensor and an ultrasonic Web Audio handshake, then streams files peer-to-peer over WebRTC data channels with OPFS chunked storage.}
+          \resumeItemListEnd
+
+      \resumeProjectHeading
+          {\textbf{Agent Swarm} $|$ \emph{Swift, SwiftUI, Python, Docker, AWS EC2, OpenAI Codex CLI, MCP}}{2026}
+          \resumeItemListStart
+            \resumeItem{Built a leader and agent orchestration runtime where a leader delegates work to parallel Codex agents in isolated Git worktrees, scaling up to 8 agents with a capacity planner that watches available CPU and RAM.}
+            \resumeItem{Coordinated agents through a structured JSON task ledger with health monitoring and MCP-connected context sources, controlled from a macOS app with an iOS companion.}
+          \resumeItemListEnd
+
+      \resumeProjectHeading
+          {\textbf{Tutor-System} $|$ \emph{TypeScript, React 19, OpenRouter, Deepgram, Dexie/IndexedDB, Express}}{2026}
+          \resumeItemListStart
+            \resumeItem{Built an AI learning app with function-calling tutor tools, a realtime voice tutor that splits foreground and background models, and source-aware chat grounded in the user's own PDFs.}
+            \resumeItem{Engineered an auditable learner-memory layer with embeddings, semantic retrieval, and mastery tracking on an Express backend of around 6{,}000 lines.}
           \resumeItemListEnd
 
       \resumeProjectHeading
           {\textbf{TokaiHub} $|$ \emph{TypeScript, React, Tailwind CSS, AWS Amplify, Cognito, Vite, PWA}}{2025}
           \resumeItemListStart
-            \resumeItem{Developed a central student portal PWA for Tokai University with mobile-first UI and bilingual support.}
+            \resumeItem{Developed a central student portal PWA for Tokai University with a mobile-first UI and bilingual support.}
             \resumeItem{Integrated custom AWS Cognito authentication and SES-backed OTP verification flows.}
-          \resumeItemListEnd
-
-      \resumeProjectHeading
-          {\textbf{WebDrop} $|$ \emph{HTML, CSS, JavaScript, Node.js, WebRTC, OPFS, Service Worker}}{2024 -- 2025}
-          \resumeItemListStart
-            \resumeItem{Built a mobile-first nearby file-sharing app using WebRTC \texttt{RTCDataChannel} and OPFS chunked streaming.}
-            \resumeItem{Implemented ultrasonic Web Audio chirp exchange and motion sensors for proximity verification.}
-          \resumeItemListEnd
-
-      \resumeProjectHeading
-          {\textbf{Codex Account Switcher} $|$ \emph{Swift, AppKit, macOS Menu Bar, Process Control}}{2025}
-          \resumeItemListStart
-            \resumeItem{Created a native macOS menu-bar utility to switch active Codex profiles and hot-swap session tokens.}
           \resumeItemListEnd
     \resumeSubHeadingListEnd
 
@@ -149,19 +154,10 @@
      \textbf{Programming Languages}{: TypeScript, JavaScript, Python, Swift, HTML/CSS, SQL, Java, C, Bash/Shell} \\
      \textbf{Frameworks \& Libraries}{: React, Node.js, Express, Flask, Tailwind CSS, SwiftUI, PWA, NumPy, Pandas} \\
      \textbf{Tools \& Databases}{: Git, GitHub, AWS (Amplify/Cognito/SES), Docker, SQLite, MySQL, VS Code, Vim} \\
+     \textbf{AI \& Agents}{: Agent Orchestration, LLM Tool-Calling, MCP (Model Context Protocol), RAG / Semantic Retrieval, Codex \& OpenRouter} \\
      \textbf{Concepts}{: RESTful APIs, OOP, Design Patterns, Data Structures, WebRTC, Network Protocols, Agile} \\
-     \textbf{Languages}{: English (Professional), Japanese (Business --- JLPT N2), Tamil (Native)}
+     \textbf{Languages}{: English (Professional), Japanese (Business level, JLPT N2), Tamil (Native)}
     }}
  \end{itemize}
-
-\section{Activities}
-  \resumeSubHeadingListStart
-    \resumeSubheading
-      {IEEE Student Member}{Tokyo, Japan}
-      {Tokai University Student Branch}{2024 -- Present}
-      \resumeItemListStart
-        \resumeItem{Participated in technical seminars, workshops, and networking events in the ICT field.}
-      \resumeItemListEnd
-  \resumeSubHeadingListEnd
 
 \end{document}
