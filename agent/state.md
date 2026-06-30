@@ -35,10 +35,12 @@ committed and pushed to `origin/main` this session.
   06:00 UTC cron, and manual dispatch (Node 20) — the automated daily gate ADR-0009
   anticipated. (5) **Validator heuristic** (`validate-catalog.js`): new soft (non-failing)
   `generic-apply-url` warning + `[1b]` report flagged **14** likely-generic apply URLs.
-  (6) **Apply-URL audit** (seeds): replacing those 14 generic landings with the specific
-  posting page per role where one exists (genuine single-program pages stay flagged) — run
-  in a fresh lean worker. Verified: `npm run build` green, `validate:catalog` 183 entries /
-  0 errors / DB ok. PROCESS NOTE: a single combined worker hit `resource_exhausted` twice on
+  (6) **Apply-URL audit** (`japan-wide-research-2026-06-30.js`): of the 14 flagged, **3** got
+  verified specific deep-links (DeNA→snar ATS, Cookpad→Talentio, freee→Wantedly — the official
+  careers page is retained as `sourceUrl`), **1** was already specific (HENNGE challenge entry
+  link), and **10** are genuine single-program application pages (kept + flagged, not faked;
+  common for JP new-grad programs). `[1b]` soft list 14→11; `validate:catalog:links` 180/180
+  live. Verified: `npm run build` green, `validate:catalog` 183 entries / 0 errors / DB ok. PROCESS NOTE: a single combined worker hit `resource_exhausted` twice on
   the link audit; recovered by shipping the 5 complete fixes first and re-scoping the URL
   audit to the validator's `[1b]` worklist. See ADR-0010, BUG-004.
 - **2026-06-30 — Internship catalog overhaul + automated validation.** (1) **Expiry
