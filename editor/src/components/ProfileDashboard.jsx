@@ -19,6 +19,7 @@ import { CompanyLogo } from './CompanyLogo.jsx';
 import InterviewDateModal from './InterviewDateModal.jsx';
 import { displayCompany, displayRole, displayValue, formatDisplayDeadline } from '../utils/internshipDisplay.js';
 import { prepareProfilePhoto } from '../utils/imageUpload.js';
+import { appliedCompaniesForProfile, compareCompanyAwareMatch } from '../utils/internshipRanking.js';
 import { resolveTechList } from '../utils/techIcons.js';
 
 const STATUS_ICONS = {
@@ -144,7 +145,13 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
     () => records.filter(record => APPLIED_STATUSES.has(record.status)).slice(0, 5),
     [records],
   );
-  const tokyoMatches = useMemo(() => catalog.filter(item => /Tokyo|東京/i.test(item.location)).slice(0, 4), [catalog]);
+  const tokyoMatches = useMemo(() => {
+    const appliedCompanies = appliedCompaniesForProfile(activeProfile, records);
+    return catalog
+      .filter(item => /Tokyo|東京/i.test(item.location))
+      .sort((a, b) => compareCompanyAwareMatch(a, b, appliedCompanies))
+      .slice(0, 4);
+  }, [activeProfile, catalog, records]);
   const name = isJa
     ? (resume.personal?.nameJa || resume.personal?.nameEn || '名前未設定')
     : (resume.personal?.nameEn || resume.personal?.nameJa || 'Name not set');

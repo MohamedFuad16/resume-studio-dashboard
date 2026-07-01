@@ -5,13 +5,26 @@ Two-track résumé project. **Track A — Internship Portal** (`editor/`): React
 client and an ESM Node/Express server with sql.js (SQLite) KV storage (Vercel Blob in
 prod), Tectonic-based LaTeX compile, an internship radar/tracker, an application
 calendar, and an AI application assistant (OpenRouter `gpt-5-mini`). **Track B**: static
-LaTeX résumés (`en/`, `ja/`) compiled by `build_all.sh` to `output/`. Latest mega-update
-(2026-07-01): rebranded to **Internship Portal**, nav-bar multi-user switcher (Mohamed +
-Aiko Tanaka), editor form overhaul, radar hides applied+expired, calendar TZ/coding-test,
-OpenRouter AI agents, JA resume #1 Jake's-clean, consolidated CSS. `npm run build` green
-(~353 KB); `validate:catalog` 184 entries / 0 errors.
+LaTeX résumés (`en/`, `ja/`) compiled by `build_all.sh` to `output/`. Latest refresh
+(2026-07-02): official-source catalog audit with runtime retirements, 173 live seed roles,
+profile-aware HENNGE/Rakuten ranking, and the first JA editor option visibly mapped to
+Jake's Clean Japanese. `validate:catalog:links` is 173/173 live; build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-02 — Official-source internship audit + applied-company ranking + JA editor
+  mapping.** Added `catalog-audit-2026-07-02.js`: retired 12 stale IDs (11 seed roles plus
+  one persisted Apple live-research row) after checking official company/program/ATS pages;
+  reasons include expired deadlines, explicit closure, removed postings, and current pages
+  no longer listing an internship. Updated Sakana AI to its current English Tokyo **Member
+  of Technical Staff - Research Internship** detail page (4 months). `buildSeedCatalog()`
+  applies the audit, and all catalog read/write/legacy merge paths reject retired IDs so
+  SQLite cannot resurrect them. Runtime API now returns exactly **173**, research date
+  2026-07-02, no retired IDs. Added shared `utils/internshipRanking.js`: for Mohamed's
+  already-applied HENNGE/Rakuten companies, roles below 98 are demoted while exceptional
+  98+ matches remain; both radar and dashboard Tokyo rail use it. First JA template label/
+  test id is now **Jake's Clean 日本語** and an E2E assertion locks the mapping. Verified:
+  schema/DB 173/0, link liveness 173/173, all JA templates compile, 5/5 Playwright, build,
+  browser runtime/console, and API persistence purge. No deployment or application submit.
 - **2026-07-01 — Internship Portal mega-update (Waves 1–3, coordinator ship).** Full
   user-requested overhaul across dashboard, radar, calendar, editor, server, and templates.
   **Branding:** "Resume Studio" → **Internship Portal** (EN/JA nav, index.html, README,

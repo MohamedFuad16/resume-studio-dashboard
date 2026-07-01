@@ -46,12 +46,16 @@ Blob snapshots. All writes pass `server/validation.js`.
 Required on write (`validateInternship`): `id, company, role, url(https), sourceUrl(https)`.
 
 ### Catalog flow
-1. `readInternshipCatalog()` = enrich(`seeds/internships` + `japan-wide-research`) →
-   validate → merge (dedup by **id**) with stored live-research + non-seed entries.
-2. `useInternshipCatalog` (client) fetches `/api/internships`, dedups by `id`,
+1. `buildSeedCatalog()` = compose dated seeds → enrich → apply the latest dated audit
+   (`catalog-audit-2026-07-02.js`) to patch current records and remove retired IDs.
+2. `readInternshipCatalog()` validates the audited seed catalog, then merges (dedup by
+   **id**) with stored live-research + non-seed entries. Retired IDs are filtered from
+   live, stored, legacy-custom, and write paths so persistence cannot resurrect them.
+3. `useInternshipCatalog` (client) fetches `/api/internships`, dedups by `id`,
    caches at module scope, and re-fetches on `CATALOG_EVENT`.
-3. Live "company research" results (`prestigeTier === 'Live company research'`,
-   `id` starts with `live-`) are added via POST and preserved across seed refreshes.
+4. Live "company research" results (`prestigeTier === 'Live company research'`,
+   `id` starts with `live-`) are added via POST and preserved across seed refreshes
+   unless their exact ID is later placed in a dated retirement audit.
 
 ## Application tracker (`tracker:<id>`) — map keyed by internshipId
 ```jsonc

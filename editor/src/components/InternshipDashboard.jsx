@@ -25,6 +25,7 @@ import { notifyCatalogChange, useInternshipCatalog } from '../hooks/useInternshi
 import { CompanyLogo } from './CompanyLogo.jsx';
 import InterviewDateModal from './InterviewDateModal.jsx';
 import { displayCompany, displayRole, displayValue, internshipDetails, splitLanguageRequirement } from '../utils/internshipDisplay.js';
+import { appliedCompaniesForProfile, appliedCompanyRank, compareCompanyAwareMatch } from '../utils/internshipRanking.js';
 
 const DESKTOP_PAGE_SIZE = 14;
 const MOBILE_PAGE_SIZE = 6;
@@ -511,6 +512,10 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
     () => eligibleCatalog.filter(item => isVisibleInRadar(item, statusFor(item.id))),
     [eligibleCatalog, statusFor],
   );
+  const appliedCompanies = useMemo(
+    () => appliedCompaniesForProfile(activeProfile, records),
+    [activeProfile, records],
+  );
   const regions = ['All', 'Japan', 'Remote', 'Global'];
   const tracks = useMemo(() => ['All', ...new Set(visibleCatalog.map(item => item.track).filter(Boolean))], [visibleCatalog]);
   const savedCount = records.filter(record => record.status === 'saved').length;
@@ -564,11 +569,14 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
         return a.deadlineDate.localeCompare(b.deadlineDate);
       }
       if (sort === 'company') return a.company.localeCompare(b.company);
-      if (sort === 'match') return b.score - a.score;
+      if (sort === 'match') return compareCompanyAwareMatch(a, b, appliedCompanies);
       const priorityDelta = locationPriority(a) - locationPriority(b);
-      return priorityDelta || Number(Boolean(b.priority)) - Number(Boolean(a.priority)) || b.score - a.score;
+      return priorityDelta
+        || appliedCompanyRank(a, appliedCompanies) - appliedCompanyRank(b, appliedCompanies)
+        || Number(Boolean(b.priority)) - Number(Boolean(a.priority))
+        || b.score - a.score;
     });
-  }, [visibleCatalog, query, region, track, language, deadlineFilter, statusFilter, sort, priorityOnly, savedOnly, statusFor]);
+  }, [visibleCatalog, query, region, track, language, deadlineFilter, statusFilter, sort, priorityOnly, savedOnly, statusFor, appliedCompanies]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);

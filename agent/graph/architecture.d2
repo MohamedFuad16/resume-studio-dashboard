@@ -19,7 +19,7 @@ vars: {
 }
 direction: down
 
-title: Resume — Resume Studio + LaTeX pipeline {
+title: Resume — Internship Portal + LaTeX pipeline {
   near: top-center
   shape: text
   style: {font-size: 24; bold: true}
@@ -46,6 +46,7 @@ client: React client (editor/src) {
   }
   utils: Utils {
     display: internshipDisplay
+    ranking: internshipRanking
     image: imageUpload
     helpers: helpers
   }
@@ -63,6 +64,8 @@ client: React client (editor/src) {
   dashboards.radar -> apiclient
   dashboards -> shared.logo
   dashboards -> utils.display
+  dashboards.profile -> utils.ranking
+  dashboards.radar -> utils.ranking
   hooks.tracker -> apiclient
   hooks.catalog -> apiclient
 }
@@ -76,11 +79,15 @@ server: Node / Express server (editor/server) {
   validation: validation.js
   chat: resume-chat.js
   research: internship-research.js
+  catalog: seeds/catalog.js
+  audit: catalog-audit-2026-07-02.js
   index -> storage
   index -> templates
   index -> validation
   index -> chat
   index -> research
+  index -> catalog
+  index -> audit
 }
 
 # --- Layer 3: Data & seeds (read/enriched by the server) ---
@@ -88,7 +95,15 @@ seeds: Data & seeds (editor/server/seeds) {
   style.fill: "#fef9c3"; style.stroke: "#ca8a04"
   internships: internships.js
   japan: japan-wide-research-2026-06-29.js
+  japan2: japan-wide-research-2026-06-30.js
   enrich: internship-enrichment.js
+  audit: catalog-audit-2026-07-02.js
+  catalog: catalog.js
+  internships -> catalog
+  japan -> catalog
+  japan2 -> catalog
+  enrich -> catalog
+  audit -> catalog
 }
 
 store: SQLite (.data) / Vercel Blob {style.fill: "#f1f5f9"; shape: cylinder}
@@ -110,9 +125,8 @@ tectonic: Tectonic (XeLaTeX) {style.fill: "#f1f5f9"; shape: hexagon}
 
 # --- Cross-layer edges (all point downward) ---
 client.apiclient -> server.index: HTTP /api/* {style.stroke-dash: 4}
-server.index -> seeds.internships: read+enrich+merge
-server.index -> seeds.japan
-seeds.internships -> seeds.enrich
+server.catalog -> seeds.catalog: compose+audit
+server.audit -> seeds.audit: retire persisted IDs
 server.storage -> store
 server.templates -> tectonic: compile PDF
 build.script -> tectonic

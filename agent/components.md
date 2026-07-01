@@ -16,7 +16,8 @@ Entry: `main.jsx` → `App.jsx`. See `agent/graph/graph.md` for the import graph
   `utils/imageUpload`), completion ring, application pipeline, recent applications,
   Tokyo matches, projects, and the `ApplicationCalendar`. Reads `useInternshipCatalog`
   + `useApplicationTracker`. Uses `displayCompany/displayRole/displayValue/
-  formatDisplayDeadline` for JA localization.
+  formatDisplayDeadline` for JA localization and `utils/internshipRanking` for the
+  company-aware Tokyo match rail.
 - **`InternshipDashboard.jsx`** ("Internship Radar") — searchable/filterable internship
   table with region/track/language/deadline/status filters, sorting (Tokyo-priority,
   match, deadline, company), pagination, a detail drawer (`DetailPanel`), live
@@ -24,6 +25,8 @@ Entry: `main.jsx` → `App.jsx`. See `agent/graph/graph.md` for the import graph
   JA translation helpers from `utils/internshipDisplay.js` (the former inline `jaDisplay`/
   `displayValue`/`displayRole` were removed — ADR-0006); keeps only radar-specific
   presentation helpers (`splitRole`, `splitLanguage`, `trackLabel`, `JA_TRACK_LABELS`).
+  Default and match sorts use `utils/internshipRanking` so already-applied companies
+  are demoted unless a role meets the exceptional-fit threshold.
 - **`ApplicationCalendar.jsx`** — month calendar of application milestones (interviews,
   submissions, follow-ups); add/remove milestones via `useApplicationTracker`.
 
@@ -52,9 +55,12 @@ Entry: `main.jsx` → `App.jsx`. See `agent/graph/graph.md` for the import graph
 - **`imageUpload.js`** — `prepareProfilePhoto` (resize/encode to a size-bounded
   data URL accepted by `validation.js`).
 - **`helpers.js`** — small shared helpers (formatting, debounce-style utilities).
+- **`internshipRanking.js`** — profile-aware applied-company normalization and shared
+  comparators. Mohamed's explicit HENNGE/Rakuten history is combined with tracker
+  statuses; scores of 98+ remain eligible for their natural rank.
 
 ## Dependency hot-spots (change impact)
-- `CompanyLogo`, `internshipDisplay`, `useApplicationTracker`, `useInternshipCatalog`
+- `CompanyLogo`, `internshipDisplay`, `internshipRanking`, `useApplicationTracker`, `useInternshipCatalog`
   are shared by both dashboards — edits ripple widely (see `agent/graph/graph.md`).
 - `api/client.js` is imported by both hooks and `App` — any route/shape change there
   affects the whole app.

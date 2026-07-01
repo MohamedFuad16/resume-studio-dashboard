@@ -2,6 +2,20 @@
 
 ## Fixed
 
+### BUG-006 — Retired internships survived seed cleanup via persisted catalog — FIXED 2026-07-02
+- **Date:** 2026-07-02 · **Files:** `editor/server/index.js`,
+  `editor/server/seeds/catalog.js`, `editor/server/seeds/catalog-audit-2026-07-02.js`
+- **Symptom:** Removing or filtering a static seed did not remove the old row from the
+  running catalog; `readInternshipCatalog()` classified the stored copy as a non-seed row
+  and merged it back. A stale Apple live-research row also returned a generic careers shell.
+- **Root cause:** Seed membership was the only distinction between current and stored data;
+  there was no durable retirement concept shared by seed assembly and persistence merges.
+- **Fix:** A dated audit owns exact retired IDs and current record patches. The seed builder
+  applies it, while catalog reads, legacy custom merges, and writes all reject retired IDs.
+  Restarting the server rewrote SQLite from 185 stale rows to exactly 173 current rows.
+- **Verified:** API count 173, no retired IDs, research date 2026-07-02; catalog schema/DB
+  passes and all 173 unique official URLs pass liveness. See ADR-0013.
+
 ### BUG-005 — "Validate Catalog" CI flaky-fails on Nuro `UND_ERR_SOCKET` — FIXED 2026-06-30
 - **Date:** 2026-06-30 · **Files:** `editor/server/validate-catalog.js`,
   `editor/server/seeds/internships.js`

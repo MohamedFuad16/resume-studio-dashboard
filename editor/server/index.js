@@ -16,8 +16,8 @@ import {
   INTERNSHIP_RESEARCH_NOTE,
   internshipStats as seedInternshipStats,
 } from './seeds/internships.js';
-import { enrichSeedInternships } from './seeds/internship-enrichment.js';
-import { seedInternshipCatalog } from './seeds/catalog.js';
+import { buildSeedCatalog } from './seeds/catalog.js';
+import { isRetiredInternshipId } from './seeds/catalog-audit-2026-07-02.js';
 import {
   sendRequestError,
   validateApplication,
@@ -74,12 +74,14 @@ function mergeInternships(...groups) {
 
 async function readInternshipCatalog() {
   const stored = await store.getJson(INTERNSHIP_CATALOG_KEY, null);
-  const seedCatalog = enrichSeedInternships(seedInternshipCatalog).map(validateInternship);
+  const seedCatalog = buildSeedCatalog().map(validateInternship);
   if (Array.isArray(stored) && stored.length) {
     const seedIds = new Set(seedCatalog.map(item => item.id));
-    const liveResearch = stored.filter(item => item?.prestigeTier === 'Live company research').map(validateInternship);
+    const liveResearch = stored
+      .filter(item => item?.prestigeTier === 'Live company research' && !isRetiredInternshipId(item?.id))
+      .map(validateInternship);
     const nonSeedStored = stored
-      .filter(item => item?.prestigeTier !== 'Live company research' && !seedIds.has(item?.id))
+      .filter(item => item?.prestigeTier !== 'Live company research' && !seedIds.has(item?.id) && !isRetiredInternshipId(item?.id))
       .map(validateInternship);
     const catalog = mergeInternships(liveResearch, seedCatalog, nonSeedStored);
     if (catalog.length !== stored.length || JSON.stringify(catalog) !== JSON.stringify(stored)) {
@@ -89,7 +91,9 @@ async function readInternshipCatalog() {
   }
   const legacyCustom = await store.getJson('customInternships', []);
   const catalog = mergeInternships(
-    Array.isArray(legacyCustom) ? legacyCustom.map(validateInternship) : [],
+    Array.isArray(legacyCustom)
+      ? legacyCustom.filter(item => !isRetiredInternshipId(item?.id)).map(validateInternship)
+      : [],
     seedCatalog,
   );
   await store.setJson(INTERNSHIP_CATALOG_KEY, catalog);
@@ -97,7 +101,9 @@ async function readInternshipCatalog() {
 }
 
 async function writeInternshipCatalog(items) {
-  const catalog = mergeInternships(items.map(validateInternship));
+  const catalog = mergeInternships(
+    items.filter(item => !isRetiredInternshipId(item?.id)).map(validateInternship),
+  );
   await store.setJson(INTERNSHIP_CATALOG_KEY, catalog);
   return catalog;
 }
@@ -119,12 +125,13 @@ async function readCustomInternships() {
 
 async function writeCustomInternships(items) {
   const catalog = await readInternshipCatalog();
-  const customIds = new Set(items.map(item => item.id));
-  const next = mergeInternships(items, catalog.filter(item => item.prestigeTier !== 'Live company research' && !customIds.has(item.id)));
+  const activeItems = items.filter(item => !isRetiredInternshipId(item?.id));
+  const customIds = new Set(activeItems.map(item => item.id));
+  const next = mergeInternships(activeItems, catalog.filter(item => item.prestigeTier !== 'Live company research' && !customIds.has(item.id)));
   await writeInternshipCatalog(next);
-  await store.setJson('customInternships', items.map(validateInternship));
+  await store.setJson('customInternships', activeItems.map(validateInternship));
   if (!process.env.VERCEL) {
-    await fs.writeFile(CUSTOM_INTERNSHIPS_FILE, `${JSON.stringify(items, null, 2)}\n`, 'utf8');
+    await fs.writeFile(CUSTOM_INTERNSHIPS_FILE, `${JSON.stringify(activeItems, null, 2)}\n`, 'utf8');
   }
 }
 

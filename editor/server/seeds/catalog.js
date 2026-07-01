@@ -8,6 +8,7 @@ import { internships as seedInternships } from './internships.js';
 import { japanWideResearchInternships } from './japan-wide-research-2026-06-29.js';
 import { japanWideResearch20260630 } from './japan-wide-research-2026-06-30.js';
 import { enrichSeedInternships } from './internship-enrichment.js';
+import { applyCatalogAudit20260702 } from './catalog-audit-2026-07-02.js';
 
 export const seedInternshipCatalog = [
   ...seedInternships,
@@ -18,5 +19,5 @@ export const seedInternshipCatalog = [
 // The catalog exactly as the server materializes it from seeds (pre-validation,
 // pre-merge with stored live entries): enrichment overrides applied.
 export function buildSeedCatalog() {
-  return enrichSeedInternships(seedInternshipCatalog);
+  return applyCatalogAudit20260702(enrichSeedInternships(seedInternshipCatalog));
 }

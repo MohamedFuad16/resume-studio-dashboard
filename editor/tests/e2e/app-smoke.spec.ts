@@ -55,4 +55,14 @@ test.describe('Internship Portal — app shell', () => {
     await page.locator('.top-nav-btn', { hasText: 'Dashboard' }).click();
     await expect(search).toHaveCount(0);
   });
+
+  test('first Japanese template is Jake’s clean Japanese resume', async ({ page }) => {
+    await page.getByTestId('language-toggle-ja').click();
+    await page.locator('.top-nav-btn', { hasText: 'エディタ' }).click();
+
+    const jakesCleanJa = page.getByTestId('template-jakes-clean-ja');
+    await expect(jakesCleanJa).toBeVisible();
+    await expect(jakesCleanJa).toHaveText("Jake's Clean 日本語");
+    await expect(jakesCleanJa).toHaveAttribute('aria-selected', 'true');
+  });
 });

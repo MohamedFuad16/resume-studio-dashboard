@@ -262,3 +262,26 @@ Reverse-engineered from the codebase on 2026-06-29. Newest at the bottom.
   section + wizard `personal` defaults; the in-UI delete guard (`if (id === 'mohamed_fuad')`)
   and the `'mohamed_fuad'` URL/default fallbacks should track `DEFAULT_PROFILE_ID`; a "create
   profile" UI can POST any new id.
+
+---
+## ADR-0013 — Dated catalog retirements and shared applied-company ranking
+- **Date:** 2026-07-02
+- **Status:** Accepted
+- **Context:** Official-source review found expired, explicitly closed, removed, and
+  misrepresented internship records. Deleting a seed alone was insufficient because its
+  persisted copy could be reclassified as non-seed data and merged back. The user also
+  identified HENNGE and Rakuten as already applied, but wanted genuinely exceptional fits
+  to retain their rank across both the radar and dashboard rail.
+- **Decision:** (a) Keep historical research immutable and add a date-stamped audit module
+  with exact retired IDs plus narrow current-record patches. Apply it from the shared seed
+  builder and enforce retirement on every stored/live/legacy catalog read and write path.
+  (b) Centralize company normalization, profile/tracker applied-company aggregation, and
+  comparison logic in `src/utils/internshipRanking.js`. For `mohamed_fuad`, HENNGE and
+  Rakuten Group are treated as applied; tracker statuses add future companies dynamically.
+  Roles scoring 98+ are exceptional and retain natural score rank; lower matches from those
+  companies sort behind fresh companies without changing their underlying fit scores.
+- **Consequences:** A retirement is auditable and survives SQLite/Vercel persistence, while
+  re-opening a role requires explicitly removing its ID or adding a new current ID. Ranking
+  behavior is consistent in both surfaces and remains additive to tracker state. The
+  profile-specific seed is intentionally local product data; if profiles become user-created
+  at scale, applied-company preferences should move into persisted profile/tracker data.

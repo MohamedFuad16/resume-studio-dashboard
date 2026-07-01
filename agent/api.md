@@ -41,9 +41,12 @@ Valid compile/export templates (`VALID_TEMPLATES`): `en_01..en_04`, `ja_01..ja_0
 ## Data sources & seeds
 - **Seed catalog**: `seeds/internships.js` (large static dataset, with
   `INTERNSHIP_RESEARCH_DATE` / `INTERNSHIP_RESEARCH_NOTE`) +
-  `seeds/japan-wide-research-2026-06-29.js` (23 Japan-first ATS entries).
+  `seeds/japan-wide-research-2026-06-29.js` +
+  `seeds/japan-wide-research-2026-06-30.js`, composed by `seeds/catalog.js`.
 - **Enrichment**: `seeds/internship-enrichment.js` adds tech-stack / process / JA
   detail overrides at read time.
+- **Current audit**: `seeds/catalog-audit-2026-07-02.js` applies exact current-posting
+  patches and filters retired IDs from seed and persisted catalog paths.
 - **Profiles**: JSON under `server/profiles/` seed the store on first read; runtime
   state lives in the KV store (`storage.js`). Local mirror: `editor/resume.json`.
   Sample profiles in `SAMPLE_PROFILE_IDS` (`mohamed_fuad`, `aiko_tanaka`) are force-seeded

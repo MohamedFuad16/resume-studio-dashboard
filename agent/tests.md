@@ -13,11 +13,12 @@ Two suites for the two tracks.
   npm run test:e2e                  # or: npx playwright test
   npm run test:e2e:ui               # interactive
   ```
-- Coverage (4 cases, all green): the **current dashboard-first shell** — shell renders
+- Coverage (5 cases, all green): the **current dashboard-first shell** — shell renders
   (language toggles + primary nav), language switcher updates the indicator (JA/EN),
   rapid language toggling stays consistent, and primary navigation switches between
   dashboard ↔ internship radar ↔ editor (asserting the radar search field and the
-  editor template picker appear). Uses stable selectors (`data-testid`, nav text,
+  editor template picker appear), plus the first JA template is visibly and actively
+  mapped to `Jake's Clean 日本語`. Uses stable selectors (`data-testid`, nav text,
   `[data-testid^="template-"]`); no `/api/*` stubbing needed.
 
 ### History (spec drift — resolved 2026-06-29)

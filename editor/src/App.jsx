@@ -278,7 +278,7 @@ const testIdMap = {
   en_02: 'classic-en',
   en_03: 'minimalist-en',
   en_04: 'modern-en',
-  ja_01: 'shokumu-modern',
+  ja_01: 'jakes-clean-ja',
   ja_02: 'rirekisho-grid',
   ja_03: 'deedy-jp',
 };

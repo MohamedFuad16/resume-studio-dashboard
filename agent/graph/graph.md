@@ -8,23 +8,27 @@ The client and server are separate module graphs connected only over HTTP via
 ## Client (`editor/src`) — who imports whom
 - `main.jsx` → `App.jsx`
 - `App.jsx` → `api/client`, `components/InternshipDashboard`, `components/ProfileDashboard`,
-  `components/sections`, `components/ui`, `utils/helpers`, `index.css`
+  `components/ProfileSwitcher`, `components/sections`, `components/ui`, `utils/helpers`, `index.css`
 - `components/ProfileDashboard` → `ApplicationCalendar`, `CompanyLogo`,
   `hooks/useApplicationTracker`, `hooks/useInternshipCatalog`, `utils/imageUpload`,
-  `utils/internshipDisplay`
+  `InterviewDateModal`, `utils/internshipDisplay`, `utils/internshipRanking`, `utils/techIcons`
 - `components/InternshipDashboard` → `api/client`, `CompanyLogo`,
-  `hooks/useApplicationTracker`, `hooks/useInternshipCatalog`, `utils/internshipDisplay`
+  `InterviewDateModal`, `hooks/useApplicationTracker`, `hooks/useInternshipCatalog`,
+  `utils/internshipDisplay`, `utils/internshipRanking`
 - `components/ApplicationCalendar` → `CompanyLogo`, `hooks/useApplicationTracker`,
   `utils/internshipDisplay`
 - `components/sections` → `ui`, `utils/imageUpload`
 - `hooks/useApplicationTracker` → `api/client`; `hooks/useInternshipCatalog` → `api/client`
-- Leaves (no local imports): `CompanyLogo`, `ui`, `utils/internshipDisplay`,
-  `utils/imageUpload`, `utils/helpers`, `api/client`, `index.css`
+- Leaves (no local imports): `CompanyLogo`, `InterviewDateModal`, `ui`,
+  `utils/internshipDisplay`, `utils/internshipRanking`, `utils/imageUpload`,
+  `utils/techIcons`, `utils/helpers`, `api/client`, `index.css`
 
 ## Server (`editor/server`) — who imports whom
 - `index.js` → `templates`, `storage`, `validation`, `resume-chat`,
-  `internship-research`, `seeds/internships`, `seeds/japan-wide-research-2026-06-29`,
-  `seeds/internship-enrichment`
+  `internship-research`, `seeds/internships`, `seeds/catalog`,
+  `seeds/catalog-audit-2026-07-02`
+- `seeds/catalog` → dated research seeds, `internship-enrichment`, and the July 2 audit
+- `validate-catalog.js` → `seeds/catalog`, `storage`, `validation`
 - `test-ja-compilation.js` → `templates`
 - All others are leaves (`storage`, `templates`, `validation`, the seeds, MCP files).
 
@@ -35,6 +39,8 @@ The client and server are separate module graphs connected only over HTTP via
   `ApplicationCalendar`. This is now the **single source** for JA/EN display helpers
   (`jaDisplay`/`displayValue`/`displayRole` + company/track maps); the former inline copy
   in `InternshipDashboard` was removed (ADR-0006). Editing a phrase here affects all three.
+- **`utils/internshipRanking.js`** → both dashboards. Applied-company normalization,
+  exceptional-fit threshold, or profile defaults affect the radar and Tokyo match rail.
 - **`hooks/useApplicationTracker.js`** → both dashboards + `ApplicationCalendar`
   (tracker shape, statuses, events).
 - **`hooks/useInternshipCatalog.js`** → both dashboards (catalog shape/dedup).
@@ -46,7 +52,8 @@ The client and server are separate module graphs connected only over HTTP via
 - **`server/storage.js`** → all persistence (profiles, tracker, catalog, applications).
 - **`server/templates.js`** → `/api/compile`, `/api/export/{tex,pdf}` and the
   `ja/`+`en/` design parity. Used by `test-ja-compilation.js`.
-- **`server/seeds/*`** → `readInternshipCatalog` (catalog content, merge, meta).
+- **`server/seeds/catalog.js` + dated audit** → `readInternshipCatalog` and validator
+  (catalog content, patches, retirements, merge, meta).
 
 ## Regenerate
 ```bash
