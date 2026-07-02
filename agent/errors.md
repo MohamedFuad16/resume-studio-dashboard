@@ -2,6 +2,43 @@
 
 ## Fixed
 
+### BUG-007 — "Saved (N)" radar filter shows an empty table — FIXED 2026-07-03
+- **Date:** 2026-07-03 · **File:** `editor/src/components/InternshipDashboard.jsx`
+- **Symptom:** The Saved button could read e.g. "Saved (1)" while the filtered table was
+  empty; the status `<select>` also offered Applying/Applied/Interview options that never
+  matched anything.
+- **Root cause:** (1) `savedCount` counted raw tracker records with `status==='saved'`, but
+  the `savedOnly` filter ran over `visibleCatalog`, which had already dropped expired-deadline
+  saved roles and retired-id roles — so count > rows. (2) `visibleCatalog` excludes applied-type
+  statuses up front, so the applied-type filter options were guaranteed-empty.
+- **Fix:** (a) `isVisibleInRadar` now keeps `status==='saved'` roles visible even past their
+  deadline (shown with the existing urgent/expired styling). (b) `savedCount` is derived from
+  `visibleCatalog` with the same `statusFor(id)==='saved'` predicate the filter uses, so count ≡
+  rows. (c) the radar status filter excludes `APPLIED_TYPE_STATUSES`, leaving only Saved.
+- **Verified:** build green, E2E 5/5; predicates are identical by construction so count == rows.
+  NOTE: a saved role retired from the catalog is excluded from both count and rows (no mismatch);
+  a dismissible "saved role no longer listed" notice remains a possible future enhancement.
+
+### BUG-008 — Stale `profile:temp` (nameEn "fdf") KV row lingered — FIXED 2026-07-03
+- **Date:** 2026-07-03 · **File:** `editor/server/index.js`
+- **Symptom:** The scratch profile `temp` (`server/profiles/temp.json` deleted long ago) still
+  had a `profile:temp` KV row locally and in the prod Blob snapshot.
+- **Fix:** Added `RETIRED_PROFILE_IDS = ['temp']` + `purgeRetiredProfiles()` (deletes
+  `profile:`/`tracker:`/`applications:` keys), run in `initPersistentStore()` on every boot;
+  `listProfiles()` also excludes retired ids defensively. Idempotent; rewrites the Blob snapshot
+  so prod is cleaned on the next deploy.
+- **Verified:** local KV had `profile:temp` before boot, `(none)` after; `/api/profiles` lists
+  only `aiko_tanaka` + `mohamed_fuad`.
+
+### BUG-009 — Module-scope clock (`NOW`/`TODAY`) went stale across midnight — FIXED 2026-07-03
+- **Date:** 2026-07-03 · **File:** `editor/src/components/InternshipDashboard.jsx`
+- **Symptom:** `NOW`/`TODAY` were computed once at module load, so a tab left open across
+  midnight JST evaluated deadline expiry/urgency against yesterday.
+- **Fix:** Replaced the module constants with per-call helpers `nowDate()` / `todayIso()` used
+  at every site (`isExpiredDeadline`, `deadlineClass`, verified-date copy). `ApplicationCalendar.jsx`
+  already computed `new Date()` per render — no change needed.
+- **Verified:** build green, E2E 5/5.
+
 ### BUG-006 — Retired internships survived seed cleanup via persisted catalog — FIXED 2026-07-02
 - **Date:** 2026-07-02 · **Files:** `editor/server/index.js`,
   `editor/server/seeds/catalog.js`, `editor/server/seeds/catalog-audit-2026-07-02.js`

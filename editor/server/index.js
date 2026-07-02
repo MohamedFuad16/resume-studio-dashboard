@@ -48,6 +48,11 @@ const DEFAULT_PROFILE_ID = process.env.RESUME_DEFAULT_PROFILE_ID || 'mohamed_fua
 // fresh store always lists demo data. Each is only seeded when its KV key is missing
 // and its <id>.json file exists (see ensureSampleProfiles / readProfile).
 const SAMPLE_PROFILE_IDS = ['mohamed_fuad', 'aiko_tanaka'];
+// Profile ids that were removed and must never resurface. Their KV keys are purged on
+// boot (see purgeRetiredProfiles) and excluded from listProfiles defensively. `temp`
+// was the scratch profile (nameEn "fdf"); its <id>.json is gone but the KV row lingered
+// locally and in the prod Blob snapshot. See BUG-008.
+const RETIRED_PROFILE_IDS = ['temp'];
 // Profiles the DELETE route refuses to remove. Configurable via env (comma-separated);
 // defaults to protecting only the primary profile.
 const PROTECTED_PROFILE_IDS = new Set(
@@ -172,10 +177,10 @@ async function writeProfile(profileId, data) {
 async function listProfiles() {
   const stored = await store.listJson('profile:');
   if (stored.length) {
-    return stored.map(({ key, value }) => {
-      const id = key.replace(/^profile:/, '');
-      return { id, name: value.personal?.nameEn || value.personalInfo?.fullName || id, fileName: `${id}.json` };
-    });
+    return stored
+      .map(({ key, value }) => ({ id: key.replace(/^profile:/, ''), value }))
+      .filter(({ id }) => !RETIRED_PROFILE_IDS.includes(id))
+      .map(({ id, value }) => ({ id, name: value.personal?.nameEn || value.personalInfo?.fullName || id, fileName: `${id}.json` }));
   }
   await ensureSampleProfiles();
   return listProfiles();
@@ -187,6 +192,17 @@ async function listProfiles() {
 async function ensureSampleProfiles() {
   for (const sampleId of SAMPLE_PROFILE_IDS) {
     await readProfile(sampleId);
+  }
+}
+
+// Delete the KV rows for any retired profile ids (profile:/tracker:/applications:).
+// Idempotent — safe to run on every boot; rewrites the Blob snapshot so prod is cleaned
+// on the next deploy. See BUG-008.
+async function purgeRetiredProfiles() {
+  for (const id of RETIRED_PROFILE_IDS) {
+    await store.deleteKey(profileKey(id)).catch(() => {});
+    await store.deleteKey(trackerKey(id)).catch(() => {});
+    await store.deleteKey(applicationsKey(id)).catch(() => {});
   }
 }
 
@@ -278,6 +294,7 @@ async function initPersistentStore() {
         if (error.code !== 'ENOENT') console.error('Could not migrate profile files:', error.message);
       }
     }
+    await purgeRetiredProfiles();
     await ensureSampleProfiles();
     await readInternshipCatalog();
     console.log(`✅ Internship Portal store ready (${store.backend})`);

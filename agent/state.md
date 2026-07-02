@@ -16,6 +16,15 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-03 — Phase 0 quick bug fixes (BUG-007/008/009).** (1) **Saved radar filter**
+  (`InternshipDashboard.jsx`): saved roles stay visible past their deadline, `savedCount` is
+  derived from the visible set (count ≡ rows), and the status filter no longer offers
+  applied-type options that can't match. (2) **Stale `profile:temp`/"fdf" KV row**
+  (`server/index.js`): added `RETIRED_PROFILE_IDS`+`purgeRetiredProfiles()` on boot and excluded
+  retired ids from `listProfiles`; verified local `profile:temp` purged and `/api/profiles` clean
+  (needs a redeploy to clean the prod Blob). (3) **Module-scope clock**: `NOW`/`TODAY` →
+  per-call `nowDate()`/`todayIso()` (ApplicationCalendar already per-render). Also removed dead
+  module-level `matchLabel`. Build green, E2E 5/5. Uncommitted (on the feature branch working tree).
 - **2026-07-03 — Full per-user data migration to Firestore (client-direct) + login redesign.**
   (1) **Login redesign** (2 rounds of user feedback): soft mint→blue ambient gradient behind a
   centered white "app window" (macOS lights + `user`-icon brand pill + EN/日本語 segmented toggle),
@@ -32,7 +41,11 @@ build and 5 E2E tests green.
   list. Catalog stays server-seeded; custom researched companies stay server-global (documented
   limitation). **Verified end-to-end:** non-owner sign-up → blank profile + dashboard, tracker
   save persisted across reload (Firestore REST-confirmed `profiles/primary`+`trackers/primary`),
-  build green, E2E 5/5, test account cleaned up. Still uncommitted/undeployed.
+  build green, E2E 5/5, test account cleaned up. **Committed** on branch
+  `feat/firebase-auth-firestore` (pushed) and **deployed** to production
+  (`vercel --prod` → editor-omega-two.vercel.app); live API/catalog/seed-source verified,
+  deployed bundle confirmed to carry the auth gate. Owner-seed path proven end-to-end
+  (test owner account got the full mohamed_fuad résumé in Firestore). Branch not yet merged to main.
 - **2026-07-03 — Firebase Authentication gate + Firestore scaffold (Phase 4, real config).**
   Wired the app (project `resume-841f9` / `501333131661`) to Firebase Auth + Firestore.
   **Project side (via CLI + Identity Toolkit/Service Usage REST using the CLI's cached

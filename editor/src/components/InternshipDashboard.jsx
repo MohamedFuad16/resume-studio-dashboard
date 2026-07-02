@@ -29,8 +29,10 @@ import { appliedCompaniesForProfile, appliedCompanyRank, compareCompanyAwareMatc
 
 const DESKTOP_PAGE_SIZE = 14;
 const MOBILE_PAGE_SIZE = 6;
-const NOW = new Date();
-const TODAY = NOW.toISOString().slice(0, 10);
+// Recompute the clock per call (not once at module load) so a tab left open across
+// midnight JST still evaluates expiry/urgency against the current time. See BUG-009.
+const nowDate = () => new Date();
+const todayIso = () => new Date().toISOString().slice(0, 10);
 const DISPLAY_DATE_FORMAT = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
 // Statuses that mean the user has already engaged the role from the tracker. These
@@ -52,7 +54,7 @@ const deadlineInstant = item => {
 };
 const isExpiredDeadline = item => {
   const cutoff = deadlineInstant(item);
-  return Boolean(cutoff) && cutoff < NOW;
+  return Boolean(cutoff) && cutoff < nowDate();
 };
 // Radar visibility rule:
 //  1. Applied-type listings (applying/applied/interview) are hidden from the radar
@@ -61,7 +63,11 @@ const isExpiredDeadline = item => {
 //     INSTANT has passed in JST (so a 2026-06-30 09:00 JST deadline is already
 //     expired at 2026-07-01 00:00 JST).
 //  3. Listings with no deadlineDate ("Not stated") always show (unless applied).
-const isVisibleInRadar = (item, status) => !APPLIED_TYPE_STATUSES.has(status) && !isExpiredDeadline(item);
+//  4. EXCEPTION: a role the user has "saved" stays visible even after its deadline
+//     lapses (rendered with the existing urgent/expired styling) so the Saved filter
+//     count always matches the rendered rows. See BUG-007.
+const isVisibleInRadar = (item, status) =>
+  !APPLIED_TYPE_STATUSES.has(status) && (status === 'saved' || !isExpiredDeadline(item));
 
 const copy = {
   en: {
@@ -108,7 +114,7 @@ const copy = {
     process: 'Application procedure',
     source: 'Research source',
     compensation: 'Compensation',
-    verifiedSmall: date => `Link verified ${date || TODAY}. Openings can close without notice.`,
+    verifiedSmall: date => `Link verified ${date || todayIso()}. Openings can close without notice.`,
     noMatches: 'No internships match these filters',
     noMatchesSub: 'Clear a filter or search another technology.',
     reset: 'Reset filters',
@@ -178,7 +184,7 @@ const copy = {
     process: '応募フロー',
     source: '情報源',
     compensation: '待遇',
-    verifiedSmall: date => `リンク確認日: ${date || TODAY}。募集は予告なく終了する場合があります。`,
+    verifiedSmall: date => `リンク確認日: ${date || todayIso()}。募集は予告なく終了する場合があります。`,
     noMatches: '条件に合う募集がありません',
     noMatchesSub: '条件を減らすか、別のキーワードで検索してください。',
     reset: '条件をリセット',
@@ -207,20 +213,13 @@ const copy = {
 };
 
 // Urgency styling shares the SAME JST-instant semantics as visibility (deadlineInstant
-// + NOW), so the badge and the auto-hide rule never disagree about whether a deadline
-// has effectively passed. "Not stated" listings carry no urgency class.
+// + nowDate()), so the badge and the auto-hide rule never disagree about whether a
+// deadline has effectively passed. "Not stated" listings carry no urgency class.
 const deadlineClass = item => {
   const cutoff = deadlineInstant(item);
   if (!cutoff) return '';
-  const days = Math.ceil((cutoff - NOW) / 86400000);
+  const days = Math.ceil((cutoff - nowDate()) / 86400000);
   return days <= 7 ? 'urgent' : days <= 21 ? 'soon' : '';
-};
-
-const matchLabel = score => {
-  if (score >= 90) return 'Excellent';
-  if (score >= 85) return 'Very strong';
-  if (score >= 80) return 'Strong';
-  return 'Worth exploring';
 };
 
 const locationPriority = item => {
@@ -273,7 +272,7 @@ const JA_TRACK_LABELS = {
 
 const trackLabel = (value, isJa) => isJa ? (JA_TRACK_LABELS[value] || value) : value;
 const formatVerifiedDate = (date, isJa) => {
-  if (!date) return TODAY;
+  if (!date) return todayIso();
   if (isJa) return date;
   const parsed = new Date(`${date}T12:00:00`);
   if (Number.isNaN(parsed.getTime())) return date;
@@ -518,7 +517,13 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
   );
   const regions = ['All', 'Japan', 'Remote', 'Global'];
   const tracks = useMemo(() => ['All', ...new Set(visibleCatalog.map(item => item.track).filter(Boolean))], [visibleCatalog]);
-  const savedCount = records.filter(record => record.status === 'saved').length;
+  // Derive from the VISIBLE set (not raw tracker records) so the Saved button count
+  // always equals the number of rows the Saved filter renders. A saved role that was
+  // retired from the catalog is not in visibleCatalog, so it is excluded from both. BUG-007.
+  const savedCount = useMemo(
+    () => visibleCatalog.filter(item => statusFor(item.id) === 'saved').length,
+    [visibleCatalog, statusFor],
+  );
   const dynamicStats = useMemo(() => ({
     total: visibleCatalog.length,
     target: Math.max(meta.target || 200, visibleCatalog.length),
@@ -722,7 +727,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
             <select value={track} onChange={event => setTrack(event.target.value)} aria-label={t.allTracks}>{tracks.map(option => <option key={option} value={option}>{option === 'All' ? t.allTracks : trackLabel(option, isJa)}</option>)}</select>
             <select value={language} onChange={event => setLanguage(event.target.value)} aria-label={t.allLanguages}><option value="All">{t.allLanguages}</option><option value="English-first">{t.english}</option><option value="Bilingual">{isJa ? 'バイリンガル' : 'Bilingual'}</option></select>
             <select value={deadlineFilter} onChange={event => setDeadlineFilter(event.target.value)} aria-label={t.allDeadlines}><option value="All">{t.allDeadlines}</option><option value="7 days">{t.next7}</option><option value="30 days">{t.next30}</option><option value="Not stated">{t.notStated}</option></select>
-            <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} aria-label={t.allStatuses}><option value="All">{t.allStatuses}</option>{APPLICATION_STATUSES.map(option => <option key={option.value} value={option.value}>{statusLabel(option.value, isJa)}</option>)}</select>
+            <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} aria-label={t.allStatuses}><option value="All">{t.allStatuses}</option>{APPLICATION_STATUSES.filter(option => !APPLIED_TYPE_STATUSES.has(option.value)).map(option => <option key={option.value} value={option.value}>{statusLabel(option.value, isJa)}</option>)}</select>
             <button type="button" className={priorityOnly ? 'active' : ''} onClick={() => setPriorityOnly(value => !value)}><Star size={14} /> {t.priority}</button>
             <button type="button" className={savedOnly ? 'active' : ''} onClick={() => setSavedOnly(value => !value)}><Bookmark size={14} /> {t.saved(savedCount)}</button>
             {hasFilters ? <button type="button" className="intern-clear" onClick={clearFilters}>{t.clear}</button> : null}
