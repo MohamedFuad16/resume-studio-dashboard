@@ -673,6 +673,73 @@ app.get('/api/export/ai', async (req, res) => {
   }
 });
 
+// ── POST export variants (client-direct Firestore) ───────────────
+// These accept the résumé in the request body so the server needs no KV profile
+// lookup. The signed-in client owns its résumé in Firestore and posts it here.
+app.post('/api/export/tex', async (req, res) => {
+  try {
+    const template = String(req.body?.template || '');
+    if (!VALID_TEMPLATES.has(template)) return res.status(400).json({ error: 'Invalid resume template.' });
+    const resume = validateResume(req.body?.resume);
+    const latex = generateLatex(template, resume);
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="resume_${template}.tex"`);
+    res.send(latex);
+  } catch (e) {
+    sendRequestError(res, e);
+  }
+});
+
+app.post('/api/export/pdf', async (req, res) => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'resume-'));
+  try {
+    const template = String(req.body?.template || '');
+    if (!VALID_TEMPLATES.has(template)) return res.status(400).json({ error: 'Invalid resume template.' });
+    const resume = validateResume(req.body?.resume);
+    const photoFile = await materializeResumePhoto(resume, tmpDir);
+    const latex = generateLatex(template, resume, { photoFile });
+    const texFile = path.join(tmpDir, 'resume.tex');
+    await fs.writeFile(texFile, latex, 'utf8');
+    await execFileAsync(TECTONIC, [texFile, '-r', '0', '--outdir', tmpDir]);
+    const pdfData = await fs.readFile(path.join(tmpDir, 'resume.pdf'));
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="resume_${template}.pdf"`);
+    res.send(pdfData);
+  } catch (e) {
+    sendRequestError(res, e);
+  } finally {
+    fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+app.post('/api/export/ai', async (req, res) => {
+  try {
+    const resume = validateResume(req.body?.resume);
+    const md = buildAIProfile(resume);
+    res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="job_profile.md"');
+    res.send(md);
+  } catch (e) {
+    sendRequestError(res, e);
+  }
+});
+
+// ── POST /api/cover-letter ───────────────────────────────────────
+// Stateless cover-letter builder used by the Firestore application flow: the
+// client posts its résumé + job details, gets back the generated letter, and
+// stores the application record itself under users/{uid}/applications.
+app.post('/api/cover-letter', async (req, res) => {
+  try {
+    const resume = validateResume(req.body?.resume);
+    const { company, jobTitle, jobDescription } = validateApplication(req.body);
+    const coverLetter = buildCoverLetter(resume, company, jobTitle, jobDescription);
+    const fileName = `${company.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${jobTitle.toLowerCase().replace(/[^a-z0-9]/g, '_')}_application.md`;
+    res.json({ success: true, fileName, coverLetter });
+  } catch (e) {
+    sendRequestError(res, e);
+  }
+});
+
 // ── GET /api/applications ────────────────────────────────────────
 app.get('/api/applications', async (req, res) => {
   try {

@@ -6,9 +6,22 @@ The client and server are separate module graphs connected only over HTTP via
 `src/api/client.js → /api/*`.
 
 ## Client (`editor/src`) — who imports whom
-- `main.jsx` → `App.jsx`
+- `main.jsx` → `App.jsx`, `auth/AuthGate` (auth gate wraps `<App/>`)
 - `App.jsx` → `api/client`, `components/InternshipDashboard`, `components/ProfileDashboard`,
-  `components/ProfileSwitcher`, `components/sections`, `components/ui`, `utils/helpers`, `index.css`
+  `components/ProfileSwitcher`, `components/sections`, `components/ui`, `utils/helpers`,
+  `auth/firebase`, `auth/useAuth` (header Sign-out button), `index.css`
+- **Auth subsystem (Firebase, added 2026-07-03):**
+  - `auth/AuthGate` → `auth/useAuth`, `components/LoginScreen` (renders LoginScreen when
+    signed out; passes through to `<App/>` when signed in or auth disabled)
+  - `auth/useAuth` → `auth/firebase`, `data/userProfile`
+  - `components/LoginScreen` → `auth/useAuth`
+  - `data/userProfile` → `auth/firebase` (Firestore `users/{uid}` identity doc)
+  - `data/firestoreData` → `auth/firebase` (client-direct per-user data: profiles/trackers/
+    applications under `users/{uid}/...`; also `ensureSeed`, called by `auth/AuthGate`)
+  - `api/client` → `data/firestoreData` (profileApi/trackerApi/applicationApi delegate to
+    Firestore when signed in; else the legacy `/api/*` HTTP backend)
+  - `auth/firebase` → `firebase/app`, `firebase/auth`, `firebase/firestore` (leaf; public
+    config + `authAvailable`, off when `VITE_AUTH_DISABLED=true`)
 - `components/ProfileDashboard` → `ApplicationCalendar`, `CompanyLogo`,
   `hooks/useApplicationTracker`, `hooks/useInternshipCatalog`, `utils/imageUpload`,
   `InterviewDateModal`, `utils/internshipDisplay`, `utils/internshipRanking`, `utils/techIcons`

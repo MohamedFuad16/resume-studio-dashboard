@@ -6,11 +6,57 @@ client and an ESM Node/Express server with sql.js (SQLite) KV storage (Vercel Bl
 prod), Tectonic-based LaTeX compile, an internship radar/tracker, an application
 calendar, and an AI application assistant (OpenRouter `gpt-5-mini`). **Track B**: static
 LaTeX résumés (`en/`, `ja/`) compiled by `build_all.sh` to `output/`. Latest refresh
-(2026-07-02): official-source catalog audit with runtime retirements, 173 live seed roles,
-profile-aware HENNGE/Rakuten ranking, and the first JA editor option visibly mapped to
-Jake's Clean Japanese. `validate:catalog:links` is 173/173 live; build and 5 E2E tests green.
+(2026-07-03): **Firebase Auth gate + full per-user Firestore migration** (project
+`resume-841f9`) — Email/Password + Google sign-in wall (redesigned bilingual login window),
+open sign-up; per-user data (profiles/résumé, tracker, applications) now lives in Firestore
+under `users/{uid}/...` via a client-direct data layer with owner-only rules; the `/api/*`
+KV/Blob path is kept only for the no-auth/E2E case; the internship catalog stays server-seeded. Prior (2026-07-02): official-source catalog audit
+with runtime retirements, 173 live seed roles, profile-aware HENNGE/Rakuten ranking, and the
+first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links` 173/173 live;
+build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-03 — Full per-user data migration to Firestore (client-direct) + login redesign.**
+  (1) **Login redesign** (2 rounds of user feedback): soft mint→blue ambient gradient behind a
+  centered white "app window" (macOS lights + `user`-icon brand pill + EN/日本語 segmented toggle),
+  app line-icons (added a `radar` icon to `ui.jsx`) in white icon-chips, white feature cards with
+  soft shadow, one-line EN headline ("Land your next internship."). Bilingual, dark-aware,
+  responsive. (2) **Firestore migration** (ADR-0015): per-user data now lives in Firestore under
+  `users/{uid}/{profiles,trackers,applications}/{profileId}` via a new client-direct data layer
+  `src/data/firestoreData.js`; `src/api/client.js` delegates profileApi/trackerApi/applicationApi to
+  it when signed in and keeps the `/api/*` HTTP path for the no-auth/E2E case. Server decoupled from
+  KV for authed users: POST export variants (`/api/export/{pdf,tex,ai}` take résumé in body),
+  client-side JSON export, new stateless `/api/cover-letter`. `ensureSeed` (in AuthGate) seeds owner
+  accounts (`VITE_OWNER_EMAILS`, default flashxjapan@gmail.com) from the `mohamed_fuad` sample and
+  everyone else a blank `primary` profile; App boot resolves the active profile against the real
+  list. Catalog stays server-seeded; custom researched companies stay server-global (documented
+  limitation). **Verified end-to-end:** non-owner sign-up → blank profile + dashboard, tracker
+  save persisted across reload (Firestore REST-confirmed `profiles/primary`+`trackers/primary`),
+  build green, E2E 5/5, test account cleaned up. Still uncommitted/undeployed.
+- **2026-07-03 — Firebase Authentication gate + Firestore scaffold (Phase 4, real config).**
+  Wired the app (project `resume-841f9` / `501333131661`) to Firebase Auth + Firestore.
+  **Project side (via CLI + Identity Toolkit/Service Usage REST using the CLI's cached
+  token):** registered web app `1:501333131661:web:15135d8b04c44d1c77fdc4`; enabled the
+  Firestore + Identity Toolkit APIs; created Firestore `(default)` in `asia-northeast1`
+  (Tokyo); enabled **Email/Password** (Google was already enabled with an OAuth client);
+  deployed owner-only Firestore rules. **Client:** `src/auth/firebase.js` (public config
+  hardcoded as env-overridable fallbacks; `authAvailable`, disabled by `VITE_AUTH_DISABLED`),
+  `src/auth/useAuth.js` (hook + standalone `signOutUser`/`currentUser`), `src/auth/AuthGate.jsx`
+  (wraps `<App/>` in `main.jsx` — shows LoginScreen when signed out, spinner while resolving),
+  `src/components/LoginScreen.jsx` (bilingual EN/JA, Google + email/password sign-in & open
+  sign-up, `.auth-*` CSS appended to `index.css`), `src/data/userProfile.js` (upserts
+  `users/{uid}` on login — first real Firestore write). Added a header **Sign out** button.
+  **Config files (committed, no secrets):** `firebase.json`, `.firebaserc`, `firestore.rules`,
+  `firestore.indexes.json`; `.env.local` gained `VITE_FIREBASE_*`; `.gitignore` covers
+  `.firebase/` + debug logs. **Playwright:** `VITE_AUTH_DISABLED=true` in webServer env so the
+  gate doesn't block E2E. **Verified end-to-end:** `npm run build` green (~286 KB gzip; SDK
+  adds bulk), login screen renders with no console errors, a real email/password sign-up
+  transitioned past the gate AND wrote the `users/{uid}` doc under the deployed rules (then the
+  test user + doc were deleted, project left clean), and `npm run test:e2e` 5/5 green. **Scope
+  left open:** per-user data isolation + moving résumé/tracker/settings into Firestore, and
+  server-side ID-token verification (API still trusts the profile query param). **Pre-deploy
+  TODO:** add the Vercel prod domain to Firebase Auth authorized domains. See ADR-0014,
+  `agent/secrets.md` (Firebase section).
 - **2026-07-02 — Official-source internship audit + applied-company ranking + JA editor
   mapping.** Added `catalog-audit-2026-07-02.js`: retired 12 stale IDs (11 seed roles plus
   one persisted Apple live-research row) after checking official company/program/ATS pages;

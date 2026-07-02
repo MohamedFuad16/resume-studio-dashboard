@@ -1,0 +1,35 @@
+rules_version = '2';
+
+// Firestore security rules for the Internship Portal.
+//
+// Model (auth-gate + scaffold phase): a signed-in user may read and write ONLY
+// their own document tree under users/{uid}. Everything else is denied. When
+// per-user résumé/tracker collections are migrated into Firestore later, they
+// should live under users/{uid}/... and are already covered by the recursive
+// match below.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // A user's own profile document and any subcollections beneath it.
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+
+      match /{document=**} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
+    // Deny everything not explicitly allowed above.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

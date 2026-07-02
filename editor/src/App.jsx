@@ -6,6 +6,8 @@ import { I, Toasts, ExportMenu, TagInput, SuggestInput } from './components/ui.j
 import { InternshipDashboard } from './components/InternshipDashboard.jsx';
 import { ProfileDashboard } from './components/ProfileDashboard.jsx';
 import { ProfileSwitcher } from './components/ProfileSwitcher.jsx';
+import { authAvailable, auth } from './auth/firebase.js';
+import { signOutUser } from './auth/useAuth.js';
 import {
   PersonalSec, SummarySec, EducationSec,
   ExperienceSec, ProjectsSec, SkillsSec, ActivitiesSec,
@@ -685,10 +687,10 @@ export default function App() {
     try {
       await profileApi.remove(id);
       toast(isJa ? `ユーザーを削除しました: ${id}` : `Deleted user: ${id}`, 'success');
-      fetchProfiles();
-      if (activeProfile === id) {
-        // mohamed_fuad remains the default fallback profile.
-        handleSwitchProfile('mohamed_fuad');
+      const remaining = await profileApi.list().catch(() => profiles.filter(p => p.id !== id));
+      setProfiles(remaining);
+      if (activeProfile === id && remaining[0]?.id) {
+        handleSwitchProfile(remaining[0].id);
       }
     } catch (err) {
       // The server is the source of truth for delete protection: it returns HTTP 400
@@ -701,17 +703,28 @@ export default function App() {
 
   // ── Boot ─────────────────────────────────────────────────
   useEffect(() => {
-    const initProfile = getUrlProfile();
-    syncUrlWithProfile(initProfile);
-    profileApi.get(initProfile)
-      .then(data => {
-        const normalized = normalizeResume(data);
-        setResume(normalized);
-      })
-      .catch(() => toast('Could not load resume data', 'error'));
-    fetchApps(initProfile);
-    fetchProfiles();
-  }, [fetchApps, fetchProfiles]);
+    (async () => {
+      // Resolve the active profile against the real list. With Firestore each
+      // user has their own profiles, so the URL default ('mohamed_fuad') may not
+      // exist — fall back to the first available profile.
+      let list = [];
+      try { list = await profileApi.list(); } catch { /* surfaced below */ }
+      setProfiles(list);
+      const urlProfile = getUrlProfile();
+      const initProfile = list.some(p => p.id === urlProfile)
+        ? urlProfile
+        : (list[0]?.id || urlProfile);
+      if (initProfile !== activeProfile) setActiveProfile(initProfile);
+      syncUrlWithProfile(initProfile);
+      try {
+        setResume(normalizeResume(await profileApi.get(initProfile)));
+      } catch {
+        toast('Could not load resume data', 'error');
+      }
+      fetchApps(initProfile);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchApps]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -836,14 +849,18 @@ export default function App() {
     return !name && !email && !phone && !address && edu.length === 0 && exp.length === 0 && proj.length === 0 && acts.length === 0;
   };
 
-  const handleExport = async (type, url, filename) => {
+  const handleExport = async (type, url, filename, body) => {
     if (isResumeEmpty()) {
       setShowEmptyWarning(true);
       return;
     }
     toast(`Downloading ${type.toUpperCase()}…`);
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, body ? {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      } : undefined);
       if (!res.ok) {
         const errObj = await res.json().catch(() => ({}));
         throw new Error(errObj.error || `Failed to compile for export`);
@@ -862,12 +879,21 @@ export default function App() {
     }
   };
 
-  const activeProfileParam = encodeURIComponent(activeProfile);
-  const templateParam = encodeURIComponent(template);
-  const onPDF  = () => handleExport('pdf', apiUrl(`/api/export/pdf?template=${templateParam}&profile=${activeProfileParam}`), 'resume.pdf');
-  const onTex  = () => handleExport('tex', apiUrl(`/api/export/tex?template=${templateParam}&profile=${activeProfileParam}`), 'resume.tex');
-  const onJson = () => handleExport('json', apiUrl(`/api/export/json?profile=${activeProfileParam}`), 'resume.json');
-  const onAI   = () => handleExport('ai', apiUrl(`/api/export/ai?profile=${activeProfileParam}`), 'resume.md');
+  // Exports POST the in-memory résumé so the server needs no profile lookup
+  // (the client owns the data in Firestore). JSON is produced entirely client-side.
+  const onPDF  = () => handleExport('pdf', apiUrl('/api/export/pdf'), 'resume.pdf', { template, resume });
+  const onTex  = () => handleExport('tex', apiUrl('/api/export/tex'), 'resume.tex', { template, resume });
+  const onAI   = () => handleExport('ai', apiUrl('/api/export/ai'), 'resume.md', { resume });
+  const onJson = () => {
+    if (isResumeEmpty()) { setShowEmptyWarning(true); return; }
+    const blob = new Blob([JSON.stringify(resume, null, 2)], { type: 'application/json' });
+    const blobUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = 'resume.json';
+    a.click();
+    window.URL.revokeObjectURL(blobUrl);
+  };
 
   // ── Loading ──────────────────────────────────────────────
   if (!resume) {
@@ -1054,6 +1080,17 @@ export default function App() {
               </button>
               <ExportMenu onPDF={onPDF} onTex={onTex} onJson={onJson} onAI={onAI} isJa={isJa} />
             </>
+          )}
+          {authAvailable && auth?.currentUser && (
+            <button
+              className="btn"
+              data-testid="sign-out"
+              title={auth.currentUser.email || ''}
+              onClick={() => signOutUser().catch(() => {})}
+            >
+              <I n="user" s={12} />
+              {isJa ? 'ログアウト' : 'Sign out'}
+            </button>
           )}
         </div>
       </header>
