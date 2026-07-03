@@ -373,3 +373,20 @@ Reverse-engineered from the codebase on 2026-06-29. Newest at the bottom.
   or a service-account secret. Trade-off: the key travels in request bodies to our own API over
   HTTPS (acceptable; it is the user's own key). If server-side-only key custody is ever required,
   revisit with the Admin SDK + ID-token verification (also needed for a real data-API boundary).
+
+## ADR-0017 — LLM catalog audit is advisory-only (never auto-retire)
+- **Date:** 2026-07-03
+- **Status:** Accepted
+- **Context:** Phase 7 adds a cheap-LLM daily validity pass (`audit-catalog-llm.js`) on top of
+  the mechanical validator. An LLM reading a live page can be wrong (JS-only pages, bot walls,
+  ambiguous copy), so acting on its verdict automatically risks removing a still-open role.
+- **Decision:** The LLM audit **never mutates the catalog**. It selects stale-risk entries
+  (deadline within N days, `verifiedDate` older than N days, or a generic apply URL), asks the
+  audit model `{stillOpen, deadlineChanged, note}`, and writes a dated advisory report
+  (`server/seeds/llm-audit-<date>.json`, git-ignored; CI artifact). Only the MECHANICAL validator
+  may auto-fail/retire (404/410). The script exits 0 on any error and skips gracefully without
+  `OPENROUTER_API_KEY`, so CI stays green with or without the secret. Model is env-configurable
+  (`LLM_AUDIT_MODEL`, default a cheap nano-class slug); token usage is logged per run.
+- **Consequences:** Zero risk of an LLM hallucination silently dropping a valid role; a human/agent
+  confirms "closed" verdicts before editing seeds. Cost is bounded (only stale-risk entries, with
+  `--limit`), and the daily CI step is best-effort.

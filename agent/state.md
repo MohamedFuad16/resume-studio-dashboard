@@ -16,6 +16,17 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-03 — Phase 7 daily LLM catalog validity automation.** New
+  `server/audit-catalog-llm.js` (npm `audit:catalog:llm`, ADR-0017): selects stale-risk catalog
+  entries (deadline within N days / stale `verifiedDate` / generic apply URL), fetches page text,
+  and asks a cheap audit model `{stillOpen, deadlineChanged, note}`; writes a dated advisory report
+  (`seeds/llm-audit-<date>.json`, git-ignored + CI artifact) with token accounting. **Never
+  auto-retires** — advisory only; exits 0 on any error and skips gracefully without
+  `OPENROUTER_API_KEY`. Extended `.github/workflows/validate-catalog.yml` (daily 06:00 UTC cron)
+  with a conditional LLM step keyed by the `OPENROUTER_API_KEY` secret + a report-artifact upload.
+  Verified: `--dry` selects 24/173 candidates and writes the report (exit 0); one real LLM call
+  returned a conservative "unknown" verdict for a JS-only page and logged 528 tokens; validate:catalog
+  still passes; workflow YAML parses. Uncommitted.
 - **2026-07-03 — Phase 6 Jake's Clean JA template redesign (`server/templates.js` genJa01).**
   Refined the app's first JA résumé option to faithfully mirror the EN Jake's-clean rhythm:
   **Mincho body** (Hiragino Mincho ProN W3/W6) for an elegant read, **Gothic** (Hiragino Kaku

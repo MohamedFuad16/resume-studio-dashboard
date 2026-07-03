@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "validate:catalog": "node server/validate-catalog.js",
     "validate:catalog:links": "node server/validate-catalog.js --links",
+    "audit:catalog:llm": "node server/audit-catalog-llm.js",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },

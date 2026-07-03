@@ -12,6 +12,8 @@ tmp/
 
 # Runtime/generated local data
 editor/server/.data/
+# Generated LLM catalog-audit reports (advisory; regenerated daily in CI)
+editor/server/seeds/llm-audit-*.json
 editor/server/applications/
 editor/server/public/*.pdf
 editor/tmp/
