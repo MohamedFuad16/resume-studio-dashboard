@@ -19,7 +19,7 @@ import {
   Star,
   X,
 } from 'lucide-react';
-import { internshipApi } from '../api/client.js';
+import { internshipApi, settingsApi } from '../api/client.js';
 import { APPLICATION_STATUSES, statusLabel, useApplicationTracker } from '../hooks/useApplicationTracker.js';
 import { notifyCatalogChange, useInternshipCatalog } from '../hooks/useInternshipCatalog.js';
 import { CompanyLogo } from './CompanyLogo.jsx';
@@ -126,6 +126,8 @@ const copy = {
     liveStart: 'Search official sources',
     liveAdd: 'Add to matches',
     liveAdded: 'Added',
+    liveKeyMissing: 'Live research needs an OpenRouter API key.',
+    liveAddKey: 'Add your key in Settings',
     liveNoCoding: 'Coding test not published',
     showing: (start, end, total) => `Showing ${start}-${end} of ${total}`,
     page: (page, count) => `Page ${page} of ${count}`,
@@ -196,6 +198,8 @@ const copy = {
     liveStart: '公式情報を検索',
     liveAdd: '候補に追加',
     liveAdded: '追加済み',
+    liveKeyMissing: 'ライブリサーチには OpenRouter APIキーが必要です。',
+    liveAddKey: '設定でキーを追加',
     liveNoCoding: 'コーディングテスト未掲載',
     showing: (start, end, total) => `${total}件中 ${start}-${end}件を表示`,
     page: (page, count) => `${page}/${count}ページ`,
@@ -438,10 +442,11 @@ const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEditor, i
   );
 };
 
-function CompanyResearchPanel({ company, t, isJa, job, results, error, onStart, onAdd, addedIds, addingId }) {
+function CompanyResearchPanel({ company, t, isJa, job, results, error, onStart, onAdd, addedIds, addingId, onOpenSettings }) {
   if (!company) return null;
   const searching = job?.status === 'researching';
   const complete = job?.status === 'complete';
+  const missingKey = job?.errorCode === 'OPENROUTER_API_KEY_MISSING';
   const showPrompt = !job && !results.length && !error;
 
   return (
@@ -452,12 +457,18 @@ function CompanyResearchPanel({ company, t, isJa, job, results, error, onStart, 
         <CompanyLogo item={{ company }} />
         <div>
           <h3>{t.liveSearchTitle(company)}</h3>
-          <p data-testid="company-research-status">{showPrompt ? t.liveSearchSub : searching ? t.liveSearching(company) : error ? `${t.liveError} ${error}` : t.liveDone(results.length)}</p>
+          <p data-testid="company-research-status">{showPrompt ? t.liveSearchSub : searching ? t.liveSearching(company) : missingKey ? t.liveKeyMissing : error ? `${t.liveError} ${error}` : t.liveDone(results.length)}</p>
         </div>
-        <button type="button" onClick={onStart} disabled={searching}>
-          {searching ? <LoaderCircle size={15} className="spin" /> : <Search size={15} />}
-          {searching ? (isJa ? '検索中' : 'Searching') : t.liveStart}
-        </button>
+        {missingKey ? (
+          <button type="button" className="company-research-cta" data-testid="company-research-add-key" onClick={onOpenSettings}>
+            <PlusCircle size={15} /> {t.liveAddKey}
+          </button>
+        ) : (
+          <button type="button" onClick={onStart} disabled={searching}>
+            {searching ? <LoaderCircle size={15} className="spin" /> : <Search size={15} />}
+            {searching ? (isJa ? '検索中' : 'Searching') : t.liveStart}
+          </button>
+        )}
       </div>
 
       {results.length ? (
@@ -486,7 +497,7 @@ function CompanyResearchPanel({ company, t, isJa, job, results, error, onStart, 
   );
 }
 
-export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
+export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, activeProfile, resume }) {
   const t = isJa ? copy.ja : copy.en;
   const { records, statusFor, updateStatus, addMilestone } = useApplicationTracker(activeProfile);
   const { catalog, meta, refresh: refreshCatalog } = useInternshipCatalog();
@@ -619,7 +630,15 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
     setResearchError('');
     setResearchResults([]);
     try {
-      const job = await internshipApi.startResearch(cleanCompany, activeProfile);
+      // Fetch the AI settings fresh at start time so a key just saved in Settings is
+      // used immediately, and send the résumé + key/model so the server can research
+      // with the user's own OpenRouter key (env fallback). Phase 3 / ADR-0016.
+      const settings = await settingsApi.get().catch(() => ({}));
+      const job = await internshipApi.startResearch(cleanCompany, activeProfile, {
+        resume,
+        apiKey: settings?.openrouterKey || undefined,
+        searchModel: settings?.searchModel || undefined,
+      });
       setResearchJob(job);
       if (job.status === 'complete') setResearchResults(Array.isArray(job.results) ? job.results : []);
       if (options.auto) autoResearchStarted.current.add(cleanCompany.toLowerCase());
@@ -755,6 +774,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
             onAdd={addResearchResult}
             addedIds={addedResearchIds}
             addingId={addingId}
+            onOpenSettings={onOpenSettings}
           />
         ) : null}
 

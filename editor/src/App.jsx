@@ -1098,7 +1098,7 @@ export default function App() {
           onResumeChange={change}
         />
       ) : appView === 'radar' ? (
-        <InternshipDashboard isJa={isJa} activeProfile={activeProfile} onOpenEditor={() => setAppView('editor')} />
+        <InternshipDashboard isJa={isJa} activeProfile={activeProfile} resume={resume} onOpenEditor={() => setAppView('editor')} onOpenSettings={() => setAppView('settings')} />
       ) : appView === 'settings' ? (
         <SettingsPanel
           resume={resume}

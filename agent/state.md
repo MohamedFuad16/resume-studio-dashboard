@@ -16,6 +16,20 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-03 — Phase 3 live company search polish (key from Settings + CTA).** The research
+  request now carries the user's **résumé + OpenRouter key + search model** in the body so the
+  server works for client-direct Firestore users (résumé isn't in server KV) and uses the user's
+  own key. `server/internship-research.js`: `getOpenRouterClient(apiKey)` / `researchModel(model)`
+  resolve per-request value → env; the missing-key error preserves `code`
+  `OPENROUTER_API_KEY_MISSING`. `server/index.js` research route reads `resume`/`apiKey`/`searchModel`
+  from the body (KV/env fallback) and returns `errorCode` on the job. Client
+  (`InternshipDashboard.jsx`): `startCompanyResearch` fetches settings fresh (so a just-saved key
+  is used) and sends them; `CompanyResearchPanel` shows an **"Add your key in Settings" CTA**
+  (deep-links to the Settings view) instead of a raw error when the key is missing. Verified:
+  build green, E2E 5/5; direct API returns the preserved errorCode, the CTA renders + navigates to
+  Settings, and the request body carries résumé+apiKey+searchModel. NOTE: the local Node server does
+  not load `.env.local`, so local live research now depends on a key entered in Settings (prod uses
+  the Vercel env key). Uncommitted.
 - **2026-07-03 — Phase 2 Settings view + profile menu.** (1) **Profile menu**
   (`components/ProfileSwitcher.jsx`, rewritten): the old nav `<select> + New + X` cluster + the
   standalone Sign-out button are replaced by a single **avatar dropdown** (initials badge + active

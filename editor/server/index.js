@@ -473,10 +473,16 @@ app.post('/api/internships/research-company', async (req, res) => {
   internshipResearchByCompany.set(companyKey, jobId);
   res.status(202).json({ jobId, company, status: 'researching' });
 
+  // Client-direct users own their résumé + OpenRouter key in Firestore, so both may
+  // arrive in the request body; fall back to server KV / env otherwise. Phase 3.
+  const bodyResume = req.body?.resume && typeof req.body.resume === 'object' ? req.body.resume : null;
+  const apiKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
+  const searchModel = typeof req.body?.searchModel === 'string' ? req.body.searchModel.trim() : '';
+
   Promise.resolve().then(async () => {
     try {
-      const resume = await readProfile(profileId);
-      const research = await researchCompanyInternships({ company, resume, rootDir: RESUME_ROOT });
+      const resume = bodyResume || await readProfile(profileId);
+      const research = await researchCompanyInternships({ company, resume, rootDir: RESUME_ROOT, apiKey, searchModel });
       internshipResearchJobs.set(jobId, { jobId, status: 'complete', completedAt: new Date().toISOString(), ...research });
     } catch (error) {
       internshipResearchJobs.set(jobId, {
@@ -484,6 +490,7 @@ app.post('/api/internships/research-company', async (req, res) => {
         company,
         status: 'error',
         error: error.message || 'Company research failed',
+        errorCode: error.code || null,
         completedAt: new Date().toISOString(),
       });
     }

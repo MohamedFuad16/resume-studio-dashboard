@@ -40,7 +40,7 @@ export const trackerApi = {
 export const internshipApi = {
   list: () => requestJson('/api/internships'),
   add: internship => requestJson('/api/internships', { method: 'POST', body: internship }),
-  startResearch: (company, profile) => requestJson('/api/internships/research-company', { method: 'POST', body: { company, profile } }),
+  startResearch: (company, profile, extra = {}) => requestJson('/api/internships/research-company', { method: 'POST', body: { company, profile, ...extra } }),
   researchStatus: jobId => requestJson(`/api/internships/research-company/${encodeURIComponent(jobId)}`),
 };
 
