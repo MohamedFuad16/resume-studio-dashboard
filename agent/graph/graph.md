@@ -18,8 +18,14 @@ The client and server are separate module graphs connected only over HTTP via
   - `data/userProfile` → `auth/firebase` (Firestore `users/{uid}` identity doc)
   - `data/firestoreData` → `auth/firebase` (client-direct per-user data: profiles/trackers/
     applications under `users/{uid}/...`; also `ensureSeed`, called by `auth/AuthGate`)
-  - `api/client` → `data/firestoreData` (profileApi/trackerApi/applicationApi delegate to
-    Firestore when signed in; else the legacy `/api/*` HTTP backend)
+  - `api/client` → `data/firestoreData` (profileApi/trackerApi/applicationApi/**settingsApi**
+    delegate to Firestore when signed in; else the legacy `/api/*` HTTP backend / localStorage)
+  - `App.jsx` → `components/SettingsPanel` (Phase 2 settings view) → `api/client` (settingsApi)
+  - `components/InternshipDashboard` → `api/client` (settingsApi — sends the OpenRouter key with
+    live-research requests, Phase 3)
+- **Server tooling:** `server/audit-catalog-llm.js` (Phase 7, npm `audit:catalog:llm`) →
+  `seeds/catalog.js` (buildSeedCatalog) + `openai` (OpenRouter audit model). Standalone; not
+  imported by the app. `madge --circular` over the client graph: clean (0 cycles).
   - `auth/firebase` → `firebase/app`, `firebase/auth`, `firebase/firestore` (leaf; public
     config + `authAvailable`, off when `VITE_AUTH_DISABLED=true`)
 - `components/ProfileDashboard` → `ApplicationCalendar`, `CompanyLogo`,

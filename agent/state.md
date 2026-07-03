@@ -16,6 +16,20 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-03 — Phase 8 audit + targeted cleanup.** Most Phase 8 items were already resolved in
+  Phases 0–2 (Saved filter, stale `temp` KV, module clock, dead `matchLabel`, fabricated research
+  logo, `fitNote===about`, ProfileSwitcher inline styles, one-click delete X, `.gitignore` covers
+  `server/.data/`). This pass fixed the rest: (1) **React key collisions** — `key={part}` on
+  role/location/language/duration part lists in `InternshipDashboard.jsx` → `key={`${part}-${i}`}`.
+  (2) **Radar row keyboard focus** — the row's Enter/Space handler now returns early when a child
+  control (status `<select>` / company button) is focused (`event.target !== event.currentTarget`),
+  so keyboard users operate the select without opening the drawer. (3) **Documented** the global
+  `useInternshipCatalog` module cache (profile-independent — correct not to invalidate on switch).
+  Audit tooling: `madge --circular` is **clean (0 cycles)**; there is no `lint` script configured
+  (skipped). Build green, E2E 5/5. **DEFERRED (organization-only, high-risk/low-user-value — do as
+  a dedicated pass with screenshot-diff verification):** splitting `App.jsx` (2328 lines; extract
+  `ProfileWizard.jsx` + AI chat sidebar, target <800) and `index.css` (6694 lines; → `styles/{base,
+  nav,dashboard,radar,editor,calendar,landing}.css` + tokens, no visual change). Uncommitted.
 - **2026-07-03 — Phase 7 daily LLM catalog validity automation.** New
   `server/audit-catalog-llm.js` (npm `audit:catalog:llm`, ADR-0017): selects stale-risk catalog
   entries (deadline within N days / stale `verifiedDate` / generic apply URL), fetches page text,

@@ -369,7 +369,7 @@ const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEditor, i
       <CompanyLogo item={item} size="lg" />
       <div className="intern-detail-title">
         <strong>{companyName}</strong>
-        <p className="intern-role-stack"><span>{roleLead}</span>{roleDetails.map(part => <span key={part}>{part}</span>)}</p>
+        <p className="intern-role-stack"><span>{roleLead}</span>{roleDetails.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</p>
       </div>
       <div className="intern-detail-score">
         <b>{item.score}%</b>
@@ -379,9 +379,9 @@ const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEditor, i
     </div>
 
     <div className="intern-detail-meta" aria-label={isJa ? '募集条件' : 'Internship facts'}>
-      {locationParts.map((part, index) => <span className="intern-meta-token" key={part}>{index === 0 ? <MapPin size={13} /> : null}{part}</span>)}
-      {languageParts.map((part, index) => <span className="intern-meta-token language" key={part}><b>{index === 0 ? 'EN' : 'JA'}</b>{part}</span>)}
-      {durationParts.map((part, index) => <span className="intern-meta-token" key={part}>{index === 0 ? <CalendarClock size={13} /> : null}{part}</span>)}
+      {locationParts.map((part, index) => <span className="intern-meta-token" key={`${part}-${index}`}>{index === 0 ? <MapPin size={13} /> : null}{part}</span>)}
+      {languageParts.map((part, index) => <span className="intern-meta-token language" key={`${part}-${index}`}><b>{index === 0 ? 'EN' : 'JA'}</b>{part}</span>)}
+      {durationParts.map((part, index) => <span className="intern-meta-token" key={`${part}-${index}`}>{index === 0 ? <CalendarClock size={13} /> : null}{part}</span>)}
     </div>
 
     {(details.about || details.aboutJa) && (
@@ -796,6 +796,10 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
                     aria-label={`${displayCompany(item, isJa)}: ${isJa ? '詳細を開く' : 'Open internship details'}`}
                     onClick={() => setSelectedId(item.id)}
                     onKeyDown={event => {
+                      // Only the row itself opens the drawer on Enter/Space — not when a
+                      // child control (the status <select> or company button) is focused,
+                      // so keyboard users can operate the select without opening the drawer.
+                      if (event.target !== event.currentTarget) return;
                       if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault();
                         setSelectedId(item.id);
@@ -803,11 +807,11 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
                     }}
                   >
                     <span className="intern-rank">{(page - 1) * pageSize + index + 1}</span>
-                    <span className="intern-company-cell"><CompanyLogo item={item} /><button type="button" className="intern-company-trigger" onClick={() => setSelectedId(item.id)} aria-label={`${displayCompany(item, isJa)}: ${isJa ? '詳細を開く' : 'Open internship details'}`}><strong>{displayCompany(item, isJa)}</strong><small className="intern-role-stack"><span>{roleLead}</span>{roleDetails.map(part => <span key={part}>{part}</span>)}</small></button></span>
+                    <span className="intern-company-cell"><CompanyLogo item={item} /><button type="button" className="intern-company-trigger" onClick={() => setSelectedId(item.id)} aria-label={`${displayCompany(item, isJa)}: ${isJa ? '詳細を開く' : 'Open internship details'}`}><strong>{displayCompany(item, isJa)}</strong><small className="intern-role-stack"><span>{roleLead}</span>{roleDetails.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</small></button></span>
                     <span className="intern-match"><strong>{item.score}%</strong><small>{item.priority ? t.priority : t.matchLabel(item.score)}</small></span>
-                    <span className="intern-location" data-label={t.location}><MapPin size={13} /><span className="intern-location-stack">{locationParts.map(part => <span key={part}>{part}</span>)}</span></span>
-                    <span className="intern-language" data-label={t.language}><Globe2 size={13} /><span className="intern-language-stack">{languageParts.map(part => <span key={part}>{part}</span>)}</span></span>
-                    <span className="intern-duration" data-label={t.duration}><span className="intern-duration-stack">{durationParts.map(part => <span key={part}>{part}</span>)}</span></span>
+                    <span className="intern-location" data-label={t.location}><MapPin size={13} /><span className="intern-location-stack">{locationParts.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</span></span>
+                    <span className="intern-language" data-label={t.language}><Globe2 size={13} /><span className="intern-language-stack">{languageParts.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</span></span>
+                    <span className="intern-duration" data-label={t.duration}><span className="intern-duration-stack">{durationParts.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</span></span>
                     <span className={`intern-deadline ${deadlineClass(item)}`} data-label={t.deadline}>{formatDeadline(item.deadline, isJa)}</span>
                     <select className={`intern-row-status ${status || 'untracked'}`} value={status} onClick={event => event.stopPropagation()} onChange={event => handleStatusSelect(item, event.target.value)} aria-label={`${t.status}: ${displayCompany(item, isJa)}`}><option value="">{t.track}</option>{APPLICATION_STATUSES.map(option => <option key={option.value} value={option.value}>{statusLabel(option.value, isJa)}</option>)}</select>
                     <a className="intern-apply" href={item.url} target="_blank" rel="noreferrer" onClick={event => { event.stopPropagation(); onApply(item); }}>{t.apply} <ExternalLink size={13} /></a>
