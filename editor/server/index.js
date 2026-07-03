@@ -207,19 +207,15 @@ async function purgeRetiredProfiles() {
 }
 
 // Live LaTeX compilation cannot run on Vercel (no Tectonic binary), so the PDF
-// preview there falls back to the prebaked `resume_<template>.pdf` files. That
-// fallback is served from the KV store FIRST (a persisted copy of the last compile),
-// so a template redesign leaves a stale PDF cached in the Blob. Bump this version to
-// purge those cached PDFs on the next boot and re-seed from the fresh prebaked files.
+// preview there falls back to the prebaked `resume_<template>.pdf` files, cached in
+// the KV store. A template redesign would otherwise leave a STALE PDF cached in the
+// Blob. We namespace the cache key by a VERSION rather than deleting: bumping the
+// version means the new key is empty, so the next read serves the fresh deployed
+// prebaked file and re-caches under the new key. This is concurrency-safe on Vercel's
+// whole-DB-snapshot Blob store (a delete can be clobbered by a stale instance's
+// write; an orphaned old key simply never gets read). Bump on any template change.
 const COMPILED_CACHE_VERSION = '2026-07-03-jakes-clean-ja';
-async function purgeStaleCompiledCache() {
-  const current = await store.getJson('compiled:version', null);
-  if (current === COMPILED_CACHE_VERSION) return;
-  for (const template of VALID_TEMPLATES) {
-    await store.deleteKey(`compiled:${template}`).catch(() => {});
-  }
-  await store.setJson('compiled:version', COMPILED_CACHE_VERSION);
-}
+const compiledKey = template => `compiled:${COMPILED_CACHE_VERSION}:${template}`;
 
 async function deleteProfile(profileId) {
   const id = validateProfileId(profileId);
@@ -254,7 +250,7 @@ async function materializeResumePhoto(resume, tmpDir) {
 }
 
 async function persistCompiledPdf(template, pdfData, { mirrorLocal = !process.env.VERCEL } = {}) {
-  await store.setJson(`compiled:${template}`, {
+  await store.setJson(compiledKey(template), {
     contentType: 'application/pdf',
     base64: pdfData.toString('base64'),
     updatedAt: new Date().toISOString(),
@@ -267,7 +263,7 @@ async function persistCompiledPdf(template, pdfData, { mirrorLocal = !process.en
 }
 
 async function readCompiledPdf(template) {
-  const stored = await store.getJson(`compiled:${template}`, null);
+  const stored = await store.getJson(compiledKey(template), null);
   if (stored?.base64) {
     return {
       contentType: stored.contentType || 'application/pdf',
@@ -310,7 +306,6 @@ async function initPersistentStore() {
       }
     }
     await purgeRetiredProfiles();
-    await purgeStaleCompiledCache();
     await ensureSampleProfiles();
     await readInternshipCatalog();
     console.log(`✅ Internship Portal store ready (${store.backend})`);
