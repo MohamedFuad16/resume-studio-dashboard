@@ -1,5 +1,14 @@
 # Project state
 
+## Overhaul plan status (PLAN-2026-07-03) — 2026-07-03
+All phases complete on branch `feat/firebase-auth-firestore` (pushed, not merged to main):
+Phase 4 (auth gate + login), Phase 2-migration (client-direct Firestore), Phase 0 (bug fixes),
+Phase 1 (data/logos), Phase 2 (Settings + profile menu), Phase 3 (live-search key/CTA), Phase 5
+(editor Present pill), Phase 6 (Jake's Clean JA), Phase 7 (LLM audit), Phase 8 (audit + cleanup).
+**Deployed to prod: through Phase 0 only** (editor-omega-two.vercel.app) — Phases 1/2/3/5/6/7/8 are
+committed+pushed but NOT yet redeployed. Deferred: App.jsx + index.css splits (org-only; spawned as
+separate tasks).
+
 ## Current state summary
 Two-track résumé project. **Track A — Internship Portal** (`editor/`): React 18 + Vite
 client and an ESM Node/Express server with sql.js (SQLite) KV storage (Vercel Blob in
