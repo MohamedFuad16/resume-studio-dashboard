@@ -6262,25 +6262,38 @@ body,
   cursor: not-allowed;
 }
 
-.month-ongoing {
+/* "Present" / "Expected" ongoing toggle — a brand pill matching the app's
+   segmented controls (Phase 5). Off = subtle outline; On = brand-blue fill. */
+.month-ongoing-toggle {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 11px;
-  font-weight: 700;
+  padding: 7px 12px;
+  border: 1px solid var(--b1);
+  border-radius: 999px;
+  background: var(--input-bg);
   color: var(--t2);
+  font-size: 12px;
+  font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
   user-select: none;
+  transition: background .15s, border-color .15s, color .15s;
 }
-
-.month-ongoing input[type="checkbox"] {
-  width: 14px;
-  height: 14px;
-  cursor: pointer;
-  accent-color: var(--blue);
+.month-ongoing-toggle:hover { border-color: var(--b-focus); color: var(--t1); }
+.month-ongoing-toggle.on {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
 }
+.month-ongoing-check {
+  display: inline-flex;
+  width: 0; overflow: hidden;
+  opacity: 0;
+  transition: width .15s, opacity .15s;
+}
+.month-ongoing-toggle.on .month-ongoing-check { width: 12px; opacity: 1; }
 
 .photo-actions {
   grid-column: 2;

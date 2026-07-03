@@ -16,6 +16,13 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-03 — Phase 5 editor: Present/Expected toggle pill + spacing spot-check.** The bare
+  checkbox + label in `MonthInput` (`components/ui.jsx`) is now a **brand-blue toggle pill**
+  (`.month-ongoing-toggle`, `aria-pressed`, animated check) matching the app's segmented controls,
+  for both `ongoingMode="present"` (Experience — disables the month) and `"expected"` (Education —
+  keeps the graduation month). Verified both variants + on/off states, and the editor form has no
+  misalignment / horizontal overflow at 1600 / 900 / 375 px (no further CSS fixes needed). Build
+  green, E2E 5/5. Uncommitted.
 - **2026-07-03 — Phase 3 live company search polish (key from Settings + CTA).** The research
   request now carries the user's **résumé + OpenRouter key + search model** in the body so the
   server works for client-direct Firestore users (résumé isn't in server KV) and uses the user's

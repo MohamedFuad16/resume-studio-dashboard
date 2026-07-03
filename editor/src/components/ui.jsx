@@ -222,10 +222,15 @@ export function MonthInput({ label, value, onChange, ongoingMode, isJa = false, 
           onChange={e => emit(e.target.value, ongoingOn)}
         />
         {ongoingMode && (
-          <label className="month-ongoing">
-            <input type="checkbox" checked={ongoingOn} onChange={e => emit(monthVal, e.target.checked)} />
-            <span>{ongoingLabel}</span>
-          </label>
+          <button
+            type="button"
+            className={`month-ongoing-toggle ${ongoingOn ? 'on' : ''}`}
+            aria-pressed={ongoingOn}
+            onClick={() => emit(monthVal, !ongoingOn)}
+          >
+            <span className="month-ongoing-check" aria-hidden="true"><I n="check" s={11} /></span>
+            {ongoingLabel}
+          </button>
         )}
       </div>
     </div>
