@@ -206,6 +206,21 @@ async function purgeRetiredProfiles() {
   }
 }
 
+// Live LaTeX compilation cannot run on Vercel (no Tectonic binary), so the PDF
+// preview there falls back to the prebaked `resume_<template>.pdf` files. That
+// fallback is served from the KV store FIRST (a persisted copy of the last compile),
+// so a template redesign leaves a stale PDF cached in the Blob. Bump this version to
+// purge those cached PDFs on the next boot and re-seed from the fresh prebaked files.
+const COMPILED_CACHE_VERSION = '2026-07-03-jakes-clean-ja';
+async function purgeStaleCompiledCache() {
+  const current = await store.getJson('compiled:version', null);
+  if (current === COMPILED_CACHE_VERSION) return;
+  for (const template of VALID_TEMPLATES) {
+    await store.deleteKey(`compiled:${template}`).catch(() => {});
+  }
+  await store.setJson('compiled:version', COMPILED_CACHE_VERSION);
+}
+
 async function deleteProfile(profileId) {
   const id = validateProfileId(profileId);
   await store.deleteKey(profileKey(id));
@@ -295,6 +310,7 @@ async function initPersistentStore() {
       }
     }
     await purgeRetiredProfiles();
+    await purgeStaleCompiledCache();
     await ensureSampleProfiles();
     await readInternshipCatalog();
     console.log(`✅ Internship Portal store ready (${store.backend})`);

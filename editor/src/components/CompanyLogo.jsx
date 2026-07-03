@@ -69,12 +69,15 @@ function companyLogoUrls(item) {
   const filled = FILLED_BRAND_LOGOS[item.company];
   if (filled) return [filled.src];
   const domain = item.companyDomain || KNOWN_DOMAINS[item.company] || domainFromUrl(item.url);
+  // Prefer the DuckDuckGo FAVICON over the seed `logoUrl`: favicons are square icons
+  // designed to read at small sizes, whereas company `logoUrl` wordmarks vary wildly
+  // (e.g. HENNGE ships a WHITE svg that is invisible on the light logo chip). DDG also
+  // returns a clean 404 when it has no icon (→ onError → next source → text initials),
+  // unlike Google's s2/favicons which serves a generic GLOBE at HTTP 200 (never errors,
+  // so the wrong image sticks — the bug this fixes). Order: favicon → logoUrl → initials.
   return [
-    item.logoUrl,
-    domain ? `https://www.google.com/s2/favicons?domain_url=https://${domain}&sz=128` : '',
-    // DuckDuckGo icon service as a second favicon source: catches domains Google's
-    // service has no icon for, before we fall back to text initials.
     domain ? `https://icons.duckduckgo.com/ip3/${domain}.ico` : '',
+    item.logoUrl,
   ].filter((source, index, sources) => source && sources.indexOf(source) === index);
 }
 

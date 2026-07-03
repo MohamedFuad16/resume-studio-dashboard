@@ -25,6 +25,23 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-03 — Post-review fixes (prod feedback) + deploy of Phases 1–8.** From the user reviewing
+  the (Phase-0) prod site: (1) **Account menu simplified** (`ProfileSwitcher.jsx`) — with Firebase
+  one account == one user, so removed profile switching + "+ New"; the avatar now opens just
+  **Settings / Sign out** (+ shows the email). (2) **Sign-out clears `?profile=`** — the handler
+  `history.replaceState`s to the clean root before signing out (`App.jsx`). (3) **Company logos**
+  (`CompanyLogo.jsx`) — dropped Google's `s2/favicons` (it serves a generic GLOBE at HTTP 200 for
+  unknown domains, so `onError` never fired). Now **DuckDuckGo favicon primary → `logoUrl` → text
+  initials**: favicons read well at small sizes and 404 cleanly (→ initials), fixing both the globe
+  icons (GEOTRA/CyberAgent/InsightX) and invisible white-wordmark `logoUrl`s (HENNGE). (4) **Wrong JA
+  preview on prod** — root cause: Vercel has no Tectonic, so live compile always fails and the app
+  serves a **prebaked/Blob-cached PDF**; the cached `resume_ja_01.pdf` predated the Jake's-Clean-JA
+  redesign. Regenerated `seed-pdfs/resume_ja_0{1,2,3}.pdf` from current templates and added a
+  versioned **`purgeStaleCompiledCache`** (bump `COMPILED_CACHE_VERSION`) that clears stale
+  `compiled:*` KV entries on boot so prod re-seeds the fresh PDFs. Build green, E2E 5/5. Deploying
+  all of Phases 1–8 + these fixes to prod. NOTE (flagged): live LaTeX compile does not run on Vercel
+  — the prod PDF preview is always a prebaked fallback (not the user's live edits); a real fix needs
+  a compile service/worker.
 - **2026-07-03 — Phase 8 audit + targeted cleanup.** Most Phase 8 items were already resolved in
   Phases 0–2 (Saved filter, stale `temp` KV, module clock, dead `matchLabel`, fabricated research
   logo, `fitNote===about`, ProfileSwitcher inline styles, one-click delete X, `.gitignore` covers

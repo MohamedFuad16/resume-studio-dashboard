@@ -1070,7 +1070,11 @@ export default function App() {
           onNew={openProfileWizard}
           onDelete={handleDeleteProfile}
           onSettings={() => setAppView('settings')}
-          onSignOut={authAvailable && auth?.currentUser ? () => signOutUser().catch(() => {}) : undefined}
+          onSignOut={authAvailable && auth?.currentUser ? () => {
+            // Clear the ?profile= query so the login screen sits on the clean root URL.
+            window.history.replaceState(null, '', window.location.pathname);
+            signOutUser().catch(() => {});
+          } : undefined}
           userEmail={auth?.currentUser?.email || ''}
         />
 
