@@ -1,11 +1,10 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { I } from './ui.jsx';
 
-// Nav-bar user/profile switcher. Lives in the top header so the active user can be
-// changed from any view (dashboard, radar, editor). Reuses the existing
-// `.profile-select-input` / `.btn-new-profile` / `.btn-delete-profile` styles and
-// adds a small `.nav-profile-switcher` wrapper (see CSS SPEC). Inline flex styles
-// keep it laid out even before the CSS class lands so it is self-contained.
+// Nav-bar profile menu. A single avatar button opens a dropdown with: profile switch
+// list, Add user, Settings, Delete user, and Sign out. Replaces the old raw
+// <select> + New + X cluster (Phase 2). Export name kept as ProfileSwitcher so App
+// wiring is unchanged.
 export function ProfileSwitcher({
   profiles = [],
   activeId,
@@ -13,61 +12,94 @@ export function ProfileSwitcher({
   onSwitch,
   onNew,
   onDelete,
+  onSettings,
+  onSignOut,
+  userEmail = '',
 }) {
-  // Delete protection is enforced by the server (HTTP 400 for protected profiles);
-  // we only hide the button when there is nothing else to fall back to.
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
   const canDelete = profiles.length > 1;
+  const active = profiles.find(p => p.id === activeId);
+  const activeName = active?.name || activeId || (isJa ? 'ユーザー' : 'User');
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDocClick = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onKey = e => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDocClick); document.removeEventListener('keydown', onKey); };
+  }, [open]);
+
+  const initials = String(activeName).split(/\s+/).map(w => w[0]).join('').replace(/[^A-Z0-9]/gi, '').slice(0, 2).toUpperCase() || '?';
+
+  const run = fn => () => { setOpen(false); fn?.(); };
 
   return (
-    <div
-      className="nav-profile-switcher"
-      data-testid="nav-profile-switcher"
-      role="group"
-      aria-label={isJa ? 'ユーザーの切り替え' : 'Switch user'}
-      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0 }}
-    >
-      <span className="nav-profile-icon" aria-hidden="true" style={{ display: 'inline-flex', color: 'var(--t3)' }}>
-        <I n="user" s={13} />
-      </span>
-      <select
-        className="profile-select-input nav-profile-select"
-        data-testid="nav-profile-select"
-        value={activeId || ''}
-        onChange={e => onSwitch?.(e.target.value)}
-        aria-label={isJa ? 'ユーザーを選択' : 'Select user'}
-        title={isJa ? 'ユーザーを切り替え' : 'Switch user'}
-        style={{ maxWidth: 180 }}
-      >
-        {profiles.length === 0 && (
-          <option value="">{isJa ? '読み込み中…' : 'Loading…'}</option>
-        )}
-        {profiles.map(p => (
-          <option key={p.id} value={p.id}>
-            {p.name || p.id}
-          </option>
-        ))}
-      </select>
+    <div className="nav-profile-menu" data-testid="nav-profile-switcher" ref={ref}>
       <button
         type="button"
-        className="btn btn-new-profile nav-profile-new"
-        data-testid="nav-profile-new"
-        onClick={() => onNew?.()}
-        title={isJa ? '新しいユーザーを作成' : 'Create new user'}
+        className="nav-profile-avatar"
+        data-testid="nav-profile-button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen(o => !o)}
+        title={activeName}
       >
-        <I n="plus" s={11} />
-        <span className="nav-profile-btn-label">{isJa ? '新規' : 'New'}</span>
+        <span className="nav-avatar-badge" aria-hidden="true">{initials}</span>
+        <span className="nav-avatar-name">{activeName}</span>
+        <I n="chev" s={13} />
       </button>
-      {canDelete && (
-        <button
-          type="button"
-          className="btn btn-delete-profile nav-profile-delete"
-          data-testid="nav-profile-delete"
-          onClick={e => onDelete?.(activeId, e)}
-          title={isJa ? 'このユーザーを削除' : 'Delete current user'}
-          aria-label={isJa ? 'このユーザーを削除' : 'Delete current user'}
-        >
-          <I n="x" s={11} />
-        </button>
+
+      {open && (
+        <div className="nav-profile-dropdown" role="menu">
+          {userEmail && <div className="nav-menu-email">{userEmail}</div>}
+
+          <div className="nav-menu-group" role="group" aria-label={isJa ? 'プロフィール' : 'Profiles'}>
+            <div className="nav-menu-label">{isJa ? 'プロフィール' : 'Profiles'}</div>
+            {profiles.map(p => (
+              <button
+                key={p.id}
+                type="button"
+                role="menuitemradio"
+                aria-checked={p.id === activeId}
+                className={`nav-menu-item ${p.id === activeId ? 'active' : ''}`}
+                onClick={run(() => p.id !== activeId && onSwitch?.(p.id))}
+              >
+                <span className="nav-menu-item-icon"><I n="user" s={13} /></span>
+                <span className="nav-menu-item-label">{p.name || p.id}</span>
+                {p.id === activeId && <I n="check" s={13} />}
+              </button>
+            ))}
+          </div>
+
+          <div className="nav-menu-sep" />
+
+          <button type="button" role="menuitem" className="nav-menu-item" onClick={run(onNew)}>
+            <span className="nav-menu-item-icon"><I n="plus" s={13} /></span>
+            <span className="nav-menu-item-label">{isJa ? 'ユーザーを追加' : 'Add user'}</span>
+          </button>
+          <button type="button" role="menuitem" className="nav-menu-item" data-testid="nav-settings" onClick={run(onSettings)}>
+            <span className="nav-menu-item-icon"><I n="panel" s={13} /></span>
+            <span className="nav-menu-item-label">{isJa ? '設定' : 'Settings'}</span>
+          </button>
+          {canDelete && (
+            <button type="button" role="menuitem" className="nav-menu-item danger" data-testid="nav-profile-delete" onClick={run(() => onDelete?.(activeId))}>
+              <span className="nav-menu-item-icon"><I n="x" s={13} /></span>
+              <span className="nav-menu-item-label">{isJa ? 'このユーザーを削除' : 'Delete user'}</span>
+            </button>
+          )}
+
+          {onSignOut && (
+            <>
+              <div className="nav-menu-sep" />
+              <button type="button" role="menuitem" className="nav-menu-item" data-testid="sign-out" onClick={run(onSignOut)}>
+                <span className="nav-menu-item-icon"><I n="dl" s={13} style={{ transform: 'rotate(90deg)' }} /></span>
+                <span className="nav-menu-item-label">{isJa ? 'ログアウト' : 'Sign out'}</span>
+              </button>
+            </>
+          )}
+        </div>
       )}
     </div>
   );

@@ -48,3 +48,21 @@ export const applicationApi = {
   list: profile => (firestoreEnabled() ? fsData.listApplications(profile) : requestJson(`/api/applications?${profilePath(profile)}`)),
   create: (profile, application) => (firestoreEnabled() ? fsData.createApplication(profile, application) : requestJson(`/api/applications?${profilePath(profile)}`, { method: 'POST', body: application })),
 };
+
+// Per-user AI settings (OpenRouter key + model slugs). Stored in Firestore when signed
+// in; falls back to localStorage for the no-auth path (no server round-trip needed —
+// the key is sent with research/chat requests, see Phase 3).
+const LS_SETTINGS_KEY = 'internship-portal:settings';
+function localSettings() {
+  try { return JSON.parse(localStorage.getItem(LS_SETTINGS_KEY) || '{}'); } catch { return {}; }
+}
+export const settingsApi = {
+  get: () => (firestoreEnabled()
+    ? fsData.getSettings()
+    : Promise.resolve(localSettings())),
+  save: patch => {
+    if (firestoreEnabled()) return fsData.saveSettings(patch);
+    localStorage.setItem(LS_SETTINGS_KEY, JSON.stringify({ ...localSettings(), ...patch }));
+    return Promise.resolve({ ok: true });
+  },
+};

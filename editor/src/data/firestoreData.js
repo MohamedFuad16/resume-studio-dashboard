@@ -55,6 +55,7 @@ const profilesCol = () => collection(db, 'users', uid(), 'profiles');
 const profileDoc = id => doc(db, 'users', uid(), 'profiles', id);
 const trackerDoc = id => doc(db, 'users', uid(), 'trackers', id);
 const appsDoc = id => doc(db, 'users', uid(), 'applications', id);
+const settingsDoc = () => doc(db, 'users', uid(), 'settings', 'app');
 
 function deriveName(resume, fallback) {
   return resume?.personal?.nameEn || resume?.personal?.nameJa || fallback;
@@ -130,6 +131,20 @@ export async function createApplication(id, application) {
   const next = [record, ...existing.filter(item => item.fileName !== record.fileName)];
   await setDoc(appsDoc(id), { items: next, updatedAt: serverTimestamp() });
   return { success: true, ...record };
+}
+
+// ── per-user settings (AI keys + models) ─────────────────────────
+// Stored at users/{uid}/settings/app. The OpenRouter key lives here (secured by the
+// owner-only rules) and is sent with research/chat requests (Phase 3), since the
+// server has no Admin SDK to read Firestore.
+export async function getSettings() {
+  const snap = await getDoc(settingsDoc());
+  return snap.exists() ? snap.data() : {};
+}
+
+export async function saveSettings(patch) {
+  await setDoc(settingsDoc(), { ...patch, updatedAt: serverTimestamp() }, { merge: true });
+  return { ok: true };
 }
 
 // ── first-login seed ──────────────────────────────────────────────

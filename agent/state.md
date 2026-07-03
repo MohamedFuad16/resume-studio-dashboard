@@ -16,6 +16,20 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-03 — Phase 2 Settings view + profile menu.** (1) **Profile menu**
+  (`components/ProfileSwitcher.jsx`, rewritten): the old nav `<select> + New + X` cluster + the
+  standalone Sign-out button are replaced by a single **avatar dropdown** (initials badge + active
+  name) with a Profiles switch list, Add user, Settings, Delete user, and Sign out (sign-out only
+  when authed). Click-outside/Escape to close. (2) **Settings view** (`components/SettingsPanel.jsx`,
+  new `appView === 'settings'`): Profile (name EN/JA, email, phone — written through the résumé
+  personal block via `saveProfileImmediately`), AI & API keys (OpenRouter key + search/audit model
+  slugs, validated), and Data (export JSON, danger-zone delete profile). The key is write-only in
+  the UI — after saving it shows a masked "key saved / Remove key" note. (3) **Settings storage**
+  (`data/firestoreData.js` getSettings/saveSettings on `users/{uid}/settings/app`; `api/client.js`
+  `settingsApi`): Firestore when signed in, localStorage otherwise — no server round-trip (the key
+  is sent with research/chat requests in Phase 3). See ADR-0016. Photo editing stays in the editor
+  (not duplicated in Settings). Verified: build green, E2E 5/5, profile menu + settings render and
+  the save/mask/remove-key flow works (key persisted to localStorage in the no-auth test). Uncommitted.
 - **2026-07-03 — Phase 1 company data consistency + logos.** (1) **Detail panels are now
   truthful/consistent** (`utils/internshipDisplay.js`, `components/InternshipDashboard.jsx`):
   `internshipDetails` no longer fabricates fallbacks — `about` stops falling back to `fitNote`

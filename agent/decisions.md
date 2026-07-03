@@ -354,3 +354,22 @@ Reverse-engineered from the codebase on 2026-06-29. Newest at the bottom.
   (no server-side ID-token verification) so this remains an app boundary, not a data-API security
   boundary. Verified end-to-end: owner+non-owner seeding, profile/tracker write+read across reload
   (Firestore REST-confirmed), build green, E2E 5/5 (HTTP fallback), test account cleaned up.
+
+## ADR-0016 — Per-user AI settings in Firestore; key sent per-request (Phase 2/3)
+- **Date:** 2026-07-03
+- **Status:** Accepted
+- **Context:** The Settings view needs to store an OpenRouter API key + model slugs per user.
+  The key is consumed **server-side** (internship-research.js / resume-chat.js), but the
+  client-direct architecture (ADR-0015) has no Firebase Admin SDK, so the server cannot read
+  Firestore. The original plan (Phase 2) assumed a server KV `settings:<profileId>` with a
+  masked-key GET.
+- **Decision:** Store settings at `users/{uid}/settings/app` in Firestore (owner-only rules),
+  read/written directly by the client via `settingsApi` (`data/firestoreData.js`); fall back to
+  `localStorage` for the no-auth/E2E path. No server settings endpoint. The key is treated
+  write-only in the UI (masked "key saved" note + Remove). The server continues to read
+  `OPENROUTER_API_KEY` from env; **Phase 3 will send the user's key + model slugs in the
+  research/chat request body**, resolving stored-key → env fallback server-side.
+- **Consequences:** Simplest path that keeps the key per-user and isolated without an Admin SDK
+  or a service-account secret. Trade-off: the key travels in request bodies to our own API over
+  HTTPS (acceptable; it is the user's own key). If server-side-only key custody is ever required,
+  revisit with the Admin SDK + ID-token verification (also needed for a real data-API boundary).

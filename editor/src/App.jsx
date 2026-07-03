@@ -6,6 +6,7 @@ import { I, Toasts, ExportMenu, TagInput, SuggestInput } from './components/ui.j
 import { InternshipDashboard } from './components/InternshipDashboard.jsx';
 import { ProfileDashboard } from './components/ProfileDashboard.jsx';
 import { ProfileSwitcher } from './components/ProfileSwitcher.jsx';
+import SettingsPanel from './components/SettingsPanel.jsx';
 import { authAvailable, auth } from './auth/firebase.js';
 import { signOutUser } from './auth/useAuth.js';
 import {
@@ -1060,7 +1061,7 @@ export default function App() {
           </span>
         </div>
 
-        {/* User/profile switcher — visible across all views */}
+        {/* User/profile menu — switch / add / settings / delete / sign out */}
         <ProfileSwitcher
           profiles={profiles}
           activeId={activeProfile}
@@ -1068,6 +1069,9 @@ export default function App() {
           onSwitch={handleSwitchProfile}
           onNew={openProfileWizard}
           onDelete={handleDeleteProfile}
+          onSettings={() => setAppView('settings')}
+          onSignOut={authAvailable && auth?.currentUser ? () => signOutUser().catch(() => {}) : undefined}
+          userEmail={auth?.currentUser?.email || ''}
         />
 
         {/* Right: Actions and Status */}
@@ -1080,17 +1084,6 @@ export default function App() {
               </button>
               <ExportMenu onPDF={onPDF} onTex={onTex} onJson={onJson} onAI={onAI} isJa={isJa} />
             </>
-          )}
-          {authAvailable && auth?.currentUser && (
-            <button
-              className="btn"
-              data-testid="sign-out"
-              title={auth.currentUser.email || ''}
-              onClick={() => signOutUser().catch(() => {})}
-            >
-              <I n="user" s={12} />
-              {isJa ? 'ログアウト' : 'Sign out'}
-            </button>
           )}
         </div>
       </header>
@@ -1106,6 +1099,17 @@ export default function App() {
         />
       ) : appView === 'radar' ? (
         <InternshipDashboard isJa={isJa} activeProfile={activeProfile} onOpenEditor={() => setAppView('editor')} />
+      ) : appView === 'settings' ? (
+        <SettingsPanel
+          resume={resume}
+          isJa={isJa}
+          activeProfile={activeProfile}
+          canDelete={profiles.length > 1}
+          onSaveProfile={async personal => { await saveProfileImmediately({ ...resume, personal }, activeProfile, { refreshFromServer: false }); }}
+          onExportJson={onJson}
+          onDeleteProfile={id => { handleDeleteProfile(id); setAppView('dashboard'); }}
+          onBack={() => setAppView('dashboard')}
+        />
       ) : (
         <>
           <div className="editor-commandbar">
