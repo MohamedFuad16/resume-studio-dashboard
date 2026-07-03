@@ -380,10 +380,12 @@ const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEditor, i
       {durationParts.map((part, index) => <span className="intern-meta-token" key={part}>{index === 0 ? <CalendarClock size={13} /> : null}{part}</span>)}
     </div>
 
-    <section className="intern-detail-section">
-      <h3>{t.about}</h3>
-      <p className="intern-fit-note">{displayValue(isJa ? details.aboutJa : details.about, isJa)}</p>
-    </section>
+    {(details.about || details.aboutJa) && (
+      <section className="intern-detail-section">
+        <h3>{t.about}</h3>
+        <p className="intern-fit-note">{displayValue(isJa ? details.aboutJa : details.about, isJa)}</p>
+      </section>
+    )}
 
     <section className="intern-detail-section">
       <h3>{t.fitHeading}</h3>
@@ -393,19 +395,23 @@ const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEditor, i
       </ul>
     </section>
 
-    <section className="intern-detail-section">
-      <h3>{t.techStack}</h3>
-      <div className="intern-chip-list">
-        {details.techStack.map((tech, index) => <span key={`${tech}-${index}`}>{displayValue(tech, isJa)}</span>)}
-      </div>
-    </section>
+    {details.techStack.length > 0 && (
+      <section className="intern-detail-section">
+        <h3>{t.techStack}</h3>
+        <div className="intern-chip-list">
+          {details.techStack.map((tech, index) => <span key={`${tech}-${index}`}>{displayValue(tech, isJa)}</span>)}
+        </div>
+      </section>
+    )}
 
-    <section className="intern-detail-section intern-eligibility">
-      <h3>{t.eligibility}</h3>
-      <ul className="intern-check-list">
-        {eligibility.map((entry, index) => <li key={`${entry}-${index}`}><ShieldCheck size={15} />{displayValue(entry, isJa)}</li>)}
-      </ul>
-    </section>
+    {eligibility.length > 0 && (
+      <section className="intern-detail-section intern-eligibility">
+        <h3>{t.eligibility}</h3>
+        <ul className="intern-check-list">
+          {eligibility.map((entry, index) => <li key={`${entry}-${index}`}><ShieldCheck size={15} />{displayValue(entry, isJa)}</li>)}
+        </ul>
+      </section>
+    )}
 
     <section className="intern-detail-section">
       <h3>{t.process}</h3>
@@ -441,7 +447,9 @@ function CompanyResearchPanel({ company, t, isJa, job, results, error, onStart, 
   return (
     <section className="company-research-panel" aria-live="polite" data-testid="company-research-panel">
       <div className="company-research-intro">
-        <CompanyLogo item={{ company, url: `https://${company.toLowerCase().replace(/[^a-z0-9]+/g, '')}.com` }} />
+        {/* No fabricated URL — let CompanyLogo resolve a known domain or show initials
+            until real research results (which carry companyDomain) arrive. */}
+        <CompanyLogo item={{ company }} />
         <div>
           <h3>{t.liveSearchTitle(company)}</h3>
           <p data-testid="company-research-status">{showPrompt ? t.liveSearchSub : searching ? t.liveSearching(company) : error ? `${t.liveError} ${error}` : t.liveDone(results.length)}</p>

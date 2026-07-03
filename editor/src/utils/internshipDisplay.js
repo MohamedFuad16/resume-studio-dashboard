@@ -697,9 +697,13 @@ function splitListEntries(list) {
 }
 
 export function internshipDetails(item) {
+  // Truthful data only — no fabricated fallbacks. Absent sections return empty so
+  // the detail panel can hide them (see BUG note / Phase 1.2). Previously techStack
+  // fell back to [track, Git, APIs, Cloud] (misleading) and `about` fell back to
+  // `fitNote` (which then rendered identically in both the About and Fit sections).
   const stack = Array.isArray(item.techStack) && item.techStack.length
     ? item.techStack
-    : [item.track, 'Git', 'APIs', 'Cloud / product engineering'].filter(Boolean);
+    : [];
   const eligibility = Array.isArray(item.eligibility) && item.eligibility.length
     ? item.eligibility
     : String(item.workAuth || '').split(';').map(v => v.trim()).filter(Boolean);
@@ -714,8 +718,8 @@ export function internshipDetails(item) {
     : process.map(processStepJa);
 
   return {
-    about: item.about || item.fitNote,
-    aboutJa: item.aboutJa || item.fitNoteJa || genericAboutJa(item),
+    about: item.about || '',
+    aboutJa: item.aboutJa || item.fitNoteJa || (item.about ? genericAboutJa(item) : ''),
     techStack: dedupeList(stack),
     // Split "; " qualifiers into their own bullets, normalize any Japanese
     // proficiency quoted in CEFR to JLPT (English stays CEFR), then dedupe.

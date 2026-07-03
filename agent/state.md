@@ -16,6 +16,22 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-03 — Phase 1 company data consistency + logos.** (1) **Detail panels are now
+  truthful/consistent** (`utils/internshipDisplay.js`, `components/InternshipDashboard.jsx`):
+  `internshipDetails` no longer fabricates fallbacks — `about` stops falling back to `fitNote`
+  (the on-screen duplication where "What it's about" and "Why it's a fit" showed identical text
+  for the 144 entries lacking a real `about`), and `techStack` no longer fills with generic
+  `[track, Git, APIs, Cloud]`. `DetailPanel` hides the About / Tech-stack / Eligibility sections
+  when their data is absent (Fit + Application-procedure always show). (2) **Live research**
+  (`server/internship-research.js`): `normalizeResult` now sets a real `about` and a genuine
+  (non-duplicate) `fitNote`. (3) **Logos** (`components/CompanyLogo.jsx`): added a DuckDuckGo
+  favicon fallback after Google's, and removed the fabricated `https://<company>.com` URL in
+  `CompanyResearchPanel` (initials/known-domain until real results arrive). NOTE: seed
+  `companyDomain` coverage was already ~100% (earlier "54/173" was a grep artifact). Verified:
+  build green, E2E 5/5, validate:catalog passes; rich company (HENNGE) shows all 5 sections,
+  sparse company (Atilika) correctly hides About/Tech with no duplication and a real favicon.
+  Deferred (tooling, low value): a normalization audit script + validator shape checks, and the
+  11 documented generic-apply-url re-audit. Uncommitted.
 - **2026-07-03 — Phase 0 quick bug fixes (BUG-007/008/009).** (1) **Saved radar filter**
   (`InternshipDashboard.jsx`): saved roles stay visible past their deadline, `savedCount` is
   derived from the visible set (count ≡ rows), and the status filter no longer offers

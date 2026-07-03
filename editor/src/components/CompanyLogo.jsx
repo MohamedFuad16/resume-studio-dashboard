@@ -72,6 +72,9 @@ function companyLogoUrls(item) {
   return [
     item.logoUrl,
     domain ? `https://www.google.com/s2/favicons?domain_url=https://${domain}&sz=128` : '',
+    // DuckDuckGo icon service as a second favicon source: catches domains Google's
+    // service has no icon for, before we fall back to text initials.
+    domain ? `https://icons.duckduckgo.com/ip3/${domain}.ico` : '',
   ].filter((source, index, sources) => source && sources.indexOf(source) === index);
 }
 

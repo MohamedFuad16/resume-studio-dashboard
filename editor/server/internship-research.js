@@ -79,7 +79,10 @@ function normalizeResult(company, result, index, verifiedDate) {
     priority: isJapan,
     workAuth: result.eligibility?.trim() || 'Re-check eligibility on the official page',
     reasons: [isJapan ? 'Japan-based official opening' : 'Official opening found by live research', codingText],
-    fitNote: result.about?.trim() || 'Review the official description for responsibilities and fit.',
+    // Keep the role description in `about` and give `fitNote` a genuine (non-duplicate)
+    // fit statement — the detail panel renders these in separate sections. Phase 1.2.
+    about: result.about?.trim() || '',
+    fitNote: 'Surfaced by live company research as a match for your profile — confirm the responsibilities and eligibility on the official page before applying.',
     applicationProcess: process,
     codingTest: result.codingTest,
     url,
