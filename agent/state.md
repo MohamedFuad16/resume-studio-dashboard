@@ -16,6 +16,17 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-03 — Phase 6 Jake's Clean JA template redesign (`server/templates.js` genJa01).**
+  Refined the app's first JA résumé option to faithfully mirror the EN Jake's-clean rhythm:
+  **Mincho body** (Hiragino Mincho ProN W3/W6) for an elegant read, **Gothic** (Hiragino Kaku
+  Gothic ProN W6) for the section headings + the name via a new `\gothicfont` CJK family, and a
+  **monotone** grayscale palette (dropped the blue `accent`; role lines use `subtle` gray). Kept
+  photoless (matching EN Jake's-clean) and the single-page rhythm. Verified by compiling the
+  generated TeX with Tectonic: **0 errors, no overfull, 1 page**; PyMuPDF confirms HiraMinProN
+  (W3+W6) body + HiraKakuProN W6 headings and no fake-italic CJK; page-1 render looks clean. Build
+  green, E2E 5/5 (incl. the "first JA template is Jake's clean" assertion). NOTE: this is the
+  app's genJa01 only — the static `ja/` résumés (shokumu_modern/rirekisho_grid/deedy_jp) + their
+  PyMuPDF suite are a separate track, untouched. Uncommitted.
 - **2026-07-03 — Phase 5 editor: Present/Expected toggle pill + spacing spot-check.** The bare
   checkbox + label in `MonthInput` (`components/ui.jsx`) is now a **brand-blue toggle pill**
   (`.month-ongoing-toggle`, `aria-pressed`, animated check) matching the app's segmented controls,

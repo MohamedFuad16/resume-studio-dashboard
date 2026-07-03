@@ -626,25 +626,28 @@ function genJa01(r, options = {}) {
 \\usepackage{enumitem}
 \\usepackage[hidelinks,bookmarks=false]{hyperref}
 \\usepackage{tabularx}
-\\setCJKmainfont{Hiragino Kaku Gothic ProN W3}[BoldFont={Hiragino Kaku Gothic ProN W6}]
+% Refined Jake's-clean JA (Phase 6): Mincho body for an elegant read, Gothic for
+% headings + the name, and a monotone (grayscale) palette — no accent color.
+\\setCJKmainfont{Hiragino Mincho ProN}[BoldFont={Hiragino Mincho ProN W6}]
 \\setCJKsansfont{Hiragino Kaku Gothic ProN W3}[BoldFont={Hiragino Kaku Gothic ProN W6}]
+\\newCJKfontfamily\\gothicfont{Hiragino Kaku Gothic ProN W6}
 \\setmainfont{Avenir Next}
 \\geometry{a4paper,top=1.2cm,bottom=1.2cm,left=1.5cm,right=1.5cm}
 \\hypersetup{hidelinks}
 \\pagestyle{empty}
-\\definecolor{accent}{RGB}{37, 99, 170}
+\\definecolor{subtle}{gray}{0.35}
 \\urlstyle{same}
 \\raggedbottom
 \\raggedright
 \\setlength{\\parindent}{0pt}
 \\setlength{\\tabcolsep}{0in}
-\\titleformat{\\section}{\\vspace{-2pt}\\large\\bfseries\\raggedright}{}{0em}{}[\\color{black}\\titlerule \\vspace{-4pt}]
+\\titleformat{\\section}{\\vspace{-2pt}\\large\\bfseries\\gothicfont\\raggedright}{}{0em}{}[\\color{black}\\titlerule \\vspace{-4pt}]
 \\newcommand{\\resumeItem}[1]{\\item\\small{#1}}
 \\newcommand{\\resumeSubheading}[4]{%
   \\vspace{-1pt}\\item
     \\begin{tabular*}{0.97\\textwidth}[t]{l@{\\extracolsep{\\fill}}r}
       \\textbf{#1} & {\\small #2} \\\\
-      {\\small\\color{accent} #3} & {\\small #4} \\\\
+      {\\small\\color{subtle} #3} & {\\small #4} \\\\
     \\end{tabular*}\\vspace{-5pt}
 }
 \\newcommand{\\resumeProjectHeading}[2]{%
@@ -661,7 +664,7 @@ function genJa01(r, options = {}) {
 \\begin{document}
 \\begin{center}
     {\\small ${escJa(p.furigana || '')}}\\\\[2pt]
-    {\\Huge\\bfseries ${escJa(p.nameJa || p.nameEn)}}\\\\[5pt]
+    {\\Huge\\bfseries\\gothicfont ${escJa(p.nameJa || p.nameEn)}}\\\\[5pt]
     \\small
     Tel: ${esc(p.phone)} $|$
     \\href{mailto:${p.email}}{\\underline{${esc(p.email)}}} $|$
