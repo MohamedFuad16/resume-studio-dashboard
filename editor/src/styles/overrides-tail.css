@@ -1,0 +1,583 @@
+/* ── Regression guard: dashboard, radar drawer, logos and calendar ── */
+.company-logo.official-logo img {
+  width: 88%;
+  height: 88%;
+  object-fit: contain;
+  object-position: center;
+}
+
+.company-logo.filled-logo {
+  border-color: var(--logo-background);
+  background: var(--logo-background);
+}
+
+.company-logo.filled-logo img {
+  width: 100%;
+  height: 100%;
+  padding: 7px;
+  box-sizing: border-box;
+}
+
+.project-tech-icons {
+  height: 64px;
+  display: flex;
+  align-content: flex-start;
+  align-items: flex-start;
+  gap: 7px;
+  flex-wrap: wrap;
+  overflow: hidden;
+}
+
+.project-tech-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 28px;
+  border: 1px solid #dfe6f0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.project-tech-icon img { width: 17px; height: 17px; object-fit: contain; }
+.project-card { min-height: 246px; }
+.project-card h3 {
+  min-height: 34px;
+  display: flex;
+  align-items: flex-start;
+  margin: 12px 0 7px;
+  line-height: 1.3;
+}
+.project-card p { min-height: 48px; }
+.project-card em { display: inline-flex; align-items: center; gap: 7px; margin-top: auto; padding-top: 13px; }
+.project-github-mark { width: 16px; height: 16px; display: inline-grid; place-items: center; color: #111827; }
+.project-github-mark svg { width: 15px; height: 15px; }
+
+.rail-tip { grid-template-columns: 24px minmax(0, 1fr); align-items: start; gap: 10px; }
+.rail-tip-icon { width: 24px; height: 24px; }
+.rail-tip-icon svg { width: 13px; height: 13px; }
+.rail-tip > div { padding-top: 0; }
+.rail-tip b { line-height: 24px; }
+
+.application-calendar {
+  width: min(1180px, 100%);
+  max-width: none;
+}
+
+.calendar-source-note {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  box-sizing: border-box;
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid #dce6f4;
+  border-radius: 14px;
+  background: #f4f8ff;
+  color: #5d6b82;
+  font-size: 12px;
+  font-weight: 560;
+  line-height: 1.5;
+}
+
+.calendar-source-note svg { flex: 0 0 auto; margin-top: 2px; color: #3f6bd6; }
+
+.calendar-view-switch { min-height: 42px; box-sizing: border-box; }
+.calendar-add { min-height: 42px; padding-inline: 18px; }
+.calendar-form-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 12px;
+  border-radius: 10px;
+  background: #fff;
+  color: #647086;
+  font-size: 11px;
+  font-weight: 650;
+  text-align: center;
+}
+
+.intern-toolbar .intern-sort {
+  min-height: 42px;
+  align-items: center;
+}
+
+.intern-toolbar .intern-sort select {
+  width: auto;
+  min-width: 0;
+  min-height: 42px;
+}
+
+/* Radar & dashboard selects — uniform custom chevron, padding, and sizing */
+.intern-filter-row select,
+.intern-sort select,
+.intern-row-status,
+.intern-status-control select,
+.application-row select {
+  appearance: none;
+  -webkit-appearance: none;
+  min-height: 32px;
+  padding: 0 30px 0 11px;
+  border: 1px solid #d5ddea;
+  border-radius: 7px;
+  color: #34445e;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 650;
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 10px 6px;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.intern-filter-row select:focus-visible,
+.intern-sort select:focus-visible,
+.intern-row-status:focus-visible,
+.intern-status-control select:focus-visible,
+.application-row select:focus-visible {
+  outline: none;
+  border-color: var(--intern-blue);
+  box-shadow: 0 0 0 3px rgba(10, 87, 255, .12);
+}
+
+/* Size status selects to their content so the chevron sits beside the label (no mid gap) */
+.intern-row-status,
+.intern-status-control select,
+.application-row select {
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+  justify-self: start;
+}
+
+.intern-content { display: block; min-width: 0; min-height: 660px; }
+.intern-results { min-width: 0; }
+.intern-rows { min-width: 0; }
+.intern-table-head,
+.intern-row {
+  min-width: 0;
+  grid-template-columns: 32px minmax(0, 2fr) 68px minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, .9fr) minmax(0, .9fr) 106px 66px 32px;
+  column-gap: 12px;
+  cursor: pointer;
+}
+
+.intern-row select,
+.intern-row a,
+.intern-row button { cursor: default; }
+.intern-row .intern-company-trigger,
+.intern-row .intern-apply,
+.intern-row .intern-bookmark { cursor: pointer; }
+
+.intern-company-trigger {
+  min-width: 0;
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.intern-company-trigger:hover strong,
+.intern-company-trigger:focus-visible strong { color: var(--intern-blue); text-decoration: underline; text-underline-offset: 3px; }
+.intern-company-trigger:focus-visible { border-radius: 5px; box-shadow: 0 0 0 3px rgba(11, 92, 255, .14); }
+.intern-company-cell > .intern-company-trigger { flex: 1; }
+.intern-company-cell > .intern-company-trigger strong,
+.intern-company-cell > .intern-company-trigger small { display: block; min-width: 0; }
+
+.intern-location-stack,
+.intern-language-stack,
+.intern-duration-stack {
+  min-width: 0;
+  display: grid;
+  align-content: center;
+  gap: 3px;
+}
+
+.intern-location-stack > span,
+.intern-language-stack > span,
+.intern-duration-stack > span {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  white-space: normal;
+  line-height: 1.38;
+}
+
+.intern-location,
+.intern-language { align-items: flex-start; }
+.intern-duration,
+.intern-deadline { overflow-wrap: normal; word-break: normal; }
+.internship-radar.ja .intern-company-cell strong { font-size: 12.8px; line-height: 1.25; }
+.internship-radar.ja .intern-role-stack { gap: 3px; }
+.internship-radar.ja .intern-location,
+.internship-radar.ja .intern-language,
+.internship-radar.ja .intern-duration,
+.internship-radar.ja .intern-deadline {
+  font-size: 11px;
+  line-height: 1.44;
+  letter-spacing: -0.01em;
+}
+
+.intern-detail-backdrop {
+  position: fixed;
+  z-index: 80;
+  inset: 58px 0 0;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(8, 18, 34, .24);
+  backdrop-filter: blur(2px);
+  animation: internBackdropIn 180ms ease both;
+}
+
+.intern-detail.drawer {
+  width: min(470px, 92vw);
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 22px 24px 30px;
+  border-left: 1px solid #dce3ed;
+  background: #fff;
+  box-shadow: -22px 0 56px rgba(15, 29, 51, .18);
+  animation: internDrawerIn 240ms cubic-bezier(.22, .9, .32, 1) both;
+}
+
+@keyframes internBackdropIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes internDrawerIn { from { opacity: .55; transform: translateX(42px); } to { opacity: 1; transform: translateX(0); } }
+
+.intern-detail-head {
+  grid-template-columns: 58px minmax(0, 1fr) 72px 34px;
+  align-items: center;
+  gap: 12px;
+}
+
+.intern-detail-head > .company-logo { width: 58px; height: 58px; transform: none; align-self: center; }
+.intern-detail-close { width: 34px; height: 34px; align-self: center; }
+.intern-detail-head .intern-detail-close { display: inline-flex !important; }
+.intern-detail-title .intern-role-stack { gap: 4px; }
+.intern-detail-title .intern-role-stack > span { white-space: normal; overflow: visible; text-overflow: clip; }
+
+.intern-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 15px 0;
+  border-bottom: 1px solid #e8edf4;
+}
+
+.intern-detail-meta .intern-meta-token {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  border: 1px solid #dfe6f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #4b5870;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.intern-detail-meta .intern-meta-token svg { color: #65758c; }
+.intern-detail-meta .intern-meta-token.language {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.intern-detail-meta .intern-meta-token.language b {
+  color: #0b5cff;
+  font-size: 8px;
+  letter-spacing: .03em;
+}
+
+.company-research-panel { position: relative; }
+.company-research-intro button { min-width: 145px; }
+
+@media (max-width: 860px) {
+  .application-calendar { width: 100%; }
+  .calendar-head-actions { width: 100%; justify-content: space-between; }
+  .calendar-add { min-height: 42px; }
+  .intern-table-head { display: none; }
+  .intern-results { overflow-x: visible; }
+  .intern-row {
+    min-width: 0;
+    grid-template-columns: 26px minmax(0, 1fr) 92px 66px;
+    grid-template-areas:
+      'rank company match save'
+      '. company match save'
+      '. location location location'
+      '. language language language'
+      '. duration duration duration'
+      '. deadline status apply';
+  }
+  .intern-detail.drawer { width: min(520px, 100vw); padding: 20px 18px 28px; }
+  .intern-detail-head { grid-template-columns: 52px minmax(0, 1fr) 62px 34px; gap: 10px; }
+  .intern-detail-head > .company-logo { width: 52px; height: 52px; }
+}
+
+@media (max-width: 560px) {
+  .calendar-head-actions { align-items: stretch; }
+  .calendar-view-switch { flex: 1; }
+  .calendar-view-switch button { flex: 1; }
+  .calendar-add { flex: 1; }
+  .calendar-nav strong { min-width: 130px; }
+  .intern-detail-meta .intern-meta-token { max-width: 100%; white-space: normal; }
+  .intern-detail-head { grid-template-columns: 46px minmax(0, 1fr) 56px 32px; }
+  .intern-detail-head > .company-logo { width: 46px; height: 46px; }
+}
+
+/* Editor form rhythm: compact, consistent and aligned across sections. */
+.autosize-textarea {
+  resize: none;
+  overflow: hidden;
+}
+
+.summary-textarea {
+  min-height: 112px !important;
+  height: auto;
+  max-height: none;
+  padding: 11px 13px;
+  line-height: 1.55;
+}
+
+.bullet-row {
+  position: relative;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.bullet-row .fta,
+.bullet-row .bullet-textarea {
+  min-height: 52px !important;
+  max-height: none;
+  padding: 9px 11px;
+  line-height: 1.45;
+  resize: none;
+  overflow: hidden;
+}
+
+.bullet-del {
+  width: 34px;
+  min-height: 52px;
+  flex: 0 0 34px;
+  border-radius: 8px;
+}
+
+.skills-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.skills-selector-grid .tag-inp-container:last-child { grid-column: 1 / -1; }
+.skills-selector-grid .tag-inp-box {
+  min-height: 54px;
+  max-height: none;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fbfcfe;
+}
+
+.tag-inp-box.tag-ms-box {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+  max-height: none;
+  overflow: visible;
+  padding-right: 4px;
+  gap: 6px;
+  position: relative;
+}
+
+.tag-ms-pills {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.tag-ms-box .field-chevron {
+  align-self: flex-start;
+  padding-top: 8px;
+}
+
+.tag-ms-field {
+  flex: 1 0 90px;
+  min-width: 90px;
+}
+
+.tag-pill-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag-ms-dropdown {
+  z-index: 200;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.skills-selector-grid .tag-inp-box.tag-ms-box {
+  max-height: none;
+}
+
+.field-chevron {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  padding: 0 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--t3);
+}
+
+.field-chevron:hover {
+  color: var(--t1);
+}
+
+.tag-inp-box.suggest-box {
+  align-items: center;
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+}
+
+.suggest-input.tag-inp-field {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  text-overflow: ellipsis;
+}
+
+.suggest-dropdown {
+  z-index: 200;
+}
+
+.month-field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.month-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.month-input:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+/* "Present" / "Expected" ongoing toggle — a brand pill matching the app's
+   segmented controls (Phase 5). Off = subtle outline; On = brand-blue fill. */
+.month-ongoing-toggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  border: 1px solid var(--b1);
+  border-radius: 999px;
+  background: var(--input-bg);
+  color: var(--t2);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.month-ongoing-toggle:hover { border-color: var(--b-focus); color: var(--t1); }
+.month-ongoing-toggle.on {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+.month-ongoing-check {
+  display: inline-flex;
+  width: 0; overflow: hidden;
+  opacity: 0;
+  transition: width .15s, opacity .15s;
+}
+.month-ongoing-toggle.on .month-ongoing-check { width: 12px; opacity: 1; }
+
+.photo-actions {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.photo-remove {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid var(--b0);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--err);
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.photo-remove:hover {
+  background: var(--red-dim);
+  border-color: var(--err);
+}
+.skills-selector-grid .tag-pill {
+  min-height: 24px;
+  padding: 3px 8px;
+  border-color: #d9e3f1;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #234f8f;
+  font-size: 11px;
+  font-weight: 700;
+}
+.skills-selector-grid .tag-inp-field { min-width: 120px; padding: 4px 2px; }
+
+@media (max-width: 520px) {
+  .nav-profile-switcher .nav-profile-btn-label {
+    display: none;
+  }
+}
+
+/* Keep a whole A4 preview visible on a typical Mac viewport. */
+.preview .pdf-frame {
+  width: auto;
+  height: min(calc(100% - 58px), calc(100vh - 190px));
+  max-width: 100%;
+  max-height: calc(100% - 58px);
+  aspect-ratio: 210 / 297;
+}
+
+@media (max-width: 760px) {
+  .skills-selector-grid { grid-template-columns: 1fr; }
+  .skills-selector-grid .tag-inp-container:last-child { grid-column: auto; }
+}
+

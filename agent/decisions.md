@@ -390,3 +390,36 @@ Reverse-engineered from the codebase on 2026-06-29. Newest at the bottom.
 - **Consequences:** Zero risk of an LLM hallucination silently dropping a valid role; a human/agent
   confirms "closed" verdicts before editing seeds. Cost is bounded (only stale-risk entries, with
   `--limit`), and the daily CI step is best-effort.
+
+## ADR-0018 — Split `index.css` into `styles/` modules via consecutive slices (byte-identical, no reorder)
+- **Date:** 2026-07-04
+- **Status:** Accepted
+- **Context:** `editor/src/index.css` had grown to 6694 lines and was imported wholesale by
+  `App.jsx`. Phase 8 #11 asked to break it into logical modules (`base/tokens/nav/dashboard/radar/
+  editor/calendar/landing`, …) under `editor/src/styles/` with a **hard constraint of zero visual
+  change**. The file has a documented history of drifted DUPLICATE rules across "override"/"regression
+  guard"/"final pass" sections where the *last* equal-specificity rule wins (BUG-002, ADR-0008). A
+  naive concern-based regroup (all radar rules → `radar.css`, etc.) would reorder those late overrides
+  relative to the feature rules they intentionally override → real cascade regressions.
+- **Decision:** Split by **consecutive source ranges cut only at section-comment boundaries** (between
+  complete rules), never by re-grouping. Each slice becomes one module; the barrel `styles/index.css`
+  `@import`s them **in the exact source order**, so Vite/postcss-import inlining reproduces the original
+  cascade. 13 modules: `tokens` (font import, reset, `:root` light/dark vars) · `base` (var fallback,
+  scrollbars, app shell) · `nav` · `editor` · `resume-studio` (2026 JA redesign) · `layout` (full-page
+  fix) · `radar` · `dashboard` · `overrides` (radar fidelity + form + precision passes) · `calendar`
+  (+ radar calendar/search polish) · `overrides-tail` (regression guard, selects, editor rhythm, A4) ·
+  `landing` (Firebase auth/login gate) · `settings` (profile menu + Settings view + research-key CTA).
+  `App.jsx` imports `./styles/index.css`; the monolith is removed. Two override files (`overrides`,
+  `overrides-tail`) bracket `calendar` because that is where those late layers physically sit — honoring
+  order matters more than tidy names. There is intentionally **no standalone `calendar` base vs override
+  separation** and no invented auth `landing.css` beyond the real login CSS on this branch.
+- **Verification (chosen because it is stronger than a screenshot diff):** (1) concatenating the 13
+  modules is **MD5-identical** to the pre-split `index.css`; (2) the compiled CSS bundle from the split
+  is **byte-identical** (`cmp`) to a bundle built from the restored monolith (124,937 B). Plus screenshot
+  checks of every view (login, dashboard, radar, editor, calendar, settings) at desktop + mobile with
+  `scrollWidth − clientWidth === 0` on radar and no console errors; `npm run build` green, E2E 5/5.
+- **Consequences:** Navigable, per-concern CSS files with a documented cascade order. **Constraint for
+  future edits:** the `@import` order in `styles/index.css` is load-bearing — do not reorder it, and put
+  new late overrides in `overrides-tail.css` (or a new trailing module imported last), mirroring how the
+  monolith layered fixes. Splitting `editor.css` (1450 lines) or `overrides*.css` further later is safe
+  only if the same "consecutive slice, preserve import order" rule is followed.

@@ -6,8 +6,10 @@ Phase 4 (auth gate + login), Phase 2-migration (client-direct Firestore), Phase 
 Phase 1 (data/logos), Phase 2 (Settings + profile menu), Phase 3 (live-search key/CTA), Phase 5
 (editor Present pill), Phase 6 (Jake's Clean JA), Phase 7 (LLM audit), Phase 8 (audit + cleanup).
 **Deployed to prod: through Phase 0 only** (editor-omega-two.vercel.app) — Phases 1/2/3/5/6/7/8 are
-committed+pushed but NOT yet redeployed. Deferred: App.jsx + index.css splits (org-only; spawned as
-separate tasks).
+committed+pushed but NOT yet redeployed. Deferred: **App.jsx split** (org-only; still open).
+**index.css split — DONE 2026-07-04** on branch `feat/split-index-css` (off `feat/firebase-auth-firestore`):
+6694-line monolith → 13 modules under `editor/src/styles/` behind a `styles/index.css` barrel, verified
+byte-identical compiled CSS (see ADR-0018).
 
 ## Current state summary
 Two-track résumé project. **Track A — Internship Portal** (`editor/`): React 18 + Vite
@@ -25,6 +27,23 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-04 — Phase 8 #11: split `index.css` into `styles/` modules (zero visual change).**
+  The 6694-line `editor/src/index.css` monolith is now 13 logical modules under
+  `editor/src/styles/`, imported by a single barrel `styles/index.css` (`App.jsx` imports the
+  barrel). Modules, in cascade order: `tokens, base, nav, editor, resume-studio, layout, radar,
+  dashboard, overrides, calendar, overrides-tail, landing, settings`. **Method:** sliced at
+  section-comment boundaries into **consecutive** ranges so the `@import` order reproduces the
+  original source order exactly — no rule was reordered. This directly defends the drifted-
+  duplicate-rule history (BUG-002 / ADR-0008): a naive concern-based regroup would have flipped
+  equal-specificity late overrides. **Proof of no visual change (stronger than a screenshot
+  diff):** (1) `cat`-concatenating the 13 modules is **MD5-identical** to the old `index.css`;
+  (2) building the split vs. the restored monolith yields a **byte-identical** compiled CSS
+  bundle (`cmp` clean, 124,937 B). Also screenshot-verified login, dashboard, radar, editor,
+  calendar, settings at desktop **and** mobile (375px) — all render identically, `scrollWidth −
+  clientWidth === 0` on radar (BUG-002 guard) at both widths, no console errors. `npm run build`
+  green; `npm run test:e2e` 5/5. No `landing.css`-for-auth was invented earlier by mistake — the
+  feat branch's `index.css` *does* carry the Firebase login/settings CSS, so `landing.css` +
+  `settings.css` are real. See ADR-0018. Branch `feat/split-index-css`; uncommitted until commit step.
 - **2026-07-03 — Phase 8 audit + targeted cleanup.** Most Phase 8 items were already resolved in
   Phases 0–2 (Saved filter, stale `temp` KV, module clock, dead `matchLabel`, fabricated research
   logo, `fitNote===about`, ProfileSwitcher inline styles, one-click delete X, `.gitignore` covers
@@ -37,8 +56,8 @@ build and 5 E2E tests green.
   Audit tooling: `madge --circular` is **clean (0 cycles)**; there is no `lint` script configured
   (skipped). Build green, E2E 5/5. **DEFERRED (organization-only, high-risk/low-user-value — do as
   a dedicated pass with screenshot-diff verification):** splitting `App.jsx` (2328 lines; extract
-  `ProfileWizard.jsx` + AI chat sidebar, target <800) and `index.css` (6694 lines; → `styles/{base,
-  nav,dashboard,radar,editor,calendar,landing}.css` + tokens, no visual change). Uncommitted.
+  `ProfileWizard.jsx` + AI chat sidebar, target <800). **`index.css` split is now DONE — see the
+  2026-07-04 entry above.** Uncommitted.
 - **2026-07-03 — Phase 7 daily LLM catalog validity automation.** New
   `server/audit-catalog-llm.js` (npm `audit:catalog:llm`, ADR-0017): selects stale-risk catalog
   entries (deadline within N days / stale `verifiedDate` / generic apply URL), fetches page text,

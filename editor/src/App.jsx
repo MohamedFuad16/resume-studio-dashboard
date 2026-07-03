@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import './index.css';
+import './styles/index.css';
 import { apiUrl, applicationApi, profileApi, requestJson } from './api/client.js';
 import { debounce, TEMPLATES } from './utils/helpers.js';
 import { I, Toasts, ExportMenu, TagInput, SuggestInput } from './components/ui.jsx';

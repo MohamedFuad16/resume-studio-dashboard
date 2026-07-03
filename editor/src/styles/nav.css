@@ -1,0 +1,172 @@
+/* ── Consolidated Header ───────────────────────────────── */
+.tb {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  padding: 0 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--b0);
+  z-index: 10;
+  position: relative;
+  gap: 16px;
+}
+
+.tb-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tb-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--t2);
+  cursor: pointer;
+  transition: all var(--ease);
+  flex-shrink: 0;
+}
+.tb-toggle:hover {
+  background: var(--hover);
+  color: var(--t1);
+}
+.tb-toggle.active {
+  color: var(--b-focus);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.tb-logo {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--t1);
+  letter-spacing: -0.4px;
+}
+
+/* Tabs switcher styling */
+.tb-tabs {
+  display: flex;
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--b0);
+  padding: 2px;
+  border-radius: 6px;
+  gap: 2px;
+}
+
+.tb-tab-grp {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.tb-grp-lbl {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 5px;
+  letter-spacing: 0.05em;
+  border-radius: 4px;
+  margin-right: 4px;
+}
+.tb-grp-lbl.en {
+  color: var(--b-focus);
+  background: rgba(99, 102, 241, 0.08);
+}
+.tb-grp-lbl.ja {
+  color: var(--red);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.tb-tab-sep {
+  width: 1px;
+  height: 14px;
+  background: var(--b0);
+  align-self: center;
+}
+
+.tpl {
+  display: flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--t2);
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--ease);
+}
+.tpl:hover {
+  color: var(--t1);
+  background: var(--hover);
+}
+.tpl.on-en {
+  color: #fff;
+  background: var(--blue);
+  box-shadow: 0 2px 8px var(--blue-glow);
+}
+.tpl.on-ja {
+  color: #fff;
+  background: var(--red);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
+}
+
+/* Actions section */
+.tb-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tbar-refresh, .tbar-theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--t2);
+  cursor: pointer;
+  transition: all var(--ease);
+}
+.tbar-refresh:hover, .tbar-theme-toggle:hover {
+  background: var(--hover);
+  color: var(--t1);
+}
+.tbar-refresh:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Save Indicator style */
+.save-dot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--t2);
+  transition: color var(--ease);
+}
+.save-dot.saving { color: var(--amber); }
+.save-dot.saved  { color: var(--green); }
+.save-dot.err    { color: var(--err); }
+
+.sdot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  transition: background var(--ease);
+}
+.save-dot.saving .sdot { animation: blink 0.8s ease infinite; }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+

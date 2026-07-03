@@ -134,6 +134,12 @@
   chevron rule and content-sized width for status selects. See ADR-0008.
 - **Verified:** `npm run build` green; headless Chromium shows
   `scrollWidth - clientWidth === 0` at 1024/1280/1440 + mobile widths.
+- **2026-07-04 update:** `index.css` was split into `editor/src/styles/*.css` (ADR-0018). The
+  split preserves source order exactly (consecutive slices → ordered `@import`s → byte-identical
+  compiled bundle), so this fix's winning override still wins. The radar rules now live in
+  `styles/radar.css` + `styles/overrides.css` + `styles/overrides-tail.css` (grid/select overrides).
+  **Gotcha for future CSS edits:** these files' `@import` order in `styles/index.css` is
+  load-bearing — reordering them can resurrect the drifted-duplicate cascade that caused this bug.
 
 ### BUG-001 — Track filter returns no results in Japanese mode
 - **Date:** 2026-06-29 · **File:** `editor/src/components/InternshipDashboard.jsx`

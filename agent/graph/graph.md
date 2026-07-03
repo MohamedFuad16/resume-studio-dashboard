@@ -9,7 +9,7 @@ The client and server are separate module graphs connected only over HTTP via
 - `main.jsx` → `App.jsx`, `auth/AuthGate` (auth gate wraps `<App/>`)
 - `App.jsx` → `api/client`, `components/InternshipDashboard`, `components/ProfileDashboard`,
   `components/ProfileSwitcher`, `components/sections`, `components/ui`, `utils/helpers`,
-  `auth/firebase`, `auth/useAuth` (header Sign-out button), `index.css`
+  `auth/firebase`, `auth/useAuth` (header Sign-out button), `styles/index.css`
 - **Auth subsystem (Firebase, added 2026-07-03):**
   - `auth/AuthGate` → `auth/useAuth`, `components/LoginScreen` (renders LoginScreen when
     signed out; passes through to `<App/>` when signed in or auth disabled)
@@ -40,7 +40,15 @@ The client and server are separate module graphs connected only over HTTP via
 - `hooks/useApplicationTracker` → `api/client`; `hooks/useInternshipCatalog` → `api/client`
 - Leaves (no local imports): `CompanyLogo`, `InterviewDateModal`, `ui`,
   `utils/internshipDisplay`, `utils/internshipRanking`, `utils/imageUpload`,
-  `utils/techIcons`, `utils/helpers`, `api/client`, `index.css`
+  `utils/techIcons`, `utils/helpers`, `api/client`
+- **Styles (2026-07-04, `styles/`):** `App.jsx` imports the single barrel
+  `styles/index.css`, which `@import`s 13 modules **in a load-bearing cascade order**
+  (Vite/postcss-import inlines them; the concatenation reproduces the old `index.css`
+  byte-for-byte): `tokens → base → nav → editor → resume-studio → layout → radar →
+  dashboard → overrides → calendar → overrides-tail → landing → settings`. The late
+  `overrides*.css` layers intentionally win over the feature modules — **do not reorder
+  the `@import`s** (drift/duplicate-rule history: BUG-002 / ADR-0008, ADR-0018). All are
+  CSS leaves (imported only by the barrel).
 
 ## Server (`editor/server`) — who imports whom
 - `index.js` → `templates`, `storage`, `validation`, `resume-chat`,

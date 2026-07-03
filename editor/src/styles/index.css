@@ -1,0 +1,38 @@
+/*
+ * Internship Portal — global styles barrel.
+ *
+ * index.css was split into logical modules (Phase 8 #11). These @imports are
+ * inlined by Vite/postcss-import in THE EXACT ORDER BELOW, which reproduces the
+ * original single-file cascade byte-for-byte. Ordering is load-bearing: the file
+ * has a history of drifted duplicate rules where the last one wins (see BUG-002 /
+ * ADR-0008). The late `overrides*.css` layers intentionally come after the
+ * feature modules they refine — DO NOT reorder these imports.
+ *
+ * tokens        design tokens: @font-face import, reset, :root light/dark vars
+ * base          default-var fallback, custom scrollbars, app shell layout
+ * nav           consolidated header, tabs switcher, actions, save indicator
+ * editor        sidebar, accordions, forms, cards, buttons, preview, modals,
+ *               wizard, dropzone, multi-select — the résumé editor surface
+ * resume-studio 2026 Japanese Resume Studio redesign shell
+ * layout        full-page app fix (mockup gutter removal, clean navigation)
+ * radar         Internship Radar table + drawer
+ * dashboard     career command center refresh
+ * overrides     radar fidelity + form simplification + precision passes
+ * calendar      application calendar UI + radar calendar/search polish
+ * overrides-tail regression guard, selects, editor rhythm, A4 preview
+ * landing       Auth / LoginScreen (Firebase auth gate)
+ * settings      profile menu dropdown + Settings view + research-key CTA
+ */
+@import './tokens.css';
+@import './base.css';
+@import './nav.css';
+@import './editor.css';
+@import './resume-studio.css';
+@import './layout.css';
+@import './radar.css';
+@import './dashboard.css';
+@import './overrides.css';
+@import './calendar.css';
+@import './overrides-tail.css';
+@import './landing.css';
+@import './settings.css';
