@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 import { I } from './ui.jsx';
 import { settingsApi } from '../api/client.js';
 
-const DEFAULT_SEARCH_MODEL = 'openai/gpt-5-mini';
+const DEFAULT_SEARCH_MODEL = 'google/gemini-2.5-flash';
 const DEFAULT_AUDIT_MODEL = 'openai/gpt-5-nano';
 const KEY_RE = /^sk-or-[A-Za-z0-9\-_]{20,}$/;
 const MODEL_RE = /^[a-z0-9][a-z0-9._/:-]{1,60}$/i;

@@ -65,10 +65,17 @@ function domainFromUrl(url) {
   }
 }
 
+// Case-insensitive KNOWN_DOMAINS lookup: the live-search intro passes the raw query
+// (e.g. lowercase "google") which would otherwise miss the "Google" key.
+const KNOWN_DOMAINS_LC = Object.fromEntries(Object.entries(KNOWN_DOMAINS).map(([k, v]) => [k.toLowerCase(), v]));
+function knownDomain(company) {
+  return KNOWN_DOMAINS[company] || KNOWN_DOMAINS_LC[String(company || '').trim().toLowerCase()] || '';
+}
+
 function companyLogoUrls(item) {
   const filled = FILLED_BRAND_LOGOS[item.company];
   if (filled) return [filled.src];
-  const domain = item.companyDomain || KNOWN_DOMAINS[item.company] || domainFromUrl(item.url);
+  const domain = item.companyDomain || knownDomain(item.company) || domainFromUrl(item.url);
   // Prefer the DuckDuckGo FAVICON over the seed `logoUrl`: favicons are square icons
   // designed to read at small sizes, whereas company `logoUrl` wordmarks vary wildly
   // (e.g. HENNGE ships a WHITE svg that is invisible on the light logo chip). DDG also
