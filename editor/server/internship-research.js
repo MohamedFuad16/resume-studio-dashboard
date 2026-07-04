@@ -5,9 +5,11 @@ import OpenAI from 'openai';
 
 const SCHEMA_FILE = fileURLToPath(new URL('./internship-search.schema.json', import.meta.url));
 const BLOCKED_JOB_DOMAINS = /(?:indeed|glassdoor|linkedin|ziprecruiter|simplyhired)\./i;
-// Gemini 2.5 Flash: cheap, accurate, and MUCH faster than gpt-5-mini for the
-// :online web-search research (measured ~49s vs 120s+). Overridable via Settings/env.
-const DEFAULT_MODEL = 'google/gemini-2.5-flash';
+// gpt-5-mini (with :online web search) is slower (~60-120s) but noticeably more
+// accurate than gemini-2.5-flash, which returned expired job-board/aggregator links.
+// Accuracy wins here — the UI shows staged progress during the wait. Overridable
+// via Settings/env. See the raised INTERNSHIP_RESEARCH_TIMEOUT_MS below.
+const DEFAULT_MODEL = 'openai/gpt-5-mini';
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const slugify = value => String(value || '')
@@ -253,12 +255,13 @@ Evidence rules:
 - Include only openings verified on an official company careers page or the company's official ATS page.
 - Include any currently open official internship/student-program result before judging profile fit, including sales, business, product, marketing, design, support, data, and engineering internships.
 - Do not exclude a role merely because it is not a software-engineering internship; set the track accordingly and let the match score be lower in the app.
-- Exclude job boards, reposts, news articles, expired pages, generic talent communities, and full-time roles.
-- Use the direct official apply/detail URL.
+- CRITICAL — only include a posting whose page CURRENTLY shows it is OPEN. Reject anything showing closed/ended/expired markers such as "終了", "受付終了", "募集終了", "開催終了", "Closed", "No longer accepting", or a past deadline. When unsure whether it is still open, exclude it.
+- Use the company's OWN official careers page or official ATS (e.g. Greenhouse, Lever, Workday, Ashby, careers.<company>.com). NEVER return a third-party aggregator/job-board link — explicitly exclude gaishishukatsu.com (外資就活), internship-guide (インターンシップガイド), rikunabi, mynavi, wantedly job listings, indeed, glassdoor, linkedin/jobs, and similar. If the only source is an aggregator, exclude the result.
+- The "url" MUST be the direct official apply/detail page for THAT specific posting.
 - Never invent deadlines, duration, language, compensation, eligibility, or stages. Use "Not stated" when absent.
-- If no qualifying opening is verified, return an empty results array and say so in summary.
-- Return at most 8 results matching the provided output schema.`;
-  const timeoutMs = Number(process.env.INTERNSHIP_RESEARCH_TIMEOUT_MS || 120000);
+- If no qualifying OPEN official opening is verified, return an empty results array and say so in summary.
+- Return at most 6 results matching the provided output schema.`;
+  const timeoutMs = Number(process.env.INTERNSHIP_RESEARCH_TIMEOUT_MS || 200000);
   let parsed;
   try {
     parsed = parseResult(await runOpenAiSearch(prompt, { timeoutMs, apiKey, searchModel }));

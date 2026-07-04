@@ -121,6 +121,13 @@ const copy = {
     liveSearchTitle: company => `Search live internships at ${company}`,
     liveSearchSub: 'Live research checks official company and ATS pages. Most searches finish in 30–90 seconds and repeat searches reuse recent results.',
     liveSearching: company => `Researching ${company}…`,
+    researchPhases: [
+      'Thinking about official sources…',
+      'Searching official company & ATS pages…',
+      'Reading postings & checking they are still open…',
+      'Compiling the best matches…',
+    ],
+    researchSlow: 'Deep search in progress — accurate results can take up to ~2 minutes.',
     liveDone: count => count ? `${count} verified opening${count === 1 ? '' : 's'} found` : 'No currently available internship found on official sources.',
     liveError: 'Company research failed. Try again in a moment.',
     liveWaking: 'Waking the research service (a free host can take ~30s)… retrying.',
@@ -194,6 +201,13 @@ const copy = {
     liveSearchTitle: company => `${company}の募集を公式情報で検索`,
     liveSearchSub: '企業公式ページとATSをライブ検索します。通常30〜90秒で完了し、直近の同一検索は結果を再利用します。',
     liveSearching: company => `${company}を調査中…`,
+    researchPhases: [
+      '公式ソースを検討中…',
+      '企業公式ページ・ATSを検索中…',
+      '募集ページを確認し、現在も応募可能か検証中…',
+      '最適な結果をまとめています…',
+    ],
+    researchSlow: '詳細検索を実行中です。正確な結果には最大2分ほどかかる場合があります。',
     liveDone: count => count ? `${count}件の確認済み募集が見つかりました` : '公式情報では現在応募可能なインターンは見つかりませんでした。',
     liveError: '企業検索に失敗しました。少し後でもう一度試してください。',
     liveWaking: '検索サービスを起動中（無料ホストは約30秒かかる場合があります）… 再試行します。',
@@ -444,12 +458,13 @@ const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEditor, i
   );
 };
 
-function CompanyResearchPanel({ company, t, isJa, job, results, error, onStart, onAdd, addedIds, addingId, onOpenSettings }) {
+function CompanyResearchPanel({ company, t, isJa, job, results, error, onStart, onAdd, addedIds, addingId, onOpenSettings, phase = 0 }) {
   if (!company) return null;
   const searching = job?.status === 'researching';
   const complete = job?.status === 'complete';
   const missingKey = job?.errorCode === 'OPENROUTER_API_KEY_MISSING';
   const showPrompt = !job && !results.length && !error;
+  const phaseMsg = t.researchPhases[Math.min(phase, t.researchPhases.length - 1)];
 
   return (
     <section className="company-research-panel" aria-live="polite" data-testid="company-research-panel">
@@ -459,7 +474,8 @@ function CompanyResearchPanel({ company, t, isJa, job, results, error, onStart, 
         <CompanyLogo item={{ company }} />
         <div>
           <h3>{t.liveSearchTitle(company)}</h3>
-          <p data-testid="company-research-status">{showPrompt ? t.liveSearchSub : searching ? t.liveSearching(company) : missingKey ? t.liveKeyMissing : error ? `${t.liveError} ${error}` : t.liveDone(results.length)}</p>
+          <p data-testid="company-research-status">{showPrompt ? t.liveSearchSub : searching ? phaseMsg : missingKey ? t.liveKeyMissing : error ? `${t.liveError} ${error}` : t.liveDone(results.length)}</p>
+          {searching && phase >= 2 && <p style={{ fontSize: '11px', color: 'var(--t3)', marginTop: '2px' }}>{t.researchSlow}</p>}
         </div>
         {missingKey ? (
           <button type="button" className="company-research-cta" data-testid="company-research-add-key" onClick={onOpenSettings}>
@@ -518,6 +534,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
   const [researchJob, setResearchJob] = useState(null);
   const [researchResults, setResearchResults] = useState([]);
   const [researchError, setResearchError] = useState('');
+  const [researchPhase, setResearchPhase] = useState(0);
   const [addedResearchIds, setAddedResearchIds] = useState(() => new Set());
   const [addingId, setAddingId] = useState('');
   const [interviewTarget, setInterviewTarget] = useState(null);
@@ -565,7 +582,11 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
     if (!needle) return false;
     return visibleCatalog.some(item => [item.company, item.role, item.track].join(' ').toLowerCase().includes(needle));
   }, [visibleCatalog, query]);
-  const canLiveSearchCompany = isCompanyResearchQuery(companyQuery) && !hasCatalogTextMatch;
+  // Show the live-search panel for any company-like query — INCLUDING companies that
+  // already have catalog rows (e.g. "mercari") so the user can find current openings
+  // beyond the seeded ones. Auto-search is still gated to non-catalog queries below so
+  // we don't auto-spend on companies already in the catalog.
+  const canLiveSearchCompany = isCompanyResearchQuery(companyQuery);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -631,22 +652,16 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
     if (researchJob?.status === 'researching' && researchJob.company === cleanCompany) return;
     setResearchError('');
     setResearchResults([]);
+    setResearchPhase(0);
     try {
       // Fetch the AI settings fresh at start time so a key just saved in Settings is
       // used immediately, and send the résumé + key/model so the server can research
       // with the user's own OpenRouter key (env fallback). Phase 3 / ADR-0016.
       const settings = await settingsApi.get().catch(() => ({}));
-      // Auto-migrate the old slow default (gpt-5-mini) that users may have saved to
-      // Settings before the switch to the fast google/gemini-2.5-flash default. Send
-      // the fast model EXPLICITLY (not undefined) so the speedup applies immediately,
-      // regardless of the backend's own default. A model the user genuinely chose
-      // (anything other than the old default) is respected.
-      const savedModel = settings?.searchModel;
-      const searchModel = (savedModel && savedModel !== 'openai/gpt-5-mini') ? savedModel : 'google/gemini-2.5-flash';
       const body = {
         resume,
         apiKey: settings?.openrouterKey || undefined,
-        searchModel,
+        searchModel: settings?.searchModel || undefined,
       };
       // The research/compile backend may be a free-tier container that sleeps when
       // idle; the first request after a cold start can fail while it wakes. Retry
@@ -697,12 +712,25 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
     };
   }, [researchJob?.jobId, researchJob?.status, t]);
 
+  // Advance the staged progress message while a search is running (~22s per phase,
+  // capped at the last phase) so the user sees "thinking → searching → verifying →
+  // compiling" during the wait rather than a single static line.
+  useEffect(() => {
+    if (researchJob?.status !== 'researching') return undefined;
+    const timer = window.setInterval(() => {
+      setResearchPhase(p => Math.min(p + 1, t.researchPhases.length - 1));
+    }, 22000);
+    return () => window.clearInterval(timer);
+  }, [researchJob?.status, t]);
+
   useEffect(() => {
     const key = companyQuery.toLowerCase();
-    if (!canLiveSearchCompany || autoResearchStarted.current.has(key)) return undefined;
+    // Auto-search only companies NOT already in the catalog (avoid auto-spending on
+    // catalog companies — the panel still offers a manual "Search official sources").
+    if (!canLiveSearchCompany || hasCatalogTextMatch || autoResearchStarted.current.has(key)) return undefined;
     const timer = window.setTimeout(() => startCompanyResearch(companyQuery, { auto: true }), 1100);
     return () => window.clearTimeout(timer);
-  }, [canLiveSearchCompany, companyQuery]);
+  }, [canLiveSearchCompany, hasCatalogTextMatch, companyQuery]);
 
   const addResearchResult = async item => {
     setAddingId(item.id);
@@ -799,6 +827,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
             addedIds={addedResearchIds}
             addingId={addingId}
             onOpenSettings={onOpenSettings}
+            phase={researchPhase}
           />
         ) : null}
 
