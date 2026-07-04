@@ -412,3 +412,31 @@ Reverse-engineered from the codebase on 2026-06-29. Newest at the bottom.
   and sets `VITE_API_BASE_URL` + redeploys the frontend. Free hosts cold-start (~30–60s)
   after idle. The Vercel serverless API becomes a fallback (still serves prebaked PDFs
   if `VITE_API_BASE_URL` is unset).
+
+## ADR-0019 — Compile/research backend on Azure Container Apps (always-on)
+- **Date:** 2026-07-05
+- **Status:** Accepted (supersedes the Render hosting choice in ADR-0018; the Dockerfile
+  and font-profile decisions there still stand)
+- **Context:** Render's free tier sleeps after ~15 min idle, so the first live company
+  search or PDF compile after a break cold-started (~30–60s) and sometimes failed outright
+  ("company research failed", observed for Goldman Sachs). The user has Azure credits and
+  asked to move the backend somewhere always-on.
+- **Decision:** Deploy the same root `Dockerfile` to **Azure Container Apps** with
+  **`--min-replicas 1`** (never scales to zero → no cold starts), 1 vCPU / 2 GiB (enough
+  for Tectonic). Resources: RG `internship-portal`, env `portal-compile-env`, ACR
+  `ca7959c48768acr`, app `portal-compile` (region westus2 — where the env landed;
+  latency is dominated by the outbound LLM call, so cross-region RTT is negligible).
+  **Build method matters:** `az containerapp up --source .` ignores the root Dockerfile,
+  falls back to Oryx buildpacks, and fails on this monorepo ("Could not detect the
+  language from repo"). The working path is two explicit steps — `az acr build --file
+  Dockerfile .` (cloud build, no local Docker) then `az containerapp create` from the
+  pushed image. The Dockerfile's `FROM` was also un-pinned from `--platform=linux/amd64`
+  because ACR's Dockerfile dependency scanner can't parse an inline platform (ACR agents
+  are amd64 regardless; local arm64 Macs pass `--platform linux/amd64` on the CLI).
+- **Consequences:** Verified on Azure — `/api/status` ok; `POST /api/compile` returns a
+  freshly-compiled EN PDF (~6.6s, 31 KB) and JA PDF (~3.8s, 104 KB with embedded Noto CJK
+  subsets). Frontend `VITE_API_BASE_URL` repointed Render→Azure FQDN in Vercel and
+  redeployed. Always-on carries a small ongoing cost (covered by the user's credits); set
+  `--min-replicas 0` to pause. Redeploy after code changes = re-run `az acr build …` then
+  `az containerapp update -n portal-compile -g internship-portal --image …:latest`. Guide:
+  `docs/azure-deploy.md`.
