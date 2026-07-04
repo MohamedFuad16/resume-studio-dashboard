@@ -44,6 +44,17 @@ const loadPdfJs = () => {
   });
 };
 
+// A résumé is "blank" (fresh account) when it has no name and no section content.
+function isResumeBlank(r) {
+  if (!r) return true;
+  const p = r.personal || {};
+  const hasName = Boolean((p.nameEn || '').trim() || (p.nameJa || '').trim());
+  const hasSections = ['education', 'experience', 'projects', 'activities']
+    .some(k => Array.isArray(r[k]) && r[k].length > 0);
+  const hasSummary = Boolean((r.summary || r.summaryEn || r.summaryJa || '').trim());
+  return !hasName && !hasSections && !hasSummary;
+}
+
 async function extractTextFromPdfFile(file) {
   const pdfjs = await loadPdfJs();
   const arrayBuffer = await file.arrayBuffer();
@@ -552,6 +563,7 @@ export default function App() {
   const [showWizard, setShowWizard] = useState(false);
   const [wizardStep, setWizardStep] = useState('start'); // start | pdf-upload | 1..8
   const [wizardData, setWizardData] = useState(null);
+  const [wizardOnboarding, setWizardOnboarding] = useState(false);
   const [parsingPdf, setParsingPdf] = useState(false);
   const [editingIndex, setEditingIndex] = useState(-1);
   const isJa = lang === 'ja';
@@ -673,7 +685,12 @@ export default function App() {
     }
   };
 
-  const openProfileWizard = () => {
+  // onboarding=true → the wizard populates the CURRENT (blank, just-created) profile
+  // instead of creating a new one. Used on first sign-in so a new account can import
+  // a résumé PDF or fill it in. The 'new profile' path (onboarding=false) is retained
+  // for the no-auth/local case.
+  const openProfileWizard = (onboarding = false) => {
+    setWizardOnboarding(onboarding);
     setWizardStep('start');
     setWizardData(null);
     setShowWizard(true);
@@ -718,7 +735,13 @@ export default function App() {
       if (initProfile !== activeProfile) setActiveProfile(initProfile);
       syncUrlWithProfile(initProfile);
       try {
-        setResume(normalizeResume(await profileApi.get(initProfile)));
+        const loaded = normalizeResume(await profileApi.get(initProfile));
+        setResume(loaded);
+        // New account: ensureSeed created a blank profile. Offer the onboarding
+        // wizard (résumé PDF import or manual) so the user can populate it.
+        if (authAvailable && auth?.currentUser && isResumeBlank(loaded)) {
+          openProfileWizard(true);
+        }
       } catch {
         toast('Could not load resume data', 'error');
       }
@@ -1039,7 +1062,11 @@ export default function App() {
           </button>
         </nav>
 
-        <div className="app-lang-switcher" aria-label={isJa ? '表示言語' : 'Application language'}>
+        {/* marginLeft:auto groups the right-side controls (lang / profile / actions)
+            together and keeps the brand+nav left-aligned, regardless of whether
+            .tb-actions has content on this view (it is empty outside the editor,
+            which otherwise let the header's space-between spread everything out). */}
+        <div className="app-lang-switcher" style={{ marginLeft: 'auto' }} aria-label={isJa ? '表示言語' : 'Application language'}>
           <button
             type="button"
             data-testid="language-toggle-en"
@@ -2251,34 +2278,43 @@ export default function App() {
               {/* Step 8: Save & Finish */}
               {wizardStep === 8 && (
                 <div className="wizard-step-flow">
-                  <div className="wizard-step-title">Step 8 of 8: Finish & Save Profile</div>
-                  <p className="wizard-intro-text">
-                    Enter a profile name / ID for your resume. This ID will be used in the URL query string (e.g. <code>?profile=your_id</code>) to share your profile.
-                  </p>
-                  <div className="f">
-                    <span className="fl">Profile Name / ID (lowercase, alphanumeric, dashes, underscores) *</span>
-                    <input 
-                      className="fi" 
-                      type="text" 
-                      placeholder="e.g. john_doe" 
-                      onChange={e => {
-                        const val = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '');
-                        setWizardData({...wizardData, _profileId: val});
-                      }} 
-                    />
+                  <div className="wizard-step-title">
+                    {wizardOnboarding ? 'Finish setting up your résumé' : 'Step 8 of 8: Finish & Save Profile'}
                   </div>
+                  {wizardOnboarding ? (
+                    <p className="wizard-intro-text">
+                      Review your details, then save to start tailoring your résumé. You can refine everything in the Editor afterwards.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="wizard-intro-text">
+                        Enter a profile name / ID for your resume. This ID will be used in the URL query string (e.g. <code>?profile=your_id</code>) to share your profile.
+                      </p>
+                      <div className="f">
+                        <span className="fl">Profile Name / ID (lowercase, alphanumeric, dashes, underscores) *</span>
+                        <input
+                          className="fi"
+                          type="text"
+                          placeholder="e.g. john_doe"
+                          onChange={e => {
+                            const val = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+                            setWizardData({...wizardData, _profileId: val});
+                          }}
+                        />
+                      </div>
+                    </>
+                  )}
 
                   <div className="wizard-actions">
                     <button className="btn" onClick={() => setWizardStep(7)}>Back</button>
-                    <button 
+                    <button
                       className="btn btn-submit-app"
-                      disabled={!wizardData._profileId || !wizardData._profileId.trim()}
+                      disabled={!wizardOnboarding && (!wizardData._profileId || !wizardData._profileId.trim())}
                       onClick={async () => {
-                        const pid = wizardData._profileId;
                         const data = { ...wizardData };
                         delete data._profileId;
 
-                        // Guarantee new profiles carry personal.postalCode (server validates it),
+                        // Guarantee the profile carries personal.postalCode (server validates it),
                         // including the PDF-import path which does not seed the field.
                         data.personal = { ...data.personal, postalCode: data.personal?.postalCode || '' };
 
@@ -2286,19 +2322,31 @@ export default function App() {
                           toast('Full name is required', 'error');
                           return;
                         }
-                        
+
                         try {
-                          await profileApi.save(pid, data);
-                          toast(`Created new resume profile "${pid}"!`, 'success');
-                          setShowWizard(false);
-                          fetchProfiles();
-                          handleSwitchProfile(pid);
+                          if (wizardOnboarding) {
+                            // Populate the current (just-created) profile — no new profile.
+                            const merged = { ...resume, ...data };
+                            await saveProfileImmediately(merged, activeProfile, { refreshFromServer: false });
+                            toast('Résumé saved!', 'success');
+                            setShowWizard(false);
+                            setWizardOnboarding(false);
+                            lastCompiled.current = '';
+                            compile(normalizeResume(merged), template, { force: true });
+                          } else {
+                            const pid = wizardData._profileId;
+                            await profileApi.save(pid, data);
+                            toast(`Created new resume profile "${pid}"!`, 'success');
+                            setShowWizard(false);
+                            fetchProfiles();
+                            handleSwitchProfile(pid);
+                          }
                         } catch (error) {
                           toast(error.message || 'Failed to save profile. Ensure the profile ID is unique and has no special characters.', 'error');
                         }
                       }}
                     >
-                      Save Profile & Generate Resume
+                      {wizardOnboarding ? 'Save & Start' : 'Save Profile & Generate Resume'}
                     </button>
                   </div>
                 </div>
