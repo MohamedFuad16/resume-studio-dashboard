@@ -9,23 +9,35 @@ Prereqs: an Azure account (you have credits), the `az` CLI (`brew install azure-
 
 ## One-time deploy (from the repo root)
 
-```bash
-# 1. Resource group (pick a region near you, e.g. japaneast)
-az group create -n internship-portal -l japaneast
+> **Do NOT use `az containerapp up --source .`** — it ignores our root `Dockerfile`,
+> falls back to Oryx buildpacks, and fails with *"Could not detect the language from
+> repo"* (this is a monorepo with no root `package.json`). Build the image explicitly
+> from the `Dockerfile` with `az acr build`, then create the app from that image.
 
-# 2. Build the Dockerfile in the cloud and deploy as a Container App.
-#    --ingress external + --target-port 8080 exposes it; --min-replicas 1 = always-on.
-az containerapp up \
+```bash
+# 1. Resource group + Container Apps environment + registry (one-time).
+az group create -n internship-portal -l japaneast
+az acr create -n <uniqueacrname> -g internship-portal --sku Basic --admin-enabled true
+az containerapp env create -n portal-compile-env -g internship-portal -l japaneast
+
+# 2. Build the Dockerfile in the cloud (ACR Task — no local Docker needed).
+#    --file Dockerfile forces our Dockerfile instead of language auto-detection.
+#    ACR build agents are amd64, so no --platform flag is needed (and an inline
+#    `FROM --platform=…` breaks ACR's dependency scanner — keep the FROM plain).
+az acr build --registry <uniqueacrname> --image portal-compile:latest --file Dockerfile .
+
+# 3. Create the Container App from the pushed image.
+#    --min-replicas 1 = always-on (no cold starts); 1 vCPU / 2 GiB for Tectonic.
+az containerapp create \
   -n portal-compile \
   -g internship-portal \
-  --source . \
+  --environment portal-compile-env \
+  --image <uniqueacrname>.azurecr.io/portal-compile:latest \
+  --registry-server <uniqueacrname>.azurecr.io \
   --ingress external \
   --target-port 8080 \
+  --min-replicas 1 --max-replicas 2 --cpu 1.0 --memory 2.0Gi \
   --env-vars RESUME_FONT_PROFILE=linux RESUME_STUDIO_APP_ORIGIN=https://editor-omega-two.vercel.app
-
-# 3. Ensure it never scales to zero (always warm) and give it enough CPU/RAM for LaTeX.
-az containerapp update -n portal-compile -g internship-portal \
-  --min-replicas 1 --max-replicas 2 --cpu 1.0 --memory 2.0Gi
 
 # 4. Get the public URL:
 az containerapp show -n portal-compile -g internship-portal \
