@@ -135,7 +135,7 @@ export default function SettingsPanel({ resume, onSaveProfile, onExportJson, onD
   );
 
   return (
-    <div className="settings-view">
+    <div className="settings-view" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
       <div className="settings-head">
         <button type="button" className="btn settings-back" onClick={onBack}><I n="chev" s={13} /> {t.back}</button>
         <div>

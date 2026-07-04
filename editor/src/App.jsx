@@ -1029,6 +1029,10 @@ export default function App() {
 
       {/* ── Consolidated Modern Header ──────────────────────── */}
       <header className="tb">
+        {/* Constrain the header content to a centered max-width so the brand and
+            profile controls aren't flung to the extreme screen edges on ultra-wide
+            monitors (the border-bottom still spans full width via .tb). */}
+        <div className="tb-inner" style={{ display: 'flex', alignItems: 'center', gap: '16px', width: '100%', maxWidth: '1500px', margin: '0 auto' }}>
         <div className="window-lights" aria-hidden="true">
           <span className="light red" />
           <span className="light amber" />
@@ -1116,6 +1120,7 @@ export default function App() {
               <ExportMenu onPDF={onPDF} onTex={onTex} onJson={onJson} onAI={onAI} isJa={isJa} />
             </>
           )}
+        </div>
         </div>
       </header>
 
