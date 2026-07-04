@@ -123,6 +123,7 @@ const copy = {
     liveSearching: company => `Researching ${company}…`,
     liveDone: count => count ? `${count} verified opening${count === 1 ? '' : 's'} found` : 'No currently available internship found on official sources.',
     liveError: 'Company research failed. Try again in a moment.',
+    liveWaking: 'Waking the research service (a free host can take ~30s)… retrying.',
     liveStart: 'Search official sources',
     liveAdd: 'Add to matches',
     liveAdded: 'Added',
@@ -195,6 +196,7 @@ const copy = {
     liveSearching: company => `${company}を調査中…`,
     liveDone: count => count ? `${count}件の確認済み募集が見つかりました` : '公式情報では現在応募可能なインターンは見つかりませんでした。',
     liveError: '企業検索に失敗しました。少し後でもう一度試してください。',
+    liveWaking: '検索サービスを起動中（無料ホストは約30秒かかる場合があります）… 再試行します。',
     liveStart: '公式情報を検索',
     liveAdd: '候補に追加',
     liveAdded: '追加済み',
@@ -634,11 +636,26 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
       // used immediately, and send the résumé + key/model so the server can research
       // with the user's own OpenRouter key (env fallback). Phase 3 / ADR-0016.
       const settings = await settingsApi.get().catch(() => ({}));
-      const job = await internshipApi.startResearch(cleanCompany, activeProfile, {
+      const body = {
         resume,
         apiKey: settings?.openrouterKey || undefined,
         searchModel: settings?.searchModel || undefined,
-      });
+      };
+      // The research/compile backend may be a free-tier container that sleeps when
+      // idle; the first request after a cold start can fail while it wakes. Retry
+      // once after a short delay so a sleeping service doesn't read as "broken".
+      let job;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          job = await internshipApi.startResearch(cleanCompany, activeProfile, body);
+          break;
+        } catch (err) {
+          if (attempt === 1) throw err;
+          setResearchError(t.liveWaking);
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        }
+      }
+      setResearchError('');
       setResearchJob(job);
       if (job.status === 'complete') setResearchResults(Array.isArray(job.results) ? job.results : []);
       if (options.auto) autoResearchStarted.current.add(cleanCompany.toLowerCase());
