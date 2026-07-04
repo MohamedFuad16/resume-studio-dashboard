@@ -34,7 +34,7 @@ ENV NODE_ENV=production \
 
 WORKDIR /app
 COPY editor/package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --no-audit --no-fund
 COPY editor/ ./
 
 # Warm the Tectonic bundle cache at build time so the first production compile is fast
