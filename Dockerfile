@@ -8,6 +8,7 @@
 # container hosts (Render/Railway/Fly) run x86_64. Build with --platform linux/amd64.
 # Debian trixie (glibc 2.41): the Tectonic 0.16.9 prebuilt needs glibc ≥ 2.38 (bookworm
 # ships 2.36, too old).
+ENV DEBIAN_FRONTEND=noninteractive
 FROM node:22-trixie-slim
 
 # LaTeX runtime libs, fontconfig, and Japanese fonts (Noto Serif/Sans CJK JP) that the
