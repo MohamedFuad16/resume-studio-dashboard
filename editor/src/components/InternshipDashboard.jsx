@@ -637,11 +637,12 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
       // with the user's own OpenRouter key (env fallback). Phase 3 / ADR-0016.
       const settings = await settingsApi.get().catch(() => ({}));
       // Auto-migrate the old slow default (gpt-5-mini) that users may have saved to
-      // Settings before the switch to the fast google/gemini-2.5-flash default: treat
-      // it as "unset" so the server picks the new fast default. A model the user
-      // genuinely chose (anything else) is respected.
+      // Settings before the switch to the fast google/gemini-2.5-flash default. Send
+      // the fast model EXPLICITLY (not undefined) so the speedup applies immediately,
+      // regardless of the backend's own default. A model the user genuinely chose
+      // (anything other than the old default) is respected.
       const savedModel = settings?.searchModel;
-      const searchModel = (savedModel && savedModel !== 'openai/gpt-5-mini') ? savedModel : undefined;
+      const searchModel = (savedModel && savedModel !== 'openai/gpt-5-mini') ? savedModel : 'google/gemini-2.5-flash';
       const body = {
         resume,
         apiKey: settings?.openrouterKey || undefined,
