@@ -25,6 +25,21 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-04 — Live PDF preview via a containerized compile backend (ADR-0018) + nav/onboarding
+  fixes.** (1) **Compile backend**: Vercel can't run Tectonic, so the prod preview was a stale
+  prebaked fallback. Added a root `Dockerfile` (node:22-trixie + Tectonic 0.16.9 + Noto CJK fonts,
+  amd64) running the existing server, `render.yaml` Blueprint, and `docs/compile-backend.md`.
+  `server/templates.js` now has an env-driven font profile (`RESUME_FONT_PROFILE=linux` → Noto
+  Serif/Sans CJK; macOS default keeps Hiragino; EN templates unchanged). **Verified by building the
+  image + compiling all EN/JA templates in the container** — JA renders Noto Mincho body + Gothic
+  headings (bold auto-detected), 1 page, ~identical to Hiragino. The frontend routes `/api/*` via
+  `VITE_API_BASE_URL`, so the user deploys the container (Render free) + sets that env + redeploys
+  the frontend → live edits compile. (2) **Nav bar**: grouped the right-side header controls with
+  `marginLeft:auto` (empty `.tb-actions` on non-editor views had let space-between spread them).
+  (3) **New-account onboarding**: the résumé wizard (PDF import → heuristic parse) was unreachable
+  after "+ New" removal; now it opens on first sign-in with a blank profile and saves into the
+  current profile. Nav + onboarding built, deployed to prod; compile backend awaits the user's
+  container deploy.
 - **2026-07-03 — Post-review fixes (prod feedback) + deploy of Phases 1–8.** From the user reviewing
   the (Phase-0) prod site: (1) **Account menu simplified** (`ProfileSwitcher.jsx`) — with Firebase
   one account == one user, so removed profile switching + "+ New"; the avatar now opens just

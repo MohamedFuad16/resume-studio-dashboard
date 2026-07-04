@@ -1,6 +1,24 @@
 // LaTeX template generators for all 8 resume formats
 // Each function takes a `resume` data object and returns a LaTeX string
 
+// The JA templates use fontspec/xeCJK with macOS fonts (Hiragino / Avenir Next) for
+// local dev where Tectonic runs on the user's Mac. In the Linux compile container
+// (RESUME_FONT_PROFILE=linux, see Dockerfile) those fonts don't exist, so we swap to
+// the bundled Noto CJK + Noto Sans. EN templates use no fontspec (default LaTeX
+// fonts) and need no swap. This keeps a single template source working on both.
+const LINUX_FONTS = String(process.env.RESUME_FONT_PROFILE || '').toLowerCase() === 'linux';
+const FONTS = LINUX_FONTS
+  ? { mincho: 'Noto Serif CJK JP', minchoBold: '', gothic: 'Noto Sans CJK JP', gothicBold: '', gothicHeading: 'Noto Sans CJK JP', latin: 'Noto Sans' }
+  : { mincho: 'Hiragino Mincho ProN', minchoBold: 'Hiragino Mincho ProN W6', gothic: 'Hiragino Kaku Gothic ProN W3', gothicBold: 'Hiragino Kaku Gothic ProN W6', gothicHeading: 'Hiragino Kaku Gothic ProN W6', latin: 'Avenir Next' };
+
+// Emit a font-select command. When boldFamily is empty (Noto: one family carries all
+// weights) we omit [BoldFont=…] and let fontspec auto-select the bold face.
+function fontCmd(cmd, family, boldFamily) {
+  return boldFamily && boldFamily !== family
+    ? `\\${cmd}{${family}}[BoldFont={${boldFamily}}]`
+    : `\\${cmd}{${family}}`;
+}
+
 function esc(str) {
   if (!str) return '';
   return String(str)
@@ -628,10 +646,10 @@ function genJa01(r, options = {}) {
 \\usepackage{tabularx}
 % Refined Jake's-clean JA (Phase 6): Mincho body for an elegant read, Gothic for
 % headings + the name, and a monotone (grayscale) palette — no accent color.
-\\setCJKmainfont{Hiragino Mincho ProN}[BoldFont={Hiragino Mincho ProN W6}]
-\\setCJKsansfont{Hiragino Kaku Gothic ProN W3}[BoldFont={Hiragino Kaku Gothic ProN W6}]
-\\newCJKfontfamily\\gothicfont{Hiragino Kaku Gothic ProN W6}
-\\setmainfont{Avenir Next}
+${fontCmd('setCJKmainfont', FONTS.mincho, FONTS.minchoBold)}
+${fontCmd('setCJKsansfont', FONTS.gothic, FONTS.gothicBold)}
+\\newCJKfontfamily\\gothicfont{${FONTS.gothicHeading}}
+\\setmainfont{${FONTS.latin}}
 \\geometry{a4paper,top=1.2cm,bottom=1.2cm,left=1.5cm,right=1.5cm}
 \\hypersetup{hidelinks}
 \\pagestyle{empty}
@@ -741,9 +759,9 @@ function genJa02(r) {
 \\usepackage{tabularx}
 \\usepackage{array}
 \\usepackage{enumitem}
-\\setCJKmainfont{Hiragino Kaku Gothic ProN W3}[BoldFont={Hiragino Kaku Gothic ProN W6}]
-\\setCJKsansfont{Hiragino Kaku Gothic ProN W3}[BoldFont={Hiragino Kaku Gothic ProN W6}]
-\\setmainfont{Avenir Next}
+${fontCmd('setCJKmainfont', FONTS.gothic, FONTS.gothicBold)}
+${fontCmd('setCJKsansfont', FONTS.gothic, FONTS.gothicBold)}
+\\setmainfont{${FONTS.latin}}
 \\geometry{a4paper,top=1.05cm,bottom=1.05cm,left=1.1cm,right=1.1cm}
 \\hypersetup{hidelinks,colorlinks=true,urlcolor=accent}
 \\pagestyle{empty}
@@ -861,9 +879,9 @@ function genJa03(r) {
 \\usepackage{tabularx}
 \\usepackage{array}
 
-\\setCJKmainfont{Hiragino Kaku Gothic ProN W3}[BoldFont={Hiragino Kaku Gothic ProN W6}]
-\\setCJKsansfont{Hiragino Kaku Gothic ProN W3}[BoldFont={Hiragino Kaku Gothic ProN W6}]
-\\setmainfont{Avenir Next}
+${fontCmd('setCJKmainfont', FONTS.gothic, FONTS.gothicBold)}
+${fontCmd('setCJKsansfont', FONTS.gothic, FONTS.gothicBold)}
+\\setmainfont{${FONTS.latin}}
 
 \\definecolor{darksidebar}{RGB}{17, 24, 39}       % Deep slate sidebar
 \\definecolor{sidebarsoft}{RGB}{148, 163, 184}    % Muted text in sidebar

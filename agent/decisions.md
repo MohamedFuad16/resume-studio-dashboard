@@ -390,3 +390,25 @@ Reverse-engineered from the codebase on 2026-06-29. Newest at the bottom.
 - **Consequences:** Zero risk of an LLM hallucination silently dropping a valid role; a human/agent
   confirms "closed" verdicts before editing seeds. Cost is bounded (only stale-risk entries, with
   `--limit`), and the daily CI step is best-effort.
+
+## ADR-0018 — Live PDF preview via a containerized compile backend
+- **Date:** 2026-07-04
+- **Status:** Accepted
+- **Context:** Vercel's serverless runtime can't run Tectonic (LaTeX), so the deployed
+  PDF preview served a stale prebaked fallback instead of the user's live edits. The JA
+  templates also used macOS-only fonts (Hiragino / Avenir Next).
+- **Decision (user-chosen):** Run the existing Node/Express server in a Docker container
+  with Tectonic + Noto CJK fonts; the Vercel frontend calls it via `VITE_API_BASE_URL`
+  (the client already routes all `/api/*` through that base). Root `Dockerfile`
+  (node:22-trixie — glibc ≥2.38 for the Tectonic prebuilt; amd64) + `render.yaml`
+  Blueprint + `docs/compile-backend.md`. Templates gained an env-driven font profile:
+  `RESUME_FONT_PROFILE=linux` swaps the JA fonts Hiragino→Noto Serif CJK (Mincho) /
+  Noto Sans CJK (Gothic); macOS (unset) keeps Hiragino; EN templates unchanged (no
+  fontspec). The compile endpoint already takes the résumé in the body, so it compiles
+  live data; per-user data stays in Firestore.
+- **Consequences:** Verified locally by building the image and compiling all EN/JA
+  templates (JA renders Noto Mincho body + Gothic headings, bold auto-detected, 1 page,
+  visually ~identical to Hiragino). The user deploys the container (Render free tier)
+  and sets `VITE_API_BASE_URL` + redeploys the frontend. Free hosts cold-start (~30–60s)
+  after idle. The Vercel serverless API becomes a fallback (still serves prebaked PDFs
+  if `VITE_API_BASE_URL` is unset).
