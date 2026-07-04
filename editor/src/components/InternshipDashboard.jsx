@@ -485,8 +485,8 @@ function CompanyResearchPanel({ company, t, isJa, job, results, error, onStart, 
                   <span>{displayRole(result.role, isJa)}</span>
                   <small>{displayValue(result.location, isJa)} · {displayValue(result.duration, isJa)} · {codingTestLabel(result.codingTest, isJa, t.liveNoCoding)}</small>
                 </div>
-                <a href={result.url} target="_blank" rel="noreferrer">{isJa ? '確認' : 'View'} <ExternalLink size={13} /></a>
-                <button type="button" onClick={() => onAdd(result)} disabled={added || addingId === result.id}>
+                <a href={result.url} target="_blank" rel="noreferrer" style={{ padding: '0 12px', whiteSpace: 'nowrap' }}>{isJa ? '確認' : 'View'} <ExternalLink size={13} /></a>
+                <button type="button" onClick={() => onAdd(result)} disabled={added || addingId === result.id} style={{ padding: '0 12px', whiteSpace: 'nowrap' }}>
                   {addingId === result.id ? <LoaderCircle size={14} className="spin" /> : added ? <Check size={14} /> : <PlusCircle size={14} />}
                   {added ? t.liveAdded : t.liveAdd}
                 </button>
@@ -636,10 +636,16 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
       // used immediately, and send the résumé + key/model so the server can research
       // with the user's own OpenRouter key (env fallback). Phase 3 / ADR-0016.
       const settings = await settingsApi.get().catch(() => ({}));
+      // Auto-migrate the old slow default (gpt-5-mini) that users may have saved to
+      // Settings before the switch to the fast google/gemini-2.5-flash default: treat
+      // it as "unset" so the server picks the new fast default. A model the user
+      // genuinely chose (anything else) is respected.
+      const savedModel = settings?.searchModel;
+      const searchModel = (savedModel && savedModel !== 'openai/gpt-5-mini') ? savedModel : undefined;
       const body = {
         resume,
         apiKey: settings?.openrouterKey || undefined,
-        searchModel: settings?.searchModel || undefined,
+        searchModel,
       };
       // The research/compile backend may be a free-tier container that sleeps when
       // idle; the first request after a cold start can fail while it wakes. Retry

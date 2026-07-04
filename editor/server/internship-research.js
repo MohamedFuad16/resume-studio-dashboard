@@ -5,7 +5,9 @@ import OpenAI from 'openai';
 
 const SCHEMA_FILE = fileURLToPath(new URL('./internship-search.schema.json', import.meta.url));
 const BLOCKED_JOB_DOMAINS = /(?:indeed|glassdoor|linkedin|ziprecruiter|simplyhired)\./i;
-const DEFAULT_MODEL = 'openai/gpt-5-mini';
+// Gemini 2.5 Flash: cheap, accurate, and MUCH faster than gpt-5-mini for the
+// :online web-search research (measured ~49s vs 120s+). Overridable via Settings/env.
+const DEFAULT_MODEL = 'google/gemini-2.5-flash';
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const slugify = value => String(value || '')
