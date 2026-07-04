@@ -23,5 +23,8 @@ export default defineConfig({
     url: 'http://127.0.0.1:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
+    // The Firebase auth gate would otherwise block the app behind LoginScreen;
+    // the E2E suite has no signed-in user, so disable auth for the test server.
+    env: { ...process.env, VITE_AUTH_DISABLED: 'true' },
   },
 });

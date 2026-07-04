@@ -23,6 +23,10 @@ on:
 jobs:
   validate-catalog:
     runs-on: ubuntu-latest
+    env:
+      # Present only if the repo secret is configured. The LLM audit step and the
+      # script both skip gracefully when empty, so the job stays green without it.
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
     defaults:
       run:
         # All steps run inside editor/ (where package.json + the validator live).
@@ -58,3 +62,20 @@ jobs:
       # (404/410/5xx/DNS/timeout) fail the job; bot-wall statuses are warnings.
       - name: Validate catalog links (liveness)
         run: npm run validate:catalog:links
+
+      # Cheap-LLM validity audit of stale-risk entries (deadline soon, stale
+      # verifiedDate, or generic apply URL). Advisory only — it never auto-retires
+      # and exits 0 on any error, so it cannot fail the pipeline. Runs only when the
+      # OPENROUTER_API_KEY secret is configured.
+      - name: LLM catalog audit (advisory)
+        if: ${{ env.OPENROUTER_API_KEY != '' }}
+        run: npm run audit:catalog:llm
+
+      # Keep the dated report as a downloadable artifact for review.
+      - name: Upload LLM audit report
+        if: ${{ env.OPENROUTER_API_KEY != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: llm-audit-report
+          path: editor/server/seeds/llm-audit-*.json
+          if-no-files-found: ignore

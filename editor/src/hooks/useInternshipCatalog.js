@@ -3,6 +3,11 @@ import { internshipApi } from '../api/client.js';
 
 export const CATALOG_EVENT = 'resume-studio:internship-catalog-change';
 const EMPTY_META = { target: 200, researchDate: '', researchNote: '', count: 0 };
+// Module-level cache shared across all mounts. This is intentional and safe: the
+// internship catalog is GLOBAL (profile-independent) — matching/ranking is applied
+// per-profile downstream (utils/internshipRanking, the tracker), not baked into the
+// catalog — so it never needs invalidating on a profile switch. It IS refreshed on an
+// explicit CATALOG_EVENT (e.g. after adding a live-researched company).
 let catalogSnapshot = null;
 let catalogRequest = null;
 

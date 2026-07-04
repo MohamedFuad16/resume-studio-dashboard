@@ -6,9 +6,28 @@ The client and server are separate module graphs connected only over HTTP via
 `src/api/client.js → /api/*`.
 
 ## Client (`editor/src`) — who imports whom
-- `main.jsx` → `App.jsx`
+- `main.jsx` → `App.jsx`, `auth/AuthGate` (auth gate wraps `<App/>`)
 - `App.jsx` → `api/client`, `components/InternshipDashboard`, `components/ProfileDashboard`,
-  `components/ProfileSwitcher`, `components/sections`, `components/ui`, `utils/helpers`, `index.css`
+  `components/ProfileSwitcher`, `components/sections`, `components/ui`, `utils/helpers`,
+  `auth/firebase`, `auth/useAuth` (header Sign-out button), `index.css`
+- **Auth subsystem (Firebase, added 2026-07-03):**
+  - `auth/AuthGate` → `auth/useAuth`, `components/LoginScreen` (renders LoginScreen when
+    signed out; passes through to `<App/>` when signed in or auth disabled)
+  - `auth/useAuth` → `auth/firebase`, `data/userProfile`
+  - `components/LoginScreen` → `auth/useAuth`
+  - `data/userProfile` → `auth/firebase` (Firestore `users/{uid}` identity doc)
+  - `data/firestoreData` → `auth/firebase` (client-direct per-user data: profiles/trackers/
+    applications under `users/{uid}/...`; also `ensureSeed`, called by `auth/AuthGate`)
+  - `api/client` → `data/firestoreData` (profileApi/trackerApi/applicationApi/**settingsApi**
+    delegate to Firestore when signed in; else the legacy `/api/*` HTTP backend / localStorage)
+  - `App.jsx` → `components/SettingsPanel` (Phase 2 settings view) → `api/client` (settingsApi)
+  - `components/InternshipDashboard` → `api/client` (settingsApi — sends the OpenRouter key with
+    live-research requests, Phase 3)
+- **Server tooling:** `server/audit-catalog-llm.js` (Phase 7, npm `audit:catalog:llm`) →
+  `seeds/catalog.js` (buildSeedCatalog) + `openai` (OpenRouter audit model). Standalone; not
+  imported by the app. `madge --circular` over the client graph: clean (0 cycles).
+  - `auth/firebase` → `firebase/app`, `firebase/auth`, `firebase/firestore` (leaf; public
+    config + `authAvailable`, off when `VITE_AUTH_DISABLED=true`)
 - `components/ProfileDashboard` → `ApplicationCalendar`, `CompanyLogo`,
   `hooks/useApplicationTracker`, `hooks/useInternshipCatalog`, `utils/imageUpload`,
   `InterviewDateModal`, `utils/internshipDisplay`, `utils/internshipRanking`, `utils/techIcons`

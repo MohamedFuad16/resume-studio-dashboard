@@ -48,6 +48,11 @@ const DEFAULT_PROFILE_ID = process.env.RESUME_DEFAULT_PROFILE_ID || 'mohamed_fua
 // fresh store always lists demo data. Each is only seeded when its KV key is missing
 // and its <id>.json file exists (see ensureSampleProfiles / readProfile).
 const SAMPLE_PROFILE_IDS = ['mohamed_fuad', 'aiko_tanaka'];
+// Profile ids that were removed and must never resurface. Their KV keys are purged on
+// boot (see purgeRetiredProfiles) and excluded from listProfiles defensively. `temp`
+// was the scratch profile (nameEn "fdf"); its <id>.json is gone but the KV row lingered
+// locally and in the prod Blob snapshot. See BUG-008.
+const RETIRED_PROFILE_IDS = ['temp'];
 // Profiles the DELETE route refuses to remove. Configurable via env (comma-separated);
 // defaults to protecting only the primary profile.
 const PROTECTED_PROFILE_IDS = new Set(
@@ -172,10 +177,10 @@ async function writeProfile(profileId, data) {
 async function listProfiles() {
   const stored = await store.listJson('profile:');
   if (stored.length) {
-    return stored.map(({ key, value }) => {
-      const id = key.replace(/^profile:/, '');
-      return { id, name: value.personal?.nameEn || value.personalInfo?.fullName || id, fileName: `${id}.json` };
-    });
+    return stored
+      .map(({ key, value }) => ({ id: key.replace(/^profile:/, ''), value }))
+      .filter(({ id }) => !RETIRED_PROFILE_IDS.includes(id))
+      .map(({ id, value }) => ({ id, name: value.personal?.nameEn || value.personalInfo?.fullName || id, fileName: `${id}.json` }));
   }
   await ensureSampleProfiles();
   return listProfiles();
@@ -189,6 +194,28 @@ async function ensureSampleProfiles() {
     await readProfile(sampleId);
   }
 }
+
+// Delete the KV rows for any retired profile ids (profile:/tracker:/applications:).
+// Idempotent — safe to run on every boot; rewrites the Blob snapshot so prod is cleaned
+// on the next deploy. See BUG-008.
+async function purgeRetiredProfiles() {
+  for (const id of RETIRED_PROFILE_IDS) {
+    await store.deleteKey(profileKey(id)).catch(() => {});
+    await store.deleteKey(trackerKey(id)).catch(() => {});
+    await store.deleteKey(applicationsKey(id)).catch(() => {});
+  }
+}
+
+// Live LaTeX compilation cannot run on Vercel (no Tectonic binary), so the PDF
+// preview there falls back to the prebaked `resume_<template>.pdf` files, cached in
+// the KV store. A template redesign would otherwise leave a STALE PDF cached in the
+// Blob. We namespace the cache key by a VERSION rather than deleting: bumping the
+// version means the new key is empty, so the next read serves the fresh deployed
+// prebaked file and re-caches under the new key. This is concurrency-safe on Vercel's
+// whole-DB-snapshot Blob store (a delete can be clobbered by a stale instance's
+// write; an orphaned old key simply never gets read). Bump on any template change.
+const COMPILED_CACHE_VERSION = '2026-07-03-jakes-clean-ja';
+const compiledKey = template => `compiled:${COMPILED_CACHE_VERSION}:${template}`;
 
 async function deleteProfile(profileId) {
   const id = validateProfileId(profileId);
@@ -223,7 +250,7 @@ async function materializeResumePhoto(resume, tmpDir) {
 }
 
 async function persistCompiledPdf(template, pdfData, { mirrorLocal = !process.env.VERCEL } = {}) {
-  await store.setJson(`compiled:${template}`, {
+  await store.setJson(compiledKey(template), {
     contentType: 'application/pdf',
     base64: pdfData.toString('base64'),
     updatedAt: new Date().toISOString(),
@@ -236,7 +263,7 @@ async function persistCompiledPdf(template, pdfData, { mirrorLocal = !process.en
 }
 
 async function readCompiledPdf(template) {
-  const stored = await store.getJson(`compiled:${template}`, null);
+  const stored = await store.getJson(compiledKey(template), null);
   if (stored?.base64) {
     return {
       contentType: stored.contentType || 'application/pdf',
@@ -278,6 +305,7 @@ async function initPersistentStore() {
         if (error.code !== 'ENOENT') console.error('Could not migrate profile files:', error.message);
       }
     }
+    await purgeRetiredProfiles();
     await ensureSampleProfiles();
     await readInternshipCatalog();
     console.log(`✅ Internship Portal store ready (${store.backend})`);
@@ -456,10 +484,16 @@ app.post('/api/internships/research-company', async (req, res) => {
   internshipResearchByCompany.set(companyKey, jobId);
   res.status(202).json({ jobId, company, status: 'researching' });
 
+  // Client-direct users own their résumé + OpenRouter key in Firestore, so both may
+  // arrive in the request body; fall back to server KV / env otherwise. Phase 3.
+  const bodyResume = req.body?.resume && typeof req.body.resume === 'object' ? req.body.resume : null;
+  const apiKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
+  const searchModel = typeof req.body?.searchModel === 'string' ? req.body.searchModel.trim() : '';
+
   Promise.resolve().then(async () => {
     try {
-      const resume = await readProfile(profileId);
-      const research = await researchCompanyInternships({ company, resume, rootDir: RESUME_ROOT });
+      const resume = bodyResume || await readProfile(profileId);
+      const research = await researchCompanyInternships({ company, resume, rootDir: RESUME_ROOT, apiKey, searchModel });
       internshipResearchJobs.set(jobId, { jobId, status: 'complete', completedAt: new Date().toISOString(), ...research });
     } catch (error) {
       internshipResearchJobs.set(jobId, {
@@ -467,6 +501,7 @@ app.post('/api/internships/research-company', async (req, res) => {
         company,
         status: 'error',
         error: error.message || 'Company research failed',
+        errorCode: error.code || null,
         completedAt: new Date().toISOString(),
       });
     }
@@ -668,6 +703,73 @@ app.get('/api/export/ai', async (req, res) => {
     res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${profile}_job_profile.md"`);
     res.send(md);
+  } catch (e) {
+    sendRequestError(res, e);
+  }
+});
+
+// ── POST export variants (client-direct Firestore) ───────────────
+// These accept the résumé in the request body so the server needs no KV profile
+// lookup. The signed-in client owns its résumé in Firestore and posts it here.
+app.post('/api/export/tex', async (req, res) => {
+  try {
+    const template = String(req.body?.template || '');
+    if (!VALID_TEMPLATES.has(template)) return res.status(400).json({ error: 'Invalid resume template.' });
+    const resume = validateResume(req.body?.resume);
+    const latex = generateLatex(template, resume);
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="resume_${template}.tex"`);
+    res.send(latex);
+  } catch (e) {
+    sendRequestError(res, e);
+  }
+});
+
+app.post('/api/export/pdf', async (req, res) => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'resume-'));
+  try {
+    const template = String(req.body?.template || '');
+    if (!VALID_TEMPLATES.has(template)) return res.status(400).json({ error: 'Invalid resume template.' });
+    const resume = validateResume(req.body?.resume);
+    const photoFile = await materializeResumePhoto(resume, tmpDir);
+    const latex = generateLatex(template, resume, { photoFile });
+    const texFile = path.join(tmpDir, 'resume.tex');
+    await fs.writeFile(texFile, latex, 'utf8');
+    await execFileAsync(TECTONIC, [texFile, '-r', '0', '--outdir', tmpDir]);
+    const pdfData = await fs.readFile(path.join(tmpDir, 'resume.pdf'));
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="resume_${template}.pdf"`);
+    res.send(pdfData);
+  } catch (e) {
+    sendRequestError(res, e);
+  } finally {
+    fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+app.post('/api/export/ai', async (req, res) => {
+  try {
+    const resume = validateResume(req.body?.resume);
+    const md = buildAIProfile(resume);
+    res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="job_profile.md"');
+    res.send(md);
+  } catch (e) {
+    sendRequestError(res, e);
+  }
+});
+
+// ── POST /api/cover-letter ───────────────────────────────────────
+// Stateless cover-letter builder used by the Firestore application flow: the
+// client posts its résumé + job details, gets back the generated letter, and
+// stores the application record itself under users/{uid}/applications.
+app.post('/api/cover-letter', async (req, res) => {
+  try {
+    const resume = validateResume(req.body?.resume);
+    const { company, jobTitle, jobDescription } = validateApplication(req.body);
+    const coverLetter = buildCoverLetter(resume, company, jobTitle, jobDescription);
+    const fileName = `${company.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${jobTitle.toLowerCase().replace(/[^a-z0-9]/g, '_')}_application.md`;
+    res.json({ success: true, fileName, coverLetter });
   } catch (e) {
     sendRequestError(res, e);
   }

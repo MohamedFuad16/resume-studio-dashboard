@@ -19,7 +19,7 @@ import {
   Star,
   X,
 } from 'lucide-react';
-import { internshipApi } from '../api/client.js';
+import { internshipApi, settingsApi } from '../api/client.js';
 import { APPLICATION_STATUSES, statusLabel, useApplicationTracker } from '../hooks/useApplicationTracker.js';
 import { notifyCatalogChange, useInternshipCatalog } from '../hooks/useInternshipCatalog.js';
 import { CompanyLogo } from './CompanyLogo.jsx';
@@ -29,8 +29,10 @@ import { appliedCompaniesForProfile, appliedCompanyRank, compareCompanyAwareMatc
 
 const DESKTOP_PAGE_SIZE = 14;
 const MOBILE_PAGE_SIZE = 6;
-const NOW = new Date();
-const TODAY = NOW.toISOString().slice(0, 10);
+// Recompute the clock per call (not once at module load) so a tab left open across
+// midnight JST still evaluates expiry/urgency against the current time. See BUG-009.
+const nowDate = () => new Date();
+const todayIso = () => new Date().toISOString().slice(0, 10);
 const DISPLAY_DATE_FORMAT = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
 // Statuses that mean the user has already engaged the role from the tracker. These
@@ -52,7 +54,7 @@ const deadlineInstant = item => {
 };
 const isExpiredDeadline = item => {
   const cutoff = deadlineInstant(item);
-  return Boolean(cutoff) && cutoff < NOW;
+  return Boolean(cutoff) && cutoff < nowDate();
 };
 // Radar visibility rule:
 //  1. Applied-type listings (applying/applied/interview) are hidden from the radar
@@ -61,7 +63,11 @@ const isExpiredDeadline = item => {
 //     INSTANT has passed in JST (so a 2026-06-30 09:00 JST deadline is already
 //     expired at 2026-07-01 00:00 JST).
 //  3. Listings with no deadlineDate ("Not stated") always show (unless applied).
-const isVisibleInRadar = (item, status) => !APPLIED_TYPE_STATUSES.has(status) && !isExpiredDeadline(item);
+//  4. EXCEPTION: a role the user has "saved" stays visible even after its deadline
+//     lapses (rendered with the existing urgent/expired styling) so the Saved filter
+//     count always matches the rendered rows. See BUG-007.
+const isVisibleInRadar = (item, status) =>
+  !APPLIED_TYPE_STATUSES.has(status) && (status === 'saved' || !isExpiredDeadline(item));
 
 const copy = {
   en: {
@@ -108,7 +114,7 @@ const copy = {
     process: 'Application procedure',
     source: 'Research source',
     compensation: 'Compensation',
-    verifiedSmall: date => `Link verified ${date || TODAY}. Openings can close without notice.`,
+    verifiedSmall: date => `Link verified ${date || todayIso()}. Openings can close without notice.`,
     noMatches: 'No internships match these filters',
     noMatchesSub: 'Clear a filter or search another technology.',
     reset: 'Reset filters',
@@ -120,6 +126,8 @@ const copy = {
     liveStart: 'Search official sources',
     liveAdd: 'Add to matches',
     liveAdded: 'Added',
+    liveKeyMissing: 'Live research needs an OpenRouter API key.',
+    liveAddKey: 'Add your key in Settings',
     liveNoCoding: 'Coding test not published',
     showing: (start, end, total) => `Showing ${start}-${end} of ${total}`,
     page: (page, count) => `Page ${page} of ${count}`,
@@ -178,7 +186,7 @@ const copy = {
     process: '応募フロー',
     source: '情報源',
     compensation: '待遇',
-    verifiedSmall: date => `リンク確認日: ${date || TODAY}。募集は予告なく終了する場合があります。`,
+    verifiedSmall: date => `リンク確認日: ${date || todayIso()}。募集は予告なく終了する場合があります。`,
     noMatches: '条件に合う募集がありません',
     noMatchesSub: '条件を減らすか、別のキーワードで検索してください。',
     reset: '条件をリセット',
@@ -190,6 +198,8 @@ const copy = {
     liveStart: '公式情報を検索',
     liveAdd: '候補に追加',
     liveAdded: '追加済み',
+    liveKeyMissing: 'ライブリサーチには OpenRouter APIキーが必要です。',
+    liveAddKey: '設定でキーを追加',
     liveNoCoding: 'コーディングテスト未掲載',
     showing: (start, end, total) => `${total}件中 ${start}-${end}件を表示`,
     page: (page, count) => `${page}/${count}ページ`,
@@ -207,20 +217,13 @@ const copy = {
 };
 
 // Urgency styling shares the SAME JST-instant semantics as visibility (deadlineInstant
-// + NOW), so the badge and the auto-hide rule never disagree about whether a deadline
-// has effectively passed. "Not stated" listings carry no urgency class.
+// + nowDate()), so the badge and the auto-hide rule never disagree about whether a
+// deadline has effectively passed. "Not stated" listings carry no urgency class.
 const deadlineClass = item => {
   const cutoff = deadlineInstant(item);
   if (!cutoff) return '';
-  const days = Math.ceil((cutoff - NOW) / 86400000);
+  const days = Math.ceil((cutoff - nowDate()) / 86400000);
   return days <= 7 ? 'urgent' : days <= 21 ? 'soon' : '';
-};
-
-const matchLabel = score => {
-  if (score >= 90) return 'Excellent';
-  if (score >= 85) return 'Very strong';
-  if (score >= 80) return 'Strong';
-  return 'Worth exploring';
 };
 
 const locationPriority = item => {
@@ -273,7 +276,7 @@ const JA_TRACK_LABELS = {
 
 const trackLabel = (value, isJa) => isJa ? (JA_TRACK_LABELS[value] || value) : value;
 const formatVerifiedDate = (date, isJa) => {
-  if (!date) return TODAY;
+  if (!date) return todayIso();
   if (isJa) return date;
   const parsed = new Date(`${date}T12:00:00`);
   if (Number.isNaN(parsed.getTime())) return date;
@@ -366,7 +369,7 @@ const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEditor, i
       <CompanyLogo item={item} size="lg" />
       <div className="intern-detail-title">
         <strong>{companyName}</strong>
-        <p className="intern-role-stack"><span>{roleLead}</span>{roleDetails.map(part => <span key={part}>{part}</span>)}</p>
+        <p className="intern-role-stack"><span>{roleLead}</span>{roleDetails.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</p>
       </div>
       <div className="intern-detail-score">
         <b>{item.score}%</b>
@@ -376,15 +379,17 @@ const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEditor, i
     </div>
 
     <div className="intern-detail-meta" aria-label={isJa ? '募集条件' : 'Internship facts'}>
-      {locationParts.map((part, index) => <span className="intern-meta-token" key={part}>{index === 0 ? <MapPin size={13} /> : null}{part}</span>)}
-      {languageParts.map((part, index) => <span className="intern-meta-token language" key={part}><b>{index === 0 ? 'EN' : 'JA'}</b>{part}</span>)}
-      {durationParts.map((part, index) => <span className="intern-meta-token" key={part}>{index === 0 ? <CalendarClock size={13} /> : null}{part}</span>)}
+      {locationParts.map((part, index) => <span className="intern-meta-token" key={`${part}-${index}`}>{index === 0 ? <MapPin size={13} /> : null}{part}</span>)}
+      {languageParts.map((part, index) => <span className="intern-meta-token language" key={`${part}-${index}`}><b>{index === 0 ? 'EN' : 'JA'}</b>{part}</span>)}
+      {durationParts.map((part, index) => <span className="intern-meta-token" key={`${part}-${index}`}>{index === 0 ? <CalendarClock size={13} /> : null}{part}</span>)}
     </div>
 
-    <section className="intern-detail-section">
-      <h3>{t.about}</h3>
-      <p className="intern-fit-note">{displayValue(isJa ? details.aboutJa : details.about, isJa)}</p>
-    </section>
+    {(details.about || details.aboutJa) && (
+      <section className="intern-detail-section">
+        <h3>{t.about}</h3>
+        <p className="intern-fit-note">{displayValue(isJa ? details.aboutJa : details.about, isJa)}</p>
+      </section>
+    )}
 
     <section className="intern-detail-section">
       <h3>{t.fitHeading}</h3>
@@ -394,19 +399,23 @@ const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEditor, i
       </ul>
     </section>
 
-    <section className="intern-detail-section">
-      <h3>{t.techStack}</h3>
-      <div className="intern-chip-list">
-        {details.techStack.map((tech, index) => <span key={`${tech}-${index}`}>{displayValue(tech, isJa)}</span>)}
-      </div>
-    </section>
+    {details.techStack.length > 0 && (
+      <section className="intern-detail-section">
+        <h3>{t.techStack}</h3>
+        <div className="intern-chip-list">
+          {details.techStack.map((tech, index) => <span key={`${tech}-${index}`}>{displayValue(tech, isJa)}</span>)}
+        </div>
+      </section>
+    )}
 
-    <section className="intern-detail-section intern-eligibility">
-      <h3>{t.eligibility}</h3>
-      <ul className="intern-check-list">
-        {eligibility.map((entry, index) => <li key={`${entry}-${index}`}><ShieldCheck size={15} />{displayValue(entry, isJa)}</li>)}
-      </ul>
-    </section>
+    {eligibility.length > 0 && (
+      <section className="intern-detail-section intern-eligibility">
+        <h3>{t.eligibility}</h3>
+        <ul className="intern-check-list">
+          {eligibility.map((entry, index) => <li key={`${entry}-${index}`}><ShieldCheck size={15} />{displayValue(entry, isJa)}</li>)}
+        </ul>
+      </section>
+    )}
 
     <section className="intern-detail-section">
       <h3>{t.process}</h3>
@@ -433,24 +442,33 @@ const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEditor, i
   );
 };
 
-function CompanyResearchPanel({ company, t, isJa, job, results, error, onStart, onAdd, addedIds, addingId }) {
+function CompanyResearchPanel({ company, t, isJa, job, results, error, onStart, onAdd, addedIds, addingId, onOpenSettings }) {
   if (!company) return null;
   const searching = job?.status === 'researching';
   const complete = job?.status === 'complete';
+  const missingKey = job?.errorCode === 'OPENROUTER_API_KEY_MISSING';
   const showPrompt = !job && !results.length && !error;
 
   return (
     <section className="company-research-panel" aria-live="polite" data-testid="company-research-panel">
       <div className="company-research-intro">
-        <CompanyLogo item={{ company, url: `https://${company.toLowerCase().replace(/[^a-z0-9]+/g, '')}.com` }} />
+        {/* No fabricated URL — let CompanyLogo resolve a known domain or show initials
+            until real research results (which carry companyDomain) arrive. */}
+        <CompanyLogo item={{ company }} />
         <div>
           <h3>{t.liveSearchTitle(company)}</h3>
-          <p data-testid="company-research-status">{showPrompt ? t.liveSearchSub : searching ? t.liveSearching(company) : error ? `${t.liveError} ${error}` : t.liveDone(results.length)}</p>
+          <p data-testid="company-research-status">{showPrompt ? t.liveSearchSub : searching ? t.liveSearching(company) : missingKey ? t.liveKeyMissing : error ? `${t.liveError} ${error}` : t.liveDone(results.length)}</p>
         </div>
-        <button type="button" onClick={onStart} disabled={searching}>
-          {searching ? <LoaderCircle size={15} className="spin" /> : <Search size={15} />}
-          {searching ? (isJa ? '検索中' : 'Searching') : t.liveStart}
-        </button>
+        {missingKey ? (
+          <button type="button" className="company-research-cta" data-testid="company-research-add-key" onClick={onOpenSettings}>
+            <PlusCircle size={15} /> {t.liveAddKey}
+          </button>
+        ) : (
+          <button type="button" onClick={onStart} disabled={searching}>
+            {searching ? <LoaderCircle size={15} className="spin" /> : <Search size={15} />}
+            {searching ? (isJa ? '検索中' : 'Searching') : t.liveStart}
+          </button>
+        )}
       </div>
 
       {results.length ? (
@@ -479,7 +497,7 @@ function CompanyResearchPanel({ company, t, isJa, job, results, error, onStart, 
   );
 }
 
-export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
+export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, activeProfile, resume }) {
   const t = isJa ? copy.ja : copy.en;
   const { records, statusFor, updateStatus, addMilestone } = useApplicationTracker(activeProfile);
   const { catalog, meta, refresh: refreshCatalog } = useInternshipCatalog();
@@ -518,7 +536,13 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
   );
   const regions = ['All', 'Japan', 'Remote', 'Global'];
   const tracks = useMemo(() => ['All', ...new Set(visibleCatalog.map(item => item.track).filter(Boolean))], [visibleCatalog]);
-  const savedCount = records.filter(record => record.status === 'saved').length;
+  // Derive from the VISIBLE set (not raw tracker records) so the Saved button count
+  // always equals the number of rows the Saved filter renders. A saved role that was
+  // retired from the catalog is not in visibleCatalog, so it is excluded from both. BUG-007.
+  const savedCount = useMemo(
+    () => visibleCatalog.filter(item => statusFor(item.id) === 'saved').length,
+    [visibleCatalog, statusFor],
+  );
   const dynamicStats = useMemo(() => ({
     total: visibleCatalog.length,
     target: Math.max(meta.target || 200, visibleCatalog.length),
@@ -606,7 +630,15 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
     setResearchError('');
     setResearchResults([]);
     try {
-      const job = await internshipApi.startResearch(cleanCompany, activeProfile);
+      // Fetch the AI settings fresh at start time so a key just saved in Settings is
+      // used immediately, and send the résumé + key/model so the server can research
+      // with the user's own OpenRouter key (env fallback). Phase 3 / ADR-0016.
+      const settings = await settingsApi.get().catch(() => ({}));
+      const job = await internshipApi.startResearch(cleanCompany, activeProfile, {
+        resume,
+        apiKey: settings?.openrouterKey || undefined,
+        searchModel: settings?.searchModel || undefined,
+      });
       setResearchJob(job);
       if (job.status === 'complete') setResearchResults(Array.isArray(job.results) ? job.results : []);
       if (options.auto) autoResearchStarted.current.add(cleanCompany.toLowerCase());
@@ -722,7 +754,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
             <select value={track} onChange={event => setTrack(event.target.value)} aria-label={t.allTracks}>{tracks.map(option => <option key={option} value={option}>{option === 'All' ? t.allTracks : trackLabel(option, isJa)}</option>)}</select>
             <select value={language} onChange={event => setLanguage(event.target.value)} aria-label={t.allLanguages}><option value="All">{t.allLanguages}</option><option value="English-first">{t.english}</option><option value="Bilingual">{isJa ? 'バイリンガル' : 'Bilingual'}</option></select>
             <select value={deadlineFilter} onChange={event => setDeadlineFilter(event.target.value)} aria-label={t.allDeadlines}><option value="All">{t.allDeadlines}</option><option value="7 days">{t.next7}</option><option value="30 days">{t.next30}</option><option value="Not stated">{t.notStated}</option></select>
-            <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} aria-label={t.allStatuses}><option value="All">{t.allStatuses}</option>{APPLICATION_STATUSES.map(option => <option key={option.value} value={option.value}>{statusLabel(option.value, isJa)}</option>)}</select>
+            <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} aria-label={t.allStatuses}><option value="All">{t.allStatuses}</option>{APPLICATION_STATUSES.filter(option => !APPLIED_TYPE_STATUSES.has(option.value)).map(option => <option key={option.value} value={option.value}>{statusLabel(option.value, isJa)}</option>)}</select>
             <button type="button" className={priorityOnly ? 'active' : ''} onClick={() => setPriorityOnly(value => !value)}><Star size={14} /> {t.priority}</button>
             <button type="button" className={savedOnly ? 'active' : ''} onClick={() => setSavedOnly(value => !value)}><Bookmark size={14} /> {t.saved(savedCount)}</button>
             {hasFilters ? <button type="button" className="intern-clear" onClick={clearFilters}>{t.clear}</button> : null}
@@ -742,6 +774,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
             onAdd={addResearchResult}
             addedIds={addedResearchIds}
             addingId={addingId}
+            onOpenSettings={onOpenSettings}
           />
         ) : null}
 
@@ -763,6 +796,10 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
                     aria-label={`${displayCompany(item, isJa)}: ${isJa ? '詳細を開く' : 'Open internship details'}`}
                     onClick={() => setSelectedId(item.id)}
                     onKeyDown={event => {
+                      // Only the row itself opens the drawer on Enter/Space — not when a
+                      // child control (the status <select> or company button) is focused,
+                      // so keyboard users can operate the select without opening the drawer.
+                      if (event.target !== event.currentTarget) return;
                       if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault();
                         setSelectedId(item.id);
@@ -770,11 +807,11 @@ export function InternshipDashboard({ isJa, onOpenEditor, activeProfile }) {
                     }}
                   >
                     <span className="intern-rank">{(page - 1) * pageSize + index + 1}</span>
-                    <span className="intern-company-cell"><CompanyLogo item={item} /><button type="button" className="intern-company-trigger" onClick={() => setSelectedId(item.id)} aria-label={`${displayCompany(item, isJa)}: ${isJa ? '詳細を開く' : 'Open internship details'}`}><strong>{displayCompany(item, isJa)}</strong><small className="intern-role-stack"><span>{roleLead}</span>{roleDetails.map(part => <span key={part}>{part}</span>)}</small></button></span>
+                    <span className="intern-company-cell"><CompanyLogo item={item} /><button type="button" className="intern-company-trigger" onClick={() => setSelectedId(item.id)} aria-label={`${displayCompany(item, isJa)}: ${isJa ? '詳細を開く' : 'Open internship details'}`}><strong>{displayCompany(item, isJa)}</strong><small className="intern-role-stack"><span>{roleLead}</span>{roleDetails.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</small></button></span>
                     <span className="intern-match"><strong>{item.score}%</strong><small>{item.priority ? t.priority : t.matchLabel(item.score)}</small></span>
-                    <span className="intern-location" data-label={t.location}><MapPin size={13} /><span className="intern-location-stack">{locationParts.map(part => <span key={part}>{part}</span>)}</span></span>
-                    <span className="intern-language" data-label={t.language}><Globe2 size={13} /><span className="intern-language-stack">{languageParts.map(part => <span key={part}>{part}</span>)}</span></span>
-                    <span className="intern-duration" data-label={t.duration}><span className="intern-duration-stack">{durationParts.map(part => <span key={part}>{part}</span>)}</span></span>
+                    <span className="intern-location" data-label={t.location}><MapPin size={13} /><span className="intern-location-stack">{locationParts.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</span></span>
+                    <span className="intern-language" data-label={t.language}><Globe2 size={13} /><span className="intern-language-stack">{languageParts.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</span></span>
+                    <span className="intern-duration" data-label={t.duration}><span className="intern-duration-stack">{durationParts.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</span></span>
                     <span className={`intern-deadline ${deadlineClass(item)}`} data-label={t.deadline}>{formatDeadline(item.deadline, isJa)}</span>
                     <select className={`intern-row-status ${status || 'untracked'}`} value={status} onClick={event => event.stopPropagation()} onChange={event => handleStatusSelect(item, event.target.value)} aria-label={`${t.status}: ${displayCompany(item, isJa)}`}><option value="">{t.track}</option>{APPLICATION_STATUSES.map(option => <option key={option.value} value={option.value}>{statusLabel(option.value, isJa)}</option>)}</select>
                     <a className="intern-apply" href={item.url} target="_blank" rel="noreferrer" onClick={event => { event.stopPropagation(); onApply(item); }}>{t.apply} <ExternalLink size={13} /></a>

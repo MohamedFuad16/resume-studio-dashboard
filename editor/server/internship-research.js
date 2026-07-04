@@ -79,7 +79,10 @@ function normalizeResult(company, result, index, verifiedDate) {
     priority: isJapan,
     workAuth: result.eligibility?.trim() || 'Re-check eligibility on the official page',
     reasons: [isJapan ? 'Japan-based official opening' : 'Official opening found by live research', codingText],
-    fitNote: result.about?.trim() || 'Review the official description for responsibilities and fit.',
+    // Keep the role description in `about` and give `fitNote` a genuine (non-duplicate)
+    // fit statement — the detail panel renders these in separate sections. Phase 1.2.
+    about: result.about?.trim() || '',
+    fitNote: 'Surfaced by live company research as a match for your profile — confirm the responsibilities and eligibility on the official page before applying.',
     applicationProcess: process,
     codingTest: result.codingTest,
     url,
@@ -110,8 +113,9 @@ function fallbackCompanyName(value) {
 
 // Builds an OpenAI-SDK client pointed at OpenRouter. Throws a clearly-worded,
 // taggable error when the key is missing so callers can degrade gracefully.
-function getOpenRouterClient() {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+function getOpenRouterClient(overrideKey) {
+  // Resolution order: per-user key from Settings (passed in) → env. See ADR-0016.
+  const apiKey = (typeof overrideKey === 'string' && overrideKey.trim()) || process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     const error = new Error(
       'Live internship research is unavailable because OPENROUTER_API_KEY is not set. '
@@ -144,8 +148,8 @@ async function loadSearchSchema() {
 // The research call gets OpenRouter web search via the `:online` model suffix
 // (a still-supported shortcut for the web plugin). If the operator already
 // pinned a fully-qualified slug/variant we leave it untouched.
-function researchModel() {
-  const base = process.env.OPENROUTER_MODEL || DEFAULT_MODEL;
+function researchModel(overrideModel) {
+  const base = (typeof overrideModel === 'string' && overrideModel.trim()) || process.env.OPENROUTER_MODEL || DEFAULT_MODEL;
   return base.includes(':') ? base : `${base}:online`;
 }
 
@@ -168,10 +172,10 @@ function isStructuredOutputRejection(error) {
     || /json_schema|response_format|structured|schema|strict|not support|no endpoints/.test(message);
 }
 
-async function runOpenAiSearch(prompt, { timeoutMs }) {
-  const client = getOpenRouterClient();
+async function runOpenAiSearch(prompt, { timeoutMs, apiKey, searchModel }) {
+  const client = getOpenRouterClient(apiKey);
   const schema = await loadSearchSchema();
-  const model = researchModel();
+  const model = researchModel(searchModel);
   const messages = [
     {
       role: 'system',
@@ -221,7 +225,7 @@ async function verifyUrlLive(url, timeoutMs) {
   }
 }
 
-export async function researchCompanyInternships({ company, resume, rootDir }) {
+export async function researchCompanyInternships({ company, resume, rootDir, apiKey, searchModel }) {
   const verifiedDate = todayInTokyo();
   const profile = {
     education: (resume?.education || []).slice(0, 1),
@@ -255,10 +259,15 @@ Evidence rules:
   const timeoutMs = Number(process.env.INTERNSHIP_RESEARCH_TIMEOUT_MS || 120000);
   let parsed;
   try {
-    parsed = parseResult(await runOpenAiSearch(prompt, { timeoutMs }));
+    parsed = parseResult(await runOpenAiSearch(prompt, { timeoutMs, apiKey, searchModel }));
   } catch (error) {
+    // Preserve the taggable code so the client can show an "add your key" CTA
+    // instead of a raw error string. See Phase 3 / ADR-0016.
     if (error.code === 'OPENROUTER_API_KEY_MISSING') {
-      console.warn('[internship-research] OPENROUTER_API_KEY is not set; live research disabled. Set it in editor/.env.local and in Vercel.');
+      console.warn('[internship-research] No OpenRouter key (Settings or env); live research disabled.');
+      const wrapped = new Error('Add your OpenRouter API key in Settings to run live research.');
+      wrapped.code = 'OPENROUTER_API_KEY_MISSING';
+      throw wrapped;
     }
     throw new Error(`Live research agent failed: ${error.message}`);
   }

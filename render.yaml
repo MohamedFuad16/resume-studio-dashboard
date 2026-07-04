@@ -1,0 +1,28 @@
+# Render Blueprint for the Internship Portal compile backend (LaTeX/Tectonic).
+# One-click: on render.com → New → Blueprint → connect this repo. Render builds the
+# root Dockerfile and gives you a URL. Then set VITE_API_BASE_URL to that URL in the
+# Vercel project and redeploy the frontend. See docs/compile-backend.md.
+services:
+  - type: web
+    name: internship-portal-compile
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /api/status
+    autoDeploy: true
+    envVars:
+      # JA templates use Noto CJK on Linux (Hiragino is macOS-only).
+      - key: RESUME_FONT_PROFILE
+        value: linux
+      # Allow the production frontend origin (CORS). Add more with commas if needed.
+      - key: RESUME_STUDIO_APP_ORIGIN
+        value: https://editor-omega-two.vercel.app
+      # Optional: share the Vercel Blob store so catalog/settings persist across
+      # restarts. Leave unset to use ephemeral local SQLite (catalog re-seeds on boot).
+      # - key: BLOB_READ_WRITE_TOKEN
+      #   sync: false
+      # Optional: OpenRouter key for server-side live research fallback (the client
+      # also sends the user's own key per request).
+      # - key: OPENROUTER_API_KEY
+      #   sync: false

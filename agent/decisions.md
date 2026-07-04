@@ -285,3 +285,130 @@ Reverse-engineered from the codebase on 2026-06-29. Newest at the bottom.
   behavior is consistent in both surfaces and remains additive to tracker state. The
   profile-specific seed is intentionally local product data; if profiles become user-created
   at scale, applied-company preferences should move into persisted profile/tracker data.
+
+## ADR-0014 — Firebase Authentication gate + Firestore scaffold (auth first, data migration deferred)
+- **Date:** 2026-07-03
+- **Status:** Accepted
+- **Context:** The user wants Firebase (project `resume-841f9` / `501333131661`) as the
+  backend with Email/Password + Google auth and Firestore. The app today stores all
+  résumé/tracker/application data in a sql.js + Vercel Blob KV backend with named profile
+  ids (`mohamed_fuad`, `aiko_tanaka`). A full migration to per-user Firestore collections is
+  large and risky and touches every server route. This realizes Phase 4 of
+  `PLAN-2026-07-03-portal-overhaul.md` but with real config instead of a placeholder scaffold.
+- **Decision:** Ship the **auth gate + Firestore scaffold** with **open sign-up** (chosen by
+  the user) and keep existing data storage on the KV/Blob backend for now.
+  - Registered a Firebase web app via CLI; enabled Email/Password (Identity Toolkit Admin
+    API) — Google was already enabled. Created Firestore `(default)` in `asia-northeast1`.
+  - Client: `src/auth/firebase.js` (init + `authAvailable`), `src/auth/useAuth.js` (hook +
+    standalone `signOutUser`), `src/auth/AuthGate.jsx` (wraps `<App/>` in `main.jsx`),
+    `src/components/LoginScreen.jsx` (bilingual, Google + email/password), and
+    `src/data/userProfile.js` (upserts `users/{uid}` on login — the first real Firestore
+    write). A "Sign out" button was added to the header.
+  - Firebase web config is treated as public and hardcoded as fallbacks (env-overridable);
+    `authAvailable` is false when `VITE_AUTH_DISABLED=true`, which Playwright sets so the E2E
+    suite is not blocked by the login wall.
+  - Firestore rules restrict each user to their own `users/{uid}` tree; deployed via CLI.
+- **Consequences:** Login now gates the whole app when auth is available; per-user data
+  isolation and moving résumé/tracker/settings into Firestore remain **out of scope** and are
+  the next step if multi-tenant storage is wanted (new collections should hang off
+  `users/{uid}`). Server-side ID-token verification is not yet implemented — the current API
+  still trusts the profile query param, so this is an auth gate, not a security boundary on
+  the data API. Before a Vercel deploy, the production domain must be added to Firebase Auth
+  authorized domains (see `agent/secrets.md`). Bundle grew ~340 KB → ~1.05 MB (286 KB gzip)
+  from the Firebase SDK; code-splitting/lazy auth import is a possible later optimization.
+
+## ADR-0015 — Full per-user data migration to Firestore (client-direct)
+- **Date:** 2026-07-03
+- **Status:** Accepted
+- **Context:** Following ADR-0014's auth gate, the user asked to move all per-user data off the
+  sql.js + Vercel Blob KV backend into Firestore with per-user isolation. Chosen architecture
+  (user decision): **client-direct** (React SDK reads/writes Firestore, no Firebase Admin SDK),
+  with the **global internship catalog kept server-seeded**.
+- **Decision:**
+  - **Data model** (owner-only rules already deployed): `users/{uid}/profiles/{profileId}`
+    `{ name, resume, createdAt, updatedAt }`; `users/{uid}/trackers/{profileId}` `{ data, updatedAt }`;
+    `users/{uid}/applications/{profileId}` `{ items, updatedAt }`.
+  - **`src/data/firestoreData.js`** implements the same surface as the HTTP API
+    (listProfiles/getProfile/saveProfile/removeProfile, getTracker/saveTracker,
+    listApplications/createApplication) plus `ensureSeed`. **`src/api/client.js`** delegates
+    profileApi/trackerApi/applicationApi to it when `firestoreEnabled()` (signed-in), and keeps
+    the legacy `/api/*` HTTP path for the no-auth / E2E (`VITE_AUTH_DISABLED`) case. `internshipApi`
+    (catalog + research) is always HTTP.
+  - **Server decoupled from KV for authed users:** the LaTeX **export** endpoints gained POST
+    variants that take the résumé in the body (`/api/export/{pdf,tex,ai}`), JSON export is now
+    client-side, and a stateless **`/api/cover-letter`** builds the letter so the client can store
+    the application record in Firestore. `/api/compile` and `/api/chat/edit` already took the résumé
+    in the body. The GET export routes + KV read/write endpoints remain for the no-auth path.
+  - **Seeding:** `ensureSeed` (run once in AuthGate before App mounts) gives owner accounts
+    (`VITE_OWNER_EMAILS`, default `flashxjapan@gmail.com`) a copy of the `mohamed_fuad` sample
+    (profile + tracker, keeping id `mohamed_fuad` so the ranking map + defaults align); everyone
+    else gets a blank `primary` profile. App's boot now resolves the active profile against the real
+    list (falls back off the hard-coded `mohamed_fuad` default), and delete falls back to the first
+    remaining profile.
+- **Consequences:** Signed-in users get real-time, per-user isolated data with offline support and
+  no server data secret. The KV/Blob backend is now only exercised by the no-auth/E2E path. **Known
+  limitations:** custom researched companies (`/api/internships/custom`) are still server-global
+  (one user's researched role can appear for others) — acceptable for the current single-real-user
+  scope, migrate later; base64 ID photos live inside the profile doc (Firestore 1 MiB doc limit —
+  move to Firebase Storage if it ever overflows); and the API still trusts the `profile`/body input
+  (no server-side ID-token verification) so this remains an app boundary, not a data-API security
+  boundary. Verified end-to-end: owner+non-owner seeding, profile/tracker write+read across reload
+  (Firestore REST-confirmed), build green, E2E 5/5 (HTTP fallback), test account cleaned up.
+
+## ADR-0016 — Per-user AI settings in Firestore; key sent per-request (Phase 2/3)
+- **Date:** 2026-07-03
+- **Status:** Accepted
+- **Context:** The Settings view needs to store an OpenRouter API key + model slugs per user.
+  The key is consumed **server-side** (internship-research.js / resume-chat.js), but the
+  client-direct architecture (ADR-0015) has no Firebase Admin SDK, so the server cannot read
+  Firestore. The original plan (Phase 2) assumed a server KV `settings:<profileId>` with a
+  masked-key GET.
+- **Decision:** Store settings at `users/{uid}/settings/app` in Firestore (owner-only rules),
+  read/written directly by the client via `settingsApi` (`data/firestoreData.js`); fall back to
+  `localStorage` for the no-auth/E2E path. No server settings endpoint. The key is treated
+  write-only in the UI (masked "key saved" note + Remove). The server continues to read
+  `OPENROUTER_API_KEY` from env; **Phase 3 will send the user's key + model slugs in the
+  research/chat request body**, resolving stored-key → env fallback server-side.
+- **Consequences:** Simplest path that keeps the key per-user and isolated without an Admin SDK
+  or a service-account secret. Trade-off: the key travels in request bodies to our own API over
+  HTTPS (acceptable; it is the user's own key). If server-side-only key custody is ever required,
+  revisit with the Admin SDK + ID-token verification (also needed for a real data-API boundary).
+
+## ADR-0017 — LLM catalog audit is advisory-only (never auto-retire)
+- **Date:** 2026-07-03
+- **Status:** Accepted
+- **Context:** Phase 7 adds a cheap-LLM daily validity pass (`audit-catalog-llm.js`) on top of
+  the mechanical validator. An LLM reading a live page can be wrong (JS-only pages, bot walls,
+  ambiguous copy), so acting on its verdict automatically risks removing a still-open role.
+- **Decision:** The LLM audit **never mutates the catalog**. It selects stale-risk entries
+  (deadline within N days, `verifiedDate` older than N days, or a generic apply URL), asks the
+  audit model `{stillOpen, deadlineChanged, note}`, and writes a dated advisory report
+  (`server/seeds/llm-audit-<date>.json`, git-ignored; CI artifact). Only the MECHANICAL validator
+  may auto-fail/retire (404/410). The script exits 0 on any error and skips gracefully without
+  `OPENROUTER_API_KEY`, so CI stays green with or without the secret. Model is env-configurable
+  (`LLM_AUDIT_MODEL`, default a cheap nano-class slug); token usage is logged per run.
+- **Consequences:** Zero risk of an LLM hallucination silently dropping a valid role; a human/agent
+  confirms "closed" verdicts before editing seeds. Cost is bounded (only stale-risk entries, with
+  `--limit`), and the daily CI step is best-effort.
+
+## ADR-0018 — Live PDF preview via a containerized compile backend
+- **Date:** 2026-07-04
+- **Status:** Accepted
+- **Context:** Vercel's serverless runtime can't run Tectonic (LaTeX), so the deployed
+  PDF preview served a stale prebaked fallback instead of the user's live edits. The JA
+  templates also used macOS-only fonts (Hiragino / Avenir Next).
+- **Decision (user-chosen):** Run the existing Node/Express server in a Docker container
+  with Tectonic + Noto CJK fonts; the Vercel frontend calls it via `VITE_API_BASE_URL`
+  (the client already routes all `/api/*` through that base). Root `Dockerfile`
+  (node:22-trixie — glibc ≥2.38 for the Tectonic prebuilt; amd64) + `render.yaml`
+  Blueprint + `docs/compile-backend.md`. Templates gained an env-driven font profile:
+  `RESUME_FONT_PROFILE=linux` swaps the JA fonts Hiragino→Noto Serif CJK (Mincho) /
+  Noto Sans CJK (Gothic); macOS (unset) keeps Hiragino; EN templates unchanged (no
+  fontspec). The compile endpoint already takes the résumé in the body, so it compiles
+  live data; per-user data stays in Firestore.
+- **Consequences:** Verified locally by building the image and compiling all EN/JA
+  templates (JA renders Noto Mincho body + Gothic headings, bold auto-detected, 1 page,
+  visually ~identical to Hiragino). The user deploys the container (Render free tier)
+  and sets `VITE_API_BASE_URL` + redeploys the frontend. Free hosts cold-start (~30–60s)
+  after idle. The Vercel serverless API becomes a fallback (still serves prebaked PDFs
+  if `VITE_API_BASE_URL` is unset).

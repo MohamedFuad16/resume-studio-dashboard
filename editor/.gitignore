@@ -1,2 +1,8 @@
 .vercel
 .env*
+
+# Firebase CLI artifacts (config below IS committed: firebase.json, .firebaserc, firestore.rules)
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log

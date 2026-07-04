@@ -1,16 +1,203 @@
 # Project state
 
+## Overhaul plan status (PLAN-2026-07-03) — 2026-07-03
+All phases complete on branch `feat/firebase-auth-firestore` (pushed, not merged to main):
+Phase 4 (auth gate + login), Phase 2-migration (client-direct Firestore), Phase 0 (bug fixes),
+Phase 1 (data/logos), Phase 2 (Settings + profile menu), Phase 3 (live-search key/CTA), Phase 5
+(editor Present pill), Phase 6 (Jake's Clean JA), Phase 7 (LLM audit), Phase 8 (audit + cleanup).
+**Deployed to prod: through Phase 0 only** (editor-omega-two.vercel.app) — Phases 1/2/3/5/6/7/8 are
+committed+pushed but NOT yet redeployed. Deferred: App.jsx + index.css splits (org-only; spawned as
+separate tasks).
+
 ## Current state summary
 Two-track résumé project. **Track A — Internship Portal** (`editor/`): React 18 + Vite
 client and an ESM Node/Express server with sql.js (SQLite) KV storage (Vercel Blob in
 prod), Tectonic-based LaTeX compile, an internship radar/tracker, an application
 calendar, and an AI application assistant (OpenRouter `gpt-5-mini`). **Track B**: static
 LaTeX résumés (`en/`, `ja/`) compiled by `build_all.sh` to `output/`. Latest refresh
-(2026-07-02): official-source catalog audit with runtime retirements, 173 live seed roles,
-profile-aware HENNGE/Rakuten ranking, and the first JA editor option visibly mapped to
-Jake's Clean Japanese. `validate:catalog:links` is 173/173 live; build and 5 E2E tests green.
+(2026-07-03): **Firebase Auth gate + full per-user Firestore migration** (project
+`resume-841f9`) — Email/Password + Google sign-in wall (redesigned bilingual login window),
+open sign-up; per-user data (profiles/résumé, tracker, applications) now lives in Firestore
+under `users/{uid}/...` via a client-direct data layer with owner-only rules; the `/api/*`
+KV/Blob path is kept only for the no-auth/E2E case; the internship catalog stays server-seeded. Prior (2026-07-02): official-source catalog audit
+with runtime retirements, 173 live seed roles, profile-aware HENNGE/Rakuten ranking, and the
+first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links` 173/173 live;
+build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-04 — Live PDF preview via a containerized compile backend (ADR-0018) + nav/onboarding
+  fixes.** (1) **Compile backend**: Vercel can't run Tectonic, so the prod preview was a stale
+  prebaked fallback. Added a root `Dockerfile` (node:22-trixie + Tectonic 0.16.9 + Noto CJK fonts,
+  amd64) running the existing server, `render.yaml` Blueprint, and `docs/compile-backend.md`.
+  `server/templates.js` now has an env-driven font profile (`RESUME_FONT_PROFILE=linux` → Noto
+  Serif/Sans CJK; macOS default keeps Hiragino; EN templates unchanged). **Verified by building the
+  image + compiling all EN/JA templates in the container** — JA renders Noto Mincho body + Gothic
+  headings (bold auto-detected), 1 page, ~identical to Hiragino. The frontend routes `/api/*` via
+  `VITE_API_BASE_URL`, so the user deploys the container (Render free) + sets that env + redeploys
+  the frontend → live edits compile. (2) **Nav bar**: grouped the right-side header controls with
+  `marginLeft:auto` (empty `.tb-actions` on non-editor views had let space-between spread them).
+  (3) **New-account onboarding**: the résumé wizard (PDF import → heuristic parse) was unreachable
+  after "+ New" removal; now it opens on first sign-in with a blank profile and saves into the
+  current profile. Nav + onboarding built, deployed to prod; compile backend awaits the user's
+  container deploy.
+- **2026-07-03 — Post-review fixes (prod feedback) + deploy of Phases 1–8.** From the user reviewing
+  the (Phase-0) prod site: (1) **Account menu simplified** (`ProfileSwitcher.jsx`) — with Firebase
+  one account == one user, so removed profile switching + "+ New"; the avatar now opens just
+  **Settings / Sign out** (+ shows the email). (2) **Sign-out clears `?profile=`** — the handler
+  `history.replaceState`s to the clean root before signing out (`App.jsx`). (3) **Company logos**
+  (`CompanyLogo.jsx`) — dropped Google's `s2/favicons` (it serves a generic GLOBE at HTTP 200 for
+  unknown domains, so `onError` never fired). Now **DuckDuckGo favicon primary → `logoUrl` → text
+  initials**: favicons read well at small sizes and 404 cleanly (→ initials), fixing both the globe
+  icons (GEOTRA/CyberAgent/InsightX) and invisible white-wordmark `logoUrl`s (HENNGE). (4) **Wrong JA
+  preview on prod** — root cause: Vercel has no Tectonic, so live compile always fails and the app
+  serves a **prebaked/Blob-cached PDF**; the cached `resume_ja_01.pdf` predated the Jake's-Clean-JA
+  redesign. Regenerated `seed-pdfs/resume_ja_0{1,2,3}.pdf` from current templates and added a
+  versioned **`purgeStaleCompiledCache`** (bump `COMPILED_CACHE_VERSION`) that clears stale
+  `compiled:*` KV entries on boot so prod re-seeds the fresh PDFs. Build green, E2E 5/5. Deploying
+  all of Phases 1–8 + these fixes to prod. NOTE (flagged): live LaTeX compile does not run on Vercel
+  — the prod PDF preview is always a prebaked fallback (not the user's live edits); a real fix needs
+  a compile service/worker.
+- **2026-07-03 — Phase 8 audit + targeted cleanup.** Most Phase 8 items were already resolved in
+  Phases 0–2 (Saved filter, stale `temp` KV, module clock, dead `matchLabel`, fabricated research
+  logo, `fitNote===about`, ProfileSwitcher inline styles, one-click delete X, `.gitignore` covers
+  `server/.data/`). This pass fixed the rest: (1) **React key collisions** — `key={part}` on
+  role/location/language/duration part lists in `InternshipDashboard.jsx` → `key={`${part}-${i}`}`.
+  (2) **Radar row keyboard focus** — the row's Enter/Space handler now returns early when a child
+  control (status `<select>` / company button) is focused (`event.target !== event.currentTarget`),
+  so keyboard users operate the select without opening the drawer. (3) **Documented** the global
+  `useInternshipCatalog` module cache (profile-independent — correct not to invalidate on switch).
+  Audit tooling: `madge --circular` is **clean (0 cycles)**; there is no `lint` script configured
+  (skipped). Build green, E2E 5/5. **DEFERRED (organization-only, high-risk/low-user-value — do as
+  a dedicated pass with screenshot-diff verification):** splitting `App.jsx` (2328 lines; extract
+  `ProfileWizard.jsx` + AI chat sidebar, target <800) and `index.css` (6694 lines; → `styles/{base,
+  nav,dashboard,radar,editor,calendar,landing}.css` + tokens, no visual change). Uncommitted.
+- **2026-07-03 — Phase 7 daily LLM catalog validity automation.** New
+  `server/audit-catalog-llm.js` (npm `audit:catalog:llm`, ADR-0017): selects stale-risk catalog
+  entries (deadline within N days / stale `verifiedDate` / generic apply URL), fetches page text,
+  and asks a cheap audit model `{stillOpen, deadlineChanged, note}`; writes a dated advisory report
+  (`seeds/llm-audit-<date>.json`, git-ignored + CI artifact) with token accounting. **Never
+  auto-retires** — advisory only; exits 0 on any error and skips gracefully without
+  `OPENROUTER_API_KEY`. Extended `.github/workflows/validate-catalog.yml` (daily 06:00 UTC cron)
+  with a conditional LLM step keyed by the `OPENROUTER_API_KEY` secret + a report-artifact upload.
+  Verified: `--dry` selects 24/173 candidates and writes the report (exit 0); one real LLM call
+  returned a conservative "unknown" verdict for a JS-only page and logged 528 tokens; validate:catalog
+  still passes; workflow YAML parses. Uncommitted.
+- **2026-07-03 — Phase 6 Jake's Clean JA template redesign (`server/templates.js` genJa01).**
+  Refined the app's first JA résumé option to faithfully mirror the EN Jake's-clean rhythm:
+  **Mincho body** (Hiragino Mincho ProN W3/W6) for an elegant read, **Gothic** (Hiragino Kaku
+  Gothic ProN W6) for the section headings + the name via a new `\gothicfont` CJK family, and a
+  **monotone** grayscale palette (dropped the blue `accent`; role lines use `subtle` gray). Kept
+  photoless (matching EN Jake's-clean) and the single-page rhythm. Verified by compiling the
+  generated TeX with Tectonic: **0 errors, no overfull, 1 page**; PyMuPDF confirms HiraMinProN
+  (W3+W6) body + HiraKakuProN W6 headings and no fake-italic CJK; page-1 render looks clean. Build
+  green, E2E 5/5 (incl. the "first JA template is Jake's clean" assertion). NOTE: this is the
+  app's genJa01 only — the static `ja/` résumés (shokumu_modern/rirekisho_grid/deedy_jp) + their
+  PyMuPDF suite are a separate track, untouched. Uncommitted.
+- **2026-07-03 — Phase 5 editor: Present/Expected toggle pill + spacing spot-check.** The bare
+  checkbox + label in `MonthInput` (`components/ui.jsx`) is now a **brand-blue toggle pill**
+  (`.month-ongoing-toggle`, `aria-pressed`, animated check) matching the app's segmented controls,
+  for both `ongoingMode="present"` (Experience — disables the month) and `"expected"` (Education —
+  keeps the graduation month). Verified both variants + on/off states, and the editor form has no
+  misalignment / horizontal overflow at 1600 / 900 / 375 px (no further CSS fixes needed). Build
+  green, E2E 5/5. Uncommitted.
+- **2026-07-03 — Phase 3 live company search polish (key from Settings + CTA).** The research
+  request now carries the user's **résumé + OpenRouter key + search model** in the body so the
+  server works for client-direct Firestore users (résumé isn't in server KV) and uses the user's
+  own key. `server/internship-research.js`: `getOpenRouterClient(apiKey)` / `researchModel(model)`
+  resolve per-request value → env; the missing-key error preserves `code`
+  `OPENROUTER_API_KEY_MISSING`. `server/index.js` research route reads `resume`/`apiKey`/`searchModel`
+  from the body (KV/env fallback) and returns `errorCode` on the job. Client
+  (`InternshipDashboard.jsx`): `startCompanyResearch` fetches settings fresh (so a just-saved key
+  is used) and sends them; `CompanyResearchPanel` shows an **"Add your key in Settings" CTA**
+  (deep-links to the Settings view) instead of a raw error when the key is missing. Verified:
+  build green, E2E 5/5; direct API returns the preserved errorCode, the CTA renders + navigates to
+  Settings, and the request body carries résumé+apiKey+searchModel. NOTE: the local Node server does
+  not load `.env.local`, so local live research now depends on a key entered in Settings (prod uses
+  the Vercel env key). Uncommitted.
+- **2026-07-03 — Phase 2 Settings view + profile menu.** (1) **Profile menu**
+  (`components/ProfileSwitcher.jsx`, rewritten): the old nav `<select> + New + X` cluster + the
+  standalone Sign-out button are replaced by a single **avatar dropdown** (initials badge + active
+  name) with a Profiles switch list, Add user, Settings, Delete user, and Sign out (sign-out only
+  when authed). Click-outside/Escape to close. (2) **Settings view** (`components/SettingsPanel.jsx`,
+  new `appView === 'settings'`): Profile (name EN/JA, email, phone — written through the résumé
+  personal block via `saveProfileImmediately`), AI & API keys (OpenRouter key + search/audit model
+  slugs, validated), and Data (export JSON, danger-zone delete profile). The key is write-only in
+  the UI — after saving it shows a masked "key saved / Remove key" note. (3) **Settings storage**
+  (`data/firestoreData.js` getSettings/saveSettings on `users/{uid}/settings/app`; `api/client.js`
+  `settingsApi`): Firestore when signed in, localStorage otherwise — no server round-trip (the key
+  is sent with research/chat requests in Phase 3). See ADR-0016. Photo editing stays in the editor
+  (not duplicated in Settings). Verified: build green, E2E 5/5, profile menu + settings render and
+  the save/mask/remove-key flow works (key persisted to localStorage in the no-auth test). Uncommitted.
+- **2026-07-03 — Phase 1 company data consistency + logos.** (1) **Detail panels are now
+  truthful/consistent** (`utils/internshipDisplay.js`, `components/InternshipDashboard.jsx`):
+  `internshipDetails` no longer fabricates fallbacks — `about` stops falling back to `fitNote`
+  (the on-screen duplication where "What it's about" and "Why it's a fit" showed identical text
+  for the 144 entries lacking a real `about`), and `techStack` no longer fills with generic
+  `[track, Git, APIs, Cloud]`. `DetailPanel` hides the About / Tech-stack / Eligibility sections
+  when their data is absent (Fit + Application-procedure always show). (2) **Live research**
+  (`server/internship-research.js`): `normalizeResult` now sets a real `about` and a genuine
+  (non-duplicate) `fitNote`. (3) **Logos** (`components/CompanyLogo.jsx`): added a DuckDuckGo
+  favicon fallback after Google's, and removed the fabricated `https://<company>.com` URL in
+  `CompanyResearchPanel` (initials/known-domain until real results arrive). NOTE: seed
+  `companyDomain` coverage was already ~100% (earlier "54/173" was a grep artifact). Verified:
+  build green, E2E 5/5, validate:catalog passes; rich company (HENNGE) shows all 5 sections,
+  sparse company (Atilika) correctly hides About/Tech with no duplication and a real favicon.
+  Deferred (tooling, low value): a normalization audit script + validator shape checks, and the
+  11 documented generic-apply-url re-audit. Uncommitted.
+- **2026-07-03 — Phase 0 quick bug fixes (BUG-007/008/009).** (1) **Saved radar filter**
+  (`InternshipDashboard.jsx`): saved roles stay visible past their deadline, `savedCount` is
+  derived from the visible set (count ≡ rows), and the status filter no longer offers
+  applied-type options that can't match. (2) **Stale `profile:temp`/"fdf" KV row**
+  (`server/index.js`): added `RETIRED_PROFILE_IDS`+`purgeRetiredProfiles()` on boot and excluded
+  retired ids from `listProfiles`; verified local `profile:temp` purged and `/api/profiles` clean
+  (needs a redeploy to clean the prod Blob). (3) **Module-scope clock**: `NOW`/`TODAY` →
+  per-call `nowDate()`/`todayIso()` (ApplicationCalendar already per-render). Also removed dead
+  module-level `matchLabel`. Build green, E2E 5/5. Uncommitted (on the feature branch working tree).
+- **2026-07-03 — Full per-user data migration to Firestore (client-direct) + login redesign.**
+  (1) **Login redesign** (2 rounds of user feedback): soft mint→blue ambient gradient behind a
+  centered white "app window" (macOS lights + `user`-icon brand pill + EN/日本語 segmented toggle),
+  app line-icons (added a `radar` icon to `ui.jsx`) in white icon-chips, white feature cards with
+  soft shadow, one-line EN headline ("Land your next internship."). Bilingual, dark-aware,
+  responsive. (2) **Firestore migration** (ADR-0015): per-user data now lives in Firestore under
+  `users/{uid}/{profiles,trackers,applications}/{profileId}` via a new client-direct data layer
+  `src/data/firestoreData.js`; `src/api/client.js` delegates profileApi/trackerApi/applicationApi to
+  it when signed in and keeps the `/api/*` HTTP path for the no-auth/E2E case. Server decoupled from
+  KV for authed users: POST export variants (`/api/export/{pdf,tex,ai}` take résumé in body),
+  client-side JSON export, new stateless `/api/cover-letter`. `ensureSeed` (in AuthGate) seeds owner
+  accounts (`VITE_OWNER_EMAILS`, default flashxjapan@gmail.com) from the `mohamed_fuad` sample and
+  everyone else a blank `primary` profile; App boot resolves the active profile against the real
+  list. Catalog stays server-seeded; custom researched companies stay server-global (documented
+  limitation). **Verified end-to-end:** non-owner sign-up → blank profile + dashboard, tracker
+  save persisted across reload (Firestore REST-confirmed `profiles/primary`+`trackers/primary`),
+  build green, E2E 5/5, test account cleaned up. **Committed** on branch
+  `feat/firebase-auth-firestore` (pushed) and **deployed** to production
+  (`vercel --prod` → editor-omega-two.vercel.app); live API/catalog/seed-source verified,
+  deployed bundle confirmed to carry the auth gate. Owner-seed path proven end-to-end
+  (test owner account got the full mohamed_fuad résumé in Firestore). Branch not yet merged to main.
+- **2026-07-03 — Firebase Authentication gate + Firestore scaffold (Phase 4, real config).**
+  Wired the app (project `resume-841f9` / `501333131661`) to Firebase Auth + Firestore.
+  **Project side (via CLI + Identity Toolkit/Service Usage REST using the CLI's cached
+  token):** registered web app `1:501333131661:web:15135d8b04c44d1c77fdc4`; enabled the
+  Firestore + Identity Toolkit APIs; created Firestore `(default)` in `asia-northeast1`
+  (Tokyo); enabled **Email/Password** (Google was already enabled with an OAuth client);
+  deployed owner-only Firestore rules. **Client:** `src/auth/firebase.js` (public config
+  hardcoded as env-overridable fallbacks; `authAvailable`, disabled by `VITE_AUTH_DISABLED`),
+  `src/auth/useAuth.js` (hook + standalone `signOutUser`/`currentUser`), `src/auth/AuthGate.jsx`
+  (wraps `<App/>` in `main.jsx` — shows LoginScreen when signed out, spinner while resolving),
+  `src/components/LoginScreen.jsx` (bilingual EN/JA, Google + email/password sign-in & open
+  sign-up, `.auth-*` CSS appended to `index.css`), `src/data/userProfile.js` (upserts
+  `users/{uid}` on login — first real Firestore write). Added a header **Sign out** button.
+  **Config files (committed, no secrets):** `firebase.json`, `.firebaserc`, `firestore.rules`,
+  `firestore.indexes.json`; `.env.local` gained `VITE_FIREBASE_*`; `.gitignore` covers
+  `.firebase/` + debug logs. **Playwright:** `VITE_AUTH_DISABLED=true` in webServer env so the
+  gate doesn't block E2E. **Verified end-to-end:** `npm run build` green (~286 KB gzip; SDK
+  adds bulk), login screen renders with no console errors, a real email/password sign-up
+  transitioned past the gate AND wrote the `users/{uid}` doc under the deployed rules (then the
+  test user + doc were deleted, project left clean), and `npm run test:e2e` 5/5 green. **Scope
+  left open:** per-user data isolation + moving résumé/tracker/settings into Firestore, and
+  server-side ID-token verification (API still trusts the profile query param). **Pre-deploy
+  TODO:** add the Vercel prod domain to Firebase Auth authorized domains. See ADR-0014,
+  `agent/secrets.md` (Firebase section).
 - **2026-07-02 — Official-source internship audit + applied-company ranking + JA editor
   mapping.** Added `catalog-audit-2026-07-02.js`: retired 12 stale IDs (11 seed roles plus
   one persisted Apple live-research row) after checking official company/program/ATS pages;

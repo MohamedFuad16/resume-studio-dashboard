@@ -12,6 +12,8 @@ tmp/
 
 # Runtime/generated local data
 editor/server/.data/
+# Generated LLM catalog-audit reports (advisory; regenerated daily in CI)
+editor/server/seeds/llm-audit-*.json
 editor/server/applications/
 editor/server/public/*.pdf
 editor/tmp/
@@ -30,3 +32,10 @@ __pycache__/
 # OS/editor noise
 .DS_Store
 *.log
+
+# Local Claude Code settings + dev launch configs (machine-specific)
+.claude/
+editor/.claude/
+# Firebase CLI artifacts (committed config: firebase.json, .firebaserc, firestore.rules)
+editor/.firebase/
+firebase-debug.log
