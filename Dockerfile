@@ -5,10 +5,11 @@
 # cannot run Tectonic). Deploy to a container host (Render / Railway / Fly); the Vercel
 # frontend calls this service via VITE_API_BASE_URL. See docs/compile-backend.md.
 # amd64: Tectonic publishes prebuilt x86_64-linux binaries (no aarch64-gnu build), and
-# container hosts (Render/Railway/Fly) run x86_64. Build with --platform linux/amd64.
+# container hosts (Render / Azure Container Apps) run x86_64. Cloud builders (ACR, Render)
+# are already amd64; when building locally on an arm64 Mac, pass `--platform linux/amd64`
+# on the CLI. (An inline `FROM --platform=…` breaks ACR's Dockerfile dependency scanner.)
 # Debian trixie (glibc 2.41): the Tectonic 0.16.9 prebuilt needs glibc ≥ 2.38 (bookworm
 # ships 2.36, too old).
-ENV DEBIAN_FRONTEND=noninteractive
 FROM node:22-trixie-slim
 
 # LaTeX runtime libs, fontconfig, and Japanese fonts (Noto Serif/Sans CJK JP) that the

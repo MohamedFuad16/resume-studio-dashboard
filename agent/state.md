@@ -25,6 +25,17 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-05 — Compile/research backend moved to Azure Container Apps (always-on).** Render's
+  free tier slept after ~15 min → cold starts made the first live-search/compile fail ("company
+  research failed", e.g. Goldman Sachs). Deployed the same root `Dockerfile` to **Azure Container
+  Apps** (`portal-compile`, RG `internship-portal`, env `portal-compile-env`, ACR `ca7959c48768acr`,
+  region westus2) with **min-replicas 1 = always warm** (1 vCPU / 2 GiB). Build gotcha: `az
+  containerapp up --source .` ignores the root Dockerfile and falls back to Oryx buildpacks →
+  "Could not detect the language from repo"; the fix is `az acr build --file Dockerfile .` then
+  `az containerapp create` from the pushed image. Also dropped the inline `FROM --platform=…`
+  (ACR's dependency scanner can't parse it). Verified on Azure: `/api/status` ok, EN compile 200
+  (~6.6s, 31 KB PDF), JA compile 200 (~3.8s, 104 KB CJK PDF). Frontend `VITE_API_BASE_URL` in
+  Vercel repointed Render→Azure FQDN and redeployed. See `docs/azure-deploy.md`, ADR-0019.
 - **2026-07-04 — Live PDF preview via a containerized compile backend (ADR-0018) + nav/onboarding
   fixes.** (1) **Compile backend**: Vercel can't run Tectonic, so the prod preview was a stale
   prebaked fallback. Added a root `Dockerfile` (node:22-trixie + Tectonic 0.16.9 + Noto CJK fonts,

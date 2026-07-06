@@ -187,7 +187,15 @@ covering the real shell: language switcher, rapid toggle stability, and dashboar
   PDF and the LaTeX tests fail.
 - **Prod durability:** Without `BLOB_READ_WRITE_TOKEN`, Vercel writes are ephemeral.
 - **Research jobs are in-memory:** `/api/internships/research-company/:jobId` returns
-  404 after a server restart.
+  404 after a server restart. **Corollary — the compile/research host must run a single
+  replica:** the job Map is per-process, so the start-POST and poll-GETs must hit the same
+  instance. Azure Container Apps was first created with `--max-replicas 2`; on scale-up the
+  ingress round-robined polls onto a replica with no job → 404 → UI "search failed". Fixed
+  by pinning `--min-replicas 1 --max-replicas 1` (2026-07-06, ADR-0019).
+- **gpt-5-mini live search is slow (120–245 s):** the `:online` web search regularly
+  exceeds a 200 s LLM timeout on the slow tail → job errors as "search failed". Default
+  `INTERNSHIP_RESEARCH_TIMEOUT_MS` raised to 280000; the client polls indefinitely so the
+  long wait itself is fine (staged "thinking → searching → compiling" progress covers it).
 - **Large research+edit worker tasks can hit `resource_exhausted`:** the internship apply-link
   audit overran an agent's context twice when research-subagent fan-out + seed edits +
   validation were combined in one worker. Mitigation: ship the already-complete sub-fixes
