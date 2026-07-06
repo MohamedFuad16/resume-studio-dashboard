@@ -261,7 +261,10 @@ Evidence rules:
 - Never invent deadlines, duration, language, compensation, eligibility, or stages. Use "Not stated" when absent.
 - If no qualifying OPEN official opening is verified, return an empty results array and say so in summary.
 - Return at most 6 results matching the provided output schema.`;
-  const timeoutMs = Number(process.env.INTERNSHIP_RESEARCH_TIMEOUT_MS || 200000);
+  // gpt-5-mini with :online web search realistically takes 120–245 s; give the call
+  // headroom past that so a slow-but-valid search completes instead of erroring out
+  // ("search failed"). Override with INTERNSHIP_RESEARCH_TIMEOUT_MS.
+  const timeoutMs = Number(process.env.INTERNSHIP_RESEARCH_TIMEOUT_MS || 280000);
   let parsed;
   try {
     parsed = parseResult(await runOpenAiSearch(prompt, { timeoutMs, apiKey, searchModel }));
