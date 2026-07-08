@@ -93,7 +93,15 @@ function normalizeResult(company, result, index, verifiedDate) {
     source: result.sourceType === 'official_ats' ? 'Official applicant tracking page' : 'Official company careers page',
     sourceUrl,
     companyUrl: sourceUrl,
-    companyDomain: (() => { try { return new URL(sourceUrl).hostname.replace(/^www\./, ''); } catch { return ''; } })(),
+    // Only trust the posting host as the company's domain when it is NOT a job board /
+    // ATS — otherwise the logo chip renders the board's favicon (e.g. HERP instead of
+    // enechain). Blank lets the client fall back to its curated domain map or initials.
+    companyDomain: (() => {
+      try {
+        const host = new URL(sourceUrl).hostname.replace(/^www\./, '');
+        return /greenhouse|lever\.co|workday|myworkdayjobs|ashbyhq|gaishishukatsu|herp\.careers|01intern|wantedly|onecareer|indeed\.|linkedin|talentio|hrmos|mynavi|rikunabi/.test(host) ? '' : host;
+      } catch { return ''; }
+    })(),
     logoUrl: '',
     verifiedDate,
     prestigeTier: 'Live company research',
