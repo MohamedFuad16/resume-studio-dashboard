@@ -413,3 +413,25 @@ build and 5 E2E tests green.
   Same nodes/edges/labels as before — layout only. Title switched from a clipping `md`
   block to a single-line `text` shape. Re-rendered `architecture.svg`; verified via a
   Quick Look PNG: no connector crosses any box and no containers overlap.
+
+- **2026-07-08 — Company logo chips: job-board favicon + missing-icon fixes.** Fixed the
+  "wrong logo" on live-researched internships: `internship-research.js` derived
+  `companyDomain` from the posting's `sourceUrl`, so a company found on a job board
+  (e.g. enechain on herp.careers) rendered the board's favicon. Server now blanks
+  job-board/ATS hosts (greenhouse, lever.co, workday, herp.careers, 01intern, wantedly,
+  onecareer, indeed, linkedin, talentio, hrmos, mynavi, rikunabi); `CompanyLogo.jsx`
+  applies the same blocklist to `item.companyDomain` at render time (heals already-stored
+  items) and prefers the curated `KNOWN_DOMAINS` entry over a derived domain. Added
+  `KNOWN_LOGOS` direct icon URLs for companies whose domain 404s on the DuckDuckGo
+  favicon service (enechain → its real PNG icon; M3 → m3.com/favicon.ico). Verified in
+  the dev app: enechain card + live-search intro both render the true brand mark.
+  See ADR-0025. Uncommitted — review before push.
+
+- **2026-07-09 — Daily catalog sweep: dead listings retired + failure visibility.** The
+  existing validate-catalog.yml daily cron was failing (every run red) because two
+  seed listings are genuinely gone: Verkada global-010 (greenhouse → not-found
+  redirect) and Kinaxis global-049 (HTTP 410). Removed both from
+  `server/seeds/internships.js` (catalog 173 → 171; validator green locally). Workflow
+  now tees the liveness report, writes it to the run Summary, and on failure
+  files/updates a single `catalog-liveness` issue listing the broken entries — dead
+  listings are visible without opening run logs. See ADR-0026.

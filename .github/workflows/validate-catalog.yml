@@ -23,6 +23,10 @@ on:
 jobs:
   validate-catalog:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Needed by the failure handler that files/updates the dead-listings issue.
+      issues: write
     env:
       # Present only if the repo secret is configured. The LLM audit step and the
       # script both skip gracefully when empty, so the job stays green without it.
@@ -60,8 +64,54 @@ jobs:
 
       # Adds HTTP link-liveness checks for every apply/source URL. Hard failures
       # (404/410/5xx/DNS/timeout) fail the job; bot-wall statuses are warnings.
+      # Output is teed to a file so the summary/issue steps below can quote it.
       - name: Validate catalog links (liveness)
-        run: npm run validate:catalog:links
+        run: |
+          set -o pipefail
+          npm run validate:catalog:links 2>&1 | tee link-report.txt
+
+      # Always surface the liveness result on the run's Summary page.
+      - name: Write run summary
+        if: always()
+        run: |
+          {
+            echo "## Catalog link liveness"
+            echo '```'
+            grep -E "Link liveness:|BROKEN|blocked|VALIDATION" link-report.txt | tail -30 || echo "no report captured"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # On failure, file (or update) a single tracking issue listing the broken
+      # listings so dead/expired postings are visible without opening the run logs.
+      - name: File dead-listings issue
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let report = '';
+            try { report = fs.readFileSync('editor/link-report.txt', 'utf8'); } catch {}
+            const lines = report.split('\n').filter(l => /BROKEN|used by|Link liveness:/.test(l)).slice(0, 60).join('\n');
+            const title = 'Dead internship listings detected by daily catalog sweep';
+            const body = [
+              `The scheduled catalog validation failed on ${new Date().toISOString().slice(0,10)}.`,
+              '',
+              '```',
+              lines || 'See the workflow run logs for details.',
+              '```',
+              '',
+              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              '',
+              'Fix: retire or re-link the entries in `editor/server/seeds/internships.js`, then re-run the workflow.',
+            ].join('\n');
+            const { data: issues } = await github.rest.issues.listForRepo({
+              ...context.repo, state: 'open', labels: 'catalog-liveness',
+            });
+            if (issues.length) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: issues[0].number, body });
+            } else {
+              await github.rest.issues.create({ ...context.repo, title, body, labels: ['catalog-liveness'] });
+            }
 
       # Cheap-LLM validity audit of stale-risk entries (deadline soon, stale
       # verifiedDate, or generic apply URL). Advisory only — it never auto-retires

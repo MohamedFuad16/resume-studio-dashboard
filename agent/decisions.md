@@ -440,3 +440,44 @@ Reverse-engineered from the codebase on 2026-06-29. Newest at the bottom.
   `--min-replicas 0` to pause. Redeploy after code changes = re-run `az acr build …` then
   `az containerapp update -n portal-compile -g internship-portal --image …:latest`. Guide:
   `docs/azure-deploy.md`.
+
+---
+
+## ADR-0025 · 2026-07-08 · Company logo domains: never trust job-board hosts; curated direct-icon fallback
+**Status:** Accepted (in working tree)
+**Context:** The internship-card logo chip resolves an icon via DuckDuckGo favicons for a
+domain chosen as `item.companyDomain || KNOWN_DOMAINS[company] || domainFromUrl(item.url)`.
+Live-researched items (`internship-research.js`) set `companyDomain` from the posting's
+`sourceUrl` hostname — which is frequently a job board / ATS (herp.careers, 01intern,
+wantedly…), so e.g. an enechain opening surfaced by live search rendered the HERP favicon
+("wrong logo"). Separately, some real company domains (enechain.co.jp, m3.com) 404 on the
+DDG favicon service, degrading the chip to text initials.
+**Decision:** (A) Share one job-board/ATS blocklist regex and apply it in BOTH places:
+server-side, `companyDomain` is blanked when the sourceUrl host matches (future items);
+client-side, `CompanyLogo.jsx` ignores a stored job-board `companyDomain` (heals existing
+items) and prefers the curated `KNOWN_DOMAINS` entry over any derived domain. (B) Add a
+small `KNOWN_LOGOS` map of direct icon URLs (case-insensitive, like `KNOWN_DOMAINS`) tried
+before the DDG favicon: enechain's real icon PNG (its /favicon.ico is a 78-byte stub) and
+m3.com/favicon.ico. The ADR-covered decision to avoid Google s2 favicons (returns a globe
+at HTTP 200, so onError never fires) is unchanged.
+**Consequences:** Live-search results show the company's own icon or clean initials — never
+a job board's logo. Curated map wins over data, so a bad stored domain can't shadow a known
+good one. `KNOWN_LOGOS` entries are external URLs that could rot; they fail over to the DDG
+favicon → logoUrl → initials chain via the existing onError ladder.
+
+---
+
+## ADR-0026 · 2026-07-09 · Catalog liveness failures must be visible outside run logs
+**Status:** Accepted
+**Context:** The daily validate-catalog.yml cron (format + DB round-trip + link
+liveness) had been failing for days — correctly, over two dead listings — but the only
+signal was a red X buried in the Actions tab. Dead postings also have no retirement
+field in the schema, so "fixing" a dead listing means removing it from the seeds.
+**Decision:** (A) Remove genuinely-dead postings from `seeds/internships.js` (Verkada
+global-010, Kinaxis global-049). (B) Teach the workflow to tee the liveness report,
+append the BROKEN/summary lines to $GITHUB_STEP_SUMMARY on every run, and on failure
+create-or-comment a single open issue labeled `catalog-liveness` with the broken URLs,
+the run link, and the fix instruction (job permissions: issues:write).
+**Consequences:** A failing sweep now lands in Issues/notifications with the exact
+entries to retire. One tracking issue accumulates comments instead of spamming new
+issues. Retirement stays manual by design — the validator never auto-deletes data.
