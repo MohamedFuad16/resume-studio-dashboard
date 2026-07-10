@@ -481,3 +481,26 @@ the run link, and the fix instruction (job permissions: issues:write).
 **Consequences:** A failing sweep now lands in Issues/notifications with the exact
 entries to retire. One tracking issue accumulates comments instead of spamming new
 issues. Retirement stays manual by design — the validator never auto-deletes data.
+
+## ADR-0027 · 2026-07-10 · Multi-angle agent-team bug sweep: race/isolation fixes over redesigns
+**Context:** A three-reviewer agent team (UI architecture, performance/API-polling,
+deployment/data-integrity — each cross-examined by a devil's-advocate coordinator)
+audited the app and confirmed ~18 real defects, clustered around (a) unserialized
+last-writer-wins writes, (b) responses applied without staleness checks, and (c) shared
+server state leaking across users.
+**Decision:** Fix with minimal, local mechanisms rather than architectural rewrites:
+sequence tokens for compile/tracker-refresh staleness, a promise chain to serialize
+whole-tracker saves (broadcasting the newest local state on ack, not the save's
+snapshot), a per-request token map for fresh compiled PDFs (`?rid=` — the durable
+`compiled:<template>` KV entry remains only as the no-tectonic fallback, safe because
+the compile host is single-replica per ADR-0019), consecutive-failure tolerance (4×)
+before declaring a research poll dead, lazy TTL pruning (60 min) of the research job
+maps, percent-encoding (`texUrl`) for user values inside `\href{...}` arguments, and
+retry-on-failure for the storage `init()` memo. AI-chat responses are *refused* when
+the résumé changed mid-flight (explicit message) instead of merged — a merge would
+need three-way diffing the LLM result against two client states.
+**Consequences:** No API shapes changed (the `?rid=` query param is additive; clients
+ignoring it get the old fallback behavior). Known-open items documented in errors.md
+instead of half-fixed: no-auth `/api/*` writes (needs real ID-token verification),
+Azure Blob-token ephemerality, preview-deploy CORS, and the whole-DB-per-op Blob
+round-trip design.

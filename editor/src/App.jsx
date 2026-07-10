@@ -281,7 +281,17 @@ function parseResumeTextHeuristically(text) {
     experience: parseListSection(sections.experience, false),
     projects: parseProjects(sections.projects),
     skills: parsedSkills,
-    activities: parseListSection(sections.activities, false),
+    // parseListSection emits experience-shaped {company, role, ...} entries; activities
+    // use {title, org, ...} (see ActivitiesSec / the wizard Step 7 editor, which calls
+    // item.title.trim() and would crash on this shape).
+    activities: parseListSection(sections.activities, false).map(entry => ({
+      title: entry.company || '',
+      org: entry.role && entry.role !== 'Specialist' ? entry.role : '',
+      location: entry.location || '',
+      startDate: entry.startDate || '',
+      endDate: entry.endDate || '',
+      bullets: entry.bullets || [],
+    })),
     summary: summaryText || '',
   };
 }
@@ -504,6 +514,10 @@ export default function App() {
   const loaded   = useRef(false);
   const lastCompiled = useRef('');
   const chatAbortRef = useRef(null);
+  const compileSeq = useRef(0);
+  const lastCompileWarning = useRef('');
+  const resumeRef = useRef(null);
+  resumeRef.current = resume;
 
   // ── Toasts ───────────────────────────────────────────────
   const toast = useCallback((msg, type = 'info') => {
@@ -550,11 +564,16 @@ export default function App() {
     return params.get('profile') || 'mohamed_fuad';
   };
 
-  const syncUrlWithProfile = (id) => {
+  const syncUrlWithProfile = (id, { replace = false } = {}) => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('profile') !== id) {
       params.set('profile', id);
-      window.history.pushState(null, '', `?${params.toString()}`);
+      // Boot must use replaceState: pushing a new entry leaves the bare URL in
+      // history, and Back would then resolve to the hardcoded 'mohamed_fuad'
+      // default — which doesn't exist for Firestore users (their profile is
+      // 'primary') and throws a failed-switch toast.
+      if (replace) window.history.replaceState(null, '', `?${params.toString()}`);
+      else window.history.pushState(null, '', `?${params.toString()}`);
     }
   };
 
@@ -608,10 +627,15 @@ export default function App() {
     const cacheKey = `${tmpl}_${JSON.stringify(data)}`;
     if (!force && lastCompiled.current === cacheKey && pdfSrc) return;
 
+    // Sequence token: only the most recent compile may touch the preview. Without it,
+    // an older in-flight compile (e.g. armed just before a profile switch) that
+    // resolves last would overwrite the preview with the wrong resume's PDF.
+    const seq = ++compileSeq.current;
     setCompiling(true);
     setErrMsg(null);
     try {
       const result = await requestJson('/api/compile', { method: 'POST', body: { template: tmpl, resume: data } });
+      if (seq !== compileSeq.current) return;
       if (!result.success) {
         throw new Error(result.error || 'Compilation failed');
       }
@@ -630,8 +654,21 @@ export default function App() {
       } catch (err) {
         throw new Error(`PDF Render Error: ${err.message}`);
       }
+      if (seq !== compileSeq.current) return;
 
-      lastCompiled.current = cacheKey;
+      if (result.cached) {
+        // The server could not compile and served the last stored PDF instead. Do NOT
+        // mark this resume state as compiled (so a retry recompiles once the backend
+        // recovers) and tell the user the preview is stale rather than silently
+        // showing old content.
+        if (result.warning && lastCompileWarning.current !== result.warning) {
+          lastCompileWarning.current = result.warning;
+          toast(result.warning, 'error');
+        }
+      } else {
+        lastCompileWarning.current = '';
+        lastCompiled.current = cacheKey;
+      }
 
       // Force reload by appending v=timestamp, and use open parameters to hide chrome & document outline
       const hash = zoom === 'Fit'
@@ -640,6 +677,7 @@ export default function App() {
       const separator = url.includes('?') ? '&' : '?';
       setPdfSrc(`${url}${separator}v=${Date.now()}#${hash}`);
     } catch (e) {
+      if (seq !== compileSeq.current) return;
       const message = e instanceof TypeError && /fetch|network/i.test(e.message)
         ? (isJa ? '履歴書サービスに接続できません。サーバーを確認して再試行してください。' : 'Resume service is unavailable. Check the server and retry.')
         : e.message;
@@ -647,7 +685,7 @@ export default function App() {
       setErrMsg(message);
       toast(`Compile error: ${message.slice(0, 70)}`, 'error');
     } finally {
-      setCompiling(false);
+      if (seq === compileSeq.current) setCompiling(false);
     }
   }, [toast, zoom, pdfSrc, isJa]);
 
@@ -669,6 +707,9 @@ export default function App() {
 
   const handleSwitchProfile = async (id, skipUrl = false) => {
     try {
+      // Cancel any pending auto-compile armed by edits to the previous profile so it
+      // can't fire after the switch and replace the preview with the old resume.
+      if (cmpTimer.current) clearTimeout(cmpTimer.current);
       const data = await profileApi.get(id);
       setActiveProfile(id);
       const normalized = normalizeResume(data);
@@ -733,7 +774,7 @@ export default function App() {
         ? urlProfile
         : (list[0]?.id || urlProfile);
       if (initProfile !== activeProfile) setActiveProfile(initProfile);
-      syncUrlWithProfile(initProfile);
+      syncUrlWithProfile(initProfile, { replace: true });
       try {
         const loaded = normalizeResume(await profileApi.get(initProfile));
         setResume(loaded);
@@ -823,6 +864,18 @@ export default function App() {
         body: { profile: activeProfile, instruction: text, resume, language: lang },
       });
       if (result.changedSections?.length && result.resume) {
+        // The LLM worked from the resume snapshot captured at submit time (the round
+        // trip can take up to ~90s). If the user edited meanwhile, applying the
+        // response wholesale would silently wipe those edits — refuse instead.
+        if (resumeRef.current !== resume) {
+          setChatMessages(prev => [...prev, {
+            role: 'assistant',
+            text: isJa
+              ? '処理中に履歴書が編集されたため、変更を適用しませんでした。もう一度お試しください。'
+              : 'Your résumé changed while I was working, so I did not apply the edit (it would overwrite your newer changes). Please try again.',
+          }]);
+          return;
+        }
         const nextResume = normalizeResume(result.resume);
         change(nextResume);
         setActiveSection(result.focusSection || result.changedSections?.[0] || 'summary');
@@ -2262,14 +2315,14 @@ export default function App() {
                       <div className="wizard-subform-actions" style={{ display: 'flex', gap: '10px', marginTop: '16px', borderTop: '1px solid var(--b0)', paddingTop: '12px' }}>
                         <button className="btn btn-primary" onClick={() => {
                           const item = wizardData.activities[editingIndex];
-                          if (!item.title.trim()) {
+                          if (!(item.title || '').trim()) {
                             toast('Activity title is required', 'error');
                             return;
                           }
                           setEditingIndex(-1);
                         }}>Save Activity</button>
                         <button className="btn" onClick={() => {
-                          if (!wizardData.activities[editingIndex].title.trim()) {
+                          if (!(wizardData.activities[editingIndex].title || '').trim()) {
                             setWizardData({...wizardData, activities: wizardData.activities.filter((_, i) => i !== editingIndex)});
                           }
                           setEditingIndex(-1);
@@ -2301,6 +2354,7 @@ export default function App() {
                           className="fi"
                           type="text"
                           placeholder="e.g. john_doe"
+                          value={wizardData._profileId || ''}
                           onChange={e => {
                             const val = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '');
                             setWizardData({...wizardData, _profileId: val});

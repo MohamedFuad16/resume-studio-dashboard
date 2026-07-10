@@ -42,6 +42,8 @@ export function useApplicationTracker(profileId) {
   const activeProfile = normalizeProfileId(profileId);
   const [tracker, setTracker] = useState(EMPTY_TRACKER);
   const trackerRef = useRef(EMPTY_TRACKER);
+  const refreshSeq = useRef(0);
+  const commitChain = useRef(Promise.resolve());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -51,20 +53,34 @@ export function useApplicationTracker(profileId) {
   }, []);
 
   const refresh = useCallback(async () => {
+    // Staleness guard: a refresh started for an earlier profile (or superseded by a
+    // newer refresh) must not overwrite the current profile's tracker when its slow
+    // response finally lands — committing afterwards would persist the wrong
+    // profile's records.
+    const seq = ++refreshSeq.current;
     setLoading(true);
     try {
       setError('');
-      replaceTracker(normalizeTracker(await trackerApi.get(activeProfile)));
+      const next = normalizeTracker(await trackerApi.get(activeProfile));
+      if (seq === refreshSeq.current) replaceTracker(next);
     } catch (fetchError) {
-      setError(fetchError.message || 'Could not load application tracker');
+      if (seq === refreshSeq.current) setError(fetchError.message || 'Could not load application tracker');
     } finally {
-      setLoading(false);
+      if (seq === refreshSeq.current) setLoading(false);
     }
   }, [activeProfile, replaceTracker]);
 
   const commit = useCallback(next => {
-    trackerApi.save(activeProfile, next)
-      .then(() => window.dispatchEvent(new CustomEvent(TRACKER_EVENT, { detail: { profileId: activeProfile, tracker: next } })))
+    // Whole-tracker saves are last-writer-wins, so two in-flight POSTs (e.g. a status
+    // change immediately followed by its interview milestone) could land out of order
+    // and durably drop the later change. Chain saves so they reach the server in call
+    // order, and broadcast the newest local state — not this save's snapshot — so a
+    // late ack can never revert newer edits.
+    commitChain.current = commitChain.current
+      .then(() => trackerApi.save(activeProfile, next))
+      .then(() => {
+        window.dispatchEvent(new CustomEvent(TRACKER_EVENT, { detail: { profileId: activeProfile, tracker: trackerRef.current } }));
+      })
       .catch(saveError => {
         setError(saveError.message || 'Could not save application tracker');
         refresh();

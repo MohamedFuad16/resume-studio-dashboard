@@ -44,6 +44,19 @@ function escJa(str) {
     .replace(/#/g, '\\#');
 }
 
+// Sanitize a user-supplied URL/email for use INSIDE a \href{...} argument.
+// esc() is wrong here (\# etc. break the link target); instead percent-encode the
+// characters that terminate or corrupt the group — email is not URL-validated at
+// all, so a stray brace/percent would otherwise abort the whole compile and the
+// preview silently falls back to the stale cached PDF.
+function texUrl(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/\\/g, '%5C')
+    .replace(/%(?![0-9A-Fa-f]{2})/g, '%25')
+    .replace(/[{}#\s]/g, ch => `%${ch.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`);
+}
+
 // ══════════════════════════════════════════════════════════════════
 // EN 01 — Jake's Clean
 // ══════════════════════════════════════════════════════════════════
@@ -141,9 +154,9 @@ function genEn01(r) {
     {\\Huge \\scshape ${esc(p.nameEn)}} \\\\ \\vspace{1pt}
     \\small
     Tel: ${esc(p.phone)} $|$
-    \\href{mailto:${p.email}}{\\underline{${esc(p.email)}}} $|$
-    \\href{${p.linkedin}}{\\underline{linkedin}} $|$
-    \\href{${p.github}}{\\underline{github}}
+    \\href{mailto:${texUrl(p.email)}}{\\underline{${esc(p.email)}}} $|$
+    \\href{${texUrl(p.linkedin)}}{\\underline{linkedin}} $|$
+    \\href{${texUrl(p.github)}}{\\underline{github}}
 \\end{center}` +
 (r.education && r.education.length > 0 ? `
 \\section{Education}
@@ -259,9 +272,9 @@ function genEn02(r) {
   {\\fontsize{26}{30}\\selectfont\\bfseries\\color{darkgray}${esc(p.nameEn)}}\\\\[6pt]
   {\\small\\color{medgray}
     ${esc(p.phone)} \\quad|\\quad
-    \\href{mailto:${p.email}}{${esc(p.email)}} \\quad|\\quad
-    \\href{${p.linkedin}}{LinkedIn} \\quad|\\quad
-    \\href{${p.github}}{GitHub}
+    \\href{mailto:${texUrl(p.email)}}{${esc(p.email)}} \\quad|\\quad
+    \\href{${texUrl(p.linkedin)}}{LinkedIn} \\quad|\\quad
+    \\href{${texUrl(p.github)}}{GitHub}
   }
 \\end{center}
 \\vspace{8pt}
@@ -347,7 +360,7 @@ function genEn03(r) {
 \\begin{document}
 \\begin{center}
   {\\Huge\\bfseries\\color{headcolor}${esc(p.nameEn)}}\\\\[4pt]
-  {\\small ${esc(p.phone)} $\\cdot$ \\href{mailto:${p.email}}{${esc(p.email)}} $\\cdot$ \\href{${p.linkedin}}{LinkedIn} $\\cdot$ \\href{${p.github}}{GitHub}}
+  {\\small ${esc(p.phone)} $\\cdot$ \\href{mailto:${texUrl(p.email)}}{${esc(p.email)}} $\\cdot$ \\href{${texUrl(p.linkedin)}}{LinkedIn} $\\cdot$ \\href{${texUrl(p.github)}}{GitHub}}
 \\end{center}
 \\ressection{Education}
 ${edu}
@@ -426,9 +439,9 @@ function genEn04(r) {
     {\\Huge\\bfseries\\color{white}${esc(p.nameEn)}}\\\\[4pt]
     {\\small\\color{white!80}
       ${esc(p.phone)} \\quad $\\cdot$ \\quad
-      \\href{mailto:${p.email}}{${esc(p.email)}} \\quad $\\cdot$ \\quad
-      \\href{${p.linkedin}}{LinkedIn} \\quad $\\cdot$ \\quad
-      \\href{${p.github}}{GitHub}
+      \\href{mailto:${texUrl(p.email)}}{${esc(p.email)}} \\quad $\\cdot$ \\quad
+      \\href{${texUrl(p.linkedin)}}{LinkedIn} \\quad $\\cdot$ \\quad
+      \\href{${texUrl(p.github)}}{GitHub}
     }
     \\vspace{6pt}
   }
@@ -685,9 +698,9 @@ ${fontCmd('setCJKsansfont', FONTS.gothic, FONTS.gothicBold)}
     {\\Huge\\bfseries\\gothicfont ${escJa(p.nameJa || p.nameEn)}}\\\\[5pt]
     \\small
     Tel: ${esc(p.phone)} $|$
-    \\href{mailto:${p.email}}{\\underline{${esc(p.email)}}} $|$
-    \\href{${p.linkedin}}{\\underline{LinkedIn}} $|$
-    \\href{${p.github}}{\\underline{GitHub}}
+    \\href{mailto:${texUrl(p.email)}}{\\underline{${esc(p.email)}}} $|$
+    \\href{${texUrl(p.linkedin)}}{\\underline{LinkedIn}} $|$
+    \\href{${texUrl(p.github)}}{\\underline{GitHub}}
 \\end{center}` +
 (edu ? `
 \\section{学歴}
@@ -934,9 +947,9 @@ ${fontCmd('setCJKsansfont', FONTS.gothic, FONTS.gothicBold)}
       \\leftsection{連絡先}
       \\sideitem{住所}{${escJa(p.address)}}
       \\sideitem{電話}{${esc(p.phone)}}
-      \\sideitem{E-mail}{\\href{mailto:${p.email}}{\\textcolor{lightgray}{${esc(p.email)}}}}
-      \\sideitem{GitHub}{\\href{${p.github}}{\\textcolor{lightgray}{github.com/${esc(githubHandle)}}}}
-      \\sideitem{LinkedIn}{\\href{${p.linkedin}}{\\textcolor{lightgray}{in/${esc(linkedinHandle)}}}}
+      \\sideitem{E-mail}{\\href{mailto:${texUrl(p.email)}}{\\textcolor{lightgray}{${esc(p.email)}}}}
+      \\sideitem{GitHub}{\\href{${texUrl(p.github)}}{\\textcolor{lightgray}{github.com/${esc(githubHandle)}}}}
+      \\sideitem{LinkedIn}{\\href{${texUrl(p.linkedin)}}{\\textcolor{lightgray}{in/${esc(linkedinHandle)}}}}
 
       \\leftsection{学歴}
       {\\fontsize{8.6}{12.5}\\selectfont\\raggedright

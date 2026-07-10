@@ -40,7 +40,47 @@ const store = createStore({ localDbPath: path.join(DATA_DIR, 'resume-studio.sqli
 const internshipResearchJobs = new Map();
 const internshipResearchByCompany = new Map();
 const RESEARCH_CACHE_MS = 15 * 60 * 1000;
+// Finished jobs are kept well past the reuse cache window (so late pollers still
+// resolve), then pruned — the maps otherwise grow for the life of the always-on
+// research host, one multi-KB result object per search.
+const RESEARCH_JOB_TTL_MS = 60 * 60 * 1000;
+
+function pruneResearchJobs() {
+  const cutoff = Date.now() - RESEARCH_JOB_TTL_MS;
+  for (const [id, job] of internshipResearchJobs) {
+    if (job.status === 'researching') continue;
+    const stamp = new Date(job.completedAt || job.searchedAt || job.startedAt || 0).getTime();
+    if (stamp < cutoff) internshipResearchJobs.delete(id);
+  }
+  for (const [key, id] of internshipResearchByCompany) {
+    if (!internshipResearchJobs.has(id)) internshipResearchByCompany.delete(key);
+  }
+}
 const VALID_TEMPLATES = new Set(['en_01', 'en_02', 'en_03', 'en_04', 'ja_01', 'ja_02', 'ja_03']);
+
+// Fresh compile results held per-request. The durable compiled:<template> KV entry is
+// shared by everyone hitting this backend, so two concurrent compiles of the same
+// template clobber each other — and both clients would then fetch whichever PDF landed
+// last (one user's résumé served to another). Each successful compile therefore gets a
+// one-time token whose bytes are returned to that requester; the KV entry remains only
+// as the no-tectonic fallback. In-memory is safe on the single-replica compile host
+// (ADR-0019); on serverless the GET falls back to the KV entry, same as before.
+const compiledResultTokens = new Map();
+const COMPILED_RESULT_TTL_MS = 10 * 60 * 1000;
+const COMPILED_RESULT_MAX = 40;
+
+function stashCompiledResult(pdfData) {
+  const now = Date.now();
+  for (const [token, entry] of compiledResultTokens) {
+    if (entry.expires < now) compiledResultTokens.delete(token);
+  }
+  while (compiledResultTokens.size >= COMPILED_RESULT_MAX) {
+    compiledResultTokens.delete(compiledResultTokens.keys().next().value);
+  }
+  const token = randomUUID();
+  compiledResultTokens.set(token, { data: pdfData, expires: now + COMPILED_RESULT_TTL_MS });
+  return token;
+}
 
 // Primary profile used as the read/write fallback everywhere a profile id is omitted.
 const DEFAULT_PROFILE_ID = process.env.RESUME_DEFAULT_PROFILE_ID || 'mohamed_fuad';
@@ -472,6 +512,7 @@ app.post('/api/internships/research-company', async (req, res) => {
   if (!/^[\p{L}\p{N}&.' -]{2,80}$/u.test(company)) {
     return res.status(400).json({ error: 'Enter a company name between 2 and 80 characters.' });
   }
+  pruneResearchJobs();
   const companyKey = company.toLocaleLowerCase('en').replace(/\s+/g, ' ');
   const cachedId = internshipResearchByCompany.get(companyKey);
   const cachedJob = cachedId ? internshipResearchJobs.get(cachedId) : null;
@@ -614,7 +655,8 @@ app.post('/api/compile', async (req, res) => {
     const pdfData = await fs.readFile(pdfFile);
     await persistCompiledPdf(template, pdfData);
 
-    res.json({ success: true, pdfUrl: `/api/compiled/resume_${template}.pdf` });
+    const rid = stashCompiledResult(pdfData);
+    res.json({ success: true, pdfUrl: `/api/compiled/resume_${template}.pdf?rid=${rid}` });
   } catch (e) {
     console.error('Compile error:', e.message);
     const fallback = await readCompiledPdf(template);
@@ -635,6 +677,13 @@ app.post('/api/compile', async (req, res) => {
 app.get('/api/compiled/:file', async (req, res) => {
   const match = String(req.params.file || '').match(/^resume_([a-z]{2}_\d{2})\.pdf$/i);
   if (!match) return res.status(404).json({ error: 'Compiled PDF not found.' });
+  const rid = String(req.query.rid || '');
+  const held = rid ? compiledResultTokens.get(rid) : null;
+  if (held && held.expires > Date.now()) {
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Cache-Control', 'no-store');
+    return res.send(held.data);
+  }
   const compiled = await readCompiledPdf(match[1]);
   if (!compiled) return res.status(404).json({ error: 'Compile the resume first.' });
   res.setHeader('Content-Type', compiled.contentType || 'application/pdf');

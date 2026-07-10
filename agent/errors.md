@@ -2,6 +2,66 @@
 
 ## Fixed
 
+### BUG-010…018 — Agent-team sweep (races, isolation, robustness) — FIXED 2026-07-10
+Found by a three-reviewer agent team (UI architecture / perf & polling / deployment)
+with devil's-advocate verification; all confirmed by code tracing. See ADR-0027.
+- **BUG-010 · Tracker saves race** (`hooks/useApplicationTracker.js`): `commit()` was
+  fire-and-forget and its ack event re-applied the *sent* snapshot, so two quick writes
+  (status change + interview milestone fire back-to-back) could land/ack out of order
+  and durably drop the later one. Fixed: saves are serialized on a promise chain and the
+  ack broadcasts `trackerRef.current` (newest state). Also added a staleness guard to
+  `refresh()` so a slow profile-A fetch can't overwrite profile B's tracker (and then be
+  committed into B's storage).
+- **BUG-011 · Compiled-PDF cross-user leak/race** (`server/index.js`): compile results
+  were stored under `compiled:<template>` and served to *anyone* from
+  `/api/compiled/resume_<template>.pdf` — concurrent compiles clobbered each other and
+  could serve user A's résumé PDF to user B. Fixed: each successful compile returns a
+  one-time `?rid=` token backed by an in-memory TTL map (10 min, cap 40; single-replica
+  host per ADR-0019); the KV entry remains only as the no-tectonic fallback.
+- **BUG-012 · AI chat applied a stale résumé** (`App.jsx handleResumeChat`): the LLM
+  response (round trip up to ~90s) replaced the whole résumé from the submit-time
+  snapshot, wiping edits made meanwhile. Fixed: if the résumé changed in flight the edit
+  is refused with an explanatory chat message.
+- **BUG-013 · Compile races + silent stale fallback** (`App.jsx compile`): no sequencing
+  meant an older in-flight compile (e.g. armed pre-profile-switch — `cmpTimer` also
+  wasn't cleared on switch) could win `setPdfSrc` and show the wrong profile's PDF; a
+  `cached: true` fallback response was treated as a successful compile (cached under the
+  resume's cacheKey, warning dropped) so a broken backend never surfaced and never
+  retried. Fixed: compile sequence token, timer cleared on switch, `cached` responses
+  surface the warning as a toast and don't set `lastCompiled`.
+- **BUG-014 · Research-job UI died on one poll blip; start failures invisible**
+  (`InternshipDashboard.jsx`): a single rejected 1.5s poll marked the job errored, which
+  tore down the interval for good while the server job (up to 280s) kept running; a
+  *start* failure set `researchJob=null`, and the panel gates `error` on
+  `researchJob.company === query`, so the user saw the idle prompt instead of the error.
+  Fixed: 4 consecutive failures required (+ overlap guard), and start failures keep a
+  company-tagged error job.
+- **BUG-015 · PDF-import wizard crash + desynced ID input** (`App.jsx`): the heuristic
+  parser emitted experience-shaped `{company, role}` activities while the Step-7 editor
+  and `ActivitiesSec` expect `{title, org}` → `item.title.trim()` threw (no error
+  boundary → white screen); the Step-8 profile-ID input was uncontrolled so it desynced
+  from `wizardData._profileId` after Back/forward. Fixed: parser maps to the activities
+  shape, `.trim()` guards, input is controlled.
+- **BUG-016 · Storage init bricked by one transient error** (`server/storage.js`): a
+  rejected first `init()` was memoized forever — every later call returned the same
+  rejected promise until restart. Fixed: reset `ready = null` on failure so the next
+  call retries.
+- **BUG-017 · Research job maps grew forever** (`server/index.js`): jobs were only ever
+  `set`, never deleted, on the always-on host. Fixed: lazy 60-min TTL prune of finished
+  jobs (+ orphaned company pointers) on each research start.
+- **BUG-018 · `\href{}` LaTeX breakage from user fields** (`server/templates.js`):
+  email (never URL-validated) / linkedin / github were interpolated raw into
+  `\href{...}` — a `}`/`%` in the value aborted the compile, which then silently served
+  the stale cached PDF (see BUG-013). Fixed: new `texUrl()` percent-encodes
+  `\ { } % #` + whitespace at every href site (visible text still uses `esc()`).
+- **Smaller fixes**, same date: boot now `replaceState`s the resolved profile into the
+  URL (pushState left a bare-URL history entry; Back resolved to the hardcoded
+  `mohamed_fuad` and errored for Firestore users whose profile is `primary`); the radar
+  "Next 7/30 days" filter now computes the horizon in JST like all other deadline logic
+  (UTC lagged a day between 00:00–09:00 JST); the auto-research spend gate matches the
+  FULL catalog, not the filtered visible set (a company whose rows were all
+  expired/applied triggered a paid auto-search).
+
 ### BUG-007 — "Saved (N)" radar filter shows an empty table — FIXED 2026-07-03
 - **Date:** 2026-07-03 · **File:** `editor/src/components/InternshipDashboard.jsx`
 - **Symptom:** The Saved button could read e.g. "Saved (1)" while the filtered table was
@@ -179,7 +239,39 @@ covering the real shell: language switcher, rapid toggle stability, and dashboar
 ↔ editor navigation. Build remains the primary client gate. See ADR-0007 and `tests.md`.
 
 ## Known / open (non-blocking)
-- None currently tracked. (ISSUE-002/003/004 resolved 2026-06-29 — see above.)
+From the 2026-07-10 agent-team sweep — verified real but deliberately NOT fixed in that
+pass (need ops work, product decisions, or architecture changes; see ADR-0027):
+- **ISSUE-005 · No auth on `/api/*` writes; Origin guard bypassable.** The server never
+  verifies Firebase ID tokens; the cross-origin write guard passes requests with NO
+  Origin header (curl/scripts), so anyone can write the shared `internships:catalog`
+  (served to all users, incl. signed-in ones), read/write the sample profiles via
+  `?profile=`, and delete `aiko_tanaka` (only `mohamed_fuad` is protected). Real fix =
+  server-side ID-token verification (already flagged as open scope in ADR-0014).
+- **ISSUE-006 · Azure compile/research host runs without `BLOB_READ_WRITE_TOKEN`**
+  (`docs/azure-deploy.md` create command omits it) → backend is `ephemeral-local-sqlite`;
+  user-added research internships and no-auth profile writes vanish on container
+  recycle. The "ephemeral without token" caveat is documented for Vercel but this is the
+  PRIMARY backend. Fix = set the token on the Container App (or accept + document).
+- **ISSUE-007 · Vercel preview deploys are CORS-rejected by the Azure backend** (trusted
+  origins = hardcoded prod alias + env); previews get random `*.vercel.app` origins →
+  all writes 403. Also: photo/body size limits (validation ~8.1 MB data-URL, Express
+  12 MB) exceed Vercel's 4.5 MB request cap → opaque 413s on the no-auth Vercel path.
+- **ISSUE-008 · WebP résumé photos are silently dropped on Linux compile hosts**
+  (`materializeResumePhoto` shells to macOS-only `/usr/bin/sips`; the Docker image has no
+  converter). Low impact: the client re-encodes uploads to JPEG (`imageUpload.js`), so
+  only direct-API writers hit it. Fix = a Linux converter in the image or reject WebP.
+- **ISSUE-009 · Dead "application assistant" state in App.jsx**: `applications` is
+  fetched on every boot/profile switch but never rendered; `setActiveApp` is only ever
+  called with `null` so the detail modal is unreachable. Product decision: render or
+  remove (App.jsx split is already a deferred task).
+- **ISSUE-010 · No-auth multi-profile mode has no switching UI**: App passes
+  `onSwitch`/`onNew`/`onDelete` to `ProfileSwitcher`, which (deliberately, post-Firebase)
+  ignores them — in `VITE_AUTH_DISABLED` mode only hand-editing `?profile=` switches
+  between the two server-seeded samples.
+- **Perf (by design, documented):** on the Blob backend every KV read/write round-trips
+  the ENTIRE SQLite DB (which also stores base64 compiled PDFs), and `GET /api/compiled`
+  re-persists seed PDFs (a write on a read path); `saveProfileImmediately`'s
+  refresh-from-server can revert keystrokes made during the round trip.
 
 ## Environment gotchas
 - **Tectonic required:** `/api/compile`, `/api/export/pdf`, and `build_all.sh` need the

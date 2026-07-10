@@ -102,7 +102,13 @@ export function createStore({ localDbPath }) {
       if (hasBlob()) backend = 'vercel-blob-sqlite';
       else if (process.env.VERCEL) backend = 'ephemeral-local-sqlite';
       await persist();
-    })();
+    })().catch(error => {
+      // Don't memoize a rejected promise: a transient Blob/network error at first
+      // init would otherwise brick every subsequent store call until the process
+      // restarts. Reset so the next call retries.
+      ready = null;
+      throw error;
+    });
     return ready;
   }
 

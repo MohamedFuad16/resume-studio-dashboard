@@ -25,6 +25,29 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-10 — Agent-team bug sweep (3 reviewers + devil's-advocate coordinator): 9
+  confirmed defect clusters fixed.** Reviewers covered UI architecture, perf/API-polling,
+  and deployment/data-integrity; every finding was re-verified against the code before
+  fixing. Client: tracker saves serialized + ack broadcasts newest state (out-of-order
+  whole-blob saves durably lost interview milestones), tracker refresh staleness guard
+  (profile-switch race could commit A's tracker into B), compile sequence token + timer
+  cleanup on profile switch (stale compile could show the wrong profile's PDF),
+  `cached:true` compile fallbacks now surface their warning and don't poison the dedupe
+  cache, AI-chat edits are refused when the résumé changed during the (≤90s) LLM round
+  trip, research polling tolerates 4 consecutive failures (one blip used to kill a
+  running 280s job) and start failures render instead of showing the idle prompt,
+  PDF-import wizard activities-shape crash + uncontrolled Step-8 ID input fixed, boot
+  URL sync uses `replaceState` (Back-button trap for Firestore users), radar "Next 7/30
+  days" filter now JST-anchored, auto-research spend gate matches the full catalog.
+  Server: compiled PDFs served per-request via `?rid=` token (the shared
+  `compiled:<template>` entry could serve user A's résumé to user B), storage `init()`
+  no longer memoizes a rejected promise (one Blob blip bricked persistence until
+  restart), research job maps get 60-min TTL pruning, user fields in `\href{}` are
+  percent-encoded via `texUrl()`. Verified: build green, `validate:catalog` passes, E2E
+  5/5, hostile-email LaTeX smoke shows encoded href + escaped text. Open items recorded
+  as ISSUE-005…010 in errors.md (no-auth API writes, Azure Blob token, preview CORS,
+  WebP-on-Linux, dead applications UI, no-auth profile switching). See BUG-010…018,
+  ADR-0027.
 - **2026-07-05 — Compile/research backend moved to Azure Container Apps (always-on).** Render's
   free tier slept after ~15 min → cold starts made the first live-search/compile fail ("company
   research failed", e.g. Goldman Sachs). Deployed the same root `Dockerfile` to **Azure Container

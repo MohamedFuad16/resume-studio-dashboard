@@ -33,6 +33,11 @@ const MOBILE_PAGE_SIZE = 6;
 // midnight JST still evaluates expiry/urgency against the current time. See BUG-009.
 const nowDate = () => new Date();
 const todayIso = () => new Date().toISOString().slice(0, 10);
+// JST calendar date N days from now. Deadline expiry/urgency anchor to +09:00
+// (deadlineInstant below), so the "Next 7/30 days" filter must use the same clock —
+// the UTC date is one day behind between 00:00 and 09:00 JST, making the filter and
+// the row's urgency badge disagree for boundary deadlines.
+const jstIsoInDays = days => new Date(Date.now() + days * 86400000 + 9 * 3600000).toISOString().slice(0, 10);
 const DISPLAY_DATE_FORMAT = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
 // Statuses that mean the user has already engaged the role from the tracker. These
@@ -580,8 +585,11 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
   const hasCatalogTextMatch = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return false;
-    return visibleCatalog.some(item => [item.company, item.role, item.track].join(' ').toLowerCase().includes(needle));
-  }, [visibleCatalog, query]);
+    // Match against the FULL catalog, not the visible (filtered) set: this gate only
+    // exists to stop auto-spending on paid research for companies the catalog already
+    // covers, and a company whose rows are all expired/applied is still covered.
+    return catalog.some(item => [item.company, item.role, item.track].join(' ').toLowerCase().includes(needle));
+  }, [catalog, query]);
   // Show the live-search panel for any company-like query — INCLUDING companies that
   // already have catalog rows (e.g. "mercari") so the user can find current openings
   // beyond the seeded ones. Auto-search is still gated to non-catalog queries below so
@@ -603,8 +611,8 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
         && (statusFilter === 'All' || status === statusFilter)
         && (deadlineFilter === 'All'
           || (deadlineFilter === 'Not stated' && !item.deadlineDate)
-          || (deadlineFilter === '7 days' && item.deadlineDate && item.deadlineDate <= new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10))
-          || (deadlineFilter === '30 days' && item.deadlineDate && item.deadlineDate <= new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)))
+          || (deadlineFilter === '7 days' && item.deadlineDate && item.deadlineDate <= jstIsoInDays(7))
+          || (deadlineFilter === '30 days' && item.deadlineDate && item.deadlineDate <= jstIsoInDays(30)))
         && (!priorityOnly || item.priority)
         && (!savedOnly || status === 'saved');
     });
@@ -683,25 +691,46 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
       if (options.auto) autoResearchStarted.current.add(cleanCompany.toLowerCase());
     } catch (error) {
       setResearchError(error.message || t.liveError);
-      setResearchJob(null);
+      // Keep a company-tagged error job: the panel only shows `error` when
+      // researchJob.company matches the query, so clearing the job here would
+      // silently render the idle "Search official sources" prompt instead.
+      setResearchJob({
+        jobId: null,
+        company: cleanCompany,
+        status: 'error',
+        error: error.message || t.liveError,
+        errorCode: error.code || null,
+      });
     }
   };
 
   useEffect(() => {
     if (!researchJob?.jobId || researchJob.status !== 'researching') return undefined;
     let cancelled = false;
+    let inFlight = false;
+    let failures = 0;
     const poll = async () => {
+      if (inFlight) return; // don't stack requests when a poll outlives the interval
+      inFlight = true;
       try {
         const job = await internshipApi.researchStatus(researchJob.jobId);
         if (cancelled) return;
+        failures = 0;
         setResearchJob(job);
         if (job.status === 'complete') setResearchResults(Array.isArray(job.results) ? job.results : []);
         if (job.status === 'error') setResearchError(job.error || t.liveError);
       } catch (error) {
-        if (!cancelled) {
+        if (cancelled) return;
+        // A single failed poll is usually a network blip — the server job (up to
+        // ~280s) is still running and will complete. Only give up after several
+        // consecutive failures; marking the job errored kills polling for good.
+        failures += 1;
+        if (failures >= 4) {
           setResearchError(error.message || t.liveError);
           setResearchJob(current => current ? { ...current, status: 'error' } : null);
         }
+      } finally {
+        inFlight = false;
       }
     };
     const timer = window.setInterval(poll, 1500);
