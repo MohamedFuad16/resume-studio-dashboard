@@ -39,3 +39,8 @@ editor/.claude/
 # Firebase CLI artifacts (committed config: firebase.json, .firebaserc, firestore.rules)
 editor/.firebase/
 firebase-debug.log
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
