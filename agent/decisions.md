@@ -685,3 +685,18 @@ entries — so account deletion correctly touches Firebase Auth + Firestore only
 Standard_LRS account + 5 GB share (cents/month). **The account-deletion flow is built and
 builds clean but has NOT been executed end-to-end** — it needs a signed-in account, and
 running it would permanently delete a real one. It needs a test account before being trusted.
+
+## ADR-0033 · 2026-07-15 · Inset-card app shell; per-view cards instead of a floating window
+**Context:** The reference design shows the sidebar flush to the viewport with each view as a
+white rounded card floating in a soft gutter. A first attempt wrapped the whole app (sidebar +
+content) in one floating panel over a gradient backdrop — rejected by the user.
+**Decision:** Keep `html/body` white and `.shell` full-screen. `.app-main` is a gradient gutter
+(`padding: 12px 12px 12px 4px`); every top-level view (`.profile-dashboard`, `.internship-radar`,
+`.calendar-view`, `.settings-scroll`, `.applications-view`, `.profile-view`, `.editor-view`)
+gets `background:#fff; border-radius:16px; box-shadow` from one shared rule in index.css. The
+editor needed a new `.editor-view` wrapper (toolbar + commandbar + split were three siblings, so
+no card could clip them; its old fixed split height now flexes). Sidebar: grey→peach vertical
+gradient, `border-right: 0` — separation comes from the gutter, never a hard line.
+**Consequences:** New views opt in by adding one selector to the shared card rule. The profile
+dropdown still escapes the sidebar (opens upward; sidebar keeps `overflow: visible`). Dashboard
+type scale reduced (h1 clamp 20–26px, section h2 15px, stat numerals 17px) as the new baseline.

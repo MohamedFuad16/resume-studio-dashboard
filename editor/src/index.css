@@ -2791,7 +2791,7 @@ body,
   }
 }
 
-/* ── Full-page app fix: remove mockup gutter and clean navigation ── */
+/* ── Full-screen app: sidebar flush to the edges, content as an inset card ── */
 html,
 body,
 #root {
@@ -2808,6 +2808,7 @@ body,
   border: 0;
   border-radius: 0;
   box-shadow: none;
+  background: transparent;
 }
 
 .tb {
@@ -4045,7 +4046,9 @@ body,
   height: calc(100vh - 58px);
   overflow-y: auto;
   padding: 28px 34px 48px;
-  background: #f7f7f6;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(30, 41, 59, 0.04), 0 10px 30px rgba(30, 41, 59, 0.06);
   color: var(--career-ink);
 }
 
@@ -4062,10 +4065,8 @@ body,
   align-items: center;
   gap: 34px;
   min-height: 188px;
-  padding: 28px 30px;
-  border: 1px solid #dde3ec;
-  border-radius: 15px 15px 0 0;
-  background: #fff;
+  padding: 8px 6px 24px;
+  background: transparent;
 }
 
 .profile-identity { display: flex; align-items: center; gap: 22px; min-width: 0; }
@@ -4089,8 +4090,8 @@ body,
 }
 .profile-photo img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 .profile-photo i { position: absolute; right: 0; bottom: 4px; width: 35px; height: 35px; display: grid; place-items: center; border: 1px solid #d6dde8; border-radius: 50%; background: #fff; color: #243956; box-shadow: 0 4px 12px rgba(21, 39, 67, .12); }
-.profile-identity h1 { margin: 0 0 12px; color: var(--career-ink); font-size: clamp(27px, 2.3vw, 38px); line-height: 1; letter-spacing: -.035em; }
-.profile-identity p { display: flex; align-items: center; gap: 8px; margin: 7px 0; color: #58657a; font-size: 13px; font-weight: 600; }
+.profile-identity h1 { margin: 0 0 9px; color: var(--career-ink); font-size: clamp(20px, 1.7vw, 26px); line-height: 1.05; letter-spacing: -.025em; }
+.profile-identity p { display: flex; align-items: center; gap: 7px; margin: 5px 0; color: #58657a; font-size: 12px; font-weight: 600; }
 
 .profile-socials { display: grid; gap: 10px; }
 .profile-socials a { min-width: 0; display: grid; grid-template-columns: 38px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 11px; align-items: center; padding: 10px 12px; border: 1px solid transparent; border-radius: 10px; color: var(--career-ink); text-decoration: none; transition: border-color 120ms ease, background 120ms ease; }
@@ -4102,7 +4103,7 @@ body,
 
 .profile-completion { min-width: 0; display: flex; align-items: center; gap: 18px; padding-left: 26px; border-left: 1px solid #e3e8ef; }
 .completion-ring { width: 94px; height: 94px; flex: 0 0 auto; display: grid; place-items: center; align-content: center; border-radius: 50%; background: radial-gradient(circle at center, #fff 58%, transparent 59%), conic-gradient(var(--career-blue) var(--completion), #e5eaf2 0); }
-.completion-ring strong { font-size: 20px; letter-spacing: -.03em; }
+.completion-ring strong { font-size: 17px; letter-spacing: -.02em; }
 .completion-ring span { color: #7a8596; font-size: 9px; }
 .profile-completion b { font-size: 13px; }
 .profile-completion p { margin: 5px 0 10px; color: #68758a; font-size: 11px; line-height: 1.45; }
@@ -4110,30 +4111,31 @@ body,
 .section-heading button,
 .application-empty button { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: transparent; color: var(--career-blue); font: inherit; font-size: 11px; font-weight: 750; cursor: pointer; }
 
-.pipeline-strip { min-height: 92px; display: grid; grid-template-columns: minmax(210px, 1.25fr) repeat(4, minmax(120px, .85fr)); align-items: stretch; border: 1px solid #dde3ec; border-top: 0; border-radius: 0 0 15px 15px; background: #fff; }
+.pipeline-strip { min-height: 84px; display: grid; grid-template-columns: minmax(200px, 1.2fr) repeat(5, minmax(92px, .82fr)); align-items: stretch; border-top: 1px solid #e8ebf0; border-bottom: 1px solid #e8ebf0; background: transparent; }
 .pipeline-title,
-.pipeline-stat { display: flex; align-items: center; gap: 12px; padding: 20px; border-right: 1px solid #e5e9f0; }
+.pipeline-stat { display: flex; align-items: center; gap: 12px; padding: 18px 16px; border-right: 1px solid #eef0f4; }
+.pipeline-strip > :last-child { border-right: 0; }
 .pipeline-title span,
 .pipeline-stat span { display: grid; gap: 3px; }
-.pipeline-title b { font-size: 13px; }
+.pipeline-title b { font-size: 12px; }
 .pipeline-title small,
 .pipeline-stat small { color: #7a8597; font-size: 9.5px; }
 .pipeline-stat svg { color: #70809a; }
-.pipeline-stat strong { font-size: 20px; line-height: 1; }
+.pipeline-stat strong { font-size: 17px; line-height: 1; }
 .pipeline-stat.offer svg,
 .pipeline-stat.offer strong { color: #118a55; }
 .pipeline-stat.rejected svg,
 .pipeline-stat.rejected strong { color: #d54b50; }
 
-.dashboard-grid { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 22px; margin-top: 22px; }
+.dashboard-grid { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 0; margin-top: 26px; }
 .dashboard-main,
-.dashboard-rail { min-width: 0; border: 1px solid #dde3ec; border-radius: 15px; background: #fff; }
-.dashboard-main { padding: 25px 27px 28px; }
-.dashboard-rail { align-self: start; padding: 23px; }
+.dashboard-rail { min-width: 0; border: 0; border-radius: 0; background: transparent; }
+.dashboard-main { padding: 4px 34px 8px 6px; }
+.dashboard-rail { align-self: start; padding: 4px 6px 8px 34px; border-left: 1px solid #eef0f4; }
 .section-heading,
 .rail-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .section-heading h2,
-.rail-heading h2 { margin: 0; color: var(--career-ink); font-size: 18px; letter-spacing: -.02em; }
+.rail-heading h2 { margin: 0; color: var(--career-ink); font-size: 15px; letter-spacing: -.015em; }
 .section-heading p,
 .rail-heading p { margin: 5px 0 0; color: #788398; font-size: 11px; }
 .section-heading button { min-height: 30px; padding: 0 9px; border: 1px solid #dce3ee; border-radius: 7px; color: #34435c; }
@@ -6763,7 +6765,6 @@ body,
 /* ── Settings view — Phase 2 ─────────────────────────────────────── */
 .settings-view { max-width: 720px; margin: 0 auto; padding: 28px 20px 64px; }
 .settings-head { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 22px; }
-.settings-back { flex: none; }
 .settings-head h1 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.02em; color: var(--t1); }
 .settings-head p { margin: 4px 0 0; color: var(--t2); font-size: 13.5px; }
 .settings-card {
@@ -6782,6 +6783,18 @@ body,
   color: var(--t1); font-size: 13.5px; transition: border-color .15s, box-shadow .15s;
 }
 .settings-field input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-glow); }
+/* Model selects match the app's inputs (was the raw grey OS dropdown): same box,
+   custom chevron, and focus ring as .settings-field input. */
+.settings-field select {
+  width: 100%; box-sizing: border-box; padding: 9px 34px 9px 11px;
+  border: 1px solid var(--b1); border-radius: 9px; background-color: var(--input-bg);
+  color: var(--t1); font: inherit; font-size: 13.5px; cursor: pointer;
+  appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center; background-size: 10px 6px;
+  transition: border-color .15s, box-shadow .15s;
+}
+.settings-field select:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-glow); }
 .settings-field + .settings-field, .settings-field { margin-top: 0; }
 .settings-card .settings-field:not(:last-child) { margin-bottom: 14px; }
 .settings-note { display: block; margin-top: 6px; font-size: 11.5px; color: var(--t3); }
@@ -6932,8 +6945,10 @@ body,
   flex-direction: column;
   gap: 3px;
   padding: 14px 12px;
-  background: #f6f6f5;
-  border-right: 1px solid var(--b0);
+  /* Subtle vertical wash: cool grey at the top easing into a warm peach at the
+     bottom (reference design). The gradient lives here, not on the backdrop. */
+  background: linear-gradient(180deg, #e9ebef 0%, #eee9e3 48%, #f6e7d7 100%);
+  border-right: 0;
   /* Must NOT clip: the profile dropdown is absolutely positioned inside the
      footer and has to escape the bar's 236px (64px collapsed) width. Content
      here is short (brand + 4 rows + footer), so nothing needs to scroll. */
@@ -6985,6 +7000,10 @@ body,
 .side-collapse:hover { background: #fafafa; }
 /* Chevron points the way the bar will move */
 .app-sidebar.collapsed .side-collapse { margin-left: 0; transform: rotate(180deg); }
+/* When collapsed, the (now-empty) brand-home still held flex:1 and shoved the
+   toggle to the right, so it no longer lined up with the centred nav icons.
+   Drop it out of flow so the toggle centres on the same vertical axis. */
+.app-sidebar.collapsed .side-brand-home { display: none; }
 .side-logo {
   flex: none;
   display: inline-flex;
@@ -7019,16 +7038,17 @@ body,
 .side-nav-btn {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 12px;
   width: 100%;
-  padding: 10px;
+  padding: 11px 12px;
   border: 1px solid transparent;
-  border-radius: 9px;
+  border-radius: 10px;
   background: transparent;
-  color: var(--t2);
+  color: #3a3f47;
   font: inherit;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
   text-align: left;
   cursor: pointer;
   transition: background var(--ease), color var(--ease), box-shadow var(--ease);
@@ -7190,6 +7210,10 @@ body,
   min-width: 0;
   display: flex;
   flex-direction: column;
+  /* Soft gutter around the content card. The sidebar gradient bleeds into this,
+     and the white content card floats inside — no hard dividing line. */
+  background: linear-gradient(180deg, #eceef1 0%, #efeae4 55%, #f4e9dc 100%);
+  padding: 12px 12px 12px 4px;
 }
 
 /* Only the editor renders .tb now (Save/Export), and it needs no rule beneath it —
@@ -7354,10 +7378,96 @@ body,
    only the editor renders now. Let them fill whatever .app-main leaves instead,
    which drops the magic number entirely. Both are direct children of .app-main. */
 .app-main > .profile-dashboard,
-.app-main > .internship-radar {
+.app-main > .internship-radar,
+.app-main > .calendar-view,
+.app-main > .settings-scroll,
+.app-main > .applications-view,
+.app-main > .profile-view,
+.app-main > .editor-view {
   height: auto;
   flex: 1;
   min-height: 0;
+  /* Every view is an inset white card floating in the app-main gutter. */
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(30, 41, 59, 0.04), 0 10px 30px rgba(30, 41, 59, 0.06);
+}
+
+/* Editor: commandbar + split live inside one card; overflow clips the square
+   split panes to the card's radius. The old .split height calc fought the flex
+   chain inside the wrapper, so it flexes instead. */
+.editor-view { display: flex; flex-direction: column; overflow: hidden; }
+.editor-view > .split { height: auto; flex: 1; min-height: 0; }
+
+/* ── Applications view ─────────────────────────────────────────────── */
+.applications-view,
+.profile-view { overflow-y: auto; padding: 28px 34px 40px; color: #18243a; }
+.applications-head { margin-bottom: 18px; }
+.applications-count { align-self: center; padding: 5px 12px; border: 1px solid #e3e7ee; border-radius: 999px; color: #58657a; font-size: 11px; font-weight: 650; white-space: nowrap; }
+.applications-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.applications-tab {
+  display: inline-flex; align-items: center; gap: 7px;
+  min-height: 32px; padding: 0 12px;
+  border: 1px solid #e3e7ee; border-radius: 999px;
+  background: #fff; color: #58657a; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: background var(--ease), border-color var(--ease), color var(--ease);
+}
+.applications-tab svg { color: #94a3b8; }
+.applications-tab b { min-width: 18px; padding: 1px 6px; border-radius: 999px; background: #f0f2f5; color: #64748b; font-size: 10.5px; font-weight: 700; text-align: center; }
+.applications-tab:hover { border-color: #cfd6e2; color: #18243a; }
+.applications-tab.active { background: #18243a; border-color: #18243a; color: #fff; }
+.applications-tab.active svg { color: #cbd5e1; }
+.applications-tab.active b { background: rgba(255,255,255,0.18); color: #fff; }
+.applications-tab.rejected.active { background: #d54b50; border-color: #d54b50; }
+.applications-view .application-nolink { color: #b6bfcd; }
+
+/* ── Profile view ──────────────────────────────────────────────────── */
+.profile-view-hero { display: flex; align-items: center; gap: 22px; padding: 6px 2px 24px; margin-bottom: 22px; border-bottom: 1px solid #eef0f4; }
+.profile-view-avatar { width: 96px; height: 96px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; background: linear-gradient(145deg, #e7edfa, #cbd8ee); color: #284669; font-size: 26px; font-weight: 800; overflow: hidden; }
+.profile-view-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.profile-view-idents h1 { margin: 0 0 8px; font-size: clamp(20px, 1.7vw, 25px); letter-spacing: -.025em; line-height: 1.05; }
+.profile-view-idents p { display: flex; align-items: center; gap: 8px; margin: 6px 0; color: #58657a; font-size: 13px; font-weight: 600; }
+.profile-view-idents p svg { color: #94a3b8; }
+
+.profile-view-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.profile-panel { border: 1px solid #e7ebf1; border-radius: 14px; padding: 20px 22px; background: #fff; }
+.profile-panel-wide { grid-column: 1 / -1; }
+.profile-panel h3 { display: flex; align-items: center; gap: 7px; margin: 0 0 14px; font-size: 13px; letter-spacing: -.01em; color: #18243a; }
+.profile-panel h3 svg { color: #94a3b8; }
+.profile-panel-sub { margin: -8px 0 14px; color: #788398; font-size: 11.5px; }
+
+.profile-info-list { display: grid; gap: 12px; }
+.profile-info-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.profile-info-icon { flex: 0 0 auto; width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid #eef0f4; border-radius: 9px; color: #64748b; }
+.profile-info-body { min-width: 0; display: grid; gap: 2px; }
+.profile-info-body small { color: #8b95a6; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+.profile-info-body b { font-size: 13px; color: #18243a; }
+.profile-info-body a { font-size: 13px; color: #2563eb; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-info-body a:hover { text-decoration: underline; }
+
+.profile-skill-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.profile-skill-tag { padding: 5px 11px; border: 1px solid #e3e7ee; border-radius: 999px; background: #f8fafc; color: #34445e; font-size: 11.5px; font-weight: 600; }
+
+.profile-entry-list { display: grid; gap: 14px; }
+.profile-entry { display: grid; gap: 3px; }
+.profile-entry b { font-size: 13px; color: #18243a; }
+.profile-entry small { color: #748095; font-size: 11.5px; }
+
+.profile-summary { color: #4a5568; font-size: 13px; line-height: 1.6; }
+
+.profile-resume-row { display: flex; flex-wrap: wrap; align-items: stretch; gap: 12px; }
+.profile-resume-item { flex: 1; min-width: 240px; display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid #e7ebf1; border-radius: 12px; background: #fbfcfe; }
+.profile-resume-icon { flex: 0 0 auto; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 10px; background: #eef2fb; color: #2f4a78; }
+.profile-resume-item > span:not(.profile-resume-icon) { min-width: 0; display: grid; gap: 2px; }
+.profile-resume-item b { font-size: 12.5px; color: #18243a; }
+.profile-resume-item small { color: #748095; font-size: 11px; }
+.profile-resume-open { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; padding: 7px 12px; border: 1px solid #dce3ee; border-radius: 8px; background: #fff; color: #34445e; font: inherit; font-size: 11.5px; font-weight: 650; cursor: pointer; }
+.profile-resume-open:hover { border-color: #c3cede; background: #f7f9fc; }
+.profile-resume-upload { display: inline-flex; align-items: center; gap: 8px; padding: 0 18px; border: 1px dashed #cfd6e2; border-radius: 12px; background: #fff; color: #94a3b8; font: inherit; font-size: 12px; font-weight: 600; cursor: not-allowed; }
+
+@media (max-width: 860px) {
+  .profile-view-grid { grid-template-columns: 1fr; }
+  .applications-view, .profile-view { padding: 20px 16px 32px; }
 }
 
 /* The sidebar collapses to a horizontal strip on narrow screens, where the

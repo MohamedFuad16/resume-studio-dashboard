@@ -63,7 +63,7 @@ const appliedDateKey = record => instantDateKey(record.appliedAt || record.creat
 
 const copy = {
   en: {
-    title: 'Application timeline',
+    title: 'Calendar',
     subtitle: 'Exact deadlines, your active applications, and the interviews or follow-ups you schedule.',
     month: 'Month',
     week: 'Week',
@@ -92,7 +92,7 @@ const copy = {
     noTracked: 'Track an internship first, then add its interview or follow-up here.',
   },
   ja: {
-    title: '応募タイムライン',
+    title: 'カレンダー',
     subtitle: '正確な締切・進行中の応募・登録した面接やフォローアップを表示します。',
     month: '月',
     week: '週',

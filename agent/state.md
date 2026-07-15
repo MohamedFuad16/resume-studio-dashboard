@@ -25,6 +25,19 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-15 — Design pass 4: inset-card shell, Applications + Profile views, small fixes
+  (commits `7414ac9`, `afe495a`; ADR-0033).** Every view now renders as an inset white rounded
+  card in a soft gutter (`.app-main` gradient, per-view card rule in index.css); sidebar keeps a
+  grey→peach gradient, no hard divider. New nav order: Dashboard · Radar · **Applications (new
+  view: all tracker records w/ status filter tabs)** · Calendar (renamed from Application
+  timeline) · Editor · **Profile (new view: contact/skills/education/experience/summary +
+  Résumés & CVs stub — file storage deferred)** · Settings. Dashboard: "Application" header,
+  5 pipeline stats on one line (grid had 4 columns → Rejected wrapped), calmer type scale.
+  Editor wrapped in `.editor-view` so the card radius clips it; Settings Back button removed;
+  model selects restyled; collapsed-sidebar toggle centred. Committed the previously-missing
+  `server/load-env.js` (fresh clones couldn't boot — see errors.md). **Planned (not built):**
+  Gmail ingest + self-healing daily catalog refresh → `PLAN-2026-07-15-gmail-ingest-and-daily-refresh.md`
+  (for a follow-up Opus session; includes CI failure root cause, model pricing, OAuth constraints).
 - **2026-07-15 — Durable Azure storage + catalog delete + account deletion (ADR-0032).**
   **Production was never using Vercel Blob** — `portal-compile-jp` had no token, no volumes, so
   it ran on ephemeral container disk since launch and silently lost every live-research result
