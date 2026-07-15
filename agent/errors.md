@@ -207,6 +207,15 @@ covering the real shell: language switcher, rapid toggle stability, and dashboar
 - None currently tracked. (ISSUE-002/003/004 resolved 2026-06-29 — see above.)
 
 ## Environment gotchas
+- **`server/load-env.js` was imported but never committed (fixed 2026-07-15, `afe495a`):**
+  `server/index.js` line 1 imports `./load-env.js`, but the file only ever existed on one
+  machine — every fresh clone failed to boot with `ERR_MODULE_NOT_FOUND`. Recreated as a
+  dependency-free `.env.local`/`.env` loader and committed. Lesson: `git status` before ending
+  a session; an import you add is a file you must commit.
+- **Stale Vite HMR errors in the browser console:** after fixing a JSX syntax error, the
+  in-app browser's console buffer still shows the old `[hmr] Failed to reload` lines across
+  reloads. Verify against the Vite *server* log (or a screenshot of the rendered app), not the
+  console buffer, before concluding the build is broken.
 - **Tectonic required:** `/api/compile`, `/api/export/pdf`, and `build_all.sh` need the
   `tectonic` binary (`TECTONIC_PATH`). Without it, compile falls back to the last saved
   PDF and the LaTeX tests fail.
