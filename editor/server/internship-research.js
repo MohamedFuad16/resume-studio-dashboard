@@ -5,11 +5,11 @@ import OpenAI from 'openai';
 
 const SCHEMA_FILE = fileURLToPath(new URL('./internship-search.schema.json', import.meta.url));
 const BLOCKED_JOB_DOMAINS = /(?:indeed|glassdoor|linkedin|ziprecruiter|simplyhired)\./i;
-// gpt-5-mini (with :online web search) is slower (~60-120s) but noticeably more
-// accurate than gemini-2.5-flash, which returned expired job-board/aggregator links.
-// Accuracy wins here — the UI shows staged progress during the wait. Overridable
-// via Settings/env. See the raised INTERNSHIP_RESEARCH_TIMEOUT_MS below.
-const DEFAULT_MODEL = 'openai/gpt-5-mini';
+// perplexity/sonar has native web search, returns sourced answers in a few
+// seconds, and is cheaper per lookup than gpt-5-mini + OpenRouter's Exa plugin
+// (which ran 120–245 s on the slow tail — see agent/errors.md). gpt-5-mini stays
+// selectable as an accuracy-first fallback. Overridable via Settings/env.
+const DEFAULT_MODEL = 'perplexity/sonar';
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const slugify = value => String(value || '')
@@ -157,12 +157,16 @@ async function loadSearchSchema() {
   return schemaCache;
 }
 
-// The research call gets OpenRouter web search via the `:online` model suffix
-// (a still-supported shortcut for the web plugin). If the operator already
-// pinned a fully-qualified slug/variant we leave it untouched.
-function researchModel(overrideModel) {
+// Web search sourcing:
+//  - Perplexity `sonar*` models are natively web-connected — appending `:online`
+//    is wrong (it would add the paid Exa plugin on top of Perplexity's own search).
+//  - Everything else gets OpenRouter's `:online` web-search shortcut.
+//  - A slug the operator already qualified with a `:variant` is left untouched.
+export function researchModel(overrideModel) {
   const base = (typeof overrideModel === 'string' && overrideModel.trim()) || process.env.OPENROUTER_MODEL || DEFAULT_MODEL;
-  return base.includes(':') ? base : `${base}:online`;
+  if (base.includes(':')) return base;
+  if (/^perplexity\//i.test(base)) return base;
+  return `${base}:online`;
 }
 
 function extractContent(response) {

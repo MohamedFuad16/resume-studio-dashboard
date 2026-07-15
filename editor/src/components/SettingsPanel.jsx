@@ -9,17 +9,30 @@ import { useEffect, useState } from 'react';
 import { I } from './ui.jsx';
 import { settingsApi } from '../api/client.js';
 
-const DEFAULT_SEARCH_MODEL = 'openai/gpt-5-mini';
+const DEFAULT_SEARCH_MODEL = 'perplexity/sonar';
 const DEFAULT_AUDIT_MODEL = 'openai/gpt-5-nano';
 
 // Only the slugs this app actually runs against OpenRouter. Deliberately not a
 // longer menu: an unverified slug would fail at request time, and the user
 // cannot tell a bad model from a broken feature. `value` is the language-stable
-// slug (see agent/conventions.md); only the label is cosmetic.
+// slug (see agent/conventions.md); the label carries a short human hint.
 const SELECTABLE_MODELS = [
-  { value: 'openai/gpt-5-mini', label: 'openai/gpt-5-mini' },
-  { value: 'openai/gpt-5-nano', label: 'openai/gpt-5-nano' },
+  { value: 'perplexity/sonar', label: 'perplexity/sonar — web search, fast (default)' },
+  { value: 'perplexity/sonar-pro', label: 'perplexity/sonar-pro — deeper web search' },
+  { value: 'openai/gpt-5-mini', label: 'openai/gpt-5-mini — accuracy-first (slow)' },
+  { value: 'google/gemini-2.5-flash-lite', label: 'google/gemini-2.5-flash-lite — cheapest' },
+  { value: 'openai/gpt-5-nano', label: 'openai/gpt-5-nano — cheap triage (audit default)' },
+  { value: 'deepseek/deepseek-chat', label: 'deepseek/deepseek-chat — cheap' },
 ];
+
+// Mirror of server researchModel(): shows which slug actually hits the API so
+// "which model is running" is never a mystery. Perplexity is natively online;
+// everything else gets OpenRouter's :online web-search shortcut.
+function effectiveSearchSlug(slug) {
+  const s = String(slug || '').trim();
+  if (!s || s.includes(':') || /^perplexity\//i.test(s)) return s;
+  return `${s}:online`;
+}
 const KEY_RE = /^sk-or-[A-Za-z0-9\-_]{20,}$/;
 const MODEL_RE = /^[a-z0-9][a-z0-9._/:-]{1,60}$/i;
 
@@ -35,6 +48,7 @@ const COPY = {
     keyLabel: 'OpenRouter API key', keyPh: 'sk-or-...', keySaved: 'A key is saved. Enter a new one to replace it.',
     searchModel: 'Search model', auditModel: 'Audit model',
     addModelSoon: 'Add another model — coming soon',
+    effectiveModel: slug => `Runs as ${slug} (web search enabled)`,
     data: 'Data',
     exportJson: 'Export résumé (JSON)',
     dangerZone: 'Danger zone',
@@ -65,6 +79,7 @@ const COPY = {
     keyLabel: 'OpenRouter APIキー', keyPh: 'sk-or-...', keySaved: 'キーは保存済みです。変更する場合は新しいキーを入力してください。',
     searchModel: '検索モデル', auditModel: '監査モデル',
     addModelSoon: '他のモデルを追加 — 近日対応',
+    effectiveModel: slug => `実行時: ${slug}（Web検索有効）`,
     data: 'データ',
     exportJson: '履歴書をエクスポート (JSON)',
     dangerZone: '危険な操作',
@@ -259,6 +274,9 @@ export default function SettingsPanel({
               ))}
               <option value="" disabled>{t.addModelSoon}</option>
             </select>
+            {effectiveSearchSlug(searchModel) !== searchModel && (
+              <small className="settings-note">{t.effectiveModel(effectiveSearchSlug(searchModel))}</small>
+            )}
           </label>
           <label className="settings-field">
             <span>{t.auditModel}</span>
