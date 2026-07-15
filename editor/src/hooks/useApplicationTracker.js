@@ -107,6 +107,10 @@ export function useApplicationTracker(profileId) {
         companyDomain: internship.companyDomain || '',
         logoUrl: internship.logoUrl || '',
         status,
+        // Provenance: 'web' (added in-app) vs 'gmail' (ingested from the inbox).
+        // A record keeps its origin once set; only a fresh Gmail action can stamp it.
+        source: internship.source || current[internship.id]?.source || 'web',
+        sourceMeta: internship.sourceMeta || current[internship.id]?.sourceMeta || null,
         updatedAt: new Date().toISOString(),
         createdAt: current[internship.id]?.createdAt || new Date().toISOString(),
         milestones: Array.isArray(current[internship.id]?.milestones) ? current[internship.id].milestones : [],

@@ -3,6 +3,7 @@ import { ArrowRight, Bookmark, CalendarClock, CircleSlash, FilePenLine, Inbox, S
 import { APPLICATION_STATUSES, statusLabel, useApplicationTracker } from '../hooks/useApplicationTracker.js';
 import { useInternshipCatalog } from '../hooks/useInternshipCatalog.js';
 import { CompanyLogo } from './CompanyLogo.jsx';
+import GmailMark from './GmailMark.jsx';
 import InterviewDateModal from './InterviewDateModal.jsx';
 import { displayCompany, displayRole, displayValue, formatDisplayDeadline } from '../utils/internshipDisplay.js';
 
@@ -110,7 +111,7 @@ export default function ApplicationsView({ isJa, activeProfile, onOpenRadar }) {
             || { ...record, id: record.internshipId, url: record.applyUrl };
           return (
             <article className="application-row" key={record.internshipId}>
-              <span className="application-company"><CompanyLogo item={item} /><span><b>{displayCompany(item, isJa)}</b><small>{displayRole(item.role || record.role, isJa)}</small></span></span>
+              <span className="application-company"><CompanyLogo item={item} /><span><b>{displayCompany(item, isJa)}{record.source === 'gmail' && <span className="src-gmail" title={isJa ? 'Gmailから追加' : 'Added from Gmail'}><GmailMark size={12} /></span>}</b><small>{displayRole(item.role || record.role, isJa)}</small></span></span>
               <span>{displayValue(record.location, isJa)}</span>
               <span className="application-deadline">{formatDisplayDeadline(record.deadline, isJa)}</span>
               <select value={record.status} onChange={event => onStatusChange(item, event.target.value)} aria-label={isJa ? `${record.company}の応募状況` : `Status for ${record.company}`}>

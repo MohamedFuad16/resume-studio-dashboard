@@ -11,6 +11,7 @@ import { ApplicationCalendar } from './components/ApplicationCalendar.jsx';
 import ApplicationsView from './components/ApplicationsView.jsx';
 import ProfileView from './components/ProfileView.jsx';
 import { useApplicationTracker } from './hooks/useApplicationTracker.js';
+import { useGmailInbox } from './hooks/useGmailInbox.js';
 import {
   LayoutDashboard, Telescope, CalendarDays, FileText, Settings2, PanelLeftClose,
   BriefcaseBusiness, UserRound,
@@ -588,6 +589,8 @@ export default function App() {
   const {
     records: trackedRecords, addMilestone: addTrackerMilestone, removeMilestone: removeTrackerMilestone,
   } = useApplicationTracker(activeProfile);
+  // Gmail ingest: drains inbox-derived actions into the tracker/calendar (full-auto).
+  const { justApplied, clearJustApplied } = useGmailInbox(activeProfile);
   // Sidebar collapse — persisted so it survives reloads.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => localStorage.getItem('sidebar-collapsed') === 'true'
@@ -599,6 +602,12 @@ export default function App() {
   const [parsingPdf, setParsingPdf] = useState(false);
   const [editingIndex, setEditingIndex] = useState(-1);
   const isJa = lang === 'ja';
+  useEffect(() => {
+    if (!justApplied.length) return;
+    const n = justApplied.length;
+    toast(isJa ? `Gmailから${n}件の応募を追加しました` : `Added ${n} application${n === 1 ? '' : 's'} from Gmail`, 'success');
+    clearJustApplied();
+  }, [justApplied, clearJustApplied, isJa, toast]);
 
   const fetchProfiles = useCallback(async () => {
     try {

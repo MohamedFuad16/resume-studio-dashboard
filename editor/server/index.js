@@ -22,6 +22,7 @@ import { isRetiredInternshipId } from './seeds/catalog-audit-2026-07-02.js';
 import * as gmailOAuth from './gmail/oauth.js';
 import * as gmailStore from './gmail/store.js';
 import { encAvailable } from './gmail/crypto.js';
+import { syncProfile } from './gmail/sync.js';
 import {
   sendRequestError,
   validateApplication,
@@ -540,6 +541,41 @@ app.post('/api/integrations/gmail/disconnect', async (req, res) => {
   }
 });
 
+// Run a sync on demand (also called by the client on load) and return a summary.
+app.post('/api/integrations/gmail/sync-now', async (req, res) => {
+  try {
+    setNoStore(res);
+    const profile = validateProfileId(req.query.profile || 'mohamed_fuad');
+    const result = await syncProfile(store, profile);
+    res.json({ ok: true, ...result });
+  } catch (error) {
+    sendRequestError(res, error);
+  }
+});
+
+// Pending Gmail-derived actions for the client to apply to its Firestore tracker.
+app.get('/api/integrations/gmail/pending', async (req, res) => {
+  try {
+    setNoStore(res);
+    const profile = validateProfileId(req.query.profile || 'mohamed_fuad');
+    res.json({ actions: await gmailStore.getQueue(store, profile) });
+  } catch (error) {
+    sendRequestError(res, error);
+  }
+});
+
+// Client acks actions it has applied; they are removed from the queue.
+app.post('/api/integrations/gmail/ack', async (req, res) => {
+  try {
+    const profile = validateProfileId(req.query.profile || 'mohamed_fuad');
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+    const remaining = await gmailStore.ackQueue(store, profile, ids);
+    res.json({ ok: true, remaining });
+  } catch (error) {
+    sendRequestError(res, error);
+  }
+});
+
 // ── Live internship catalog and company research ────────────────
 app.get('/api/internships', async (req, res) => {
   try {
@@ -983,6 +1019,37 @@ if (isDirectRun) {
   app.listen(PORT, () => {
     console.log(`✅ Internship Portal backend on http://localhost:${PORT}`);
   });
+  startGmailSyncLoop();
+}
+
+// 24/7 Gmail poll — only on a long-lived process (the single-replica Azure
+// container), never in Vercel serverless (module import ≠ direct run). Syncs
+// every connected profile so new mail is ingested even while no browser is open;
+// the client drains the resulting queue into Firestore when it next loads.
+function startGmailSyncLoop() {
+  if (String(process.env.GMAIL_SYNC_DISABLED || '') === '1') return;
+  const intervalMs = Number(process.env.GMAIL_SYNC_INTERVAL_MS || 300000); // 5 min
+  let running = false;
+  const tick = async () => {
+    if (running) return;
+    running = true;
+    try {
+      const profiles = await gmailStore.listConnectedProfiles(store);
+      for (const profile of profiles) {
+        try {
+          const r = await syncProfile(store, profile);
+          if (r.actions) console.log(`[gmail-sync] ${profile}: ${r.actions} new action(s)`);
+        } catch (error) {
+          console.warn(`[gmail-sync] ${profile} failed: ${error.message}`);
+        }
+      }
+    } finally {
+      running = false;
+    }
+  };
+  setTimeout(tick, 15000); // first run shortly after boot
+  setInterval(tick, intervalMs);
+  console.log(`✅ Gmail sync loop every ${Math.round(intervalMs / 1000)}s`);
 }
 
 export default app;

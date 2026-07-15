@@ -7445,6 +7445,8 @@ body,
 .applications-tab.active b { background: rgba(255,255,255,0.18); color: #fff; }
 .applications-tab.rejected.active { background: #d54b50; border-color: #d54b50; }
 .applications-view .application-nolink { color: #b6bfcd; }
+.src-gmail { display: inline-flex; vertical-align: middle; margin-left: 6px; opacity: .9; }
+.src-gmail svg { display: block; }
 
 /* ── Profile view ──────────────────────────────────────────────────── */
 .profile-view-hero { display: flex; align-items: center; gap: 22px; padding: 6px 2px 24px; margin-bottom: 22px; border-bottom: 1px solid #eef0f4; }
