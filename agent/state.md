@@ -25,6 +25,23 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-16 — Gmail ingest Phase 2 (2a connect + 2b sync pipeline), branch
+  `feat/gmail-catalog-automation` (commits 5513866, 52beba0, 05ad392, c20954d; ADR-0035).**
+  Read-only Gmail OAuth (server-side, raw fetch, node:crypto AES-256-GCM token — NO new deps;
+  `server/gmail/*`). Settings "Gmail" card (connect/disconnect/live status, real Gmail logo).
+  Pipeline: gmailClient (token refresh + history read + MIME extract) → classify (gpt-5-nano
+  triage) → enrich (sonar) → sync pushes actions to a per-profile server queue → client
+  `useGmailInbox` drains into the Firestore tracker/calendar full-auto (Option C: no
+  firebase-admin, no rule changes) with Gmail source badges. 24/7 `setInterval` loop runs ONLY
+  on the persistent process (isDirectRun → Azure container). **Verified end-to-end** against the
+  real connected inbox (mohamed.fuad.jp@gmail.com): classify accurate, HENNGE(applied)+Rakuten
+  (interview) matched to catalog, interview milestone created, badges render, queue acks.
+  **GCP:** OAuth client + Gmail API + consent screen live (user set up); local `.env.local` has
+  GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI + GMAIL_TOKEN_ENC_KEY. **NEXT = prod deploy to Azure**
+  (`portal-compile-jp`, japaneast, durable /data): rebuild image w/ Gmail code, set the 4 env
+  vars, point frontend API at Azure, add Azure callback to Google console. Prod topology: Vercel
+  serves frontend at portal.mohamedfuad.com; `VITE_API_BASE_URL=""` (same-origin serverless
+  today). I have `az`(akshay6.nitt) + `vercel`(mohamedfuadjp) CLI access on this machine.
 - **2026-07-16 — Gmail/catalog plan Phase 1: model switch + self-healing catalog refresh
   (branch `feat/gmail-catalog-automation`, commits `fc460ea`, `f39a54f`; ADR-0034).**
   Search default → `perplexity/sonar` (native web search, ~2s w/ sources vs gpt-5-mini:online

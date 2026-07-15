@@ -722,3 +722,22 @@ HTTP-only without it) and repo setting "Allow GitHub Actions to create and appro
 Naturally-dead links no longer block pushes (caught within 24h by refresh instead). Retirements
 are reversible (edit the JSON). Harbinger is the live example of a conflict (company still hiring,
 specific URL dead) — kept active for a human to re-URL rather than auto-deleted.
+
+## ADR-0035 · 2026-07-16 · Gmail ingest: server-side read-only OAuth + client-drained queue
+**Context:** Auto-add application emails to the tracker/calendar, 24/7, single-user. Tracker data
+lives in client-direct Firestore (owner-only rules) — a server can't write it without
+firebase-admin + a service account.
+**Decision:** (1) Server-side Gmail (raw fetch, node:crypto — no googleapis/firebase-admin/cron
+deps). Read-only scope. Refresh token AES-256-GCM-encrypted in the server KV store. (2) OAuth
+callback derives the post-auth redirect from the request host (works on any prod domain).
+(3) Pipeline: gpt-5-nano triage → sonar enrichment → sync pushes normalized actions to a
+per-profile server queue; the CLIENT drains the queue into Firestore (Option C) — it owns the
+match against existing records, so no admin SDK and no rule changes. Full-auto (user choice).
+(4) 24/7 poll is a setInterval gated by isDirectRun, so it runs on the single-replica Azure
+container but never in Vercel serverless.
+**Consequences:** Works while the browser is closed (server keeps the queue fresh; client
+reconciles on next open). Needs durable server storage + a persistent process = the Azure
+container, NOT Vercel serverless (ephemeral). Prod deploy therefore must route the API (or at
+least the Gmail routes) to Azure. 7-day testing-mode token expiry is avoided by publishing the
+OAuth app to production; the reconnect banner is event-driven (fires only on a real invalid_grant),
+not a timer. Gmail brand mark is nominative use to label the integration + tag ingested rows.
