@@ -25,6 +25,18 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-16 — Gmail/catalog plan Phase 1: model switch + self-healing catalog refresh
+  (branch `feat/gmail-catalog-automation`, commits `fc460ea`, `f39a54f`; ADR-0034).**
+  Search default → `perplexity/sonar` (native web search, ~2s w/ sources vs gpt-5-mini:online
+  120-245s); `researchModel()` no longer appends `:online` to perplexity/*; Settings menu
+  expanded + shows the effective slug. Self-healing daily catalog: `server/refresh-catalog.js`
+  retires HTTP-dead listings (sonar double-checked — retire only if not "still open"; conflicts
+  logged) + refreshes stale deadlines into the machine-owned `seeds/auto-refresh.json` overlay
+  (wired into `buildSeedCatalog` + `isRetiredInternshipId`); workflow split into `validate`
+  (push/PR, no flaky link gate) + `refresh` (schedule → heal → auto-PR via peter-evans).
+  **Blocked on user:** add `OPENROUTER_API_KEY` GH Actions secret + enable "Allow Actions to
+  create PRs". **Phase 2 (Gmail ingest) not started** — see PLAN §3. Decisions locked:
+  catalog→auto-PR, Gmail→full-auto day one.
 - **2026-07-15 — Design pass 4: inset-card shell, Applications + Profile views, small fixes
   (commits `7414ac9`, `afe495a`; ADR-0033).** Every view now renders as an inset white rounded
   card in a soft gutter (`.app-main` gradient, per-view card rule in index.css); sidebar keeps a

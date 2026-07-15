@@ -700,3 +700,25 @@ gradient, `border-right: 0` — separation comes from the gutter, never a hard l
 **Consequences:** New views opt in by adding one selector to the shared card rule. The profile
 dropdown still escapes the sidebar (opens upward; sidebar keeps `overflow: visible`). Dashboard
 type scale reduced (h1 clamp 20–26px, section h2 15px, stat numerals 17px) as the new baseline.
+
+## ADR-0034 · 2026-07-16 · Self-healing catalog via a machine-owned JSON overlay; sonar default
+**Context:** The daily "Validate Catalog" action hard-failed every day on 2 naturally-dead
+greenhouse listings that nothing retired. The catalog's source of truth is hand-formatted seed
+JS arrays across 3 files — unsafe for a bot to edit surgically.
+**Decision:** (1) Add `seeds/auto-refresh.json` + `auto-refresh.js` — a machine-owned overlay the
+daily job regenerates *wholesale*, never touching seed arrays. It filters retired ids and patches
+deadlines; wired as the outermost `buildSeedCatalog()` overlay and unioned into
+`isRetiredInternshipId()` so all catalog paths honor it. (2) `server/refresh-catalog.js` reuses the
+validator's liveness checker to find HTTP-dead listings, then double-checks each with the search
+model — retire ONLY if the model doesn't say "still open" (HTTP-dead + still-open = conflict,
+logged, left active for the human reviewing the auto-PR). (3) Workflow split: `validate` (push/PR,
+format+round-trip, no flaky link gate) and `refresh` (schedule/manual → heal → re-validate →
+open PR via peter-evans/create-pull-request). (4) Search model default → `perplexity/sonar`
+(native web search, seconds vs gpt-5-mini:online's 120-245s); `:online` no longer stacked on
+perplexity/*.
+**Consequences:** No more daily red X — a heal run is green and proposes a reviewable PR (per the
+auto-PR decision). Needs the `OPENROUTER_API_KEY` GH secret for LLM verification (degrades to
+HTTP-only without it) and repo setting "Allow GitHub Actions to create and approve pull requests".
+Naturally-dead links no longer block pushes (caught within 24h by refresh instead). Retirements
+are reversible (edit the JSON). Harbinger is the live example of a conflict (company still hiring,
+specific URL dead) — kept active for a human to re-URL rather than auto-deleted.
