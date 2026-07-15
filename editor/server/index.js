@@ -19,6 +19,9 @@ import {
 } from './seeds/internships.js';
 import { buildSeedCatalog } from './seeds/catalog.js';
 import { isRetiredInternshipId } from './seeds/catalog-audit-2026-07-02.js';
+import * as gmailOAuth from './gmail/oauth.js';
+import * as gmailStore from './gmail/store.js';
+import { encAvailable } from './gmail/crypto.js';
 import {
   sendRequestError,
   validateApplication,
@@ -431,6 +434,99 @@ app.post('/api/tracker', async (req, res) => {
     const tracker = validateTracker(req.body);
     await store.setJson(trackerKey(profile), tracker);
     res.json({ saved: true, profile, count: Object.keys(tracker).length });
+  } catch (error) {
+    sendRequestError(res, error);
+  }
+});
+
+// ── Gmail integration: read-only OAuth connect flow ──────────────
+// Where to send the browser back to after the OAuth round-trip (the SPA, which
+// in dev runs on :5173 while this server is :5005; same-origin in prod).
+const gmailAppRedirect = () => process.env.RESUME_STUDIO_APP_ORIGIN || 'http://localhost:5173';
+
+// Config/connection status — safe to call anytime; never returns token material.
+app.get('/api/integrations/gmail/status', async (req, res) => {
+  try {
+    setNoStore(res);
+    const profile = validateProfileId(req.query.profile || 'mohamed_fuad');
+    const configured = gmailOAuth.oauthConfigured() && encAvailable();
+    const conn = await gmailStore.getConnection(store, profile);
+    res.json({ configured, ...gmailStore.publicStatus(conn) });
+  } catch (error) {
+    sendRequestError(res, error);
+  }
+});
+
+// Begin OAuth: returns the Google consent URL (CSRF state stored server-side).
+app.get('/api/integrations/gmail/auth-url', async (req, res) => {
+  try {
+    setNoStore(res);
+    if (!gmailOAuth.oauthConfigured() || !encAvailable()) {
+      return res.status(503).json({ error: 'Gmail integration is not configured on the server.' });
+    }
+    const profile = validateProfileId(req.query.profile || 'mohamed_fuad');
+    const nonce = randomUUID();
+    await gmailStore.saveOAuthState(store, nonce, { profile });
+    res.json({ url: gmailOAuth.buildAuthUrl(nonce) });
+  } catch (error) {
+    sendRequestError(res, error);
+  }
+});
+
+// OAuth redirect target (registered on the Google OAuth client). Exchanges the
+// code, stores the encrypted refresh token + a sync baseline, then bounces the
+// browser back to the app.
+app.get('/api/integrations/gmail/callback', async (req, res) => {
+  const backTo = gmailAppRedirect();
+  try {
+    const { code, state, error: oauthError } = req.query;
+    if (oauthError) return res.redirect(`${backTo}/?gmail=denied`);
+    const stateData = state ? await gmailStore.takeOAuthState(store, String(state)) : null;
+    if (!code || !stateData) return res.redirect(`${backTo}/?gmail=error`);
+    const profile = validateProfileId(stateData.profile);
+
+    const tokens = await gmailOAuth.exchangeCode(String(code));
+    if (!tokens.refresh_token) {
+      // No refresh token means we can't sync in the background — usually a re-consent
+      // without prompt=consent. Our auth URL forces consent, so this is rare.
+      return res.redirect(`${backTo}/?gmail=norefresh`);
+    }
+    const email = await gmailOAuth.fetchEmail(tokens.access_token);
+    // Sync baseline: only mail that arrives AFTER connect is ingested.
+    let historyId = null;
+    try {
+      const pr = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
+        headers: { Authorization: `Bearer ${tokens.access_token}` },
+      });
+      const pj = await pr.json().catch(() => ({}));
+      historyId = pj.historyId || null;
+    } catch { /* first sync will establish the baseline instead */ }
+
+    await gmailStore.setRefreshToken(store, profile, {
+      email,
+      historyId,
+      connectedAt: new Date().toISOString(),
+      lastSyncAt: null,
+      lastError: null,
+      settings: { autoApply: true },
+    }, tokens.refresh_token);
+
+    res.redirect(`${backTo}/?gmail=connected`);
+  } catch (error) {
+    console.error('Gmail callback failed:', error.message);
+    res.redirect(`${backTo}/?gmail=error`);
+  }
+});
+
+// Disconnect: revoke at Google (best-effort) and delete all local state.
+app.post('/api/integrations/gmail/disconnect', async (req, res) => {
+  try {
+    const profile = validateProfileId(req.query.profile || 'mohamed_fuad');
+    const conn = await gmailStore.getConnection(store, profile);
+    const refreshToken = gmailStore.readRefreshToken(conn);
+    if (refreshToken) await gmailOAuth.revokeToken(refreshToken);
+    await gmailStore.deleteConnection(store, profile);
+    res.json({ disconnected: true });
   } catch (error) {
     sendRequestError(res, error);
   }

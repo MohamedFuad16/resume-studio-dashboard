@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react';
 import { I } from './ui.jsx';
 import { settingsApi } from '../api/client.js';
+import GmailConnectCard from './GmailConnectCard.jsx';
 
 const DEFAULT_SEARCH_MODEL = 'perplexity/sonar';
 const DEFAULT_AUDIT_MODEL = 'openai/gpt-5-nano';
@@ -292,6 +293,8 @@ export default function SettingsPanel({
           </label>
         </div>
       </section>
+
+      <GmailConnectCard profile={activeProfile} isJa={isJa} />
 
       <section className="settings-card">
         <header><h2>{t.data}</h2></header>

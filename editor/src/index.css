@@ -6801,6 +6801,24 @@ body,
 .settings-inline-link { background: none; border: none; padding: 0; color: var(--blue); font-weight: 600; font-size: 11.5px; cursor: pointer; }
 .settings-inline-link:hover { text-decoration: underline; }
 .settings-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* ── Gmail integration card ─────────────────────────────────────────── */
+.gmail-card header h2 { display: flex; align-items: center; gap: 8px; }
+.gmail-mark { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, #ea4335, #d33b2c); color: #fff; }
+.gmail-mark svg { width: 15px; height: 15px; }
+.gmail-notice { margin: 4px 0 14px; padding: 9px 12px; border: 1px solid #d7e3f4; border-radius: 9px; background: #f2f7fe; color: #274b78; font-size: 12px; }
+.gmail-unconfigured { line-height: 1.5; }
+.gmail-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.gmail-actions .btn-primary { display: inline-flex; align-items: center; gap: 7px; padding: 9px 15px; border: 0; border-radius: 9px; background: var(--blue); color: #fff; font-weight: 650; cursor: pointer; }
+.gmail-actions .btn-primary:disabled { opacity: .6; cursor: default; }
+.gmail-connected { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.gmail-account { display: flex; align-items: center; gap: 11px; }
+.gmail-account > div { display: grid; gap: 2px; }
+.gmail-account b { font-size: 13px; color: var(--t1); }
+.gmail-account small { color: var(--t2); font-size: 11px; }
+.gmail-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px rgba(22,163,74,.15); }
+.gmail-reauth { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border: 1px solid #f3d9a0; border-radius: 8px; background: #fdf6e7; color: #8a5a11; font-size: 12px; }
+.gmail-disconnect { margin-left: auto; }
 .settings-danger {
   margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--b0);
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
