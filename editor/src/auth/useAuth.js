@@ -11,9 +11,14 @@ import {
   signInWithPopup,
   signOut as fbSignOut,
   updateProfile,
+  deleteUser,
+  reauthenticateWithPopup,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
 } from 'firebase/auth';
 import { auth, googleProvider, authAvailable } from './firebase.js';
-import { syncUserDoc } from '../data/userProfile.js';
+import { syncUserDoc, removeUserDoc } from '../data/userProfile.js';
+import { removeAllUserData } from '../data/firestoreData.js';
 
 // Map Firebase error codes to concise messages. Keys are the code suffix.
 const ERROR_MESSAGES = {
@@ -30,6 +35,7 @@ const ERROR_MESSAGES = {
   'auth/network-request-failed': 'Network error. Check your connection and retry.',
   'auth/too-many-requests': 'Too many attempts. Please wait a moment and retry.',
   'auth/unauthorized-domain': 'This domain is not authorized for sign-in.',
+  'auth/requires-recent-login': 'Please sign in again before deleting your account.',
 };
 
 function friendlyError(err) {
@@ -46,6 +52,58 @@ export async function signOutUser() {
 // The currently signed-in user, or null. Handy for one-off reads outside React.
 export function currentUser() {
   return auth?.currentUser || null;
+}
+
+// Permanently deletes the signed-in account and everything it owns.
+//
+// Order is deliberate and load-bearing: Firestore data MUST go first, while the
+// user is still authenticated. The security rules key on request.auth.uid, so if
+// the auth user were deleted first, every remaining document would be orphaned —
+// unreachable and undeletable by anyone, forever. If the data step fails we throw
+// and never touch the auth user, so the account can still sign in and retry.
+//
+// `password` is only needed for password accounts that have not signed in
+// recently; Google accounts re-auth through the popup. Firebase requires a fresh
+// credential for deletion and rejects a stale session with
+// auth/requires-recent-login.
+export async function deleteAccount({ password } = {}) {
+  if (!authAvailable || !auth) throw new Error('Auth is not available.');
+  const user = auth.currentUser;
+  if (!user) throw new Error('You are not signed in.');
+
+  const reauthenticate = async () => {
+    const isPasswordAccount = (user.providerData || []).some(p => p.providerId === 'password');
+    if (isPasswordAccount) {
+      if (!password) {
+        const err = new Error('Please re-enter your password to delete your account.');
+        err.code = 'app/password-required';
+        throw err;
+      }
+      const credential = EmailAuthProvider.credential(user.email, password);
+      await reauthenticateWithCredential(user, credential);
+    } else {
+      await reauthenticateWithPopup(user, googleProvider);
+    }
+  };
+
+  try {
+    // 1. Data first, while the uid still authorises the writes.
+    await removeAllUserData();
+    await removeUserDoc(user.uid);
+
+    // 2. Then the account itself.
+    try {
+      await deleteUser(user);
+    } catch (err) {
+      if (err?.code !== 'auth/requires-recent-login') throw err;
+      await reauthenticate();
+      await deleteUser(auth.currentUser);
+    }
+    return { ok: true };
+  } catch (err) {
+    if (err?.code === 'app/password-required') throw err;
+    throw new Error(friendlyError(err));
+  }
 }
 
 export function useAuth() {
@@ -110,5 +168,6 @@ export function useAuth() {
     signUpEmail,
     signInGoogle,
     signOut,
+    deleteAccount,
   };
 }

@@ -5,8 +5,8 @@ import {
   BriefcaseBusiness,
   CalendarClock,
   Camera,
-  Check,
-  CircleDot,
+  CircleSlash,
+  Inbox,
   FilePenLine,
   GraduationCap,
   MapPin,
@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import { APPLICATION_STATUSES, statusLabel, useApplicationTracker } from '../hooks/useApplicationTracker.js';
 import { useInternshipCatalog } from '../hooks/useInternshipCatalog.js';
-import { ApplicationCalendar } from './ApplicationCalendar.jsx';
 import { CompanyLogo } from './CompanyLogo.jsx';
 import InterviewDateModal from './InterviewDateModal.jsx';
 import { displayCompany, displayRole, displayValue, formatDisplayDeadline } from '../utils/internshipDisplay.js';
@@ -27,9 +26,11 @@ const STATUS_ICONS = {
   applying: FilePenLine,
   applied: Send,
   interview: CalendarClock,
+  rejected: CircleSlash,
 };
 
-const APPLIED_STATUSES = new Set(['applying', 'applied', 'interview']);
+// Rejected applications stay in Recent — losing them would hide the outcome.
+const APPLIED_STATUSES = new Set(['applying', 'applied', 'interview', 'rejected']);
 
 const dashboardValue = (value, isJa) => {
   return displayValue(value, isJa);
@@ -72,8 +73,6 @@ const copy = {
     tokyo: 'Tokyo opportunities',
     tokyoSub: 'Highest-priority matches nearby.',
     viewJapan: 'View all Japan matches',
-    ranking: 'Japan-first ranking',
-    rankingSub: 'Tokyo and Japan roles stay above global opportunities when match quality is similar.',
   },
   ja: {
     uploadPhoto: 'プロフィール写真をアップロード',
@@ -105,8 +104,6 @@ const copy = {
     tokyo: '東京の注目募集',
     tokyoSub: '近くで優先度の高い募集です。',
     viewJapan: '日本の募集をすべて見る',
-    ranking: '日本優先ランキング',
-    rankingSub: '同程度の適合度では、東京・日本の募集を上位に表示します。',
   },
 };
 
@@ -138,7 +135,7 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
   const t = isJa ? copy.ja : copy.en;
   const fileRef = useRef(null);
   const [interviewPending, setInterviewPending] = useState(null);
-  const { records, counts, updateStatus, addMilestone, removeMilestone } = useApplicationTracker(activeProfile);
+  const { records, counts, updateStatus, addMilestone } = useApplicationTracker(activeProfile);
   const { catalog } = useInternshipCatalog();
   const completion = profileCompletion(resume);
   const recent = useMemo(
@@ -254,7 +251,7 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
                 </article>
               );
             }) : (
-              <div className="application-empty"><CircleDot size={22} /><b>{t.noApps}</b><span>{t.noAppsSub}</span><button type="button" onClick={onOpenRadar}>{t.explore}</button></div>
+              <div className="application-empty"><span className="application-empty-icon" aria-hidden="true"><Inbox size={20} /></span><b>{t.noApps}</b><span>{t.noAppsSub}</span><button type="button" onClick={onOpenRadar}>{t.explore}</button></div>
             )}
           </div>
 
@@ -289,10 +286,9 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
             ))}
           </div>
           <button className="rail-action" type="button" onClick={onOpenRadar}>{t.viewJapan} <ArrowRight size={15} /></button>
-          <div className="rail-tip"><span className="rail-tip-icon" aria-hidden="true"><Check size={15} /></span><div><b>{t.ranking}</b><p>{t.rankingSub}</p></div></div>
         </aside>
       </div>
-      <ApplicationCalendar records={records} addMilestone={addMilestone} removeMilestone={removeMilestone} isJa={isJa} />
+      {/* Application timeline moved to its own view (sidebar → Application timeline). */}
       <InterviewDateModal
         open={Boolean(interviewPending)}
         applicationLabel={interviewPending ? `${displayCompany(interviewPending, isJa)} — ${displayRole(interviewPending.role, isJa)}` : ''}

@@ -17,7 +17,23 @@ export function createStore({ localDbPath }) {
   let operations = Promise.resolve();
   let backend = 'local-sqlite';
 
-  const hasBlob = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  // Blob is a best-effort durability layer, never a hard dependency. If the store
+  // is unreachable (quota pause, revoked/expired token, network), we log once and
+  // fall back to the local SQLite file rather than failing the request — a Blob
+  // outage used to 500 every /api/* route and hang the app on "Loading…".
+  // See BUG-011 in agent/errors.md.
+  let blobDisabled = false;
+  const hasBlob = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN) && !blobDisabled;
+  const disableBlob = (operation, error) => {
+    if (!blobDisabled) {
+      blobDisabled = true;
+      console.warn(
+        `Vercel Blob unavailable during ${operation} (${error.message}). ` +
+        'Falling back to local SQLite for the rest of this process; ' +
+        'data will not be shared across instances until Blob is restored.'
+      );
+    }
+  };
   const tokenOptions = () => (
     process.env.BLOB_READ_WRITE_TOKEN ? { token: process.env.BLOB_READ_WRITE_TOKEN } : {}
   );
@@ -28,22 +44,28 @@ export function createStore({ localDbPath }) {
 
   async function loadBlobBytes() {
     if (!hasBlob()) return null;
-    const { get, list } = await import('@vercel/blob');
-    const listed = await list({
-      prefix: BLOB_DB_PREFIX,
-      limit: 100,
-      ...tokenOptions(),
-    });
-    const latest = listed.blobs
-      .filter(blob => blob.pathname === BLOB_DB_KEY || (blob.pathname.startsWith(`${BLOB_DB_PREFIX}-`) && blob.pathname.endsWith('.sqlite')))
-      .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())[0];
-    if (!latest) return null;
-    const result = await get(latest.url, blobOptions());
-    if (!result || result.statusCode === 404 || !result.stream) return null;
-    if (result.statusCode && result.statusCode !== 200) {
-      throw new Error(`Could not read Blob SQLite store (${result.statusCode})`);
+    try {
+      const { get, list } = await import('@vercel/blob');
+      const listed = await list({
+        prefix: BLOB_DB_PREFIX,
+        limit: 100,
+        ...tokenOptions(),
+      });
+      const latest = listed.blobs
+        .filter(blob => blob.pathname === BLOB_DB_KEY || (blob.pathname.startsWith(`${BLOB_DB_PREFIX}-`) && blob.pathname.endsWith('.sqlite')))
+        .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())[0];
+      if (!latest) return null;
+      const result = await get(latest.url, blobOptions());
+      if (!result || result.statusCode === 404 || !result.stream) return null;
+      if (result.statusCode && result.statusCode !== 200) {
+        throw new Error(`Could not read Blob SQLite store (${result.statusCode})`);
+      }
+      return new Uint8Array(await new Response(result.stream).arrayBuffer());
+    } catch (error) {
+      // Read failure → serve from local instead of failing the request.
+      disableBlob('read', error);
+      return null;
     }
-    return new Uint8Array(await new Response(result.stream).arrayBuffer());
   }
 
   async function loadLocalBytes() {
@@ -58,28 +80,34 @@ export function createStore({ localDbPath }) {
   async function persist() {
     const bytes = Buffer.from(db.export());
     if (hasBlob()) {
-      const { del, list, put } = await import('@vercel/blob');
-      const pathname = `${BLOB_DB_PREFIX}-${Date.now()}-${randomUUID()}.sqlite`;
-      await put(pathname, bytes, {
-        ...blobOptions(),
-        addRandomSuffix: false,
-        allowOverwrite: false,
-        cacheControlMaxAge: 60,
-        contentType: 'application/vnd.sqlite3',
-      });
-      const listed = await list({
-        prefix: BLOB_DB_PREFIX,
-        limit: 100,
-        ...tokenOptions(),
-      });
-      const stale = listed.blobs
-        .filter(blob => blob.pathname === BLOB_DB_KEY || (blob.pathname.startsWith(`${BLOB_DB_PREFIX}-`) && blob.pathname.endsWith('.sqlite')))
-        .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
-        .slice(BLOB_HISTORY_LIMIT)
-        .map(blob => blob.url);
-      if (stale.length) await del(stale, tokenOptions());
-      backend = 'vercel-blob-sqlite';
-      return;
+      try {
+        const { del, list, put } = await import('@vercel/blob');
+        const pathname = `${BLOB_DB_PREFIX}-${Date.now()}-${randomUUID()}.sqlite`;
+        await put(pathname, bytes, {
+          ...blobOptions(),
+          addRandomSuffix: false,
+          allowOverwrite: false,
+          cacheControlMaxAge: 60,
+          contentType: 'application/vnd.sqlite3',
+        });
+        const listed = await list({
+          prefix: BLOB_DB_PREFIX,
+          limit: 100,
+          ...tokenOptions(),
+        });
+        const stale = listed.blobs
+          .filter(blob => blob.pathname === BLOB_DB_KEY || (blob.pathname.startsWith(`${BLOB_DB_PREFIX}-`) && blob.pathname.endsWith('.sqlite')))
+          .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
+          .slice(BLOB_HISTORY_LIMIT)
+          .map(blob => blob.url);
+        if (stale.length) await del(stale, tokenOptions());
+        backend = 'vercel-blob-sqlite';
+        return;
+      } catch (error) {
+        // Write failure → fall through to the local write below. Losing the
+        // remote copy is recoverable; losing the write is not.
+        disableBlob('write', error);
+      }
     }
     await fs.mkdir(path.dirname(localDbPath), { recursive: true });
     await fs.writeFile(localDbPath, bytes);

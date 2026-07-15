@@ -8,10 +8,15 @@ export const APPLICATION_STATUSES = [
   { value: 'applying', label: 'Applying', labelJa: '応募準備中' },
   { value: 'applied', label: 'Applied', labelJa: '応募済み' },
   { value: 'interview', label: 'Interview', labelJa: '面接中' },
+  { value: 'rejected', label: 'Rejected', labelJa: '不合格' },
 ];
 
 const STATUS_VALUES = new Set(APPLICATION_STATUSES.map(item => item.value));
-const LEGACY_STATUS_MAP = { offer: 'applied', rejected: 'applied' };
+// 'rejected' is a real status again — it used to be collapsed into 'applied',
+// which destroyed the applied-vs-rejected signal. Records downgraded while that
+// mapping was live already read 'applied' and cannot be recovered; only 'offer'
+// still maps, as there is no offer status.
+const LEGACY_STATUS_MAP = { offer: 'applied' };
 
 const EMPTY_TRACKER = {};
 const DEFAULT_PROFILE = 'mohamed_fuad';
