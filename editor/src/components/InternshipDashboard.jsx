@@ -38,7 +38,7 @@ const DISPLAY_DATE_FORMAT = new Intl.DateTimeFormat('en-GB', { day: '2-digit', m
 // Statuses that mean the user has already engaged the role from the tracker. These
 // now live on the dashboard, so the radar hides them entirely. "saved" / untracked
 // do not count and keep showing (subject to the deadline-expiry rule below).
-const APPLIED_TYPE_STATUSES = new Set(['applying', 'applied', 'interview']);
+const APPLIED_TYPE_STATUSES = new Set(['applying', 'applied', 'interview', 'rejected']);
 // Resolve a listing's deadline to a full JST INSTANT. A timed deadline carries an
 // "HH:MM JST" suffix (e.g. "2026-06-30 09:00 JST"); otherwise we treat end-of-day
 // (23:59:59) in JST. Returns null for "Not stated" listings (no deadlineDate).

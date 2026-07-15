@@ -5,7 +5,6 @@ import {
   ChevronRight,
   Clock3,
   ExternalLink,
-  Info,
   Plus,
   Trash2,
   X,
@@ -90,7 +89,6 @@ const copy = {
     currentStatus: 'Current status',
     open: 'Open application',
     remove: 'Remove event',
-    sourceNote: 'Deadline dates come from tracked employer records. Applications without an exact deadline appear on the day you applied. Interviews and follow-ups are only shown when you add an exact date.',
     noTracked: 'Track an internship first, then add its interview or follow-up here.',
   },
   ja: {
@@ -120,7 +118,6 @@ const copy = {
     currentStatus: '現在の状況',
     open: '応募ページを開く',
     remove: '予定を削除',
-    sourceNote: '締切は管理中の企業情報から表示します。締切のない応募は、応募した日に表示します。面接・フォローアップは正確な日付を追加した場合のみ表示します。',
     noTracked: '先にインターンを管理対象に追加すると、面接やフォローアップを登録できます。',
   },
 };
@@ -320,7 +317,6 @@ export function ApplicationCalendar({ records, addMilestone, removeMilestone, is
         </div>
       ) : null}
 
-      <p className="calendar-source-note"><Info size={15} /><span>{t.sourceNote}</span></p>
     </section>
   );
 }

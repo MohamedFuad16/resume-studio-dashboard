@@ -1,5 +1,7 @@
 const HIGH_RELEVANCE_SCORE = 98;
-const APPLIED_TYPE_STATUSES = new Set(['applying', 'applied', 'interview']);
+// 'rejected' counts as applied: you did apply, so the company should still be
+// treated as one you've approached when ranking.
+const APPLIED_TYPE_STATUSES = new Set(['applying', 'applied', 'interview', 'rejected']);
 const PROFILE_APPLIED_COMPANIES = {
   mohamed_fuad: ['HENNGE', 'Rakuten Group'],
 };

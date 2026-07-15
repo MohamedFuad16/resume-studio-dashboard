@@ -5,7 +5,7 @@ import {
   BriefcaseBusiness,
   CalendarClock,
   Camera,
-  Check,
+  CircleSlash,
   Inbox,
   FilePenLine,
   GraduationCap,
@@ -26,9 +26,11 @@ const STATUS_ICONS = {
   applying: FilePenLine,
   applied: Send,
   interview: CalendarClock,
+  rejected: CircleSlash,
 };
 
-const APPLIED_STATUSES = new Set(['applying', 'applied', 'interview']);
+// Rejected applications stay in Recent — losing them would hide the outcome.
+const APPLIED_STATUSES = new Set(['applying', 'applied', 'interview', 'rejected']);
 
 const dashboardValue = (value, isJa) => {
   return displayValue(value, isJa);
@@ -71,8 +73,6 @@ const copy = {
     tokyo: 'Tokyo opportunities',
     tokyoSub: 'Highest-priority matches nearby.',
     viewJapan: 'View all Japan matches',
-    ranking: 'Japan-first ranking',
-    rankingSub: 'Tokyo and Japan roles stay above global opportunities when match quality is similar.',
   },
   ja: {
     uploadPhoto: 'プロフィール写真をアップロード',
@@ -104,8 +104,6 @@ const copy = {
     tokyo: '東京の注目募集',
     tokyoSub: '近くで優先度の高い募集です。',
     viewJapan: '日本の募集をすべて見る',
-    ranking: '日本優先ランキング',
-    rankingSub: '同程度の適合度では、東京・日本の募集を上位に表示します。',
   },
 };
 
@@ -288,7 +286,6 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
             ))}
           </div>
           <button className="rail-action" type="button" onClick={onOpenRadar}>{t.viewJapan} <ArrowRight size={15} /></button>
-          <div className="rail-tip"><span className="rail-tip-icon" aria-hidden="true"><Check size={15} /></span><div><b>{t.ranking}</b><p>{t.rankingSub}</p></div></div>
         </aside>
       </div>
       {/* Application timeline moved to its own view (sidebar → Application timeline). */}

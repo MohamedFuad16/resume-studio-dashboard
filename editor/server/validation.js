@@ -1,5 +1,5 @@
 const FORBIDDEN_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
-const TRACKER_STATUSES = new Set(['saved', 'applying', 'applied', 'interview']);
+const TRACKER_STATUSES = new Set(['saved', 'applying', 'applied', 'interview', 'rejected']);
 const DATA_IMAGE = /^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=\s]+$/i;
 const PROFILE_ID = /^[a-zA-Z0-9_-]{1,80}$/;
 // Postal/zip code: optional. Lenient enough for JP (123-4567) and other regions

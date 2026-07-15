@@ -11,6 +11,15 @@ import { settingsApi } from '../api/client.js';
 
 const DEFAULT_SEARCH_MODEL = 'openai/gpt-5-mini';
 const DEFAULT_AUDIT_MODEL = 'openai/gpt-5-nano';
+
+// Only the slugs this app actually runs against OpenRouter. Deliberately not a
+// longer menu: an unverified slug would fail at request time, and the user
+// cannot tell a bad model from a broken feature. `value` is the language-stable
+// slug (see agent/conventions.md); only the label is cosmetic.
+const SELECTABLE_MODELS = [
+  { value: 'openai/gpt-5-mini', label: 'openai/gpt-5-mini' },
+  { value: 'openai/gpt-5-nano', label: 'openai/gpt-5-nano' },
+];
 const KEY_RE = /^sk-or-[A-Za-z0-9\-_]{20,}$/;
 const MODEL_RE = /^[a-z0-9][a-z0-9._/:-]{1,60}$/i;
 
@@ -26,11 +35,14 @@ const COPY = {
     aiHint: 'Used for live company research and résumé drafting. Your key is stored to your account and never shown again after saving.',
     keyLabel: 'OpenRouter API key', keyPh: 'sk-or-...', keySaved: 'A key is saved. Enter a new one to replace it.',
     searchModel: 'Search model', auditModel: 'Audit model',
+    addModelSoon: 'Add another model — coming soon',
     data: 'Data',
     exportJson: 'Export résumé (JSON)',
     dangerZone: 'Danger zone',
     deleteProfile: 'Delete this profile',
     deleteHint: 'Permanently removes this profile and its tracker/applications. Cannot be undone.',
+    deleteProfileWarning: id => `This permanently deletes the profile “${id}” along with its résumé, tracked internships and applications. It cannot be undone.`,
+    deleteProfileConfirm: 'Delete this profile',
     deleteAccount: 'Delete account',
     deleteAccountHint: 'Permanently deletes your account and every profile, résumé, tracker and application in it.',
     deleteAccountWarning: 'This deletes your account and all of its data — every profile, résumé, tracked internship and application. It cannot be undone, and you will be signed out immediately. Export anything you want to keep first.',
@@ -54,11 +66,14 @@ const COPY = {
     aiHint: 'ライブ企業リサーチと履歴書作成に使用します。キーはアカウントに保存され、保存後は再表示されません。',
     keyLabel: 'OpenRouter APIキー', keyPh: 'sk-or-...', keySaved: 'キーは保存済みです。変更する場合は新しいキーを入力してください。',
     searchModel: '検索モデル', auditModel: '監査モデル',
+    addModelSoon: '他のモデルを追加 — 近日対応',
     data: 'データ',
     exportJson: '履歴書をエクスポート (JSON)',
     dangerZone: '危険な操作',
     deleteProfile: 'このプロフィールを削除',
     deleteHint: 'このプロフィールと関連データを完全に削除します。元に戻せません。',
+    deleteProfileWarning: id => `プロフィール「${id}」と、そのレジュメ・管理中のインターン・応募情報を完全に削除します。元に戻すことはできません。`,
+    deleteProfileConfirm: 'このプロフィールを削除',
     deleteAccount: 'アカウントを削除',
     deleteAccountHint: 'アカウントと、含まれるすべてのプロフィール・レジュメ・管理中のインターン・応募情報を完全に削除します。',
     deleteAccountWarning: 'アカウントとすべてのデータ（プロフィール、レジュメ、管理中のインターン、応募情報）を削除します。元に戻すことはできず、直ちにサインアウトされます。必要なデータは事前にエクスポートしてください。',
@@ -84,21 +99,35 @@ export default function SettingsPanel({
   const t = COPY[isJa ? 'ja' : 'en'];
   const personal = resume?.personal || {};
 
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // One dialog for both irreversible deletes: null | 'profile' | 'account'.
+  const [confirmMode, setConfirmMode] = useState(null);
   const [confirmText, setConfirmText] = useState('');
   const [deletePassword, setDeletePassword] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
-  const runDeleteAccount = async () => {
+  const closeConfirm = () => {
+    if (deleting) return;
+    setConfirmMode(null);
+    setConfirmText('');
+    setDeletePassword('');
+    setDeleteError('');
+  };
+
+  const runConfirmedDelete = async () => {
     if (deleting) return;
     setDeleteError('');
     setDeleting(true);
     try {
-      await onDeleteAccount({ password: deletePassword });
-      // On success the auth listener unmounts this screen; nothing to do here.
+      if (confirmMode === 'account') {
+        await onDeleteAccount({ password: deletePassword });
+        // On success the auth listener unmounts this screen; nothing to do here.
+      } else {
+        await onDeleteProfile(activeProfile);
+        closeConfirm();
+      }
     } catch (err) {
-      setDeleteError(err.message);
+      setDeleteError(err.message || 'Could not delete.');
       setDeleting(false);
     }
   };
@@ -222,11 +251,29 @@ export default function SettingsPanel({
         <div className="settings-grid">
           <label className="settings-field">
             <span>{t.searchModel}</span>
-            <input type="text" value={searchModel} onChange={e => setSearchModel(e.target.value)} spellCheck={false} />
+            <select value={searchModel} onChange={e => setSearchModel(e.target.value)}>
+              {/* A saved value that predates this list still has to render, or the
+                  select would silently show the wrong model. */}
+              {!SELECTABLE_MODELS.some(m => m.value === searchModel) && (
+                <option value={searchModel}>{searchModel}</option>
+              )}
+              {SELECTABLE_MODELS.map(m => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+              <option value="" disabled>{t.addModelSoon}</option>
+            </select>
           </label>
           <label className="settings-field">
             <span>{t.auditModel}</span>
-            <input type="text" value={auditModel} onChange={e => setAuditModel(e.target.value)} spellCheck={false} />
+            <select value={auditModel} onChange={e => setAuditModel(e.target.value)}>
+              {!SELECTABLE_MODELS.some(m => m.value === auditModel) && (
+                <option value={auditModel}>{auditModel}</option>
+              )}
+              {SELECTABLE_MODELS.map(m => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+              <option value="" disabled>{t.addModelSoon}</option>
+            </select>
           </label>
         </div>
       </section>
@@ -245,7 +292,7 @@ export default function SettingsPanel({
             type="button"
             className="btn settings-delete"
             disabled={!canDelete}
-            onClick={() => onDeleteProfile(activeProfile)}
+            onClick={() => setConfirmMode('profile')}
           >
             <I n="x" s={13} /> {t.deleteProfile}
           </button>
@@ -262,7 +309,7 @@ export default function SettingsPanel({
             <button
               type="button"
               className="btn settings-delete"
-              onClick={() => setConfirmingDelete(true)}
+              onClick={() => setConfirmMode('account')}
             >
               <I n="x" s={13} /> {t.deleteAccount}
             </button>
@@ -270,17 +317,17 @@ export default function SettingsPanel({
         )}
       </section>
 
-      {confirmingDelete && (
-        <div className="modal-overlay" onClick={() => !deleting && setConfirmingDelete(false)}>
+      {confirmMode && (
+        <div className="modal-overlay" onClick={closeConfirm}>
           <div className="modal-card" onClick={e => e.stopPropagation()}>
             <div className="modal-hd">
-              <h3>{t.deleteAccount}</h3>
-              <button className="modal-close" onClick={() => !deleting && setConfirmingDelete(false)}>
+              <h3>{confirmMode === 'account' ? t.deleteAccount : t.deleteProfile}</h3>
+              <button className="modal-close" onClick={closeConfirm}>
                 <I n="x" s={14} />
               </button>
             </div>
             <div className="modal-bd">
-              <p>{t.deleteAccountWarning}</p>
+              <p>{confirmMode === 'account' ? t.deleteAccountWarning : t.deleteProfileWarning(activeProfile)}</p>
               {/* Typed confirmation: this cannot be undone, so it should not be
                   reachable by a stray click. */}
               <label className="settings-field">
@@ -293,7 +340,7 @@ export default function SettingsPanel({
                   autoComplete="off"
                 />
               </label>
-              {needsPassword && (
+              {confirmMode === 'account' && needsPassword && (
                 <label className="settings-field">
                   <span>{t.deleteAccountPassword}</span>
                   <input
@@ -306,16 +353,18 @@ export default function SettingsPanel({
               )}
               {deleteError && <div className="settings-error" role="alert">{deleteError}</div>}
               <div className="settings-actions">
-                <button type="button" className="btn" disabled={deleting} onClick={() => setConfirmingDelete(false)}>
+                <button type="button" className="btn" disabled={deleting} onClick={closeConfirm}>
                   {t.cancel}
                 </button>
                 <button
                   type="button"
                   className="btn settings-delete"
                   disabled={deleting || confirmText.trim() !== DELETE_CONFIRM_WORD}
-                  onClick={runDeleteAccount}
+                  onClick={runConfirmedDelete}
                 >
-                  {deleting ? t.deletingAccount : t.deleteAccountConfirm}
+                  {deleting
+                    ? t.deletingAccount
+                    : (confirmMode === 'account' ? t.deleteAccountConfirm : t.deleteProfileConfirm)}
                 </button>
               </div>
             </div>

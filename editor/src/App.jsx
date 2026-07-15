@@ -723,12 +723,11 @@ export default function App() {
     setShowWizard(true);
   };
 
+  // Callers own the confirmation. Settings shows a typed-confirm dialog; this used
+  // to fire a window.confirm() here, which meant an irreversible delete sat behind
+  // a single OK on a browser alert.
   const handleDeleteProfile = async (id, e) => {
     if (e) e.stopPropagation();
-    const confirmMessage = isJa
-      ? `ユーザー「${id}」を削除しますか？この操作は元に戻せません。`
-      : `Delete user profile "${id}"? This cannot be undone.`;
-    if (!window.confirm(confirmMessage)) return;
     try {
       await profileApi.remove(id);
       toast(isJa ? `ユーザーを削除しました: ${id}` : `Deleted user: ${id}`, 'success');
@@ -1058,8 +1057,17 @@ export default function App() {
         {/* ── Sidebar: brand + primary navigation ─────────────── */}
         <aside className={`app-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
           <div className="side-brand">
-            <span className="side-logo" aria-hidden="true"><Telescope size={15} /></span>
-            <span className="side-brandname">{isJa ? 'インターンポータル' : 'Internship Portal'}</span>
+            {/* The brand is the way home — clicking a product's logo is the one
+                navigation people assume exists. It was inert. */}
+            <button
+              type="button"
+              className="side-brand-home"
+              onClick={() => setAppView('dashboard')}
+              title={isJa ? 'ダッシュボードへ' : 'Go to dashboard'}
+            >
+              <span className="side-logo" aria-hidden="true"><Telescope size={15} /></span>
+              <span className="side-brandname">{isJa ? 'インターンポータル' : 'Internship Portal'}</span>
+            </button>
             <button
               type="button"
               className="side-collapse"
@@ -1137,7 +1145,6 @@ export default function App() {
           isJa={isJa}
           onSwitch={handleSwitchProfile}
           onNew={openProfileWizard}
-          onDelete={handleDeleteProfile}
           onSignOut={authAvailable && auth?.currentUser ? () => {
             // Clear the ?profile= query so the login screen sits on the clean root URL.
             window.history.replaceState(null, '', window.location.pathname);
