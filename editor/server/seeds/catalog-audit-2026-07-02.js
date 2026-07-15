@@ -1,6 +1,8 @@
 // Official-source audit performed on 2026-07-02 JST. Retired IDs remain in
 // their original dated research files for provenance, but are excluded from
 // every runtime catalog path.
+import { autoRetiredIds } from './auto-refresh.js';
+
 export const retiredInternshipIds20260702 = new Set([
   // Explicitly expired or closed.
   'mercari-software-engineer-2028',
@@ -50,7 +52,9 @@ const patches20260702 = new Map([
 ]);
 
 export function isRetiredInternshipId(id) {
-  return retiredInternshipIds20260702.has(id);
+  // Union of the one-off 2026-07-02 audit and the daily auto-refresh, so every
+  // catalog path (seeds, stored live-research, custom) drops both.
+  return retiredInternshipIds20260702.has(id) || autoRetiredIds.has(id);
 }
 
 export function applyCatalogAudit20260702(items) {

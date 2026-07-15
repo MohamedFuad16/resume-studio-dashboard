@@ -1,131 +1,103 @@
-# Validates the internship catalog (seed format + schema, duplicate detection,
-# DB save→load round-trip) and checks that every apply/source URL is live.
-# The validator (editor/server/validate-catalog.js) exits non-zero on hard
-# failures, which fails the job.
+# Internship-catalog CI + self-healing daily refresh.
+#
+#   • validate (push / PR): fast, deterministic — seed format/schema, duplicate
+#     detection, and the DB save→load round-trip. NO network link-liveness gate,
+#     so a listing that dies naturally between refreshes never blocks a push.
+#     Developer-introduced breakage (bad shapes, dupes) still fails the merge.
+#
+#   • refresh (daily schedule / manual): runs server/refresh-catalog.js, which
+#     retires HTTP-dead listings (LLM double-checked when the key is set) and
+#     patches changed deadlines into seeds/auto-refresh.json, re-validates, and
+#     opens a PR with the diff. A run that self-heals is GREEN — no more daily
+#     red X on naturally-expired postings.
 name: Validate Catalog
 
 on:
-  # Run on every push and PR that touches the editor app (where the seeds and
-  # validator live), so broken catalog data is caught before it merges.
   push:
     paths:
       - 'editor/**'
   pull_request:
     paths:
       - 'editor/**'
-  # Daily link-liveness sweep (06:00 UTC) so dead/expired apply URLs surface even
-  # without a code change.
+  # Daily self-healing refresh (06:00 UTC).
   schedule:
     - cron: '0 6 * * *'
-  # Allow manual runs from the Actions tab.
   workflow_dispatch:
 
 jobs:
-  validate-catalog:
+  # ── Fast structural validation on every push / PR ────────────────────
+  validate:
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # Needed by the failure handler that files/updates the dead-listings issue.
-      issues: write
+    defaults:
+      run:
+        working-directory: editor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: editor/package-lock.json
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+      - name: Validate catalog (format + schema + DB round-trip)
+        run: npm run validate:catalog
+
+  # ── Self-healing daily refresh → auto-PR ─────────────────────────────
+  refresh:
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # commit the refreshed overlay to a PR branch
+      pull-requests: write    # open/update the refresh PR
     env:
-      # Present only if the repo secret is configured. The LLM audit step and the
-      # script both skip gracefully when empty, so the job stays green without it.
+      # Enables LLM double-check of dead listings + deadline lookups. The script
+      # degrades to HTTP-only liveness when this is empty, so the job still runs.
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
     defaults:
       run:
-        # All steps run inside editor/ (where package.json + the validator live).
         working-directory: editor
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js 20
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-          # Cache npm downloads keyed to the editor lockfile for faster installs.
           cache: npm
           cache-dependency-path: editor/package-lock.json
-
       - name: Install dependencies
-        # Prefer a clean, reproducible install from the lockfile; fall back to
-        # npm install only if no lockfile is present.
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-          fi
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-      # Format/schema checks, duplicate detection, and the DB round-trip. Fails
-      # the job (non-zero exit) on any hard error.
-      - name: Validate catalog (format + DB round-trip)
+      # Retire HTTP-dead listings + refresh deadlines into seeds/auto-refresh.json.
+      # Writes a step-summary and sets `changed` for the PR step. Exits 0 on heal.
+      - name: Refresh catalog (retire dead + update deadlines)
+        id: refresh
+        run: npm run refresh:catalog
+
+      # Prove the healed catalog still validates before proposing it.
+      - name: Re-validate healed catalog
         run: npm run validate:catalog
 
-      # Adds HTTP link-liveness checks for every apply/source URL. Hard failures
-      # (404/410/5xx/DNS/timeout) fail the job; bot-wall statuses are warnings.
-      # Output is teed to a file so the summary/issue steps below can quote it.
-      - name: Validate catalog links (liveness)
-        run: |
-          set -o pipefail
-          npm run validate:catalog:links 2>&1 | tee link-report.txt
-
-      # Always surface the liveness result on the run's Summary page.
-      - name: Write run summary
-        if: always()
-        run: |
-          {
-            echo "## Catalog link liveness"
-            echo '```'
-            grep -E "Link liveness:|BROKEN|blocked|VALIDATION" link-report.txt | tail -30 || echo "no report captured"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      # On failure, file (or update) a single tracking issue listing the broken
-      # listings so dead/expired postings are visible without opening the run logs.
-      - name: File dead-listings issue
-        if: failure()
-        uses: actions/github-script@v7
+      # Open (or update) a single PR with the overlay diff. No-op when nothing changed.
+      - name: Open catalog-refresh PR
+        if: ${{ steps.refresh.outputs.changed == 'true' }}
+        uses: peter-evans/create-pull-request@v6
         with:
-          script: |
-            const fs = require('fs');
-            let report = '';
-            try { report = fs.readFileSync('editor/link-report.txt', 'utf8'); } catch {}
-            const lines = report.split('\n').filter(l => /BROKEN|used by|Link liveness:/.test(l)).slice(0, 60).join('\n');
-            const title = 'Dead internship listings detected by daily catalog sweep';
-            const body = [
-              `The scheduled catalog validation failed on ${new Date().toISOString().slice(0,10)}.`,
-              '',
-              '```',
-              lines || 'See the workflow run logs for details.',
-              '```',
-              '',
-              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-              '',
-              'Fix: retire or re-link the entries in `editor/server/seeds/internships.js`, then re-run the workflow.',
-            ].join('\n');
-            const { data: issues } = await github.rest.issues.listForRepo({
-              ...context.repo, state: 'open', labels: 'catalog-liveness',
-            });
-            if (issues.length) {
-              await github.rest.issues.createComment({ ...context.repo, issue_number: issues[0].number, body });
-            } else {
-              await github.rest.issues.create({ ...context.repo, title, body, labels: ['catalog-liveness'] });
-            }
+          add-paths: editor/server/seeds/auto-refresh.json
+          branch: bot/catalog-refresh
+          base: main
+          commit-message: "chore(catalog): daily auto-refresh (retire dead + update deadlines)"
+          title: "chore(catalog): daily auto-refresh"
+          body: |
+            Automated daily catalog refresh — retires HTTP-dead listings (LLM double-checked
+            when the OPENROUTER key is set) and patches changed deadlines.
 
-      # Cheap-LLM validity audit of stale-risk entries (deadline soon, stale
-      # verifiedDate, or generic apply URL). Advisory only — it never auto-retires
-      # and exits 0 on any error, so it cannot fail the pipeline. Runs only when the
-      # OPENROUTER_API_KEY secret is configured.
-      - name: LLM catalog audit (advisory)
-        if: ${{ env.OPENROUTER_API_KEY != '' }}
-        run: npm run audit:catalog:llm
-
-      # Keep the dated report as a downloadable artifact for review.
-      - name: Upload LLM audit report
-        if: ${{ env.OPENROUTER_API_KEY != '' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: llm-audit-report
-          path: editor/server/seeds/llm-audit-*.json
-          if-no-files-found: ignore
+            Only `editor/server/seeds/auto-refresh.json` (the machine-owned overlay) changes;
+            seed arrays are untouched and provenance is kept in the JSON. See the run's
+            **Summary** for the exact retirements/updates.
+          labels: catalog-refresh
+          delete-branch: false
