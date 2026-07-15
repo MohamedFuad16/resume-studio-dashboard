@@ -27,7 +27,6 @@ const COPY = {
   en: {
     title: 'Settings',
     subtitle: 'Manage your profile, AI keys, and data.',
-    back: 'Back',
     profile: 'Profile',
     profileHint: 'These write to the active résumé’s personal details.',
     nameEn: 'Name (English)', nameJa: 'Name (Japanese)', email: 'Email', phone: 'Phone',
@@ -58,7 +57,6 @@ const COPY = {
   ja: {
     title: '設定',
     subtitle: 'プロフィール、AIキー、データを管理します。',
-    back: '戻る',
     profile: 'プロフィール',
     profileHint: 'アクティブな履歴書の個人情報に反映されます。',
     nameEn: '氏名（英語）', nameJa: '氏名（日本語）', email: 'メール', phone: '電話',
@@ -94,7 +92,7 @@ const DELETE_CONFIRM_WORD = 'DELETE';
 
 export default function SettingsPanel({
   resume, onSaveProfile, onExportJson, onDeleteProfile, onDeleteAccount,
-  needsPassword = false, activeProfile, canDelete, onBack, isJa = false,
+  needsPassword = false, activeProfile, canDelete, isJa = false,
 }) {
   const t = COPY[isJa ? 'ja' : 'en'];
   const personal = resume?.personal || {};
@@ -213,7 +211,6 @@ export default function SettingsPanel({
     <div className="settings-scroll">
     <div className="settings-view">
       <div className="settings-head">
-        <button type="button" className="btn settings-back" onClick={onBack}><I n="chev" s={13} /> {t.back}</button>
         <div>
           <h1>{t.title}</h1>
           <p>{t.subtitle}</p>

@@ -8,9 +8,12 @@ import { ProfileDashboard } from './components/ProfileDashboard.jsx';
 import { ProfileSwitcher } from './components/ProfileSwitcher.jsx';
 import SettingsPanel from './components/SettingsPanel.jsx';
 import { ApplicationCalendar } from './components/ApplicationCalendar.jsx';
+import ApplicationsView from './components/ApplicationsView.jsx';
+import ProfileView from './components/ProfileView.jsx';
 import { useApplicationTracker } from './hooks/useApplicationTracker.js';
 import {
   LayoutDashboard, Telescope, CalendarDays, FileText, Settings2, PanelLeftClose,
+  BriefcaseBusiness, UserRound,
 } from 'lucide-react';
 import { authAvailable, auth } from './auth/firebase.js';
 import { signOutUser, deleteAccount } from './auth/useAuth.js';
@@ -55,11 +58,13 @@ const loadPdfJs = () => {
 // lucide-react (already used by the dashboard/radar/calendar) rather than the
 // hand-drawn `I` set, so the nav matches the rest of the app's iconography.
 const NAV_ITEMS = [
-  { id: 'dashboard', Icon: LayoutDashboard, en: 'Dashboard',        ja: 'ダッシュボード' },
-  { id: 'radar',     Icon: Telescope,       en: 'Internship Radar', ja: 'インターン検索' },
-  { id: 'calendar',  Icon: CalendarDays,    en: 'Application timeline', ja: '応募タイムライン' },
-  { id: 'editor',    Icon: FileText,        en: 'Editor',           ja: 'エディタ' },
-  { id: 'settings',  Icon: Settings2,       en: 'Settings',         ja: '設定' },
+  { id: 'dashboard',    Icon: LayoutDashboard,   en: 'Dashboard',        ja: 'ダッシュボード' },
+  { id: 'radar',        Icon: Telescope,         en: 'Internship Radar', ja: 'インターン検索' },
+  { id: 'applications', Icon: BriefcaseBusiness, en: 'Applications',     ja: '応募一覧' },
+  { id: 'calendar',     Icon: CalendarDays,      en: 'Calendar',         ja: 'カレンダー' },
+  { id: 'editor',       Icon: FileText,          en: 'Editor',           ja: 'エディタ' },
+  { id: 'profile',      Icon: UserRound,         en: 'Profile',          ja: 'プロフィール' },
+  { id: 'settings',     Icon: Settings2,         en: 'Settings',         ja: '設定' },
 ];
 
 // A résumé is "blank" (fresh account) when it has no name and no section content.
@@ -1156,22 +1161,8 @@ export default function App() {
         </aside>
 
         <div className="app-main">
-          {/* No title bar: the sidebar already names the current view, so a header
-              strip would just be an empty white line. Only the editor renders one,
-              because its Save/Export actions have nowhere else to live. */}
-          {appView === 'editor' && (
-            <header className="tb">
-              <div className="tb-inner">
-                <div className="tb-actions">
-                  <button className="btn" onClick={saveNow} disabled={save === 'saving'}>
-                    <I n="check" s={12} />
-                    {save === 'saving' ? (isJa ? '保存中' : 'Saving') : (isJa ? '保存' : 'Save')}
-                  </button>
-                  <ExportMenu onPDF={onPDF} onTex={onTex} onJson={onJson} onAI={onAI} isJa={isJa} />
-                </div>
-              </div>
-            </header>
-          )}
+          {/* No title bar: the sidebar already names the current view. The editor's
+              Save/Export toolbar renders inside its .editor-view card below. */}
 
       {appView === 'dashboard' ? (
         <ProfileDashboard
@@ -1184,6 +1175,10 @@ export default function App() {
         />
       ) : appView === 'radar' ? (
         <InternshipDashboard isJa={isJa} activeProfile={activeProfile} resume={resume} onOpenEditor={() => setAppView('editor')} onOpenSettings={() => setAppView('settings')} />
+      ) : appView === 'applications' ? (
+        <ApplicationsView isJa={isJa} activeProfile={activeProfile} onOpenRadar={() => setAppView('radar')} />
+      ) : appView === 'profile' ? (
+        <ProfileView resume={resume} isJa={isJa} onOpenEditor={() => setAppView('editor')} />
       ) : appView === 'calendar' ? (
         // Application timeline — its own view now, rather than a block appended
         // to the bottom of the dashboard.
@@ -1208,10 +1203,20 @@ export default function App() {
           // path there is nothing to delete, so Settings hides the whole section.
           onDeleteAccount={authAvailable && auth?.currentUser ? deleteAccount : undefined}
           needsPassword={(auth?.currentUser?.providerData || []).some(p => p.providerId === 'password')}
-          onBack={() => setAppView('dashboard')}
         />
       ) : (
-        <>
+        <div className="editor-view">
+          <header className="tb">
+            <div className="tb-inner">
+              <div className="tb-actions">
+                <button className="btn" onClick={saveNow} disabled={save === 'saving'}>
+                  <I n="check" s={12} />
+                  {save === 'saving' ? (isJa ? '保存中' : 'Saving') : (isJa ? '保存' : 'Save')}
+                </button>
+                <ExportMenu onPDF={onPDF} onTex={onTex} onJson={onJson} onAI={onAI} isJa={isJa} />
+              </div>
+            </div>
+          </header>
           <div className="editor-commandbar">
             <div className="editor-command-group template-command">
               <span className="command-label">{isJa ? 'テンプレート' : 'Template'}</span>
@@ -1437,7 +1442,7 @@ export default function App() {
           </div>
         </main>
           </div>
-        </>
+        </div>
       )}
 
       {activeApp && (

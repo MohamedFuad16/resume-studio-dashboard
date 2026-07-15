@@ -52,7 +52,7 @@ const copy = {
     ready: 'Ready to tailor for each role.',
     missing: 'Add missing details for stronger applications.',
     tune: 'Tune resume',
-    pipeline: 'Application pipeline',
+    pipeline: 'Application',
     rolesTracked: count => `${count} ${count === 1 ? 'role' : 'roles'} tracked`,
     recent: 'Recent applications',
     recentSub: 'Keep every application and next step in one place.',
