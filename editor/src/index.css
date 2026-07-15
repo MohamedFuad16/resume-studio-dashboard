@@ -1760,9 +1760,12 @@ html, body, #root {
   --b1: #dcdde1;
   --b-focus: #101113;
   --b-focus-glow: rgba(16, 17, 19, 0.08);
-  --blue: #1683ff;
-  --blue-dim: rgba(22, 131, 255, 0.08);
-  --blue-glow: rgba(22, 131, 255, 0.14);
+  /* One accent blue app-wide, matching the primary button (--halo-bg). This was
+     #1683ff — a second, slightly different blue from the buttons' #1a56f0. Two
+     near-identical blues read as a mistake rather than a system. */
+  --blue: #1a56f0;
+  --blue-dim: rgba(26, 86, 240, 0.08);
+  --blue-glow: rgba(26, 86, 240, 0.14);
   --red: #ff5f57;
   --red-dim: rgba(255, 95, 87, 0.08);
   --t1: #101113;
@@ -1777,15 +1780,21 @@ html, body, #root {
   --wizard-overlay-bg: rgba(246, 247, 248, 0.78);
   --r: 8px;
 
-  /* Primary action — flat solid blue pill (the "Add event" reference). The
-     earlier gradient + outer glow ("halo") was dropped: it read as heavy next to
-     the flat, quiet surfaces everywhere else. Shared by .btn-primary and the
-     page-level CTAs further down; edit only these tokens to keep them in sync.
-     Names kept as --halo-* so the ~8 call sites don't churn. */
+  /* Primary action — flat solid blue. Colour kept from "Save changes"; the
+     gradient + outer glow ("halo") was dropped as too heavy against the flat
+     surfaces everywhere else. Shared by .btn-primary and the page-level CTAs
+     further down; edit only these tokens to keep them in sync. Names kept as
+     --halo-* so the call sites don't churn. */
   --halo-bg: #1a56f0;
   --halo-bg-hover: #1246d6;
   --halo-shadow: none;
   --halo-shadow-hover: none;
+
+  /* Control radius — the reference's buttons are rounded rects (~0.25 x height),
+     not 999px pills. Matches the sidebar's row radius so the whole app shares one
+     corner language. Applies to buttons/inputs only; avatars and count badges stay
+     fully round. */
+  --r-btn: 10px;
 }
 
 :root[data-theme="dark"] {
@@ -1798,9 +1807,12 @@ html, body, #root {
   --b1: #dcdde1;
   --b-focus: #101113;
   --b-focus-glow: rgba(16, 17, 19, 0.08);
-  --blue: #1683ff;
-  --blue-dim: rgba(22, 131, 255, 0.08);
-  --blue-glow: rgba(22, 131, 255, 0.14);
+  /* One accent blue app-wide, matching the primary button (--halo-bg). This was
+     #1683ff — a second, slightly different blue from the buttons' #1a56f0. Two
+     near-identical blues read as a mistake rather than a system. */
+  --blue: #1a56f0;
+  --blue-dim: rgba(26, 86, 240, 0.08);
+  --blue-glow: rgba(26, 86, 240, 0.14);
   --red: #ff5f57;
   --red-dim: rgba(255, 95, 87, 0.08);
   --t1: #101113;
@@ -1943,7 +1955,7 @@ body,
 .btn {
   min-height: 34px;
   border-color: var(--b0);
-  border-radius: 8px;
+  border-radius: var(--r-btn);
   background: #ffffff;
   color: var(--t1);
   box-shadow: 0 1px 2px rgba(16, 17, 19, 0.04);
@@ -1952,7 +1964,9 @@ body,
 .btn:hover {
   background: #f9f9fa;
   border-color: var(--b1);
-  transform: translateY(-1px);
+  /* No lift: the sidebar's rows and the reference's buttons change fill on
+     hover, they don't move. */
+  transform: none;
 }
 
 .btn-new-profile {
@@ -1978,7 +1992,7 @@ body,
 .btn-primary,
 .btn-submit-app {
   border-color: transparent;
-  border-radius: 999px;
+  border-radius: var(--r-btn);
   background: var(--halo-bg);
   color: #fff;
   font-weight: 700;
@@ -7135,8 +7149,21 @@ body,
   color: #fff;
 }
 .app-sidebar.collapsed .side-foot { align-items: center; }
-/* Stack EN/JA vertically rather than letting them overflow the narrow bar */
-.app-sidebar.collapsed .side-foot .app-lang-switcher { flex-direction: column; gap: 2px; }
+/* Stack EN/JA in the narrow bar. The buttons need an explicit height: as flex:1
+   children of a content-height column they collapsed to ~14px and became
+   unreadable. */
+.app-sidebar.collapsed .side-foot .app-lang-switcher {
+  flex-direction: column;
+  gap: 2px;
+  width: 40px;
+  padding: 3px;
+}
+.app-sidebar.collapsed .side-foot .lang-btn {
+  flex: none;
+  width: 100%;
+  height: 22px;
+  font-size: 10.5px;
+}
 .app-sidebar.collapsed .nav-profile-avatar { justify-content: center; padding: 6px; }
 .app-sidebar.collapsed .nav-profile-avatar > :not(.nav-avatar-badge) { display: none; }
 
@@ -7161,22 +7188,75 @@ body,
 }
 .tb-actions { margin-left: auto; }
 
-/* Settings was capped at 720px and centred, leaving most of the width empty.
-   width:100% is required: it is a flex item, and its `margin: 0 auto` makes the
-   auto margins absorb the free space, so without a definite width it shrinks to
-   its content instead of stretching and max-width never applies. */
+/* Settings: the scroll container is full-width so the scrollbar sits at the
+   view's right edge; the inner element only caps the reading width. */
+.settings-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: #f7f7f6;
+}
 .settings-view {
   width: 100%;
   max-width: 1100px;
   padding: 28px 34px 48px;
+}
+
+/* Empty state — a quiet framed glyph rather than a bare floating icon. */
+.application-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 2px;
+  border: 1px solid var(--b0);
+  border-radius: var(--r-btn);
+  background: #fff;
+  color: var(--t3);
 }
 /* Application timeline — its own view; owns its scrolling like the other views. */
 .calendar-view {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 24px 34px 48px;
+  padding: 24px 34px 28px;
   background: #f7f7f6;
+  display: flex;
+}
+
+/* Fit the month to the window rather than forcing a scroll on a laptop: the day
+   cells had a fixed min-height (116px), which pinned the grid at ~635px and
+   overflowed a 900px-tall screen. The rows now flex, so cells shrink to fit and
+   the whole month stays on screen. */
+.calendar-view .application-calendar {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.calendar-view .calendar-grid {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.calendar-view .calendar-days {
+  flex: 1;
+  min-height: 0;
+  grid-auto-rows: minmax(0, 1fr);
+}
+.calendar-view .calendar-day {
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 12px;
+}
+/* Leftover blue accents in the calendar — neutralised like the rest of the app. */
+.calendar-view .calendar-day.today {
+  border-color: var(--t1);
+  box-shadow: inset 0 0 0 1px rgba(16, 17, 19, 0.18);
 }
 
 /* These views hard-code height: calc(100vh - 58px), assuming the header that
@@ -7230,7 +7310,7 @@ body,
 .settings-save,
 .intern-summary > button {
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--r-btn);
   background: var(--halo-bg);
   color: #fff;
   font-weight: 700;

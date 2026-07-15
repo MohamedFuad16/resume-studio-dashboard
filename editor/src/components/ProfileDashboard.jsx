@@ -6,7 +6,7 @@ import {
   CalendarClock,
   Camera,
   Check,
-  CircleDot,
+  Inbox,
   FilePenLine,
   GraduationCap,
   MapPin,
@@ -253,7 +253,7 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
                 </article>
               );
             }) : (
-              <div className="application-empty"><CircleDot size={22} /><b>{t.noApps}</b><span>{t.noAppsSub}</span><button type="button" onClick={onOpenRadar}>{t.explore}</button></div>
+              <div className="application-empty"><span className="application-empty-icon" aria-hidden="true"><Inbox size={20} /></span><b>{t.noApps}</b><span>{t.noAppsSub}</span><button type="button" onClick={onOpenRadar}>{t.explore}</button></div>
             )}
           </div>
 

@@ -177,7 +177,12 @@ export default function SettingsPanel({
   );
 
   return (
-    <div className="settings-view" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+    // Two elements on purpose: the outer one owns the scrolling so the scrollbar
+    // sits at the true right edge of the view, while the inner one caps the
+    // reading width. When one element did both, the bar floated at the content's
+    // edge instead of the window's.
+    <div className="settings-scroll">
+    <div className="settings-view">
       <div className="settings-head">
         <button type="button" className="btn settings-back" onClick={onBack}><I n="chev" s={13} /> {t.back}</button>
         <div>
@@ -325,6 +330,7 @@ export default function SettingsPanel({
           {status === 'saving' ? t.saving : status === 'saved' ? t.saved : t.save}
         </button>
       </div>
+    </div>
     </div>
   );
 }
