@@ -440,9 +440,17 @@ app.post('/api/tracker', async (req, res) => {
 });
 
 // ── Gmail integration: read-only OAuth connect flow ──────────────
-// Where to send the browser back to after the OAuth round-trip (the SPA, which
-// in dev runs on :5173 while this server is :5005; same-origin in prod).
-const gmailAppRedirect = () => process.env.RESUME_STUDIO_APP_ORIGIN || 'http://localhost:5173';
+// Where to send the browser back to after the OAuth round-trip (the SPA). In
+// prod the SPA and API share an origin, so derive it from the request and the
+// integration works on any deployed domain with no extra config. In dev the API
+// is :5005 but the SPA is :5173, so fall back to the explicit origin.
+const gmailAppRedirect = (req) => {
+  if (process.env.RESUME_STUDIO_APP_ORIGIN) return process.env.RESUME_STUDIO_APP_ORIGIN;
+  const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+  const host = req.headers['x-forwarded-host'] || req.headers.host || '';
+  if (host && !/^(localhost|127\.0\.0\.1)/.test(host)) return `${proto}://${host}`;
+  return 'http://localhost:5173';
+};
 
 // Config/connection status — safe to call anytime; never returns token material.
 app.get('/api/integrations/gmail/status', async (req, res) => {
@@ -477,7 +485,7 @@ app.get('/api/integrations/gmail/auth-url', async (req, res) => {
 // code, stores the encrypted refresh token + a sync baseline, then bounces the
 // browser back to the app.
 app.get('/api/integrations/gmail/callback', async (req, res) => {
-  const backTo = gmailAppRedirect();
+  const backTo = gmailAppRedirect(req);
   try {
     const { code, state, error: oauthError } = req.query;
     if (oauthError) return res.redirect(`${backTo}/?gmail=denied`);
