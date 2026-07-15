@@ -55,6 +55,15 @@ export function validateProfileId(value = 'mohamed_fuad') {
   return id;
 }
 
+// Internship ids are generated server-side ("live-<slug>-<year>"); this only has to
+// reject junk and path-ish input before it reaches the catalog, since the id arrives
+// as a URL path segment on DELETE /api/internships/custom/:id.
+export function validateInternshipId(value) {
+  const id = cleanString(value, 'Internship id', 200, true);
+  if (!/^[a-zA-Z0-9._-]+$/.test(id)) throw new RequestValidationError('Invalid internship id.');
+  return id;
+}
+
 export function validateResume(value) {
   const resume = toPlainJson(value);
   if (!isRecord(resume)) throw new RequestValidationError('Resume must be an object.');

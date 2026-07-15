@@ -2,6 +2,31 @@
 
 ## Fixed
 
+### BUG-010 — Live company search dead without a Settings key (env fallback broken) — FIXED locally 2026-07-09
+- **Date:** 2026-07-09 · **Files:** `editor/server/load-env.js` (new), `editor/server/index.js`
+- **Symptom:** Searching a company not in the catalog showed the research panel, but the
+  search errored instantly — "Live research needs an OpenRouter API key" — and the
+  "Search official sources" button was replaced by the Add-your-key CTA. Perceived as
+  "the search button doesn't work for companies that aren't there."
+- **Root cause:** The ADR-0016 key fallback (per-user Settings key → `OPENROUTER_API_KEY`
+  env) was broken in both environments. Local: `npm run dev` never loaded
+  `editor/.env.local` into the Node server (Vite only reads it for VITE_* client vars; no
+  dotenv anywhere), so the key sitting in that file was ignored. Prod: the Azure container
+  app `portal-compile-jp` was created without the `OPENROUTER_API_KEY` env var (verified
+  2026-07-09 by keyless POST to `/api/internships/research-company` → job errored
+  `OPENROUTER_API_KEY_MISSING`; the same POST with a key completed with real results).
+- **Fix (local):** New dependency-free `server/load-env.js` parses `editor/.env.local` +
+  `editor/.env` into `process.env` (real env wins; missing files are a no-op), imported as
+  the first import of `server/index.js`. Verified in the browser: with no Settings key,
+  searching "Airbnb" runs the full 60s research and reports "No currently available
+  internship found on official sources."
+- **Fix (prod, pending — needs az login):** `az containerapp update -n portal-compile-jp
+  -g internship-portal --set-env-vars OPENROUTER_API_KEY=<key>`. Until then prod users
+  must save a key in Settings (that path verified working end-to-end against Azure).
+- **Note:** A completed research job is cached server-side for 15 min
+  (`RESEARCH_CACHE_MS`), so re-clicking "Search official sources" within that window
+  returns the same result instantly — intended, but can read as "button does nothing."
+
 ### BUG-007 — "Saved (N)" radar filter shows an empty table — FIXED 2026-07-03
 - **Date:** 2026-07-03 · **File:** `editor/src/components/InternshipDashboard.jsx`
 - **Symptom:** The Saved button could read e.g. "Saved (1)" while the filtered table was
@@ -202,3 +227,25 @@ covering the real shell: language switcher, rapid toggle stability, and dashboar
   first, then run the link audit as a small pre-scoped worklist (the validator's `[1b]`
   generic-apply-url list) in a fresh lean worker, and have research subagents return only
   compact `id → url` verdicts (never page dumps).
+- **BUG-011 — a Vercel Blob outage 500s every `/api/*` route (fixed 2026-07-15):** the free
+  tier's 2,000 Advanced-Request quota was exhausted, so Vercel **paused store access for 30
+  days** and every Blob read returned `403 Forbidden`. `storage.js` treated Blob as a hard
+  dependency: `refreshFromBlob()` runs on EVERY `getJson`, and its throw propagated → 500 on
+  `/api/profiles`, `/api/resume`, `/api/tracker`, … → the app hung forever on its `!resume`
+  "Loading…" state. Nothing in the UI said why. **Fix:** Blob is now best-effort — read and
+  write failures log ONCE (`disableBlob()` latches a `blobDisabled` flag so a paused store
+  doesn't retry per request) and fall back to the local SQLite file; writes fall through to
+  the local write rather than being lost. Verified: with the paused token, `/api/profiles`
+  went 500 → 200.
+  **Scope of the outage was narrow, and worth knowing:** per-user data (profiles, résumé,
+  tracker, applications) lives in **Firestore** (`users/{uid}/…`), not Blob. The Blob-backed
+  SQLite KV holds only the internship catalog — which `readInternshipCatalog()` re-seeds from
+  `server/seeds/` when the store is empty — plus `customInternships`. So Blob is a cache with
+  one durable payload (`customInternships`), not the system of record.
+  **To drop Blob entirely** (no code change needed): unset `BLOB_READ_WRITE_TOKEN` and point
+  `RESUME_STUDIO_DATA_DIR` (already env-configurable, `server/index.js:38`) at a persistent
+  mount, e.g. an Azure Files share on the container app. Without a persistent mount the
+  container's SQLite is ephemeral and `customInternships` resets on restart (the catalog
+  itself re-seeds, so it survives). Local dev: the `resume-studio-localdb` launch config
+  passes `BLOB_READ_WRITE_TOKEN=` (empty) — `load-env.js:29` only fills vars that are
+  `undefined`, so an empty value wins over `.env.local`.

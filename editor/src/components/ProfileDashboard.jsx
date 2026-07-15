@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import { APPLICATION_STATUSES, statusLabel, useApplicationTracker } from '../hooks/useApplicationTracker.js';
 import { useInternshipCatalog } from '../hooks/useInternshipCatalog.js';
-import { ApplicationCalendar } from './ApplicationCalendar.jsx';
 import { CompanyLogo } from './CompanyLogo.jsx';
 import InterviewDateModal from './InterviewDateModal.jsx';
 import { displayCompany, displayRole, displayValue, formatDisplayDeadline } from '../utils/internshipDisplay.js';
@@ -138,7 +137,7 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
   const t = isJa ? copy.ja : copy.en;
   const fileRef = useRef(null);
   const [interviewPending, setInterviewPending] = useState(null);
-  const { records, counts, updateStatus, addMilestone, removeMilestone } = useApplicationTracker(activeProfile);
+  const { records, counts, updateStatus, addMilestone } = useApplicationTracker(activeProfile);
   const { catalog } = useInternshipCatalog();
   const completion = profileCompletion(resume);
   const recent = useMemo(
@@ -292,7 +291,7 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
           <div className="rail-tip"><span className="rail-tip-icon" aria-hidden="true"><Check size={15} /></span><div><b>{t.ranking}</b><p>{t.rankingSub}</p></div></div>
         </aside>
       </div>
-      <ApplicationCalendar records={records} addMilestone={addMilestone} removeMilestone={removeMilestone} isJa={isJa} />
+      {/* Application timeline moved to its own view (sidebar → Application timeline). */}
       <InterviewDateModal
         open={Boolean(interviewPending)}
         applicationLabel={interviewPending ? `${displayCompany(interviewPending, isJa)} — ${displayRole(interviewPending.role, isJa)}` : ''}

@@ -7,8 +7,13 @@ import { InternshipDashboard } from './components/InternshipDashboard.jsx';
 import { ProfileDashboard } from './components/ProfileDashboard.jsx';
 import { ProfileSwitcher } from './components/ProfileSwitcher.jsx';
 import SettingsPanel from './components/SettingsPanel.jsx';
+import { ApplicationCalendar } from './components/ApplicationCalendar.jsx';
+import { useApplicationTracker } from './hooks/useApplicationTracker.js';
+import {
+  LayoutDashboard, Telescope, CalendarDays, FileText, Settings2, PanelLeftClose,
+} from 'lucide-react';
 import { authAvailable, auth } from './auth/firebase.js';
-import { signOutUser } from './auth/useAuth.js';
+import { signOutUser, deleteAccount } from './auth/useAuth.js';
 import {
   PersonalSec, SummarySec, EducationSec,
   ExperienceSec, ProjectsSec, SkillsSec, ActivitiesSec,
@@ -43,6 +48,19 @@ const loadPdfJs = () => {
     document.head.appendChild(script);
   });
 };
+
+// Sidebar navigation. `id` must match the values `appView` accepts, since these
+// buttons drive it directly. Settings is included here because it is a real view
+// that was previously only reachable through the profile menu. Icons come from
+// lucide-react (already used by the dashboard/radar/calendar) rather than the
+// hand-drawn `I` set, so the nav matches the rest of the app's iconography.
+const NAV_ITEMS = [
+  { id: 'dashboard', Icon: LayoutDashboard, en: 'Dashboard',        ja: 'ダッシュボード' },
+  { id: 'radar',     Icon: Telescope,       en: 'Internship Radar', ja: 'インターン検索' },
+  { id: 'calendar',  Icon: CalendarDays,    en: 'Application timeline', ja: '応募タイムライン' },
+  { id: 'editor',    Icon: FileText,        en: 'Editor',           ja: 'エディタ' },
+  { id: 'settings',  Icon: Settings2,       en: 'Settings',         ja: '設定' },
+];
 
 // A résumé is "blank" (fresh account) when it has no name and no section content.
 function isResumeBlank(r) {
@@ -560,6 +578,15 @@ export default function App() {
 
   const [profiles, setProfiles] = useState([]);
   const [activeProfile, setActiveProfile] = useState(getUrlProfile());
+  // Same source the dashboard's "N roles tracked" pipeline reads, so the sidebar
+  // badge can never disagree with the number shown on the page.
+  const {
+    records: trackedRecords, addMilestone: addTrackerMilestone, removeMilestone: removeTrackerMilestone,
+  } = useApplicationTracker(activeProfile);
+  // Sidebar collapse — persisted so it survives reloads.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => localStorage.getItem('sidebar-collapsed') === 'true'
+  );
   const [showWizard, setShowWizard] = useState(false);
   const [wizardStep, setWizardStep] = useState('start'); // start | pdf-upload | 1..8
   const [wizardData, setWizardData] = useState(null);
@@ -1027,50 +1054,61 @@ export default function App() {
         </div>
       )}
 
-      {/* ── Consolidated Modern Header ──────────────────────── */}
-      <header className="tb">
-        {/* Constrain the header content to a centered max-width so the brand and
-            profile controls aren't flung to the extreme screen edges on ultra-wide
-            monitors (the border-bottom still spans full width via .tb). */}
-        <div className="tb-inner" style={{ display: 'flex', alignItems: 'center', gap: '16px', width: '100%', maxWidth: '1500px', margin: '0 auto' }}>
-        <div className="window-lights" aria-hidden="true">
-          <span className="light red" />
-          <span className="light amber" />
-          <span className="light green" />
-        </div>
-        <div className="tb-brand">
-          <span className="tb-home"><I n="user" s={12} /> {isJa ? 'インターンポータル' : 'Internship Portal'}</span>
-        </div>
+      <div className="app-body">
+        {/* ── Sidebar: brand + primary navigation ─────────────── */}
+        <aside className={`app-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
+          <div className="side-brand">
+            <span className="side-logo" aria-hidden="true"><Telescope size={15} /></span>
+            <span className="side-brandname">{isJa ? 'インターンポータル' : 'Internship Portal'}</span>
+            <button
+              type="button"
+              className="side-collapse"
+              aria-expanded={!sidebarCollapsed}
+              aria-label={
+                sidebarCollapsed
+                  ? (isJa ? 'サイドバーを開く' : 'Expand sidebar')
+                  : (isJa ? 'サイドバーを閉じる' : 'Collapse sidebar')
+              }
+              onClick={() => {
+                const next = !sidebarCollapsed;
+                setSidebarCollapsed(next);
+                localStorage.setItem('sidebar-collapsed', String(next));
+              }}
+            >
+              <PanelLeftClose size={16} />
+            </button>
+          </div>
 
-        <nav className="top-nav" aria-label={isJa ? 'メインナビゲーション' : 'Primary navigation'}>
-          <button
-            type="button"
-            className={`top-nav-btn ${appView === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setAppView('dashboard')}
-          >
-            {isJa ? 'ダッシュボード' : 'Dashboard'}
-          </button>
-          <button
-            type="button"
-            className={`top-nav-btn ${appView === 'radar' ? 'active' : ''}`}
-            onClick={() => setAppView('radar')}
-          >
-            {isJa ? 'インターン検索' : 'Internship Radar'}
-          </button>
-          <button
-            type="button"
-            className={`top-nav-btn ${appView === 'editor' ? 'active' : ''}`}
-            onClick={() => setAppView('editor')}
-          >
-            {isJa ? 'エディタ' : 'Editor'}
-          </button>
-        </nav>
+          <div className="side-label">{isJa ? 'ビュー' : 'Views'}</div>
+          <nav className="side-nav" aria-label={isJa ? 'メインナビゲーション' : 'Primary navigation'}>
+            {NAV_ITEMS.map(({ id, Icon, en, ja }) => {
+              // Badges show a real count only; no count → no badge (never a zero).
+              const badge = id === 'dashboard' ? trackedRecords.length : 0;
+              const active = appView === id;
+              const label = isJa ? ja : en;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  className={`side-nav-btn ${active ? 'active' : ''}`}
+                  aria-current={active ? 'page' : undefined}
+                  // Collapsed rows show only an icon, so the name has to come
+                  // from somewhere for both screen readers and hover.
+                  title={sidebarCollapsed ? label : undefined}
+                  aria-label={sidebarCollapsed ? label : undefined}
+                  onClick={() => setAppView(id)}
+                >
+                  <Icon size={16} />
+                  <span className="side-nav-label">{label}</span>
+                  {badge > 0 && <span className="side-badge">{badge}</span>}
+                </button>
+              );
+            })}
+          </nav>
 
-        {/* marginLeft:auto groups the right-side controls (lang / profile / actions)
-            together and keeps the brand+nav left-aligned, regardless of whether
-            .tb-actions has content on this view (it is empty outside the editor,
-            which otherwise let the header's space-between spread everything out). */}
-        <div className="app-lang-switcher" style={{ marginLeft: 'auto' }} aria-label={isJa ? '表示言語' : 'Application language'}>
+          {/* Footer: language + profile live in the sidebar, not the header. */}
+          <div className="side-foot">
+        <div className="app-lang-switcher" aria-label={isJa ? '表示言語' : 'Application language'}>
           <button
             type="button"
             data-testid="language-toggle-en"
@@ -1100,7 +1138,6 @@ export default function App() {
           onSwitch={handleSwitchProfile}
           onNew={openProfileWizard}
           onDelete={handleDeleteProfile}
-          onSettings={() => setAppView('settings')}
           onSignOut={authAvailable && auth?.currentUser ? () => {
             // Clear the ?profile= query so the login screen sits on the clean root URL.
             window.history.replaceState(null, '', window.location.pathname);
@@ -1108,21 +1145,26 @@ export default function App() {
           } : undefined}
           userEmail={auth?.currentUser?.email || ''}
         />
+          </div>
+        </aside>
 
-        {/* Right: Actions and Status */}
-        <div className="tb-actions">
+        <div className="app-main">
+          {/* No title bar: the sidebar already names the current view, so a header
+              strip would just be an empty white line. Only the editor renders one,
+              because its Save/Export actions have nowhere else to live. */}
           {appView === 'editor' && (
-            <>
-              <button className="btn" onClick={saveNow} disabled={save === 'saving'}>
-                <I n="check" s={12} />
-                {save === 'saving' ? (isJa ? '保存中' : 'Saving') : (isJa ? '保存' : 'Save')}
-              </button>
-              <ExportMenu onPDF={onPDF} onTex={onTex} onJson={onJson} onAI={onAI} isJa={isJa} />
-            </>
+            <header className="tb">
+              <div className="tb-inner">
+                <div className="tb-actions">
+                  <button className="btn" onClick={saveNow} disabled={save === 'saving'}>
+                    <I n="check" s={12} />
+                    {save === 'saving' ? (isJa ? '保存中' : 'Saving') : (isJa ? '保存' : 'Save')}
+                  </button>
+                  <ExportMenu onPDF={onPDF} onTex={onTex} onJson={onJson} onAI={onAI} isJa={isJa} />
+                </div>
+              </div>
+            </header>
           )}
-        </div>
-        </div>
-      </header>
 
       {appView === 'dashboard' ? (
         <ProfileDashboard
@@ -1135,6 +1177,17 @@ export default function App() {
         />
       ) : appView === 'radar' ? (
         <InternshipDashboard isJa={isJa} activeProfile={activeProfile} resume={resume} onOpenEditor={() => setAppView('editor')} onOpenSettings={() => setAppView('settings')} />
+      ) : appView === 'calendar' ? (
+        // Application timeline — its own view now, rather than a block appended
+        // to the bottom of the dashboard.
+        <main className="calendar-view">
+          <ApplicationCalendar
+            records={trackedRecords}
+            addMilestone={addTrackerMilestone}
+            removeMilestone={removeTrackerMilestone}
+            isJa={isJa}
+          />
+        </main>
       ) : appView === 'settings' ? (
         <SettingsPanel
           resume={resume}
@@ -1144,6 +1197,10 @@ export default function App() {
           onSaveProfile={async personal => { await saveProfileImmediately({ ...resume, personal }, activeProfile, { refreshFromServer: false }); }}
           onExportJson={onJson}
           onDeleteProfile={id => { handleDeleteProfile(id); setAppView('dashboard'); }}
+          // Only offered when there is a real signed-in account. On the no-auth
+          // path there is nothing to delete, so Settings hides the whole section.
+          onDeleteAccount={authAvailable && auth?.currentUser ? deleteAccount : undefined}
+          needsPassword={(auth?.currentUser?.providerData || []).some(p => p.providerId === 'password')}
           onBack={() => setAppView('dashboard')}
         />
       ) : (
@@ -2361,6 +2418,8 @@ export default function App() {
           </div>
         </div>
       )}
+        </div>{/* /.app-main */}
+      </div>{/* /.app-body */}
 
       {showEmptyWarning && (
         <div data-testid="empty-export-warning" className="modal-overlay" onClick={() => setShowEmptyWarning(false)}>

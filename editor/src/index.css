@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Noto+Sans+JP:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=Noto+Serif+JP:wght@400;500;600&display=swap');
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1771,11 +1771,21 @@ html, body, #root {
   --green: #23c552;
   --amber: #ffbd2e;
   --err: #ef4444;
-  --preview-bg: linear-gradient(135deg, #c9f8e9 0%, #f7fbff 48%, #9fcef4 100%);
+  --preview-bg: #eeedea;  /* neutral, matches the app theme (was a mint->blue gradient) */
   --pdf-frame-bg: #ffffff;
   --pdf-frame-shadow: 0 22px 60px rgba(41, 52, 72, 0.14), 0 2px 8px rgba(41, 52, 72, 0.08);
   --wizard-overlay-bg: rgba(246, 247, 248, 0.78);
   --r: 8px;
+
+  /* Primary action — flat solid blue pill (the "Add event" reference). The
+     earlier gradient + outer glow ("halo") was dropped: it read as heavy next to
+     the flat, quiet surfaces everywhere else. Shared by .btn-primary and the
+     page-level CTAs further down; edit only these tokens to keep them in sync.
+     Names kept as --halo-* so the ~8 call sites don't churn. */
+  --halo-bg: #1a56f0;
+  --halo-bg-hover: #1246d6;
+  --halo-shadow: none;
+  --halo-shadow-hover: none;
 }
 
 :root[data-theme="dark"] {
@@ -1799,7 +1809,7 @@ html, body, #root {
   --green: #23c552;
   --amber: #ffbd2e;
   --err: #ef4444;
-  --preview-bg: linear-gradient(135deg, #c9f8e9 0%, #f7fbff 48%, #9fcef4 100%);
+  --preview-bg: #eeedea;  /* neutral, matches the app theme (was a mint->blue gradient) */
   --pdf-frame-bg: #ffffff;
   --pdf-frame-shadow: 0 22px 60px rgba(41, 52, 72, 0.14), 0 2px 8px rgba(41, 52, 72, 0.08);
   --wizard-overlay-bg: rgba(246, 247, 248, 0.78);
@@ -1809,7 +1819,7 @@ html,
 body,
 #root {
   font-family: Inter, "Noto Sans JP", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: linear-gradient(135deg, #c8fae9 0%, #f7fbff 52%, #9fcff6 100%);
+  background: #f1f0ee;  /* neutral page backdrop, matching the login/base theme */
   font-size: 14px;
   letter-spacing: 0;
 }
@@ -1951,19 +1961,42 @@ body,
   border-color: var(--b0);
 }
 
-.btn-new-profile:hover,
-.btn-primary,
-.btn-submit-app {
+/* Keeps its original black hover — it was grouped with .btn-primary before the
+   latter became the blue halo, and a secondary "new profile" button should not
+   glow like a primary action. */
+.btn-new-profile:hover {
   background: var(--t1);
   border-color: var(--t1);
   color: #fff;
   box-shadow: 0 8px 20px rgba(16, 17, 19, 0.14);
 }
 
+/* Primary action — flat blue pill. Declarations live in the --halo-* tokens (see
+   the palette block above) because other primary CTAs defined later in this file
+   reuse them. Login/legal keep their own black pills (.auth-submit /
+   .auth-google) and are unaffected. */
+.btn-primary,
+.btn-submit-app {
+  border-color: transparent;
+  border-radius: 999px;
+  background: var(--halo-bg);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: var(--halo-shadow);
+}
+
 .btn-primary:hover,
 .btn-submit-app:hover {
-  background: #2a2b2f;
-  border-color: #2a2b2f;
+  background: var(--halo-bg-hover);
+  border-color: transparent;
+  box-shadow: var(--halo-shadow-hover);
+}
+
+.btn-primary:disabled,
+.btn-submit-app:disabled {
+  background: var(--hover);
+  color: var(--t3);
+  box-shadow: none;
 }
 
 .lang-switcher,
@@ -3195,8 +3228,9 @@ body,
 
 /* ── Internship Radar ─────────────────────────────────── */
 .internship-radar {
-  --intern-blue: #0a57ff;
-  --intern-blue-dark: #0848d5;
+  /* Neutralised for the same reason as --career-blue above. */
+  --intern-blue: #101113;
+  --intern-blue-dark: #000000;
   --intern-coral: #f25f4b;
   --intern-navy: #071524;
   --intern-green: #07884a;
@@ -3738,7 +3772,7 @@ body,
   cursor: pointer;
 }
 .intern-save-large:hover,
-.intern-save-large.active { border-color: var(--intern-blue); color: var(--intern-blue); background: #f6f9ff; }
+.intern-save-large.active { border-color: var(--intern-blue); color: var(--intern-blue); background: #f7f7f6; }
 
 .intern-pagination {
   min-height: 54px;
@@ -3988,13 +4022,16 @@ body,
 .company-logo.lg.brand-mercari span { font-size: 12px; }
 
 .profile-dashboard {
-  --career-blue: #0b5cff;
-  --career-ink: #0c1930;
-  --career-muted: #647087;
+  /* Neutralised to match the app's base theme — these were a blue accent + a
+     blue-tinted ink/muted, which made the whole dashboard read blueish. Blue now
+     appears only on primary actions (the --halo-* buttons). */
+  --career-blue: #101113;
+  --career-ink: #101113;
+  --career-muted: #6f7177;
   height: calc(100vh - 58px);
   overflow-y: auto;
   padding: 28px 34px 48px;
-  background: #f7f9fc;
+  background: #f7f7f6;
   color: var(--career-ink);
 }
 
@@ -4043,7 +4080,7 @@ body,
 
 .profile-socials { display: grid; gap: 10px; }
 .profile-socials a { min-width: 0; display: grid; grid-template-columns: 38px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 11px; align-items: center; padding: 10px 12px; border: 1px solid transparent; border-radius: 10px; color: var(--career-ink); text-decoration: none; transition: border-color 120ms ease, background 120ms ease; }
-.profile-socials a:hover { border-color: #d9e1ed; background: #f7f9fc; }
+.profile-socials a:hover { border-color: #d9e1ed; background: #f7f7f6; }
 .profile-socials .brand-mark { grid-row: 1 / 3; width: 38px; height: 38px; margin: 0; border-radius: 9px; }
 .brand-mark svg { width: 23px; height: 23px; }
 .profile-socials b { font-size: 12px; }
@@ -4132,7 +4169,7 @@ body,
 .rail-tip p { margin: 4px 0 0; color: #67758b; font-size: 9.5px; line-height: 1.5; }
 
 /* Radar fidelity: white summary rail and real logos. */
-.internship-radar { background: #f7f9fc; }
+.internship-radar { background: #f7f7f6; }
 .intern-heading { align-items: center; }
 .intern-heading h1 { color: #0c1930; font-size: clamp(27px, 2.2vw, 36px); }
 .intern-summary { min-height: 86px; grid-template-columns: repeat(4, minmax(135px, 1fr)) auto; border: 1px solid #dce3ed; background: #fff; color: #132039; box-shadow: none; }
@@ -4170,7 +4207,7 @@ body,
   padding: 0 9px;
   border: 1px solid #dce6f4;
   border-radius: 999px;
-  background: #f6f9ff;
+  background: #f7f7f6;
   color: #24466f;
   font-size: 10px;
   font-weight: 760;
@@ -4213,7 +4250,7 @@ body,
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: #eaf2ff;
+  background: #efefed;
   color: #0b5cff;
   font-size: 10px;
   font-weight: 850;
@@ -5363,7 +5400,7 @@ body,
 .company-research-result button {
   border-color: #dbe6f6;
   color: #0b5cff;
-  background: #f6f9ff;
+  background: #f7f7f6;
   padding: 0 10px;
 }
 
@@ -5569,7 +5606,7 @@ body,
 }
 
 .calendar-grid.week .calendar-day { min-height: 180px; }
-.calendar-day.outside { background: #f7f9fc; opacity: .65; }
+.calendar-day.outside { background: #f7f7f6; opacity: .65; }
 .calendar-day.today { border-color: #0b5cff; box-shadow: inset 0 0 0 1px rgba(11, 92, 255, .18); }
 .calendar-day-number {
   display: inline-flex;
@@ -6354,248 +6391,316 @@ body,
   .skills-selector-grid .tag-inp-container:last-child { grid-column: auto; }
 }
 
-/* ── Auth / LoginScreen (Firebase auth gate) ───────────────────────── */
+/* ── Auth / LoginScreen (Firebase auth gate) ───────────────────────────
+   Design language (per user reference): a split card floating on warm light
+   gray — white form pane on the left, ambient sunset art pane on the right.
+   Serif display headline, small muted sans body copy, fully-rounded pill
+   controls, black primary button, generous whitespace. Bilingual (EN/JA). */
 .auth-page {
   min-height: 100vh;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32px;
+  padding: 14px;
   box-sizing: border-box;
-  background:
-    radial-gradient(90% 130% at 0% 45%, rgba(110, 231, 183, 0.45), transparent 55%),
-    radial-gradient(90% 130% at 100% 55%, rgba(125, 185, 255, 0.5), transparent 55%),
-    #eef1f4;
-}
-:root[data-theme="dark"] .auth-page {
-  background:
-    radial-gradient(90% 130% at 0% 45%, rgba(16, 122, 87, 0.4), transparent 55%),
-    radial-gradient(90% 130% at 100% 55%, rgba(37, 99, 235, 0.4), transparent 55%),
-    #0b0b0e;
+  /* App-wide palette is light-only (see the 2026 redesign block above, where
+     [data-theme="dark"] resolves to the same light values), so no dark variant. */
+  background: #f1f0ee;
 }
 
-.auth-window {
-  width: 100%;
-  max-width: 940px;
-  background: var(--card);
-  border: 1px solid var(--b0);
-  border-radius: 22px;
-  box-shadow: 0 30px 80px rgba(2, 6, 23, 0.16), 0 4px 12px rgba(2, 6, 23, 0.06);
+.auth-shell {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-radius: 26px;
   overflow: hidden;
+  background: var(--card);
+  box-shadow: 0 1px 2px rgba(2, 6, 23, 0.05), 0 18px 50px rgba(2, 6, 23, 0.07);
 }
 
-/* Window toolbar: macOS lights + brand pill + language segmented control */
-.auth-winbar {
+/* ── Left: the form pane ─────────────────────────────────────────────── */
+.auth-pane {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--b0);
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.015), transparent);
+  justify-content: center;
+  padding: 40px;
+  background: var(--card);
 }
-.auth-winpill {
+.auth-brandmark {
+  position: absolute;
+  top: 26px;
+  left: 28px;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
-  border: 1px solid var(--b0);
-  border-radius: 999px;
-  background: var(--input-bg);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--t1);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  color: var(--t2);
 }
-.auth-winpill svg { color: var(--blue); }
 .auth-langseg {
-  margin-left: auto;
+  position: absolute;
+  top: 24px;
+  right: 26px;
   display: inline-flex;
   gap: 2px;
   padding: 3px;
-  border: 1px solid var(--b0);
-  border-radius: 10px;
+  border-radius: 999px;
   background: var(--hover);
 }
 .auth-langseg button {
   border: none;
   background: transparent;
-  padding: 5px 12px;
-  border-radius: 7px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--t2);
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--t3);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background var(--ease), color var(--ease);
 }
+.auth-langseg button:hover { color: var(--t2); }
 .auth-langseg button.active {
   background: var(--card);
   color: var(--t1);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 2px rgba(2, 6, 23, 0.12);
 }
 
-.auth-body {
-  display: grid;
-  grid-template-columns: 1.05fr 1fr;
+/* The centered form column — narrow, per reference */
+.auth-stack {
+  width: 100%;
+  max-width: 268px;
+  text-align: center;
 }
 
-/* Left — brand + feature rows (clean light-fill rows, per reference) */
-.auth-intro {
-  padding: 44px 40px;
-  border-right: 1px solid var(--b0);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
 .auth-headline {
   margin: 0;
-  font-size: 25px;
-  line-height: 1.22;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-family: 'Instrument Serif', 'Noto Serif JP', Georgia, serif;
+  font-weight: 400;
+  font-size: 38px;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
   color: var(--t1);
 }
 .auth-lede {
-  margin: 12px 0 24px;
-  font-size: 13.5px;
-  line-height: 1.6;
-  color: var(--t2);
-  max-width: 40ch;
+  margin: 12px 0 30px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--t3);
 }
-.auth-features { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.auth-feature {
-  display: flex;
-  gap: 13px;
-  align-items: center;
-  padding: 13px 14px;
-  border-radius: 12px;
-  background: var(--card);
-  border: 1px solid var(--b0);
-  box-shadow: 0 2px 6px rgba(2, 6, 23, 0.06), 0 1px 2px rgba(2, 6, 23, 0.04);
-  transition: box-shadow 0.15s, transform 0.15s;
-}
-.auth-feature:hover {
-  box-shadow: 0 6px 16px rgba(2, 6, 23, 0.09), 0 2px 4px rgba(2, 6, 23, 0.05);
-}
-.auth-feature-icon {
-  flex: none;
-  width: 36px;
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9px;
-  background: var(--blue-dim);
-  border: 1px solid var(--blue-glow);
-  color: var(--blue);
-}
-.auth-feature-text { min-width: 0; }
-.auth-feature-title { font-weight: 700; font-size: 13.5px; color: var(--t1); }
-.auth-feature-body { font-size: 12px; color: var(--t2); line-height: 1.45; margin-top: 2px; }
 
-/* Right — auth form */
-.auth-formcol {
-  padding: 40px 36px;
-  display: flex;
-  align-items: center;
+/* Pill controls */
+.auth-google,
+.auth-submit,
+.auth-field input {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 13px 18px;
 }
-.auth-form { width: 100%; }
-.auth-title { margin: 0; font-size: 21px; font-weight: 800; letter-spacing: -0.01em; color: var(--t1); }
-.auth-sub { margin: 6px 0 20px; color: var(--t2); font-size: 13.5px; }
 
 .auth-google {
-  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 11px 14px;
-  border: 1px solid var(--b1);
-  border-radius: 10px;
-  background: var(--input-bg);
-  color: var(--t1);
-  font-size: 14px;
-  font-weight: 600;
+  gap: 9px;
+  border: none;
+  background: var(--t1);
+  color: var(--card);
+  font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: opacity var(--ease);
 }
-.auth-google:hover:not(:disabled) { background: var(--hover); border-color: var(--b-focus); }
-.auth-google:disabled { opacity: 0.6; cursor: default; }
+.auth-google:hover:not(:disabled) { opacity: 0.85; }
+.auth-google:disabled { opacity: 0.5; cursor: default; }
+.auth-google svg { flex: none; }
 
 .auth-divider {
   display: flex;
   align-items: center;
-  text-align: center;
   color: var(--t3);
-  font-size: 12px;
-  margin: 16px 0;
+  font-size: 11.5px;
+  margin: 18px 0;
 }
 .auth-divider::before,
 .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--b0); }
 .auth-divider span { padding: 0 12px; }
 
-.auth-field { display: block; margin-bottom: 13px; }
-.auth-field span { display: block; font-size: 12.5px; font-weight: 600; color: var(--t2); margin-bottom: 6px; }
+.auth-field { display: block; margin-bottom: 9px; }
 .auth-field input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 10px 12px;
-  border: 1px solid var(--b1);
-  border-radius: 10px;
+  border: 1px solid var(--b0);
   background: var(--input-bg);
   color: var(--t1);
-  font-size: 14px;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  text-align: center;
+  transition: border-color var(--ease), box-shadow var(--ease);
 }
+.auth-field input::placeholder { color: var(--t3); }
 .auth-field input:focus {
   outline: none;
-  border-color: var(--blue);
-  box-shadow: 0 0 0 3px var(--blue-glow);
+  border-color: var(--b-focus);
+  box-shadow: 0 0 0 3px var(--b-focus-glow);
 }
 
 .auth-error {
-  margin: 2px 0 13px;
-  padding: 9px 12px;
-  border-radius: 9px;
-  background: var(--red-dim);
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
   color: var(--err);
-  font-size: 13px;
-  border: 1px solid rgba(220, 38, 38, 0.2);
 }
 
 .auth-submit {
-  width: 100%;
-  padding: 11px 14px;
+  margin-top: 9px;
   border: none;
-  border-radius: 10px;
-  background: var(--blue);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 700;
+  background: var(--t1);
+  color: var(--card);
+  font-weight: 500;
   cursor: pointer;
-  transition: filter 0.15s;
-  margin-top: 4px;
+  transition: opacity var(--ease);
 }
-.auth-submit:hover:not(:disabled) { filter: brightness(1.06); }
-.auth-submit:disabled { opacity: 0.65; cursor: default; }
+.auth-submit:hover:not(:disabled) { opacity: 0.85; }
+/* Inert-looking disabled state, per reference */
+.auth-submit:disabled {
+  background: var(--hover);
+  color: var(--t3);
+  cursor: default;
+}
 
-.auth-switch { margin: 16px 0 0; text-align: center; font-size: 13.5px; color: var(--t2); }
+.auth-switch { margin: 18px 0 0; font-size: 12px; color: var(--t3); }
 .auth-link {
   background: none;
   border: none;
   padding: 0;
-  color: var(--blue);
-  font-weight: 700;
-  font-size: 13.5px;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 600;
+  color: var(--t1);
   cursor: pointer;
 }
 .auth-link:hover { text-decoration: underline; }
 
-@media (max-width: 820px) {
-  .auth-page { padding: 16px; }
-  .auth-body { grid-template-columns: 1fr; }
-  .auth-intro { border-right: none; border-bottom: 1px solid var(--b0); padding: 28px 24px; }
-  .auth-formcol { padding: 28px 24px; }
-  .auth-headline { font-size: 22px; }
+.auth-legal {
+  margin: 22px 0 0;
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: var(--t3);
+}
+.auth-legal a {
+  color: var(--t1);
+  font-weight: 600;
+  text-decoration: none;
+}
+.auth-legal a:hover { text-decoration: underline; }
+
+/* ── Right: ambient sunset art pane with a floating product mock ─────── */
+.auth-art {
+  position: relative;
+  overflow: hidden;
+  /* Inner corners round; the outer pair is clipped by .auth-shell's own radius. */
+  border-radius: 20px 0 0 20px;
+  background:
+    radial-gradient(120% 80% at 50% 100%, #f7c9a0 0%, rgba(247, 201, 160, 0) 60%),
+    radial-gradient(90% 60% at 15% 85%, #f0a882 0%, rgba(240, 168, 130, 0) 55%),
+    linear-gradient(190deg, #a8c3dd 0%, #cbd5e0 30%, #f2cdb4 68%, #f7dcc4 100%);
+}
+/* Soft cloud drift */
+.auth-art::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(45% 22% at 30% 22%, rgba(255, 255, 255, 0.75), transparent 70%),
+    radial-gradient(38% 18% at 72% 38%, rgba(255, 255, 255, 0.55), transparent 70%),
+    radial-gradient(50% 20% at 45% 58%, rgba(255, 255, 255, 0.35), transparent 70%);
+}
+
+/* Product mock — a tall app window bleeding off the bottom-right edge. Per the
+   reference it starts ~22% down the art pane and fills the rest, rather than
+   sitting in the bottom corner. */
+.auth-mock {
+  position: absolute;
+  top: 22%;
+  left: 26%;
+  right: -22px;
+  bottom: -18px;
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 18px 0 0 0;
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-top: 1px solid rgba(255, 255, 255, 0.9);
+  border-left: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: -24px -24px 70px rgba(2, 6, 23, 0.16);
+}
+
+/* Sidebar column — one icon per row, no separate rail (it duplicated them) */
+.auth-mock-main {
+  flex: none;
+  width: 208px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.auth-mock-search {
+  padding: 9px 12px;
+  border-radius: 9px;
+  background: #fff;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #18181b;
+  box-shadow: 0 1px 2px rgba(2, 6, 23, 0.05);
+}
+.auth-mock-tabs {
+  display: flex;
+  gap: 12px;
+  padding: 5px 6px 6px;
+  font-size: 10.5px;
+  color: #a5a5ad;
+}
+.auth-mock-tabs .on { color: #18181b; font-weight: 700; }
+
+.auth-mock-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: #3f3f46;
+}
+/* Selected row — same soft blue-grey fill the real sidebar uses */
+.auth-mock-row.active {
+  background: #dfe4ed;
+  border-color: transparent;
+  color: #18181b;
+}
+.auth-mock-row svg { flex: none; color: #71717a; }
+.auth-mock-label { font-size: 11.5px; font-weight: 500; }
+
+/* Main pane — takes the rest of the window and bleeds off the right edge */
+.auth-mock-pane {
+  flex: 1;
+  min-width: 0;
+  border-radius: 10px 0 0 0;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 12px 14px;
+}
+.auth-mock-pane-title { font-size: 11.5px; font-weight: 700; color: #18181b; }
+.auth-mock-pane-meta { margin-top: 3px; font-size: 10px; color: #a5a5ad; }
+
+@media (max-width: 900px) {
+  .auth-shell { grid-template-columns: 1fr; }
+  .auth-art { display: none; }
+}
+@media (max-width: 480px) {
+  .auth-page { padding: 0; }
+  .auth-shell { border-radius: 0; }
+  .auth-pane { padding: 28px 20px; }
+  .auth-headline { font-size: 32px; }
 }
 
 /* ── Profile menu (nav avatar dropdown) — Phase 2 ─────────────────── */
@@ -6612,7 +6717,8 @@ body,
 .nav-avatar-badge {
   width: 24px; height: 24px; flex: none; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
-  background: var(--blue); color: #fff; font-size: 10.5px; font-weight: 700;
+  /* Ink, not blue — blue is reserved for primary actions (the halo buttons). */
+  background: var(--t1); color: #fff; font-size: 10.5px; font-weight: 700;
 }
 .nav-avatar-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-profile-dropdown {
@@ -6629,7 +6735,7 @@ body,
   color: var(--t1); font-size: 13px; font-weight: 500; cursor: pointer; text-align: left;
 }
 .nav-menu-item:hover { background: var(--hover); }
-.nav-menu-item.active { color: var(--blue); font-weight: 600; }
+.nav-menu-item.active { color: var(--t1); font-weight: 700; }
 .nav-menu-item.danger { color: var(--err); }
 .nav-menu-item.danger:hover { background: var(--red-dim); }
 .nav-menu-item-icon { display: inline-flex; color: var(--t2); }
@@ -6692,3 +6798,456 @@ body,
   white-space: nowrap;
 }
 .company-research-cta:hover { filter: brightness(1.06); }
+
+/* ── Legal pages (#terms, #privacy) ────────────────────────────────────
+   Public docs linked from the login page; shares its design language —
+   warm-gray page, white card, Instrument Serif headline, muted Inter body. */
+/* This page owns its scrolling. It cannot rely on the page scrolling, because
+   html/body/#root are overflow:hidden above 1180px (the app is a fixed-height
+   shell); nor on height:100%, because the <=1180px media queries flip those
+   ancestors to height:auto, which collapses a percentage height. position:fixed
+   sizes it to the viewport directly, so it scrolls identically at every width. */
+.legal-page {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  padding: 14px;
+  box-sizing: border-box;
+  background: #f1f0ee;
+}
+/* Card fills the viewport like the login shell; the text column is centred
+   inside it, so there are no wide empty gutters beside the card itself. */
+.legal-shell {
+  width: 100%;
+  min-height: calc(100vh - 28px);
+  box-sizing: border-box;
+  border-radius: 26px;
+  background: var(--card);
+  box-shadow: 0 1px 2px rgba(2, 6, 23, 0.05), 0 18px 50px rgba(2, 6, 23, 0.07);
+  padding: 30px 0 64px;
+}
+
+.legal-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 0 40px 28px;
+}
+.legal-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--t2);
+  text-decoration: none;
+}
+.legal-back:hover { color: var(--t1); }
+/* Point the chevron back toward the form */
+.legal-back svg { transform: rotate(90deg); }
+.legal-langseg { position: static; }
+
+.legal-doc { max-width: 780px; margin: 0 auto; padding: 0 40px; }
+.legal-title {
+  margin: 0;
+  font-family: 'Instrument Serif', 'Noto Serif JP', Georgia, serif;
+  font-weight: 400;
+  font-size: 42px;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--t1);
+}
+.legal-updated {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  color: var(--t3);
+}
+.legal-intro {
+  margin: 22px 0 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--t2);
+}
+
+.legal-section { margin-top: 34px; }
+.legal-h2 {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--t1);
+}
+.legal-p {
+  margin: 0 0 10px;
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--t2);
+}
+.legal-p:last-child { margin-bottom: 0; }
+.legal-p strong { color: var(--t1); font-weight: 600; }
+
+@media (max-width: 640px) {
+  .legal-page { padding: 0; }
+  .legal-shell { border-radius: 0; min-height: 100vh; padding: 22px 0 48px; }
+  .legal-top { padding: 0 22px 22px; }
+  .legal-doc { padding: 0 22px; }
+  .legal-title { font-size: 32px; }
+}
+
+/* ── App sidebar (primary nav) ─────────────────────────────────────────
+   Replaces the old .top-nav. Brand + "Views" label + icon rows with count
+   badges, plus language/profile in the footer. Deliberately monochrome: blue is
+   reserved for primary actions (the halo buttons), so the selected row reads as
+   a quiet gray pill rather than competing with them. */
+.app-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.app-sidebar {
+  flex: none;
+  width: 236px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px 12px;
+  background: #f6f6f5;
+  border-right: 1px solid var(--b0);
+  /* Must NOT clip: the profile dropdown is absolutely positioned inside the
+     footer and has to escape the bar's 236px (64px collapsed) width. Content
+     here is short (brand + 4 rows + footer), so nothing needs to scroll. */
+  overflow: visible;
+  transition: width var(--ease-s);
+}
+/* Collapsed — icons only. Width fits a centred 40px row plus the 12px padding. */
+.app-sidebar.collapsed { width: 64px; }
+
+.side-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px 20px;
+}
+
+/* Collapse toggle — white rounded square, per reference */
+.side-collapse {
+  flex: none;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(2, 6, 23, 0.07);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--t1);
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(2, 6, 23, 0.05);
+  transition: background var(--ease), transform var(--ease);
+}
+.side-collapse:hover { background: #fafafa; }
+/* Chevron points the way the bar will move */
+.app-sidebar.collapsed .side-collapse { margin-left: 0; transform: rotate(180deg); }
+.side-logo {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--t1);
+  color: #fff;
+}
+.side-brandname {
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--t1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.side-label {
+  padding: 0 8px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+
+.side-nav { display: flex; flex-direction: column; gap: 3px; }
+.side-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--t2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--ease), color var(--ease), box-shadow var(--ease);
+}
+.side-nav-btn svg { flex: none; color: var(--t3); }
+.side-nav-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.side-nav-btn:hover:not(.active) { background: rgba(255, 255, 255, 0.6); color: var(--t1); }
+
+/* Selected row — the soft blue-grey fill from the reference, no border/shadow */
+.side-nav-btn.active {
+  background: #dfe4ed;
+  border-color: transparent;
+  color: var(--t1);
+}
+.side-nav-btn.active svg { color: var(--t1); }
+.side-nav-btn.active .side-badge { background: rgba(2, 6, 23, 0.09); color: var(--t1); }
+
+.side-badge {
+  flex: none;
+  min-width: 20px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--t2);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-align: center;
+}
+.side-nav-btn.active .side-badge { background: rgba(0, 0, 0, 0.08); color: var(--t1); }
+
+/* Footer — language + profile, pushed to the bottom of the bar */
+.side-foot {
+  margin-top: auto;
+  padding-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--b0);
+}
+/* Language + profile were designed for the horizontal header (rounded pills, blue
+   avatar). Restated here so they read as sidebar rows: same 9px radius, hairline
+   edge and white-card selected treatment as .side-nav-btn. */
+.side-foot .app-lang-switcher {
+  margin-left: 0;
+  width: 100%;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid rgba(2, 6, 23, 0.06);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.5);
+}
+.side-foot .lang-btn {
+  flex: 1;
+  height: 26px;
+  padding: 0;
+  border-radius: 7px;
+  font-size: 11.5px;
+  font-weight: 600;
+  /* Cross-fade the chip instead of snapping between states. */
+  transition: background var(--ease-s), color var(--ease-s), box-shadow var(--ease-s);
+}
+.side-foot .lang-btn.active {
+  background: #fff;
+  color: var(--t1);
+  box-shadow: 0 1px 2px rgba(2, 6, 23, 0.06);
+}
+
+.side-foot .nav-profile-menu { width: 100%; }
+.side-foot .nav-profile-avatar {
+  width: 100%;
+  max-width: none;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--t2);
+  font-size: 13px;
+  font-weight: 600;
+}
+.side-foot .nav-profile-avatar:hover {
+  background: #fff;
+  border-color: rgba(2, 6, 23, 0.07);
+  box-shadow: 0 1px 2px rgba(2, 6, 23, 0.05);
+  color: var(--t1);
+}
+.side-foot .nav-avatar-badge { width: 22px; height: 22px; font-size: 9.5px; }
+
+/* The dropdown is authored to fall downward from a header (top: 100%; right: 0).
+   In the sidebar footer that opens it off the bottom of the screen, so flip it to
+   rise from the button and align to the bar's left edge. */
+.side-foot .nav-profile-dropdown {
+  top: auto;
+  bottom: calc(100% + 8px);
+  left: 0;
+  right: auto;
+  /* Match the trigger's width instead of the 232px header default, which
+     overhung the bar and read as misaligned. */
+  min-width: 0;
+  width: 100%;
+}
+/* Collapsed the bar is only 64px — too narrow for a menu, so give it a usable
+   width and let it spill to the right of the rail. */
+.app-sidebar.collapsed .side-foot .nav-profile-dropdown { width: 200px; }
+
+/* ── Collapsed sidebar: icons only ─────────────────────────────────── */
+.app-sidebar.collapsed .side-brandname,
+.app-sidebar.collapsed .side-logo,
+.app-sidebar.collapsed .side-label,
+.app-sidebar.collapsed .side-nav-label {
+  display: none;
+}
+.app-sidebar.collapsed .side-brand { justify-content: center; padding: 4px 0 20px; }
+.app-sidebar.collapsed .side-nav-btn {
+  position: relative;
+  justify-content: center;
+  padding: 10px 0;
+}
+/* Count still shows when collapsed — as a chip on the icon's corner */
+.app-sidebar.collapsed .side-badge {
+  position: absolute;
+  top: 2px;
+  right: 6px;
+  min-width: 0;
+  padding: 1px 4px;
+  font-size: 9px;
+  line-height: 1.3;
+  background: var(--t1);
+  color: #fff;
+}
+.app-sidebar.collapsed .side-foot { align-items: center; }
+/* Stack EN/JA vertically rather than letting them overflow the narrow bar */
+.app-sidebar.collapsed .side-foot .app-lang-switcher { flex-direction: column; gap: 2px; }
+.app-sidebar.collapsed .nav-profile-avatar { justify-content: center; padding: 6px; }
+.app-sidebar.collapsed .nav-profile-avatar > :not(.nav-avatar-badge) { display: none; }
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Only the editor renders .tb now (Save/Export), and it needs no rule beneath it —
+   the command bar below already provides the separation. */
+.tb {
+  border-bottom: 0;
+  background: transparent;
+}
+.tb-inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+.tb-actions { margin-left: auto; }
+
+/* Settings was capped at 720px and centred, leaving most of the width empty.
+   width:100% is required: it is a flex item, and its `margin: 0 auto` makes the
+   auto margins absorb the free space, so without a definite width it shrinks to
+   its content instead of stretching and max-width never applies. */
+.settings-view {
+  width: 100%;
+  max-width: 1100px;
+  padding: 28px 34px 48px;
+}
+/* Application timeline — its own view; owns its scrolling like the other views. */
+.calendar-view {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px 34px 48px;
+  background: #f7f7f6;
+}
+
+/* These views hard-code height: calc(100vh - 58px), assuming the header that
+   only the editor renders now. Let them fill whatever .app-main leaves instead,
+   which drops the magic number entirely. Both are direct children of .app-main. */
+.app-main > .profile-dashboard,
+.app-main > .internship-radar {
+  height: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* The sidebar collapses to a horizontal strip on narrow screens, where the
+   app already switches to page scrolling (see the <=1180px queries above). */
+@media (max-width: 860px) {
+  .app-body { flex-direction: column; }
+  .app-sidebar {
+    width: auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 8px 10px;
+    border-right: 0;
+    border-bottom: 1px solid var(--b0);
+  }
+  .side-brand,
+  .side-label,
+  .side-nav-label { display: none; }
+  .side-nav { flex-direction: row; gap: 4px; }
+  .side-nav-btn { padding: 8px 12px; }
+  .side-foot {
+    margin-top: 0;
+    margin-left: auto;
+    flex-direction: row;
+    align-items: center;
+    padding-top: 0;
+    border-top: 0;
+  }
+  .side-foot .app-lang-switcher { width: auto; }
+}
+
+/* ── Halo applied to the page-level primary CTAs ───────────────────────
+   These are declared earlier in this file with their own blue/white fills, so
+   they are re-stated here (later = wins) rather than added to the .btn-primary
+   rule. Deliberately limited to the one primary action per surface — Dashboard's
+   matches rail, Radar's research CTA, Settings' save — so the glow still reads as
+   "the main action" instead of decorating every button. */
+.rail-action,
+.company-research-cta,
+.settings-save,
+.intern-summary > button {
+  border: 0;
+  border-radius: 999px;
+  background: var(--halo-bg);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: var(--halo-shadow);
+  transition: box-shadow var(--ease), background var(--ease);
+}
+.rail-action:hover,
+.company-research-cta:hover,
+.settings-save:hover:not(:disabled),
+.intern-summary > button:hover {
+  background: var(--halo-bg-hover);
+  box-shadow: var(--halo-shadow-hover);
+  filter: none;
+  transform: none;
+}
+.settings-save:disabled {
+  background: var(--hover);
+  color: var(--t3);
+  box-shadow: none;
+}

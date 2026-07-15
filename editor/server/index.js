@@ -1,3 +1,4 @@
+import './load-env.js';
 import express from 'express';
 import cors from 'cors';
 import { execFile } from 'child_process';
@@ -22,6 +23,7 @@ import {
   sendRequestError,
   validateApplication,
   validateInternship,
+  validateInternshipId,
   validateProfileId,
   validateResume,
   validateTracker,
@@ -362,15 +364,45 @@ fs.mkdir(PUBLIC_DIR, { recursive: true }).catch(() => {});
 app.use('/public', express.static(PUBLIC_DIR));
 
 
+// Reports whether writes actually survive a restart, by checking the filesystem
+// rather than trusting a label. The previous version compared `store.backend` to
+// the string 'local-sqlite', which says nothing about durability: it reported
+// persistent:true for months while the container wrote to its ephemeral image
+// layer and lost every live-research result on each restart (BUG-011, ADR-0032).
+async function describePersistence() {
+  if (store.backend === 'vercel-blob-sqlite') return { persistent: true, reason: 'vercel-blob' };
+
+  // Outside a container the data dir is a real disk, so it survives a restart.
+  const containerized = Boolean(
+    process.env.CONTAINER_APP_NAME || process.env.VERCEL || process.env.KUBERNETES_SERVICE_HOST
+  );
+  if (!containerized) return { persistent: true, reason: 'local-disk' };
+
+  // Inside a container the app directory lives on the ephemeral image layer. A
+  // mounted volume is a separate filesystem, so a differing st_dev proves the
+  // data dir is NOT that layer — this is what actually distinguishes the two.
+  try {
+    const [dataStat, appStat] = await Promise.all([fs.stat(DATA_DIR), fs.stat(__dirname)]);
+    if (dataStat.dev !== appStat.dev) return { persistent: true, reason: 'mounted-volume' };
+    return { persistent: false, reason: 'ephemeral-container-disk' };
+  } catch (error) {
+    return { persistent: false, reason: `data-dir-unreadable: ${error.code || error.message}` };
+  }
+}
+
 // ── GET /api/status ──────────────────────────────────────────────
 app.get('/api/status', async (req, res) => {
   try {
     await store.init();
+    const { persistent, reason } = await describePersistence();
     res.json({
       status: 'ok',
       message: 'Internship Portal backend is running.',
       storage: store.backend,
-      persistent: store.backend === 'vercel-blob-sqlite' || store.backend === 'local-sqlite',
+      persistent,
+      // Says WHY, so a wrong answer is debuggable instead of silently trusted.
+      persistenceReason: reason,
+      dataDir: DATA_DIR,
     });
   } catch (error) {
     res.status(500).json({
@@ -456,6 +488,28 @@ app.post('/api/internships/custom', async (req, res) => {
     items.unshift(normalized);
     await writeCustomInternships(items);
     res.status(201).json({ added: true, internship: normalized });
+  } catch (error) {
+    sendRequestError(res, error);
+  }
+});
+
+// Remove a live-researched result. Without this the catalog was add-only: a wrong
+// or stale search result could never be taken back out, since these entries are
+// user-generated and therefore absent from server/seeds.
+app.delete('/api/internships/custom/:id', async (req, res) => {
+  try {
+    const id = validateInternshipId(req.params.id);
+    const items = await readCustomInternships();
+    const next = items.filter(entry => entry.id !== id);
+    if (next.length === items.length) {
+      return res.status(404).json({ error: 'No live-researched internship with that id.' });
+    }
+    await writeCustomInternships(next);
+    // The id is also dropped from the shared catalog, so it cannot reappear via
+    // the live-research merge in readInternshipCatalog().
+    const catalog = await readInternshipCatalog();
+    await writeInternshipCatalog(catalog.filter(entry => entry.id !== id));
+    res.json({ removed: true, id });
   } catch (error) {
     sendRequestError(res, error);
   }

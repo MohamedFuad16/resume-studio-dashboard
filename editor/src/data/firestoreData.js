@@ -94,6 +94,24 @@ export async function removeProfile(id) {
   return { ok: true, success: true };
 }
 
+// Deletes every document this account owns: each profile plus its tracker and
+// applications. Used by account deletion, which must clear Firestore BEFORE the
+// auth user goes away — the security rules key on request.auth.uid, so once the
+// user is deleted these documents can never be reached or removed again.
+// Throws if any profile fails to delete, so the caller does not proceed to delete
+// the auth user and strand data.
+export async function removeAllUserData() {
+  const profiles = await listProfiles();
+  const results = await Promise.allSettled(profiles.map(p => removeProfile(p.id)));
+  const failed = results.filter(r => r.status === 'rejected');
+  if (failed.length) {
+    throw new Error(
+      `Could not delete ${failed.length} of ${profiles.length} profiles: ${failed[0].reason?.message || 'unknown error'}`
+    );
+  }
+  return { ok: true, deleted: profiles.length };
+}
+
 // ── tracker (whole-blob per profile) ──────────────────────────────
 export async function getTracker(id) {
   const snap = await getDoc(trackerDoc(id));

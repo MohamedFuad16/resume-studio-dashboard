@@ -481,3 +481,207 @@ the run link, and the fix instruction (job permissions: issues:write).
 **Consequences:** A failing sweep now lands in Issues/notifications with the exact
 entries to retire. One tracking issue accumulates comments instead of spamming new
 issues. Retirement stays manual by design — the validator never auto-deletes data.
+
+---
+
+## ADR-0027 · 2026-07-09 · Server loads editor/.env.local at boot (load-env.js)
+**Status:** Accepted
+**Context:** Live company research ("Search official sources" for companies not in
+the catalog) failed instantly with OPENROUTER_API_KEY_MISSING whenever no key was
+saved in Settings. The intended fallback (ADR-0016: per-user key → env) was dead in
+BOTH environments: local `npm run dev` never loaded `editor/.env.local` (Vite only
+exposes VITE_* to the client; the Node server had no dotenv), and the Azure container
+app `portal-compile-jp` was deployed without the OPENROUTER_API_KEY env var
+(verified by direct keyless POST → OPENROUTER_API_KEY_MISSING).
+**Decision:** Add dependency-free `server/load-env.js` — parses `editor/.env.local`
+then `editor/.env` (KEY=VALUE, optional quotes/export, missing files ignored, real
+env always wins) — imported as the FIRST import of `server/index.js` so it runs
+before any module-scope `process.env` reads. Prod fix stays operational: set
+`OPENROUTER_API_KEY` on the Azure container app (az containerapp update
+--set-env-vars), or save the key in Settings (already works, verified end-to-end).
+**Consequences:** Local dev research works out of the box with the key already in
+`.env.local`; the BLOB token / model overrides there also now apply. No behavior
+change in containers (file absent → no-op). See BUG-010 in errors.md.
+
+---
+
+## ADR-0028 · 2026-07-15 · LoginScreen restyled to the "split card" reference theme
+**Status:** Accepted
+**Context:** The user supplied a reference login design (Offloop) and asked for its exact
+design theme — UI, font, and styling language — on the portal's login page. The existing
+LoginScreen (ADR-era Phase 4) used a different language: a mint→blue ambient gradient
+behind a centered white "app window" (macOS lights + brand pill), a two-column
+headline/feature-rows + form split, all-sans typography, 10px-radius controls, and the
+brand-blue primary button. None of that survives contact with the reference.
+**Decision:** Rewrite `components/LoginScreen.jsx` + the auth block of `index.css` to the
+reference language: a split card floating on warm light gray (`#f1f0ee`) — white form pane
+left, ambient sunset art pane right (pure CSS gradients + a floating product mock built
+from the existing FEATURES copy, so no image asset is needed). Typography pairs a serif
+display headline (**Instrument Serif**, added to the Google Fonts import, with **Noto Serif
+JP** carrying the JA headline since Instrument Serif has no kana) against small muted Inter
+body copy. Controls are fully-rounded pills (`border-radius: 999px`); the primary button is
+black (`var(--t1)`), and stays visually inert until every field has a value.
+Fields are placeholder-only per the reference — visible `<label>` text is dropped, so each
+input carries an `aria-label` to keep the accessible name.
+**Consequences:** Auth behavior is untouched (Google sign-in, email/password sign-in, open
+sign-up, EN/JA toggle + persistence, error surface). The art pane is `display:none` below
+900px, where the form pane centers alone. Two adjacent bits of copy changed shape: the
+headline is now the mode title ("Welcome back" / "Welcome to Internship Portal") and the
+feature rows moved from the left column into the art-pane mock (titles only, bodies
+dropped). Adds a Terms/Privacy legal line whose `#terms`/`#privacy` hrefs are placeholders
+— they need real targets before this is user-facing.
+
+---
+
+## ADR-0029 · 2026-07-15 · Public Terms + Privacy pages on a hash route
+**Status:** Accepted
+**Context:** The redesigned login page (ADR-0028) links to Terms of Service and Privacy
+Policy, but both hrefs were placeholders pointing nowhere, and the app has no router
+(react-router is not a dependency; App.jsx switches views with `appView` state).
+Legal pages must be readable BEFORE sign-in, so they cannot live inside AuthGate.
+**Decision:** Address them by hash. Added `hooks/useHashRoute.js` (subscribes to
+`hashchange`) and `components/LegalPage.jsx`, wired in `main.jsx` via a `Root` component
+that renders `<LegalPage>` for `#terms`/`#privacy` and otherwise falls through to
+`<AuthGate><App/></AuthGate>` — so the docs are public and the auth path is untouched.
+LegalPage reuses the login design language (warm-gray page, white card, Instrument Serif
+title, muted Inter body) and the same `resume-studio-language` key, so EN/JA persists
+across login ↔ legal.
+**Copy is written against what the app verifiably does**, not boilerplate: Firebase Auth +
+per-user Firestore storage, Vercel hosting/Blob, and — confirmed at `server/resume-chat.js`
+(`JSON.stringify(resume)` in the prompt) — résumé content is sent to OpenRouter when AI
+features are used, which the Privacy Policy states plainly. It also states that no analytics
+run: `measurementId` exists in the Firebase config but `getAnalytics` is never called, and
+localStorage holds only `theme` + `resume-studio-language`.
+**Consequences:** **The copy is a drafted starting point and has NOT had legal review.**
+`OPERATOR`, `CONTACT_EMAIL` (`support@example.com`), `JURISDICTION`, and `LAST_UPDATED` are
+placeholder constants at the top of LegalPage.jsx that MUST be filled before the pages are
+public — the contact address is currently fake, so a data-deletion request would reach
+nobody. If analytics or another processor is added later, the Privacy Policy's "we do not
+currently run analytics" claim becomes false and must be updated with it.
+
+---
+
+## ADR-0030 · 2026-07-15 · App shell: left sidebar, neutral palette, halo primary buttons
+**Status:** Accepted
+**Context:** Continuing the design overhaul (ADR-0028/0029), the user supplied two more
+references (a sidebar nav; a glowing blue "Create event" button) and asked to merge them
+with the login base. The app had no sidebar — `App.jsx` rendered a `.top-nav` in the 58px
+`.tb` header — and its palette was blue-tinted throughout.
+**Decisions:**
+1. **Left sidebar** replaces `.top-nav`. `.shell` (already `flex-column`) now wraps
+   `.app-body` (flex row) = `.app-sidebar` + `.app-main`. Views are NOT positionally
+   coupled to `.shell` (no `.shell > *` selectors), so wrapping them was safe. The 58px
+   `.tb` header is KEPT — five views size themselves with `calc(100vh - 58px)` — and now
+   carries the current view title. Nav items live in `NAV_ITEMS`, whose `id`s are the
+   `appView` values; Settings joins the nav (previously profile-menu only).
+2. **Sidebar is monochrome**, per the user choosing the "clean base" over a blue-filled
+   Noma-style bar: `#f6f6f5` surface, selected row = white card + hairline + soft shadow.
+   No icon rail — it duplicated the icon each row already carries.
+3. **Language + profile moved into the sidebar footer.** Both were built for a horizontal
+   header (rounded pills, blue avatar), so `.side-foot` restates them as sidebar rows.
+4. **Collapse** (`.app-sidebar.collapsed`, 236px→64px, icons only), persisted in
+   `localStorage['sidebar-collapsed']`. Collapsed rows carry `title` + `aria-label` since
+   the label is hidden; badges become a corner chip.
+5. **Halo primary button** (blue gradient + glow) via `--halo-*` tokens, applied to
+   `.btn-primary`/`.btn-submit-app` plus one primary CTA per surface (`.rail-action`,
+   `.company-research-cta`, `.settings-save`, `.intern-summary > button`). Those four are
+   declared later in the file, so they are restated after them rather than merged into the
+   `.btn-primary` rule. Login/legal keep black pills (`.auth-*`) — user's explicit choice.
+6. **Palette neutralised**: `--career-blue`/`--career-ink`/`--intern-blue` → ink `#101113`,
+   `--career-muted` → `#6f7177`, and blue-tinted surfaces (`#f7f9fc`, `#f6f9ff`, `#eaf2ff`,
+   `#f0f6ff`) → neutral equivalents. Blue now means "primary action" and nothing else;
+   third-party brand colours (LinkedIn) are untouched.
+**Consequences:** Sidebar badges read `useApplicationTracker(activeProfile).records.length`
+— the same source as the dashboard's "N roles tracked", so the two cannot disagree. (An
+earlier draft used App.jsx's `applications` state, which is the *AI assistant's* list, and
+showed 1 next to a pipeline reading 6.) A dangling `.btn-new-profile:hover` selector, left
+grouped with the old black `.btn-primary` rule, would have inherited the halo — it now has
+its own black-hover rule. **Not yet checked: whether the Playwright E2E suite selects the
+removed `.top-nav` / `.top-nav-btn`.**
+
+---
+
+## ADR-0031 · 2026-07-15 · Design pass 3: lucide icons, timeline view, flat primary, theme cleanup
+**Status:** Accepted
+**Context:** Review of the sidebar/halo work (ADR-0030) raised several issues at once.
+**Decisions:**
+1. **Icons** — the sidebar used the hand-drawn `I` set from `ui.jsx`, which read as
+   unprofessional beside the rest of the app. `lucide-react@0.395` was ALREADY a
+   dependency (used by ProfileDashboard/InternshipDashboard/ApplicationCalendar), so
+   `NAV_ITEMS` now carries lucide components (`Icon`) instead of `I` name strings.
+2. **Application timeline is its own view** (`appView === 'calendar'`). `ApplicationCalendar`
+   was rendered at the bottom of ProfileDashboard; it is now a sidebar destination with its
+   own `.calendar-view` scroll container. ProfileDashboard's now-unused `removeMilestone`
+   destructure and `ApplicationCalendar` import were removed (`addMilestone` stays — the
+   interview modal uses it).
+3. **Halo dropped for a flat blue pill** (`--halo-bg: #1a56f0`, shadows `none`), per the
+   "Add event" reference — the gradient + glow read as heavy against flat surfaces. Token
+   NAMES kept as `--halo-*` so the ~8 call sites did not churn.
+4. **Account menu = account only.** Settings was removed from the dropdown (it is a sidebar
+   view now), leaving Sign out; the `onSettings` prop was dropped from ProfileSwitcher and
+   App. The menu is suppressed entirely when there is neither an email nor `onSignOut` (the
+   no-auth/E2E path) rather than opening an empty popup. Dropdown now sizes to the trigger
+   and opens upward.
+5. **Theme cleanup** — `--preview-bg` and the `html/body/#root` background were mint→blue
+   gradients (`#c9f8e9`/`#c8fae9`…); both are neutral now. `.tb` lost its border-bottom and
+   background (only the editor renders it, and the command bar below already separates).
+6. **Settings uses the available width** (`max-width: 1100px`). `width: 100%` is REQUIRED:
+   `.settings-view` is a flex item with `margin: 0 auto`, and auto margins on a flex item
+   absorb free space, so without a definite width it shrank to its content (852px) and
+   max-width never applied.
+**Consequences:** `tests/e2e/app-smoke.spec.ts` selected `.top-nav-btn`, removed in
+ADR-0030 — repointed to `.side-nav-btn`; all 5 tests pass. NOTE: local `npm run dev` now
+502s/500s on every `/api/*` route because the `BLOB_READ_WRITE_TOKEN` in `editor/.env.local`
+returns **403 Forbidden** from Vercel Blob (`server/storage.js` → `refreshFromBlob`). This is
+an environment/credential problem, NOT a code regression. Added a `resume-studio-localdb`
+launch config (`BLOB_READ_WRITE_TOKEN=` empty) which falls back to local sql.js — `hasBlob()`
+is `Boolean(token)` and `load-env.js:29` only fills vars that are `undefined`, so an empty
+value wins. The token needs rotating for blob-backed local dev.
+
+---
+
+## ADR-0032 · 2026-07-15 · Durable storage on Azure Files; catalog delete; account deletion
+**Status:** Accepted
+**Context:** The Vercel Blob free tier hit 100% of its 2,000 Advanced-Request quota and the
+store was paused for 30 days (BUG-011). Investigating the move off Blob turned up a bigger
+problem, below.
+**Findings (verified against live Azure, not assumed):**
+- **Production never used Vercel Blob.** `portal-compile-jp` had exactly three env vars
+  (`RESUME_FONT_PROFILE`, `RESUME_STUDIO_APP_ORIGIN`, `INTERNSHIP_RESEARCH_TIMEOUT_MS`),
+  `volumes: null`, `mounts: null`. Blob only ever ran from local `.env.local`. The backend
+  had been on **ephemeral container disk since launch**, silently discarding every
+  live-research result on each restart/deploy. The quota exhaustion did not cause this.
+- **`/api/status` misreports durability.** `persistent` is
+  `store.backend === 'vercel-blob-sqlite' || 'local-sqlite'` (index.js:374) — a label check
+  that never inspects the disk. It reported `persistent: true` the whole time data was being
+  destroyed. Left as-is for now; it should assert on the mount. **Still open.**
+**Decisions:**
+1. **Azure Files mount** — storage account `internshipportaljpdata` (japaneast,
+   Standard_LRS) + share `resume-studio-data` (5 GB), linked to env `portal-compile-jp-env`
+   as storage `resumedata`, mounted at `/data`, with `RESUME_STUDIO_DATA_DIR=/data`. NO code
+   change: the data dir was already env-configurable (index.js:38). Revision
+   `portal-compile-jp--0000001` (previous: `--4u2g71t`). **Verified by writing an entry,
+   restarting the revision, and reading it back — it survived**; the share shows
+   `resume-studio.sqlite`. Only the JP app was touched; `portal-compile` (West US) is
+   untouched. Blob left as an optional layer (now non-fatal, BUG-011) rather than ripped out.
+2. **`DELETE /api/internships/custom/:id`** — the catalog was add-only, so a wrong live-search
+   result could never be removed (these are user-generated, so absent from `server/seeds/`).
+   Removes from both the custom list and the shared catalog so the live-research merge in
+   `readInternshipCatalog()` cannot resurrect it. New `validateInternshipId` in
+   `validation.js` (per conventions: all server input validated there) — the id arrives as a
+   URL path segment. Verified: delete 200; unknown id 404; traversal-ish id 400; **seed id
+   404** (seeds are not deletable this way).
+3. **Account deletion** — did not exist; only per-profile deletion did. Added
+   `removeAllUserData()` (firestoreData), `removeUserDoc()` (userProfile), and
+   `deleteAccount()` (useAuth), surfaced in Settings behind a typed `DELETE` confirmation.
+   **Order is load-bearing: Firestore data is deleted BEFORE the auth user.** The rules key on
+   `request.auth.uid`, so deleting the auth user first would orphan every document —
+   unreachable and undeletable by anyone, forever. If the data step throws we never touch the
+   auth user, so the account can sign in and retry. Handles `auth/requires-recent-login` by
+   re-authenticating (popup for Google, password for password accounts). Hidden entirely on
+   the no-auth path (verified).
+**Consequences:** Azure holds NO per-user data — only the shared catalog + live-research
+entries — so account deletion correctly touches Firebase Auth + Firestore only. Costs: one
+Standard_LRS account + 5 GB share (cents/month). **The account-deletion flow is built and
+builds clean but has NOT been executed end-to-end** — it needs a signed-in account, and
+running it would permanently delete a real one. It needs a test account before being trusted.

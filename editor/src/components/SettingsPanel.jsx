@@ -31,6 +31,14 @@ const COPY = {
     dangerZone: 'Danger zone',
     deleteProfile: 'Delete this profile',
     deleteHint: 'Permanently removes this profile and its tracker/applications. Cannot be undone.',
+    deleteAccount: 'Delete account',
+    deleteAccountHint: 'Permanently deletes your account and every profile, résumé, tracker and application in it.',
+    deleteAccountWarning: 'This deletes your account and all of its data — every profile, résumé, tracked internship and application. It cannot be undone, and you will be signed out immediately. Export anything you want to keep first.',
+    deleteAccountConfirmLabel: 'Type DELETE to confirm',
+    deleteAccountPassword: 'Confirm your password',
+    deleteAccountConfirm: 'Delete my account',
+    deletingAccount: 'Deleting…',
+    cancel: 'Cancel',
     save: 'Save changes', saving: 'Saving…', saved: 'Saved', clear: 'Remove key',
     badKey: 'Key must look like sk-or-… (20+ chars).',
     badModel: 'Enter a valid model slug (e.g. openai/gpt-5-mini).',
@@ -51,15 +59,49 @@ const COPY = {
     dangerZone: '危険な操作',
     deleteProfile: 'このプロフィールを削除',
     deleteHint: 'このプロフィールと関連データを完全に削除します。元に戻せません。',
+    deleteAccount: 'アカウントを削除',
+    deleteAccountHint: 'アカウントと、含まれるすべてのプロフィール・レジュメ・管理中のインターン・応募情報を完全に削除します。',
+    deleteAccountWarning: 'アカウントとすべてのデータ（プロフィール、レジュメ、管理中のインターン、応募情報）を削除します。元に戻すことはできず、直ちにサインアウトされます。必要なデータは事前にエクスポートしてください。',
+    deleteAccountConfirmLabel: '確認のため DELETE と入力してください',
+    deleteAccountPassword: 'パスワードを再入力してください',
+    deleteAccountConfirm: 'アカウントを削除する',
+    deletingAccount: '削除中…',
+    cancel: 'キャンセル',
     save: '変更を保存', saving: '保存中…', saved: '保存しました', clear: 'キーを削除',
     badKey: 'キーは sk-or-… の形式（20文字以上）で入力してください。',
     badModel: '有効なモデルスラッグを入力してください（例: openai/gpt-5-mini）。',
   },
 };
 
-export default function SettingsPanel({ resume, onSaveProfile, onExportJson, onDeleteProfile, activeProfile, canDelete, onBack, isJa = false }) {
+// Typed to confirm irreversible account deletion. Deliberately not localised — a
+// fixed token is easier to match exactly than a translated sentence.
+const DELETE_CONFIRM_WORD = 'DELETE';
+
+export default function SettingsPanel({
+  resume, onSaveProfile, onExportJson, onDeleteProfile, onDeleteAccount,
+  needsPassword = false, activeProfile, canDelete, onBack, isJa = false,
+}) {
   const t = COPY[isJa ? 'ja' : 'en'];
   const personal = resume?.personal || {};
+
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  const runDeleteAccount = async () => {
+    if (deleting) return;
+    setDeleteError('');
+    setDeleting(true);
+    try {
+      await onDeleteAccount({ password: deletePassword });
+      // On success the auth listener unmounts this screen; nothing to do here.
+    } catch (err) {
+      setDeleteError(err.message);
+      setDeleting(false);
+    }
+  };
 
   const [form, setForm] = useState({
     nameEn: personal.nameEn || '',
@@ -203,7 +245,78 @@ export default function SettingsPanel({ resume, onSaveProfile, onExportJson, onD
             <I n="x" s={13} /> {t.deleteProfile}
           </button>
         </div>
+
+        {/* Account deletion — separate from profile deletion, and irreversible.
+            Only offered when there is a real account to delete (not the no-auth path). */}
+        {onDeleteAccount && (
+          <div className="settings-danger">
+            <div>
+              <strong>{t.deleteAccount}</strong>
+              <p>{t.deleteAccountHint}</p>
+            </div>
+            <button
+              type="button"
+              className="btn settings-delete"
+              onClick={() => setConfirmingDelete(true)}
+            >
+              <I n="x" s={13} /> {t.deleteAccount}
+            </button>
+          </div>
+        )}
       </section>
+
+      {confirmingDelete && (
+        <div className="modal-overlay" onClick={() => !deleting && setConfirmingDelete(false)}>
+          <div className="modal-card" onClick={e => e.stopPropagation()}>
+            <div className="modal-hd">
+              <h3>{t.deleteAccount}</h3>
+              <button className="modal-close" onClick={() => !deleting && setConfirmingDelete(false)}>
+                <I n="x" s={14} />
+              </button>
+            </div>
+            <div className="modal-bd">
+              <p>{t.deleteAccountWarning}</p>
+              {/* Typed confirmation: this cannot be undone, so it should not be
+                  reachable by a stray click. */}
+              <label className="settings-field">
+                <span>{t.deleteAccountConfirmLabel}</span>
+                <input
+                  type="text"
+                  value={confirmText}
+                  onChange={e => setConfirmText(e.target.value)}
+                  placeholder={DELETE_CONFIRM_WORD}
+                  autoComplete="off"
+                />
+              </label>
+              {needsPassword && (
+                <label className="settings-field">
+                  <span>{t.deleteAccountPassword}</span>
+                  <input
+                    type="password"
+                    value={deletePassword}
+                    onChange={e => setDeletePassword(e.target.value)}
+                    autoComplete="current-password"
+                  />
+                </label>
+              )}
+              {deleteError && <div className="settings-error" role="alert">{deleteError}</div>}
+              <div className="settings-actions">
+                <button type="button" className="btn" disabled={deleting} onClick={() => setConfirmingDelete(false)}>
+                  {t.cancel}
+                </button>
+                <button
+                  type="button"
+                  className="btn settings-delete"
+                  disabled={deleting || confirmText.trim() !== DELETE_CONFIRM_WORD}
+                  onClick={runDeleteAccount}
+                >
+                  {deleting ? t.deletingAccount : t.deleteAccountConfirm}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && <div className="settings-error" role="alert">{error}</div>}
 

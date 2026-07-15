@@ -25,6 +25,82 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-15 — Durable Azure storage + catalog delete + account deletion (ADR-0032).**
+  **Production was never using Vercel Blob** — `portal-compile-jp` had no token, no volumes, so
+  it ran on ephemeral container disk since launch and silently lost every live-research result
+  on each restart. Fixed by mounting Azure Files (`internshipportaljpdata` /
+  `resume-studio-data`) at `/data` with `RESUME_STUDIO_DATA_DIR=/data` — no code change needed;
+  **verified by write → restart → read-back**. Revision `--0000001` (rollback: `--4u2g71t`).
+  Added `DELETE /api/internships/custom/:id` (the catalog was add-only) + `validateInternshipId`.
+  Added account deletion (`deleteAccount` in useAuth + `removeAllUserData`/`removeUserDoc`),
+  Firestore-data-before-auth-user so nothing is orphaned, behind a typed DELETE confirm.
+  **Open:** `/api/status` still reports `persistent: true` from a label check, not the mount;
+  account deletion is untested end-to-end (needs a throwaway account).
+- **2026-07-15 — BUG-011 FIXED: a Blob outage no longer 500s the API.** Root cause was NOT an
+  expired token: the Vercel free-tier Blob quota (2,000 Advanced Requests) was exhausted and
+  **store access is paused for 30 days**, so every read 403s. `storage.js` treated Blob as a hard
+  dependency, so all `/api/*` returned 500 and the app hung on "Loading…". Blob is now
+  best-effort: failures log once and fall back to local SQLite (500 → 200 verified with the
+  paused token). Note per-user data is in **Firestore**, not Blob — Blob only held the
+  (self-reseeding) internship catalog + `customInternships`. To drop Blob for good: unset
+  `BLOB_READ_WRITE_TOKEN` and point `RESUME_STUDIO_DATA_DIR` at a persistent mount. See errors.md.
+- **2026-07-15 — Design pass 3 (ADR-0031).** Sidebar icons → lucide (already a dependency);
+  Application timeline promoted from a dashboard block to its own view; halo button replaced
+  by a flat blue pill (`--halo-bg: #1a56f0`); account menu is Sign out only (Settings is a
+  sidebar view) and no longer opens empty; `.tb` border/background dropped; mint→blue
+  `--preview-bg` and body gradients neutralised; Settings widened to 1100px. E2E repointed
+  from `.top-nav-btn` to `.side-nav-btn` — **all 5 tests pass**.
+- **2026-07-15 — App shell overhaul: left sidebar + neutral palette + halo buttons (ADR-0030).**
+  `.top-nav` replaced by `.app-sidebar` (brand, Views, icon rows with real count badges,
+  language + profile in the footer, 236px→64px collapse persisted in
+  `localStorage['sidebar-collapsed']`); the 58px `.tb` header is kept (five views use
+  `calc(100vh - 58px)`) and now shows the view title. Sidebar is monochrome — selected row is
+  a white card, matching the login mock. Primary buttons adopt the blue "halo" via `--halo-*`
+  tokens; login/legal keep their black pills. App palette neutralised (`--career-blue`,
+  `--intern-blue`, `--career-ink` → ink; blue-tinted surfaces → neutral), so blue now means
+  "primary action" only. **Open:** E2E suite not yet checked for `.top-nav` selectors.
+- **2026-07-15 — Legal pages: scroll fix + full-width card.** `#terms`/`#privacy` could not
+  scroll: `html/body/#root` are `overflow:hidden` above 1180px, and the `<=1180px` queries flip
+  them to `height:auto`, which collapsed a percentage height. `.legal-page` is now
+  `position:fixed; inset:0; overflow-y:auto`, which scrolls at every width. Card fills the
+  viewport with the text column centred at 780px (was a 760px card with wide gutters).
+- **2026-07-15 — Public Terms + Privacy pages on a hash route (ADR-0029).** New
+  `components/LegalPage.jsx` + `hooks/useHashRoute.js`, wired in `main.jsx` above AuthGate so
+  `#terms`/`#privacy` render without signing in; the login page's placeholder legal links now
+  resolve. Shares the login design language, bilingual EN/JA via the same
+  `resume-studio-language` key. Copy is written against verified app behavior (Firestore
+  storage; résumé text sent to OpenRouter on AI use per `server/resume-chat.js`; no analytics
+  wired). **Not legally reviewed** — `OPERATOR`/`CONTACT_EMAIL`/`JURISDICTION` are placeholder
+  constants at the top of LegalPage.jsx and must be filled before going public.
+- **2026-07-15 — Login art-pane mock rebuilt to reference proportions.** The mock sat in the
+  bottom-right corner; per the reference it now starts ~22% down the art pane and fills the
+  rest, as a two-column window (icon rail + sidebar + main pane) bleeding off the bottom-right.
+  Sidebar rows mirror real app surfaces (Dashboard / Internship Radar / Applications /
+  Calendar / Editor / AI assistant / Profile) rather than invented screens.
+- **2026-07-15 — LoginScreen restyled to the reference "split card" theme (ADR-0028).**
+  Rewrote `components/LoginScreen.jsx` + the auth block of `index.css` to match a
+  user-supplied reference design: split card on warm light gray — white form pane beside a
+  CSS-gradient sunset art pane holding a floating product mock; **Instrument Serif** display
+  headline (+ **Noto Serif JP** for JA) over small muted Inter copy; fully-rounded pill
+  controls; black primary button that stays inert until the fields are filled. Auth behavior
+  unchanged. Placeholder-only fields keep accessible names via `aria-label`. Art pane hides
+  below 900px. Dropped the stale `[data-theme="dark"]` auth-page override — it was the only
+  rule in the app that actually painted dark, so it produced a dark frame around a white
+  card; the 2026 redesign block in `index.css` makes dark resolve to the light palette
+  app-wide. The new Terms/Privacy line points at placeholder `#terms`/`#privacy` hrefs.
+- **2026-07-09 — BUG-010: live company search fixed for keyless users (env fallback restored).**
+  Searching a non-catalog company always errored "Live research needs an OpenRouter API key"
+  unless a key was saved in Settings: the Node server never loaded `editor/.env.local` (no
+  dotenv; Vite only exposes VITE_* to the client) and the Azure app `portal-compile-jp` has no
+  `OPENROUTER_API_KEY` env var (probed directly). Added dependency-free `server/load-env.js`
+  (first import of `server/index.js`; parses `.env.local`/`.env`, real env wins, no-op when
+  absent). Verified in-browser: keyless "Airbnb" search runs the full research and completes.
+  **Prod still needs** `az containerapp update -n portal-compile-jp -g internship-portal
+  --set-env-vars OPENROUTER_API_KEY=<key>` (no az CLI/login on this machine); Settings-key
+  path verified working against Azure meanwhile. Also updated `.claude/launch.json` preview
+  config to pin `PORT=5005` (the preview harness was injecting PORT=5173, colliding Express
+  with Vite) and `VITE_AUTH_DISABLED=true` (mirrors the Playwright E2E env) so browser
+  verification works. See ADR-0027, BUG-010.
 - **2026-07-05 — Compile/research backend moved to Azure Container Apps (always-on).** Render's
   free tier slept after ~15 min → cold starts made the first live-search/compile fail ("company
   research failed", e.g. Goldman Sachs). Deployed the same root `Dockerfile` to **Azure Container

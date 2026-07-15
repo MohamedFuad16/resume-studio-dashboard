@@ -9,7 +9,7 @@
 // Firestore collections is deliberately out of scope for this pass — see
 // agent/decisions.md ADR for the auth-gate-first decision. New per-user
 // collections (e.g. users/{uid}/resume) should hang off this same document.
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db, authAvailable } from '../auth/firebase.js';
 
 export function userDocRef(uid) {
@@ -38,4 +38,13 @@ export async function getUserDoc(uid) {
   if (!authAvailable || !db || !uid) return null;
   const snap = await getDoc(userDocRef(uid));
   return snap.exists() ? snap.data() : null;
+}
+
+// Deletes the users/{uid} identity doc. Part of account deletion — without it the
+// account's email/displayName would outlive the account itself, since the rules
+// key on request.auth.uid and nothing could reach the doc after the auth user is
+// gone. Must run while the user is still signed in.
+export async function removeUserDoc(uid) {
+  if (!authAvailable || !db || !uid) return;
+  await deleteDoc(userDocRef(uid));
 }
