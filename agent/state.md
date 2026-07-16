@@ -25,6 +25,22 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-17 — iOS app REBUILT from the AI-Studio React reference (ADR-0038).**
+  The ADR-0036 planner-pastel app was deleted at the user's request; the new theme
+  source of truth is `~/Downloads/zip.zip` (React/Tailwind reference rendering these
+  screens) — Inter→SF Pro, `#F4F7F6` ground, white cards r20–28, teal-600 match
+  accent, floating pill nav. New SwiftUI app in `ios/InternshipPortal/`: 4 tabs
+  (Home · Radar · Applications · Calendar; Profile+Settings is a sheet off Home),
+  detail/record/add-event/interview-date sheets, real **Liquid Glass** nav
+  (`GlassEffectContainer` + `.glassEffect(.regular.interactive())`), and 4 **Metal**
+  shaders (aurora canvas+grain, radar sweep, shimmer skeletons, press warp). Same
+  Azure API contract as before. Builds on the iOS 27.0 SDK (Xcode 27, Swift 6);
+  verified on an iPhone 17 Pro sim against live prod (173 roles, HENNGE 99%), all
+  tabs + detail sheet screenshotted. **Four silent Metal/SwiftUI traps documented in
+  ADR-0038** (float32 shader clock, chained colorEffects, raster shaders vs
+  UIKit-backed views, colorEffect over Color.clear) plus the `.environment()`-above-
+  `.sheet()` crash. NOT yet committed to `main`; iOS tracker reads the KV path, which
+  is empty (signed-in web data is in Firestore).
 - **2026-07-16 (eve) — Performance + UI bug pass (ADR-0037, BUG-016/017/018).** Pulled
   origin/main into `ios-local` (merge commit; only `agent/state.md` conflicted). Fixes:
   LaTeX compile now lazy (only in the Editor view — a dashboard load no longer POSTs

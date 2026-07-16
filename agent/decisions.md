@@ -818,3 +818,50 @@ company column to ~80px and leaving an empty cell where the hidden status select
 **Verified.** Build green, E2E 5/5, one tracker GET and zero compiles on a dashboard
 load, single compile on first Editor entry, JA + mobile verified in-browser at
 375/1366px.
+
+## ADR-0038 · 2026-07-17 · iOS app rebuilt on the AI-Studio reference theme; SwiftUI + Metal + Liquid Glass
+**Context.** ADR-0036's planner-pastel iOS scaffold was scrapped at the user's
+request. The new source of truth is a React reference app (`zip.zip`, AI Studio
+export) that already renders this product's screens — Inter on a `#F4F7F6` ground,
+white cards (r20–28) with `shadow-[0_2px_10px_rgb(0,0,0,0.02)]`, 36px pastel icon
+tiles, teal-600 as the match accent, slate-900 primaries, and a hand-built floating
+pill nav. Requirements: match that styling exactly, use Metal shaders, Liquid Glass
+is mandatory, target the iOS 27 beta.
+**Decision.**
+- **Deleted** `ios/InternshipPortal/**` (ADR-0036 app) and the HTML design mockups.
+  `project.yml` survives; the `.xcodeproj` stays generated (xcodegen) + gitignored.
+- **Tokens** (`Theme.swift`) are transcribed 1:1 from the reference's Tailwind
+  classes as literal hex, so nothing depends on a Tailwind build. **Typeface: SF Pro,
+  not Inter** — same grotesque skeleton at these sizes; bundling a webfont buys
+  licence surface and launch cost, not fidelity.
+- **IA — 4 tabs** (Home · Radar · Applications · Calendar) per the user's spoken
+  spec, which differs from the reference's Home/Radar/Calendar/Profile. Profile +
+  Settings is a sheet off Home's Profile card. The résumé editor stays on the web.
+- **Liquid Glass**: the nav is `GlassEffectContainer` + `.glassEffect(.regular
+  .interactive(), in: .capsule)`; content scrolls under it (verified refracting).
+- **Metal** (`Shaders.metal`): `auroraCanvas` (drifting teal/blue value-noise +
+  grain over the ground), `radarSweep` (rings + rotating wedge behind the Radar stat
+  strip), `shimmer` (loading skeletons), `pressWarp` (distortion under the finger).
+  All are additive over an already-correct layout — a dead shader costs polish, never
+  meaning.
+- **Data**: unchanged contract — Azure `portal-compile-jp`, `GET /api/internships`,
+  `GET|POST /api/tracker?profile=mohamed_fuad`, optimistic writes with rollback.
+**Four Metal/SwiftUI constraints found by building it — all silent failures:**
+1. **float32 time.** Passing `timeIntervalSinceReferenceDate` (~8×10⁸, ulp ≈ 64) to a
+   shader collapses every `fract()`/hash to a constant → the effect renders flat and
+   looks "too subtle" rather than broken. `ShaderClock` now passes seconds-since-launch.
+2. **Chained effects.** `.colorEffect(a).colorEffect(b)` runs only the outermost;
+   aurora + grain had to merge into one pass.
+3. **Raster shaders skip UIKit-backed views.** Wrapping content containing a
+   ScrollView in `.colorEffect` blanks the screen — shaders stay on the background layer.
+4. **`colorEffect` over `Color.clear` never runs** (no rasterisation of a fully
+   transparent layer). Generated content must use the shader as a ShapeStyle
+   (`Rectangle().fill(ShaderLibrary.…)`), which takes no `currentColor`.
+Also: `.environment()` must sit **above** the `.sheet` modifier or presented sheets
+crash with "No Observable object of type CatalogStore found" — the store is now
+injected at the App level.
+**Verified.** Builds clean against iOS 27.0 SDK (Xcode 27.0, Swift 6); runs on an
+iPhone 17 Pro sim against live prod data (173 roles, HENNGE 99%); all four tabs +
+the detail sheet screenshotted; aurora confirmed by pixel sampling (11/255 shift at
+the top, flat at the bottom). Tracker is empty because the KV path holds no records
+for `mohamed_fuad` — signed-in web data lives in Firestore (see ADR-0036 scope note).
