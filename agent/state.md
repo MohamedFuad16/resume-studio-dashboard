@@ -25,6 +25,23 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-16 — Dashboard analytics + calendar tooltip fix + Gmail internships-only +
+  CJK company names (commits `b4095c2`, `f231e60`).** (1) Dashboard (CRM-reference design):
+  analytics row under the pipeline strip — monthly "Application trend" bars (hatched
+  de-emphasis, peak month accent + value chip; Gmail records bucket by email receivedAt
+  from sourceMeta) + "Status breakdown" donut (center total, legend counts; palette
+  dataviz-validated); readiness ring rebuilt as a thick masked conic donut; Tokyo
+  opportunities moved below Projects as a 4-card row (right rail deleted). New
+  `components/DashboardCharts.jsx` (plain SVG). (2) Calendar tooltip bug root cause:
+  `.calendar-view .calendar-day{overflow:hidden}` clipped the hover card; also removed the
+  duplicate native title, added data-col/row placement (flip below on row 0, pin on edge
+  cols), hover z-index. (3) Gmail: classify emits `isInternship`; sync drops
+  freelance/gig/annotation/part-time applications (micro1 "AI interview" + Turing "LLM
+  Trainer" gigs removed from the local tracker; the user must delete them from prod
+  Firestore via the UI if drained there). (4) CJK-aware norm/slug (株式会社カナリー was
+  silently dropped; 株式会社ABEJA now matches catalog ABEJA). All shipped: Vercel prod +
+  Azure image `portal-compile:f231e60`. Build green, E2E 5/5, verified in-browser
+  (dashboard, tokyo row, calendar tooltip).
 - **2026-07-16 — Gmail pipeline hardened via a REAL 90-day inbox audit (commits `0007973`,
   `46e89ea`, `4ed7638`; BUG-012/013/014).** Ran the full backfill three times against the
   real inbox (local server, same Gmail account as prod). Results: 12 companies auto-tracked
