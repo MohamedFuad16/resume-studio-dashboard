@@ -182,3 +182,23 @@ struct FailureNote: View {
         .padding(.vertical, 40)
     }
 }
+
+// MARK: - Previews
+
+#Preview("Radar — ranked list") {
+    @Previewable @State var route: Route?
+    AmbientCanvas { RadarView(route: $route) }
+        .environment(CatalogStore.preview)
+}
+
+#Preview("Radar — loading") {
+    @Previewable @State var route: Route?
+    AmbientCanvas { RadarView(route: $route) }
+        .environment(CatalogStore.previewLoading)
+}
+
+#Preview("Radar — offline") {
+    @Previewable @State var route: Route?
+    AmbientCanvas { RadarView(route: $route) }
+        .environment(CatalogStore.previewFailed)
+}

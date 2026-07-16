@@ -59,6 +59,15 @@ struct PortalAPI {
 }
 
 /// Catalog + tracker state, shared by every tab. One load feeds them all.
+///
+/// The tracker has two possible homes, and which one is live depends on the
+/// session — exactly as on the web (api/client.js delegates to Firestore when a
+/// user is signed in, else the /api/* KV path):
+///   • signed in  → Firestore `users/{uid}/trackers/{profileId}` — the real data,
+///                  the same documents the web writes.
+///   • signed out → the server's KV path, keyed by profile id. Kept so the app
+///                  still runs (and E2E/screenshots work) without an account.
+/// The catalog is global and always comes from the server either way.
 @Observable
 @MainActor
 final class CatalogStore {
@@ -69,6 +78,13 @@ final class CatalogStore {
     var tracker: [String: TrackerRecord] = [:]
     /// Surfaced as a toast; mirrors the reference's toast pattern.
     var toast: String?
+
+    /// Set by RootView from AuthService. nil = signed out → KV path.
+    var uid: String?
+    /// Which Firestore profile document the tracker lives in. Resolved on load.
+    private(set) var profileID: String?
+
+    var isCloudBacked: Bool { uid != nil && profileID != nil }
 
     // ── Catalog derivations ──────────────────────────────────────────────
     var tokyoCount: Int { internships.filter(\.isTokyo).count }
@@ -158,15 +174,50 @@ final class CatalogStore {
         if phase == .loading { return }
         phase = .loading
         do {
+            // The catalog is the screen's reason to exist, so it decides the phase;
+            // a tracker failure degrades to "nothing tracked" rather than blanking
+            // the catalog behind an error.
             async let catalog = PortalAPI.fetchCatalog()
-            // A tracker failure must not blank the catalog — treat it as empty.
-            async let tracked = try? PortalAPI.fetchTracker()
+            async let tracked = loadTracker()
             internships = try await catalog
-            tracker = await tracked ?? [:]
+            tracker = await tracked
             phase = .loaded
         } catch {
             phase = .failed(error.localizedDescription)
         }
+    }
+
+    private func loadTracker() async -> [String: TrackerRecord] {
+        guard let uid else {
+            profileID = nil
+            return (try? await PortalAPI.fetchTracker()) ?? [:]
+        }
+        do {
+            let profile = try await FirestoreData.defaultProfileID(uid: uid)
+            profileID = profile
+            guard let profile else {
+                // Signed in, but the account has no profile document yet — the web
+                // seeds one on first login. Say so instead of showing a bare zero.
+                toast = "No résumé profile in this account yet — open the web app once."
+                return [:]
+            }
+            return try await FirestoreData.fetchTracker(uid: uid, profile: profile)
+        } catch {
+            toast = "Couldn't read your applications: \(error.localizedDescription)"
+            return [:]
+        }
+    }
+
+    /// Called when the signed-in user changes. Clears state that belonged to the
+    /// previous account before loading the new one — never show account A's
+    /// applications to account B, even for a frame.
+    func setUser(_ uid: String?) async {
+        guard self.uid != uid else { return }
+        self.uid = uid
+        tracker = [:]
+        profileID = nil
+        phase = .idle
+        await load()
     }
 
     /// Optimistic status write, mirroring the web's updateStatus contract.
@@ -235,9 +286,15 @@ final class CatalogStore {
         await persist(rollingBackTo: previous)
     }
 
+    /// Writes go back to whichever store the read came from, so a signed-in edit
+    /// lands in the same document the web reads.
     private func persist(rollingBackTo previous: [String: TrackerRecord]) async {
         do {
-            try await PortalAPI.saveTracker(tracker)
+            if let uid, let profileID {
+                try await FirestoreData.saveTracker(tracker, uid: uid, profile: profileID)
+            } else {
+                try await PortalAPI.saveTracker(tracker)
+            }
         } catch {
             tracker = previous   // never let the UI lie about what saved
             toast = "Couldn't save — check your connection."

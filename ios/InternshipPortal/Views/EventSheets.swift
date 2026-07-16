@@ -176,3 +176,14 @@ struct InterviewDateSheet: View {
         dismiss()
     }
 }
+
+// MARK: - Previews
+
+#Preview("Add event") {
+    AddEventSheet().environment(CatalogStore.preview)
+}
+
+#Preview("Interview date") {
+    InterviewDateSheet(recordId: "jp-hennge-01", company: "HENNGE")
+        .environment(CatalogStore.preview)
+}

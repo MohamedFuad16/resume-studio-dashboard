@@ -431,3 +431,48 @@ struct EmptyNote: View {
         .padding(.vertical, 32)
     }
 }
+
+// MARK: - Previews
+
+/// The component gallery: every piece of the vocabulary on one canvas, so a token
+/// change can be judged everywhere at once instead of screen by screen.
+#Preview("Component gallery") {
+    ScrollView {
+        VStack(alignment: .leading, spacing: 20) {
+            ScreenHeader(title: "Japan matches", subtitle: "173 verified live roles") {
+                StreakPill(count: 6)
+            }
+
+            HStack(spacing: 12) {
+                ForEach(ApplicationStatus.allCases) { status in
+                    StatusChip(status: status)
+                }
+            }
+
+            HStack(spacing: 8) {
+                FilterChip(label: "All tracks", count: nil, isOn: true) {}
+                FilterChip(label: "Tokyo", count: 72, isOn: false) {}
+            }
+
+            HStack(spacing: 12) {
+                StatCard(symbol: "mappin.and.ellipse", tint: .blue, value: "72", label: "Tokyo")
+                StatCard(symbol: "globe", tint: .teal, value: "122", label: "English")
+            }
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                ActionCard(symbol: "location.north.circle", tint: .teal,
+                           title: "Radar", subtitle: "173 matches") {}
+                ActionCard(symbol: "briefcase", tint: .purple,
+                           title: "Applications", subtitle: "3 tracked") {}
+            }
+
+            MatchCard(item: .sampleHennge) {}
+            ApplicationCard(record: .sampleInterview) {}
+            ShimmerBox(height: 76)
+            EmptyNote(symbol: "tray", title: "No applications yet",
+                      message: "Track a role from Radar and it will show up here.")
+        }
+        .padding(20)
+    }
+    .background(Palette.canvas)
+}

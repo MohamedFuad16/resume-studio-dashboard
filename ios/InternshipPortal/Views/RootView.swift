@@ -202,3 +202,23 @@ struct TabScroll<Content: View>: View {
         .scrollIndicators(.hidden)
     }
 }
+
+// MARK: - Previews
+
+#Preview("Whole app") {
+    RootView()
+        .environment(CatalogStore.preview)
+        .environment(AuthService())
+}
+
+#Preview("Nav bar") {
+    @Previewable @State var tab: Tab = .home
+    ZStack {
+        Palette.canvas
+        VStack {
+            Spacer()
+            GlassNav(tab: $tab)
+        }
+    }
+    .ignoresSafeArea()
+}

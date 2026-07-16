@@ -865,3 +865,46 @@ iPhone 17 Pro sim against live prod data (173 roles, HENNGE 99%); all four tabs 
 the detail sheet screenshotted; aurora confirmed by pixel sampling (11/255 shift at
 the top, flat at the bottom). Tracker is empty because the KV path holds no records
 for `mohamed_fuad` — signed-in web data lives in Firestore (see ADR-0036 scope note).
+
+## ADR-0039 · 2026-07-17 · iOS signs in with Firebase and reads the real Firestore tracker; SwiftUI previews
+**Context.** The iOS app read the server KV path (`?profile=mohamed_fuad`), which is
+empty — signed-in web data lives in Firestore under `users/{uid}/…` (ADR-0015). So the
+phone showed 0 applications while the web showed 24. The Swift files also had no
+`#Preview`s, so the Xcode canvas was unusable for design review.
+**Decision.**
+- **Registered an iOS Firebase app** (`firebase apps:create ios`) → app id
+  `1:501333131661:ios:e3d159530820c85377fdc4`. The web app id CANNOT be reused: the iOS
+  SDK validates the `:ios:` platform segment of GOOGLE_APP_ID. `GoogleService-Info.plist`
+  is committed (public config — see secrets.md).
+- **SPM via project.yml**: firebase-ios-sdk (FirebaseAuth + FirebaseFirestore ONLY — no
+  Analytics/Messaging/Crashlytics; each extra product is launch time for a feature we
+  don't have) and GoogleSignIn-iOS.
+- **AuthService** — email/password + Google, matching the web's two providers. Firebase's
+  error codes are translated to sentences a person can act on.
+- **FirestoreData** mirrors firestoreData.js exactly: reads
+  `users/{uid}/trackers/{profileId}.data`, resolves the profile id from the real
+  `profiles` collection (owner seed `mohamed_fuad` → `primary` → first) rather than
+  assuming. Records decode one-by-one so a single malformed row can't blank the tracker.
+- **CatalogStore routes by session**: signed in → Firestore (the same documents the web
+  writes); signed out → KV path (kept so E2E/screenshots run without an account).
+  `setUser` clears the previous account's records before loading — never show account A's
+  data to account B, even for a frame. The catalog stays server-global either way.
+- **Previews**: `PreviewData.swift` (`#if DEBUG`) builds stores with real production-shaped
+  rows and NO network, plus loading/empty/failed variants; every view file has `#Preview`s
+  and Kit.swift has a full component gallery.
+**Three traps, all silent:**
+1. **Keychain -34018 → infinite launch spinner.** `CODE_SIGNING_ALLOWED=NO` strips all
+   entitlements; Firebase Auth persists the session in the keychain, so its state listener
+   never fired its first callback and the app hung on the spinner with no way out. Fixed with
+   ad-hoc signing + an explicit entitlements file (`application-identifier` +
+   `keychain-access-groups`). AuthService also has a 5s failsafe that falls back to the
+   login form — an unreachable app is worse than an unnecessary sign-in.
+2. **`Field` name collision** — the `@FocusState` enum shadowed the field view; renamed AuthField.
+3. **Swift 6 `deinit` is nonisolated** and cannot touch @MainActor state; the listener handle
+   is `nonisolated(unsafe)` (written once in init, read once in deinit).
+**Cost.** Firebase adds real launch time: ~30s cold first launch (dyld over ~200MB of
+frameworks) and ~5.7s warm to first paint, in a DEBUG simulator build. Worth watching on a
+release device build before shipping.
+**Verified.** Builds clean (iOS 27 SDK, Swift 6); login screen renders; config plist and the
+Google callback URL scheme are both in the bundle; previews compile. **End-to-end sign-in is
+unverified** — entering the account password is the user's to do, not mine.

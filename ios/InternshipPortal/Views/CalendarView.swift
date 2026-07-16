@@ -300,3 +300,17 @@ private struct EventRow: View {
         }
     }
 }
+
+// MARK: - Previews
+
+#Preview("Calendar — with events") {
+    @Previewable @State var route: Route?
+    AmbientCanvas { CalendarView(route: $route) }
+        .environment(CatalogStore.preview)
+}
+
+#Preview("Calendar — empty month") {
+    @Previewable @State var route: Route?
+    AmbientCanvas { CalendarView(route: $route) }
+        .environment(CatalogStore.previewEmpty)
+}

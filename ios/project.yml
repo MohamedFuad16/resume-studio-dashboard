@@ -7,18 +7,61 @@ options:
   deploymentTarget:
     iOS: "27.0"
   createIntermediateGroups: true
+
+packages:
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    minVersion: "12.0.0"
+    maxVersion: "13.0.0"
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS
+    minVersion: "8.0.0"
+    maxVersion: "9.0.0"
+
 targets:
   InternshipPortal:
     type: application
     platform: iOS
-    sources: [InternshipPortal]
+    sources:
+      - InternshipPortal
+    dependencies:
+      # Auth + Firestore only. The rest of firebase-ios-sdk (Analytics, Messaging,
+      # Crashlytics…) is not linked: every extra product is launch time and binary
+      # size for a feature this app does not have.
+      - package: Firebase
+        product: FirebaseAuth
+      - package: Firebase
+        product: FirebaseFirestore
+      - package: GoogleSignIn
+        product: GoogleSignIn
+    info:
+      # An explicit Info.plist, not GENERATE_INFOPLIST_FILE: Google Sign-In needs a
+      # CFBundleURLTypes entry, which has no INFOPLIST_KEY_ equivalent.
+      path: InternshipPortal/Info.plist
+      properties:
+        CFBundleDisplayName: Internship Portal
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        ITSAppUsesNonExemptEncryption: false
+        CFBundleURLTypes:
+          # REVERSED_CLIENT_ID from GoogleService-Info.plist — the callback scheme
+          # Google Sign-In returns to. Must stay in step with that file.
+          - CFBundleTypeRole: Editor
+            CFBundleURLSchemes:
+              - com.googleusercontent.apps.501333131661-gkuk98fnpes3alo6rismj7d6s22edrn3
     settings:
       base:
-        GENERATE_INFOPLIST_FILE: true
         PRODUCT_BUNDLE_IDENTIFIER: com.mohamedfuad.internshipportal
         SWIFT_VERSION: "6.0"
         TARGETED_DEVICE_FAMILY: "1"
-        INFOPLIST_KEY_UILaunchScreen_Generation: true
-        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
-        INFOPLIST_KEY_CFBundleDisplayName: Internship Portal
-        CODE_SIGNING_ALLOWED: "NO"
+        # Signing must stay ON, even for the simulator. Firebase Auth persists the
+        # session in the keychain, and keychain access needs an
+        # application-identifier entitlement — which only exists if the app is
+        # signed. With CODE_SIGNING_ALLOWED=NO, SecItemCopyMatching fails with
+        # -34018 and the auth state listener never fires its first callback, so the
+        # app hangs on the launch spinner forever. Ad-hoc ("-") is enough here; a
+        # real device needs a DEVELOPMENT_TEAM.
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: "NO"
+        CODE_SIGNING_ALLOWED: "YES"
+        CODE_SIGN_ENTITLEMENTS: InternshipPortal/InternshipPortal.entitlements

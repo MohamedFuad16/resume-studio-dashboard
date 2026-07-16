@@ -5,10 +5,25 @@ import SwiftUI
 
 struct ProfileSheet: View {
     @Environment(CatalogStore.self) private var store
+    @Environment(AuthService.self) private var auth
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
 
+    @State private var confirmSignOut = false
     private let webURL = URL(string: "https://portal.mohamedfuad.com")!
+
+    /// Prefer the account's own name, fall back to the email's local part.
+    private var name: String {
+        if let displayName = auth.displayName, !displayName.isEmpty { return displayName }
+        if let email = auth.email { return String(email.split(separator: "@").first ?? "Account") }
+        return "Account"
+    }
+
+    private var initials: String {
+        let parts = name.split(separator: " ").prefix(2)
+        let letters = parts.compactMap(\.first).map(String.init).joined()
+        return letters.isEmpty ? "?" : letters.uppercased()
+    }
 
     var body: some View {
         NavigationStack {
@@ -20,21 +35,30 @@ struct ProfileSheet: View {
                                 .fill(Palette.teal50)
                                 .frame(width: 64, height: 64)
                                 .overlay {
-                                    Text("MF")
+                                    Text(initials)
                                         .font(.system(size: 20, weight: .bold))
                                         .foregroundStyle(Palette.teal)
                                 }
 
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Mohamed Fuad")
+                                Text(name)
                                     .font(.system(size: 18, weight: .bold))
                                     .foregroundStyle(Palette.ink)
-                                Label("Tokyo, Japan", systemImage: "mappin.and.ellipse")
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundStyle(Palette.ink500)
-                                Label("Tokai University (Mar 2028)", systemImage: "graduationcap")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(Palette.ink400)
+                                    .lineLimit(1)
+                                if let email = auth.email {
+                                    Label(email, systemImage: "envelope")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(Palette.ink500)
+                                        .lineLimit(1)
+                                }
+                                // Says where the data on screen actually comes from,
+                                // so an empty list is never a mystery.
+                                Label(
+                                    store.isCloudBacked ? "Synced with the web app" : "Local data only",
+                                    systemImage: store.isCloudBacked ? "checkmark.icloud" : "externaldrive"
+                                )
+                                .font(.system(size: 11))
+                                .foregroundStyle(store.isCloudBacked ? Palette.teal : Palette.ink400)
                             }
                             Spacer(minLength: 0)
                         }
@@ -117,6 +141,16 @@ struct ProfileSheet: View {
                             ) { openURL(webURL) }
                         }
                     }
+                    .padding(.bottom, 16)
+
+                    Card(radius: Radius.card, padding: 6) {
+                        SettingsRow(
+                            symbol: "rectangle.portrait.and.arrow.right", tint: .gray,
+                            title: "Sign out",
+                            subtitle: auth.email,
+                            action: { confirmSignOut = true }
+                        ) { EmptyView() }
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
@@ -131,6 +165,15 @@ struct ProfileSheet: View {
                     Button("Done") { dismiss() }.fontWeight(.semibold)
                 }
             }
+            .confirmationDialog("Sign out?", isPresented: $confirmSignOut, titleVisibility: .visible) {
+                Button("Sign out", role: .destructive) {
+                    dismiss()
+                    auth.signOut()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Your applications stay in your account — nothing is deleted.")
+            }
         }
         .presentationDetents([.large])
         .presentationCornerRadius(Radius.sheet)
@@ -143,4 +186,12 @@ struct ProfileSheet: View {
         default: "\(store.internships.count) roles · \(store.tracker.count) tracked"
         }
     }
+}
+
+// MARK: - Previews
+
+#Preview("Profile & settings") {
+    ProfileSheet()
+        .environment(CatalogStore.preview)
+        .environment(AuthService())
 }

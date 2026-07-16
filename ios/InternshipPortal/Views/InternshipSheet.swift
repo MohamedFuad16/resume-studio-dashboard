@@ -548,3 +548,22 @@ struct FlowLayout: Layout {
         }
     }
 }
+
+// MARK: - Previews
+
+#Preview("Detail sheet — full listing") {
+    InternshipSheet(item: .sampleHennge)
+        .environment(CatalogStore.previewEmpty)
+}
+
+#Preview("Detail sheet — sparse listing") {
+    // Live-researched rows carry far fewer fields; every optional block must
+    // vanish cleanly rather than leave a titled empty section.
+    InternshipSheet(item: .sampleAtilika)
+        .environment(CatalogStore.previewEmpty)
+}
+
+#Preview("Record sheet — Gmail-sourced") {
+    RecordSheet(record: .sampleInterview)
+        .environment(CatalogStore.preview)
+}

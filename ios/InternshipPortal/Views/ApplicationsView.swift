@@ -66,3 +66,17 @@ struct ApplicationsView: View {
         }
     }
 }
+
+// MARK: - Previews
+
+#Preview("Applications — tracked") {
+    @Previewable @State var route: Route?
+    AmbientCanvas { ApplicationsView(route: $route) }
+        .environment(CatalogStore.preview)
+}
+
+#Preview("Applications — empty") {
+    @Previewable @State var route: Route?
+    AmbientCanvas { ApplicationsView(route: $route) }
+        .environment(CatalogStore.previewEmpty)
+}

@@ -25,6 +25,21 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-17 (later) — iOS: Firebase auth + real Firestore data + SwiftUI previews
+  (ADR-0039).** Registered an iOS Firebase app (`1:501333131661:ios:e3d159530820c85377fdc4`;
+  the web app id can't be reused — the SDK validates the `:ios:` segment).
+  `GoogleService-Info.plist` committed (public config). Added FirebaseAuth + Firestore +
+  GoogleSignIn via SPM in `project.yml`; `Auth.swift` (email/password + Google),
+  `FirestoreData.swift` (reads `users/{uid}/trackers/{profileId}.data`, resolving the
+  profile id from the real `profiles` collection), `LoginView.swift`, and an `AuthGate`.
+  CatalogStore now routes by session: signed in → Firestore (same docs the web writes),
+  signed out → KV path. Every view file has `#Preview`s; `PreviewData.swift` supplies
+  network-free fixtures (loaded/empty/loading/failed) + a Kit component gallery.
+  **Traps:** keychain -34018 from `CODE_SIGNING_ALLOWED=NO` hung the app on its launch
+  spinner forever (fixed: ad-hoc signing + entitlements file + a 5s failsafe); Swift 6
+  deinit can't touch @MainActor state. **Launch cost:** ~30s cold / ~5.7s warm to first
+  paint in a debug sim build — check a release device build before shipping.
+  **STILL UNVERIFIED: end-to-end sign-in** — needs the user to enter their own password.
 - **2026-07-17 — iOS app REBUILT from the AI-Studio React reference (ADR-0038).**
   The ADR-0036 planner-pastel app was deleted at the user's request; the new theme
   source of truth is `~/Downloads/zip.zip` (React/Tailwind reference rendering these

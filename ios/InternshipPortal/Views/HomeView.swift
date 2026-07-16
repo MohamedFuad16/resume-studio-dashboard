@@ -152,3 +152,26 @@ struct StreakPill: View {
         .accessibilityLabel("\(count) active applications")
     }
 }
+
+// MARK: - Previews
+
+#Preview("Home — with data") {
+    @Previewable @State var tab: Tab = .home
+    @Previewable @State var route: Route?
+    AmbientCanvas { HomeView(tab: $tab, route: $route) }
+        .environment(CatalogStore.preview)
+}
+
+#Preview("Home — nothing tracked") {
+    @Previewable @State var tab: Tab = .home
+    @Previewable @State var route: Route?
+    AmbientCanvas { HomeView(tab: $tab, route: $route) }
+        .environment(CatalogStore.previewEmpty)
+}
+
+#Preview("Home — loading") {
+    @Previewable @State var tab: Tab = .home
+    @Previewable @State var route: Route?
+    AmbientCanvas { HomeView(tab: $tab, route: $route) }
+        .environment(CatalogStore.previewLoading)
+}
