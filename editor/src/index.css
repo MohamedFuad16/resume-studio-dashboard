@@ -4233,7 +4233,7 @@ body,
 .internship-radar { background: #f7f7f6; }
 .intern-heading { align-items: center; }
 .intern-heading h1 { color: #0c1930; font-size: clamp(27px, 2.2vw, 36px); }
-.intern-summary { min-height: 86px; grid-template-columns: repeat(4, minmax(135px, 1fr)) auto; border: 1px solid #dce3ed; background: #fff; color: #132039; box-shadow: none; }
+.intern-summary { min-height: 86px; grid-template-columns: repeat(4, minmax(135px, 1fr)) auto; border: 0; background: #fff; color: #132039; box-shadow: none; }
 .intern-summary > div { border-right-color: #e3e8ef; }
 .intern-summary > div svg { border-color: #e1e8f3; background: #f5f8fd; color: #316dcc; }
 .intern-summary > div strong { color: #142139; }
@@ -4321,15 +4321,9 @@ body,
 .intern-source > div { padding: 9px 10px; border: 1px solid #e8edf4; border-radius: 9px; background: #fbfcfe; }
 .intern-status-control { display: grid; grid-template-columns: 1fr; gap: 6px; padding-top: 5px; color: #7c8798; font-size: 9px; font-weight: 750; text-transform: uppercase; letter-spacing: .05em; }
 .intern-status-control select { width: 100%; min-height: 37px; text-transform: none; letter-spacing: 0; }
-/* Status moved to the top of the drawer: label + select on one row, under the meta chips. */
-.intern-status-control.intern-status-top {
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
-  padding: 14px 0 16px;
-  border-bottom: 1px solid var(--intern-soft-line);
-}
-.intern-status-control.intern-status-top select { min-height: 38px; }
+/* Status lives in the drawer head, beside the match percentage. */
+.intern-status-control.intern-status-head { padding: 0; }
+.intern-status-control.intern-status-head select { width: auto; min-height: 34px; }
 .chat-composer .btn-primary:disabled { opacity: .55; cursor: wait; }
 .chat-actions { display: grid; gap: 8px; }
 .chat-cancel { justify-content: center; border-color: #f1b8bd; color: #b4232c; background: #fff7f7; }
@@ -6140,7 +6134,8 @@ body,
 @keyframes internDrawerIn { from { opacity: .55; transform: translateX(42px); } to { opacity: 1; transform: translateX(0); } }
 
 .intern-detail-head {
-  grid-template-columns: 58px minmax(0, 1fr) 72px 34px;
+  /* logo | title | status select | score | close */
+  grid-template-columns: 58px minmax(0, 1fr) auto auto 34px;
   align-items: center;
   gap: 12px;
 }
@@ -6208,7 +6203,7 @@ body,
       '. deadline status apply';
   }
   .intern-detail.drawer { width: min(560px, 100vw); padding: 20px 18px 28px; }
-  .intern-detail-head { grid-template-columns: 52px minmax(0, 1fr) 62px 34px; gap: 10px; }
+  .intern-detail-head { grid-template-columns: 52px minmax(0, 1fr) auto auto 34px; gap: 10px; }
   .intern-detail-head > .company-logo { width: 52px; height: 52px; }
 }
 
@@ -6219,7 +6214,14 @@ body,
   .calendar-add { flex: 1; }
   .calendar-nav strong { min-width: 130px; }
   .intern-detail-meta .intern-meta-token { max-width: 100%; white-space: normal; }
-  .intern-detail-head { grid-template-columns: 46px minmax(0, 1fr) 56px 32px; }
+  /* Phone width: the head keeps logo|title|score|close on row 1; the status
+     select wraps to its own full-width row below. */
+  .intern-detail-head { grid-template-columns: 46px minmax(0, 1fr) auto 32px; }
+  .intern-detail-head > .company-logo { grid-row: 1; grid-column: 1; }
+  .intern-detail-head > .intern-detail-title { grid-row: 1; grid-column: 2; }
+  .intern-detail-head > .intern-detail-score { grid-row: 1; grid-column: 3; }
+  .intern-detail-head > .intern-detail-close { grid-row: 1; grid-column: 4; }
+  .intern-status-control.intern-status-head { grid-row: 2; grid-column: 1 / -1; }
   .intern-detail-head > .company-logo { width: 46px; height: 46px; }
 }
 
@@ -7409,6 +7411,16 @@ body,
     inset 0 -1px 0 rgba(120, 0, 8, 0.35);
   text-shadow: 0 1px 1px rgba(120, 0, 8, 0.4);
   overflow: hidden;
+}
+/* Week view labels the day as "Jul 16" — a fixed 26px circle can't hold that,
+   so the today badge becomes a pill there. */
+.calendar-view .calendar-grid.week .calendar-day.today .calendar-day-number {
+  width: auto;
+  min-width: 26px;
+  height: auto;
+  min-height: 26px;
+  padding: 3px 12px;
+  border-radius: 999px;
 }
 /* Grain — a fine dot pattern at low opacity, so the fill reads matte like the
    reference rather than flat digital red. */

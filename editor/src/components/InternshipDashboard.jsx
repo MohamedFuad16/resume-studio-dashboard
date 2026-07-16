@@ -389,6 +389,12 @@ export const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEd
         <strong>{companyName}</strong>
         <p className="intern-role-stack"><span>{roleLead}</span>{roleDetails.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</p>
       </div>
+      <label className="intern-status-control intern-status-head">
+        <select value={status} onChange={event => onStatus(item, event.target.value)} aria-label={t.status}>
+          <option value="">{t.notTracked}</option>
+          {APPLICATION_STATUSES.map(option => <option key={option.value} value={option.value}>{statusLabel(option.value, isJa)}</option>)}
+        </select>
+      </label>
       {Number.isFinite(item.score) ? (
         <div className="intern-detail-score">
           <b>{item.score}%</b>
@@ -403,8 +409,6 @@ export const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEd
       {languageParts.map((part, index) => <span className="intern-meta-token language" key={`${part}-${index}`}><b>{index === 0 ? 'EN' : 'JA'}</b>{part}</span>)}
       {durationParts.map((part, index) => <span className="intern-meta-token" key={`${part}-${index}`}>{index === 0 ? <CalendarClock size={13} /> : null}{part}</span>)}
     </div>
-
-    <label className="intern-status-control intern-status-top"><span>{t.status}</span><select value={status} onChange={event => onStatus(item, event.target.value)}><option value="">{t.notTracked}</option>{APPLICATION_STATUSES.map(option => <option key={option.value} value={option.value}>{statusLabel(option.value, isJa)}</option>)}</select></label>
 
     {(details.about || details.aboutJa) && (
       <section className="intern-detail-section">

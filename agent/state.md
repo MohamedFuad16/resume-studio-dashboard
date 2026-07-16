@@ -25,6 +25,12 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-16 (pm, round 3 — user feedback).** Drawer head is
+  `logo | title | status select | score | close` — status sits beside the match %
+  (`.intern-status-head`; the round-2 `.intern-status-top` row was removed; wraps to its
+  own row ≤560px via explicit grid placements). Radar summary strip: outer border removed
+  (`border: 0` on the 4236-area override). Calendar week view: today badge is a pill
+  (fixed 26px circle overflowed the "Jul 16" label).
 - **2026-07-16 (pm, round 2 — user feedback).** Radar: header "Tune my resume" button
   dropped (summary CTA is the only one); sort select sits beside the search bar again;
   `.intern-workspace` is borderless/full-width (no card box around the table). Drawer:
