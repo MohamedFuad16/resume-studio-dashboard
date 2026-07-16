@@ -4102,9 +4102,17 @@ body,
 .profile-socials small { min-width: 0; overflow: hidden; color: #6d788b; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 
 .profile-completion { min-width: 0; display: flex; align-items: center; gap: 18px; padding-left: 26px; border-left: 1px solid #e3e8ef; }
-.completion-ring { width: 94px; height: 94px; flex: 0 0 auto; display: grid; place-items: center; align-content: center; border-radius: 50%; background: radial-gradient(circle at center, #fff 58%, transparent 59%), conic-gradient(var(--career-blue) var(--completion), #e5eaf2 0); }
-.completion-ring strong { font-size: 17px; letter-spacing: -.02em; }
-.completion-ring span { color: #7a8596; font-size: 9px; }
+/* Readiness donut: thick ring like the analytics reference — conic fill masked
+   to a fat band, soft track, roomy center figure. */
+.completion-ring { position: relative; width: 108px; height: 108px; flex: 0 0 auto; display: grid; place-items: center; align-content: center; border-radius: 50%; }
+.completion-ring::before {
+  content: ''; position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(var(--halo-bg, #1a56f0) var(--completion), #e9edf4 0);
+  -webkit-mask: radial-gradient(circle closest-side, transparent calc(100% - 15px), #000 calc(100% - 14px));
+  mask: radial-gradient(circle closest-side, transparent calc(100% - 15px), #000 calc(100% - 14px));
+}
+.completion-ring strong { font-size: 21px; letter-spacing: -.02em; }
+.completion-ring span { color: #7a8596; font-size: 9.5px; }
 .profile-completion b { font-size: 13px; }
 .profile-completion p { margin: 5px 0 10px; color: #68758a; font-size: 11px; line-height: 1.45; }
 .profile-completion button,
@@ -4127,17 +4135,51 @@ body,
 .pipeline-stat.rejected svg,
 .pipeline-stat.rejected strong { color: #d54b50; }
 
-.dashboard-grid { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 0; margin-top: 26px; }
-.dashboard-main,
-.dashboard-rail { min-width: 0; border: 0; border-radius: 0; background: transparent; }
-.dashboard-main { padding: 4px 34px 8px 6px; }
-.dashboard-rail { align-self: start; padding: 4px 6px 8px 34px; border-left: 1px solid #eef0f4; }
-.section-heading,
-.rail-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
-.section-heading h2,
-.rail-heading h2 { margin: 0; color: var(--career-ink); font-size: 15px; letter-spacing: -.015em; }
-.section-heading p,
-.rail-heading p { margin: 5px 0 0; color: #788398; font-size: 11px; }
+.dashboard-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; margin-top: 26px; }
+
+/* ── Dashboard analytics row: trend bars + status donut ─────────────── */
+.dashboard-analytics { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; }
+.analytics-card { min-width: 0; padding: 18px 20px 14px; border: 1px solid #e7ebf2; border-radius: 16px; background: #fff; }
+.analytics-heading h2 { margin: 0; color: var(--career-ink); font-size: 14.5px; letter-spacing: -.015em; }
+.analytics-heading p { margin: 4px 0 0; color: #788398; font-size: 11px; }
+.trend-chart { width: 100%; height: auto; margin-top: 6px; display: block; }
+.trend-tick { fill: #97a1b1; font-size: 10px; }
+.trend-month { fill: #6f7b8e; font-size: 10.5px; font-weight: 650; }
+.trend-chip { opacity: 0; transition: opacity .12s ease; }
+.trend-bar.peak .trend-chip, .trend-bar:hover .trend-chip { opacity: 1; }
+.trend-bar:hover .trend-bar-mark { fill: var(--halo-bg, #1a56f0); stroke: none; }
+.trend-chip-bg { fill: #fff; stroke: #e2e7f0; filter: drop-shadow(0 3px 8px rgba(15, 23, 42, .14)); }
+.trend-chip-text { fill: #172033; font-size: 11px; font-weight: 780; }
+.donut-wrap { display: grid; grid-template-columns: 128px minmax(0, 1fr); align-items: center; gap: 16px; margin-top: 8px; }
+.donut-wrap svg { width: 128px; height: 128px; }
+.donut-total { fill: #0f172a; font-size: 24px; font-weight: 820; letter-spacing: -.02em; }
+.donut-total-label { fill: #7a8596; font-size: 9.5px; font-weight: 650; }
+.donut-legend { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.donut-legend li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.donut-legend i { width: 10px; height: 10px; border-radius: 3px; }
+.donut-legend span { color: #4b5768; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.donut-legend b { color: #172033; font-size: 12px; }
+.donut-legend-empty { color: #8b95a5; font-size: 11px; }
+
+/* ── Tokyo opportunities: full-width card row below Projects ────────── */
+.tokyo-heading { margin-top: 30px; }
+.tokyo-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.tokyo-card { min-width: 0; display: grid; gap: 4px; padding: 14px; border: 1px solid #e7ebf2; border-radius: 14px; background: #fff; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color .12s ease, box-shadow .12s ease; }
+.tokyo-card:hover { border-color: #c8d6ef; box-shadow: 0 6px 18px rgba(23, 32, 51, .07); }
+.tokyo-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.tokyo-card-top .company-logo { width: 34px; height: 34px; }
+.tokyo-card-top strong { color: #12844f; font-size: 12px; }
+.tokyo-card b { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tokyo-card small { color: #6f7b8e; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tokyo-card em { display: flex; align-items: center; gap: 3px; margin-top: 2px; color: #8b95a5; font-size: 9.5px; font-style: normal; }
+@media (max-width: 1180px) {
+  .dashboard-analytics { grid-template-columns: 1fr; }
+  .tokyo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.dashboard-main { min-width: 0; border: 0; border-radius: 0; background: transparent; padding: 4px 6px 8px; }
+.section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.section-heading h2 { margin: 0; color: var(--career-ink); font-size: 15px; letter-spacing: -.015em; }
+.section-heading p { margin: 5px 0 0; color: #788398; font-size: 11px; }
 .section-heading button { min-height: 30px; padding: 0 9px; border: 1px solid #dce3ee; border-radius: 7px; color: #34435c; }
 
 .application-list { margin-top: 18px; }
@@ -4168,21 +4210,7 @@ body,
 .project-card small { margin-top: auto; padding-top: 13px; overflow: hidden; color: #2360bd; font-size: 9px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .project-card em { margin-top: 9px; color: #0b5cff; font-size: 10px; font-style: normal; font-weight: 800; }
 
-.rail-heading svg { color: var(--career-blue); }
-.tokyo-list { margin-top: 15px; }
-.tokyo-list button { width: 100%; display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 13px 0; border: 0; border-bottom: 1px solid #e8ecf2; background: transparent; color: inherit; text-align: left; cursor: pointer; }
-.tokyo-list button > span { min-width: 0; display: grid; gap: 3px; }
-.tokyo-list b,
-.tokyo-list small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tokyo-list b { font-size: 11.5px; }
-.tokyo-list small { color: #6f7b8e; font-size: 9.5px; }
-.tokyo-list em { display: flex; align-items: center; gap: 3px; color: #8b95a5; font-size: 9px; font-style: normal; }
-.tokyo-list strong { color: #12844f; font-size: 12px; }
-.rail-action { width: 100%; min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 15px; border: 1px solid #cfdaea; border-radius: 8px; background: #fff; color: var(--career-blue); font: inherit; font-size: 11px; font-weight: 750; cursor: pointer; }
-.rail-tip { display: flex; align-items: flex-start; gap: 10px; margin-top: 18px; padding: 15px; border-radius: 10px; background: #f2f6fd; }
-.rail-tip svg { flex: 0 0 auto; margin-top: 1px; color: #2c67c4; }
-.rail-tip b { font-size: 11px; }
-.rail-tip p { margin: 4px 0 0; color: #67758b; font-size: 9.5px; line-height: 1.5; }
+/* (Tokyo opportunities moved from the right rail to .tokyo-grid below Projects.) */
 
 /* Radar fidelity: white summary rail and real logos. */
 .internship-radar { background: #f7f7f6; }
@@ -5688,12 +5716,13 @@ body,
 .calendar-event-tooltip {
   pointer-events: none;
   position: absolute;
-  z-index: 20;
-  left: 10px;
+  z-index: 40;
+  left: 50%;
+  transform: translateX(-50%);
   bottom: calc(100% + 8px);
-  width: auto;
-  min-width: 200px;
-  max-width: 260px;
+  width: max-content;
+  min-width: 180px;
+  max-width: 230px;
   display: none;
   padding: 10px;
   border: 1px solid #d9e3f2;
@@ -5703,6 +5732,15 @@ body,
   color: #1f2937;
   text-align: left;
 }
+
+/* A hovered day paints above its neighbors, so the tooltip is never under the
+   next cell's border or today badge. */
+.calendar-day:hover, .calendar-day:focus-within { z-index: 30; }
+/* First row: flip below the pill (above would escape the card). */
+.calendar-day[data-row="0"] .calendar-event-tooltip { bottom: auto; top: calc(100% + 8px); }
+/* Edge columns: pin to the pill's inner edge instead of centering off-card. */
+.calendar-day[data-col="0"] .calendar-event-tooltip { left: 0; transform: none; }
+.calendar-day[data-col="6"] .calendar-event-tooltip { left: auto; right: 0; transform: none; }
 
 .calendar-event:hover .calendar-event-tooltip,
 .calendar-event:focus-visible .calendar-event-tooltip { display: grid; gap: 3px; }
@@ -7318,7 +7356,9 @@ body,
 }
 .calendar-view .calendar-day {
   min-height: 0;
-  overflow: hidden;
+  /* overflow must stay visible — the hover tooltip overhangs the cell
+     (overflow:hidden here was the tooltip-clipping bug). */
+  overflow: visible;
   border-radius: 12px;
 }
 

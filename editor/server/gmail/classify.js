@@ -38,11 +38,14 @@ export async function classifyMessage(message) {
     `Classify this email about a job/internship application. Today is ${new Date().toISOString().slice(0, 10)}.\n\n` +
     `From: ${message.from}\nSubject: ${message.subject}\nBody:\n"""${(message.text || message.snippet || '').slice(0, 3500)}"""\n\n` +
     `Answer ONLY minified JSON:\n` +
-    `{"isApplicationRelated":bool,"kind":"applied|rejected|interview|offer|other","company":str,"role":str,` +
+    `{"isApplicationRelated":bool,"isInternship":bool,"kind":"applied|rejected|interview|offer|other","company":str,"role":str,` +
     `"interview":{"date":"YYYY-MM-DD","time":"HH:mm"|null}|null,"confidence":0..1}\n` +
     `Rules: isApplicationRelated=true only for emails about the user's OWN application to a company — ` +
     `including applications made on the company's own site or a job board (the confirmation still lands here). ` +
     `Marketing, newsletters, generic job alerts, and security notices are false.\n` +
+    `isInternship=true ONLY for an internship / co-op / new-grad program (インターン・インターンシップ・新卒採用). ` +
+    `Freelance or gig work, crowdwork, LLM/data-annotation or "AI trainer" gigs, tutoring, part-time jobs, ` +
+    `customer-support roles, and regular full-time positions are isInternship=false even when application-related.\n` +
     `kind:\n` +
     `- "applied": application confirmation / registration / pre-entry / "thank you for applying" / エントリー・応募完了.\n` +
     `- "interview": ANY selection step past "applied" — an interview invite/schedule, OR a coding test / online / ` +
@@ -72,6 +75,7 @@ export async function classifyMessage(message) {
       : null;
     return {
       isApplicationRelated: Boolean(parsed.isApplicationRelated),
+      isInternship: Boolean(parsed.isInternship),
       kind,
       company: String(parsed.company || '').slice(0, 120).trim(),
       role: String(parsed.role || '').slice(0, 160).trim(),

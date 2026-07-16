@@ -93,7 +93,9 @@ export async function syncProfile(store, profile, opts = {}) {
     const verdict = await classifyMessage(message);
     if (!verdict) continue; // classifier failed — leave unprocessed so a later sync retries
     processed.add(id);
-    if (!verdict.isApplicationRelated || verdict.confidence < MIN_CONFIDENCE || !verdict.company) continue;
+    // Internships only: freelance/gig/annotation/part-time applications (e.g. an
+    // LLM-trainer gig or an AI-interview support role) never reach the tracker.
+    if (!verdict.isApplicationRelated || !verdict.isInternship || verdict.confidence < MIN_CONFIDENCE || !verdict.company) continue;
 
     // Enrich once per company for application/offer emails, so the client can
     // create a record with a real posting URL/location/deadline if it's new.

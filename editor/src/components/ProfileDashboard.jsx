@@ -16,6 +16,7 @@ import { APPLICATION_STATUSES, statusLabel, useApplicationTracker } from '../hoo
 import { useInternshipCatalog } from '../hooks/useInternshipCatalog.js';
 import { CompanyLogo } from './CompanyLogo.jsx';
 import InterviewDateModal from './InterviewDateModal.jsx';
+import { ApplicationTrendChart, StatusBreakdownDonut } from './DashboardCharts.jsx';
 import { displayCompany, displayRole, displayValue, formatDisplayDeadline } from '../utils/internshipDisplay.js';
 import { prepareProfilePhoto } from '../utils/imageUpload.js';
 import { appliedCompaniesForProfile, compareCompanyAwareMatch } from '../utils/internshipRanking.js';
@@ -73,6 +74,10 @@ const copy = {
     tokyo: 'Tokyo opportunities',
     tokyoSub: 'Highest-priority matches nearby.',
     viewJapan: 'View all Japan matches',
+    trend: 'Application trend',
+    trendSub: 'Applications sent per month.',
+    breakdown: 'Status breakdown',
+    breakdownSub: 'Where every application stands.',
   },
   ja: {
     uploadPhoto: 'プロフィール写真をアップロード',
@@ -104,6 +109,10 @@ const copy = {
     tokyo: '東京の注目募集',
     tokyoSub: '近くで優先度の高い募集です。',
     viewJapan: '日本の募集をすべて見る',
+    trend: '応募の推移',
+    trendSub: '月ごとの応募数です。',
+    breakdown: '状況の内訳',
+    breakdownSub: '全応募の現在の状況です。',
   },
 };
 
@@ -230,6 +239,17 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
         })}
       </section>
 
+      <section className="dashboard-analytics">
+        <div className="analytics-card analytics-trend">
+          <div className="analytics-heading"><h2>{t.trend}</h2><p>{t.trendSub}</p></div>
+          <ApplicationTrendChart records={records} isJa={isJa} />
+        </div>
+        <div className="analytics-card analytics-breakdown">
+          <div className="analytics-heading"><h2>{t.breakdown}</h2><p>{t.breakdownSub}</p></div>
+          <StatusBreakdownDonut counts={counts} isJa={isJa} />
+        </div>
+      </section>
+
       <div className="dashboard-grid">
         <section className="dashboard-main">
           <div className="section-heading"><div><h2>{t.recent}</h2><p>{t.recentSub}</p></div><button type="button" onClick={onOpenRadar}>{t.browse} <ArrowRight size={15} /></button></div>
@@ -272,21 +292,19 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
               </a>
             ))}
           </div>
-        </section>
 
-        <aside className="dashboard-rail">
-          <div className="rail-heading"><div><h2>{t.tokyo}</h2><p>{t.tokyoSub}</p></div><span className="rail-heading-mark" aria-hidden="true"><MapPin size={17} /></span></div>
-          <div className="tokyo-list">
+          <div className="section-heading tokyo-heading"><div><h2>{t.tokyo}</h2><p>{t.tokyoSub}</p></div><button type="button" onClick={onOpenRadar}>{t.viewJapan} <ArrowRight size={15} /></button></div>
+          <div className="tokyo-grid">
             {tokyoMatches.map(item => (
-              <button type="button" key={item.id} onClick={onOpenRadar}>
-                <CompanyLogo item={item} />
-                <span><b>{displayCompany(item, isJa)}</b><small>{displayRole(item.role, isJa)}</small><em><MapPin size={11} />{dashboardValue(item.location, isJa)}</em></span>
-                <strong>{item.score}%</strong>
+              <button type="button" className="tokyo-card" key={item.id} onClick={onOpenRadar}>
+                <span className="tokyo-card-top"><CompanyLogo item={item} /><strong>{item.score}%</strong></span>
+                <b>{displayCompany(item, isJa)}</b>
+                <small>{displayRole(item.role, isJa)}</small>
+                <em><MapPin size={11} />{dashboardValue(item.location, isJa)}</em>
               </button>
             ))}
           </div>
-          <button className="rail-action" type="button" onClick={onOpenRadar}>{t.viewJapan} <ArrowRight size={15} /></button>
-        </aside>
+        </section>
       </div>
       {/* Application timeline moved to its own view (sidebar → Application timeline). */}
       <InterviewDateModal

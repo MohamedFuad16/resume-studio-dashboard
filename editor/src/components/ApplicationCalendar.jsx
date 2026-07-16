@@ -273,13 +273,16 @@ export function ApplicationCalendar({ records, addMilestone, removeMilestone, is
       <div className={`calendar-grid ${view}`}>
         <div className="calendar-weekdays">{weekdayLabels.map(label => <span key={label}>{label}</span>)}</div>
         <div className="calendar-days">
-          {dates.map(date => {
+          {dates.map((date, index) => {
             const key = toDateKey(date);
             const dayEvents = eventMap.get(key) || [];
             const limit = view === 'month' ? 3 : 6;
-            const gridColumnStart = view === 'month' && date.getDate() === 1 ? ((date.getDay() + 6) % 7) + 1 : undefined;
+            const col = (date.getDay() + 6) % 7; // Monday-first column, 0-6
+            const gridColumnStart = view === 'month' && date.getDate() === 1 ? col + 1 : undefined;
+            const firstCol = view === 'month' ? (dates[0].getDay() + 6) % 7 : 0;
+            const row = view === 'month' ? Math.floor((firstCol + index) / 7) : 0;
             return (
-              <div className={`calendar-day ${key === todayKey ? 'today' : ''}`} key={key} style={gridColumnStart ? { gridColumnStart } : undefined}>
+              <div className={`calendar-day ${key === todayKey ? 'today' : ''}`} key={key} data-col={col} data-row={row} style={gridColumnStart ? { gridColumnStart } : undefined}>
                 <span className="calendar-day-number">{view === 'week' ? new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(date) : date.getDate()}</span>
                 <div className="calendar-day-events">
                   {dayEvents.slice(0, limit).map(event => {
@@ -288,7 +291,7 @@ export function ApplicationCalendar({ records, addMilestone, removeMilestone, is
                     const roleLabel = displayRole(event.role, isJa);
                     const label = `${companyLabel} — ${event.title || eventLabel(event.kind, t)}`;
                     return (
-                      <button type="button" className={`calendar-event kind-${event.kind}`} key={event.id} onClick={() => setSelected(event)} aria-label={label} title={label}>
+                      <button type="button" className={`calendar-event kind-${event.kind}`} key={event.id} onClick={() => setSelected(event)} aria-label={label}>
                         <CompanyLogo item={item} size="sm" />
                         <span className="calendar-event-company">{companyLabel}</span>
                         <span className="calendar-event-tooltip"><b>{companyLabel}</b><span>{roleLabel}</span><em>{event.time ? `${event.time} · ` : ''}{event.title || eventLabel(event.kind, t)}</em><small>{t.currentStatus}: {statusLabel(event.status, isJa)}</small></span>
