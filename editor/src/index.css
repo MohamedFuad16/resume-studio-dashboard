@@ -6815,7 +6815,8 @@ body,
 
 /* Connected: a single inset row — avatar · account · live badge · disconnect. */
 .gmail-connected { display: flex; align-items: center; gap: 14px; padding: 13px 15px; border: 1px solid var(--b0); border-radius: 12px; background: var(--hover); }
-.gmail-avatar { flex: none; display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: #fff; border: 1px solid var(--b0); }
+.gmail-avatar { position: relative; flex: none; display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: #fff; border: 1px solid var(--b0); }
+.gmail-avatar-dot { position: absolute; top: -3px; right: -3px; width: 12px; height: 12px; border-radius: 50%; background: var(--green); border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(22,163,74,.25); }
 .gmail-account { min-width: 0; display: grid; gap: 3px; margin-right: auto; }
 .gmail-account b { font-size: 13.5px; color: var(--t1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gmail-account small { display: flex; align-items: center; gap: 6px; color: var(--t2); font-size: 11.5px; }
