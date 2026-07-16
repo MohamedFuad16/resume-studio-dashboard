@@ -4,7 +4,7 @@
 // existing records — the server can't read the user's client-direct Firestore).
 import { getConnection, saveConnection, pushQueue } from './store.js';
 import { getAccessToken, listNewMessageIds, listRecentMessageIds, getProfileHistoryId, getMessage, ReauthRequiredError } from './gmailClient.js';
-import { classifyMessage, enrichCompany } from './classify.js';
+import { classifyMessage, enrichCompany, llmAvailable } from './classify.js';
 
 const MIN_CONFIDENCE = Number(process.env.GMAIL_MIN_CONFIDENCE || 0.6);
 const MAX_MESSAGES_PER_SYNC = Number(process.env.GMAIL_MAX_MESSAGES_PER_SYNC || 25);
@@ -25,6 +25,7 @@ const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').repl
 export async function syncProfile(store, profile, opts = {}) {
   const conn = await getConnection(store, profile);
   if (!conn?.refreshTokenEnc) return { skipped: 'not-connected' };
+  if (!llmAvailable()) return { skipped: 'no-llm-key' };
 
   let token;
   try {
@@ -57,7 +58,9 @@ export async function syncProfile(store, profile, opts = {}) {
 
   const cap = backfillDays > 0 ? 80 : MAX_MESSAGES_PER_SYNC;
   const processed = new Set(conn.processedMessageIds || []);
-  const fresh = messageIds.filter(id => !processed.has(id)).slice(0, cap);
+  // Backfill is a deliberate one-time rescan: ignore the processed list (the
+  // queue dedupes by message:kind), so a scan that ran misconfigured can rerun.
+  const fresh = (backfillDays > 0 ? messageIds : messageIds.filter(id => !processed.has(id))).slice(0, cap);
 
   const actions = [];
   const enrichedByCompany = new Map();
@@ -65,8 +68,9 @@ export async function syncProfile(store, profile, opts = {}) {
     let message;
     try { message = await getMessage(token, id); } catch { processed.add(id); continue; }
     const verdict = await classifyMessage(message);
+    if (!verdict) continue; // classifier failed — leave unprocessed so a later sync retries
     processed.add(id);
-    if (!verdict?.isApplicationRelated || verdict.confidence < MIN_CONFIDENCE || !verdict.company) continue;
+    if (!verdict.isApplicationRelated || verdict.confidence < MIN_CONFIDENCE || !verdict.company) continue;
 
     // Enrich once per company for application/offer emails, so the client can
     // create a record with a real posting URL/location/deadline if it's new.

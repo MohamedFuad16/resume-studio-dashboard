@@ -10,6 +10,10 @@ const TRIAGE_MODEL = process.env.OPENROUTER_AUDIT_MODEL || process.env.LLM_AUDIT
 const SEARCH_MODEL = process.env.OPENROUTER_MODEL || 'perplexity/sonar';
 const TIMEOUT_MS = Number(process.env.GMAIL_LLM_TIMEOUT_MS || 40000);
 
+// Sync checks this up front: without a key, classification silently no-ops,
+// which must surface as a skip — not as messages scanned and marked processed.
+export const llmAvailable = () => Boolean(process.env.OPENROUTER_API_KEY);
+
 let client = null;
 function oai() {
   if (!process.env.OPENROUTER_API_KEY) return null;
