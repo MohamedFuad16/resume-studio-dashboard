@@ -126,27 +126,31 @@ struct RootView: View {
     }
 }
 
-/// The floating pill. Liquid Glass on iOS 26+, with the reference's white pill as
-/// the fallback so the design survives on anything older.
+/// The floating tab bar, in Liquid Glass.
+///
+/// Both layers are real glass: the bar itself, and a second glass capsule marking
+/// the selected tab. Because the selection shares one `glassEffectID` inside a
+/// `GlassEffectContainer`, moving tabs makes the two lenses merge and separate —
+/// the material flows between them instead of a highlight cross-fading in place.
+/// That fluidity is the entire point of the material, and it is why the selection
+/// is not just a tinted `Capsule` any more.
 struct GlassNav: View {
     @Binding var tab: Tab
     @Namespace private var glass
 
     var body: some View {
-        GlassEffectContainer(spacing: 18) {
+        GlassEffectContainer(spacing: 20) {
             HStack(spacing: 2) {
                 ForEach(Tab.allCases) { item in
-                    NavButton(item: item, isActive: tab == item) {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                    NavButton(item: item, isActive: tab == item, glass: glass) {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.72)) {
                             tab = item
                         }
                     }
                 }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 8)
+            .padding(6)
             .glassEffect(.regular.interactive(), in: .capsule)
-            .glassEffectID("nav", in: glass)
         }
         .floatShadow()
     }
@@ -155,28 +159,32 @@ struct GlassNav: View {
 private struct NavButton: View {
     var item: Tab
     var isActive: Bool
+    var glass: Namespace.ID
     var action: () -> Void
 
     var body: some View {
         Button(action: action) {
             VStack(spacing: 3) {
-                ZStack {
-                    if isActive {
-                        Capsule()
-                            .fill(Palette.canvas.opacity(0.9))
-                            .frame(width: 46, height: 30)
-                            .transition(.scale.combined(with: .opacity))
-                    }
-                    Image(systemName: item.symbol)
-                        .font(.system(size: 19, weight: isActive ? .semibold : .regular))
-                        .foregroundStyle(isActive ? Palette.ink : Palette.ink400)
-                        .frame(height: 30)
-                }
+                Image(systemName: item.symbol)
+                    .font(.system(size: 19, weight: isActive ? .semibold : .regular))
+                    .frame(height: 26)
                 Text(item.label)
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(isActive ? Palette.ink : Palette.ink400)
             }
-            .frame(width: 74)
+            .foregroundStyle(isActive ? Palette.ink : Palette.ink400)
+            .frame(width: 72)
+            .padding(.vertical, 7)
+            .background {
+                if isActive {
+                    // .clear + glassEffect, not a filled shape: the fill is the
+                    // material, and giving it the shared ID is what lets it flow
+                    // to the next tab rather than fade.
+                    Capsule()
+                        .fill(.clear)
+                        .glassEffect(.regular.tint(Palette.card.opacity(0.55)), in: .capsule)
+                        .glassEffectID("selection", in: glass)
+                }
+            }
             .contentShape(.rect)
         }
         .buttonStyle(.plain)

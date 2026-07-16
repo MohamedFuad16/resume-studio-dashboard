@@ -1,9 +1,8 @@
 // SwiftUI bindings for Shaders.metal.
 //
-// Every effect here is applied with `.compositingGroup()`-safe modifiers and is
-// purely additive over an already-correct view — if the shader failed to compile,
-// the app would still render its layout, just flat. That is deliberate: motion is
-// polish, never the thing that carries meaning.
+// Every effect here is applied to an already-correct view — if a shader failed to
+// compile the app would still render its layout, just flat. That is deliberate:
+// motion is polish, never the thing that carries meaning.
 import SwiftUI
 
 /// Seconds since the app started, for shader `time` arguments.
@@ -57,26 +56,6 @@ struct AmbientCanvas<Content: View>: View {
     }
 }
 
-/// The Radar stat strip's backdrop. The shader is used as a ShapeStyle so it
-/// generates its own pixels — see the note in Shaders.metal on why a colorEffect
-/// over Color.clear draws nothing.
-struct RadarSweepBackdrop: View {
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: false)) { timeline in
-            let t = ShaderClock.seconds(timeline.date)
-            GeometryReader { proxy in
-                Rectangle()
-                    .fill(
-                        ShaderLibrary.radarSweep(
-                            .float2(proxy.size),
-                            .float(t)
-                        )
-                    )
-            }
-        }
-    }
-}
-
 /// Skeleton shimmer for the loading state.
 struct ShimmerBox: View {
     var height: CGFloat
@@ -103,50 +82,24 @@ struct ShimmerBox: View {
     }
 }
 
-/// Press feedback: a soft inward warp toward the finger, paired with the
-/// reference's `active:scale-[0.98]`.
-struct PressWarp: ViewModifier {
-    var isPressed: Bool
-    var touch: CGPoint
-
-    func body(content: Content) -> some View {
-        content
-            .visualEffect { [isPressed, touch] view, proxy in
-                view.distortionEffect(
-                    ShaderLibrary.pressWarp(
-                        .float2(proxy.size),
-                        .float2(touch),
-                        .float(isPressed ? 1.0 : 0.0)
-                    ),
-                    maxSampleOffset: CGSize(width: 8, height: 8)
-                )
-            }
-            .scaleEffect(isPressed ? 0.98 : 1.0)
-            .animation(.spring(response: 0.28, dampingFraction: 0.7), value: isPressed)
-    }
-}
-
-/// A card that responds to touch with the warp shader. Wraps its content in a
-/// button so it stays fully accessible.
+/// A card that responds to touch. The feedback is the reference's own
+/// `active:scale-[0.98]` and nothing more — a distortion shader was tried here and
+/// removed: warping the thing you are touching fights the tap rather than
+/// confirming it.
 struct PressableCard<Content: View>: View {
     var action: () -> Void
     @ViewBuilder var content: () -> Content
 
     @State private var isPressed = false
-    @State private var touch: CGPoint = .zero
 
     var body: some View {
         content()
-            .modifier(PressWarp(isPressed: isPressed, touch: touch))
+            .scaleEffect(isPressed ? 0.98 : 1.0)
+            .animation(.spring(response: 0.28, dampingFraction: 0.7), value: isPressed)
             .contentShape(.rect)
             .gesture(
                 DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        if !isPressed {
-                            touch = value.startLocation
-                            isPressed = true
-                        }
-                    }
+                    .onChanged { _ in if !isPressed { isPressed = true } }
                     .onEnded { value in
                         isPressed = false
                         // Only fire if the finger stayed on the card — matches the

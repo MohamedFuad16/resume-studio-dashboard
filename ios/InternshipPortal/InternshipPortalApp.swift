@@ -47,7 +47,30 @@ struct AuthGate: View {
     @Environment(AuthService.self) private var auth
     @Environment(CatalogStore.self) private var store
 
+    /// `simctl launch … -previewMode YES` skips the wall and runs against the KV
+    /// path, for screenshots and UI checks without typing an account password.
+    /// DEBUG-only by construction — the flag does not exist in a release build, so
+    /// it can never become a way past the login screen in the wild. Mirrors the
+    /// web's `VITE_AUTH_DISABLED`, which exists for the same reason (E2E).
+    private var previewMode: Bool {
+        #if DEBUG
+        UserDefaults.standard.bool(forKey: "previewMode")
+        #else
+        false
+        #endif
+    }
+
     var body: some View {
+        Group {
+            if previewMode {
+                RootView().task { await store.setUser(nil) }
+            } else {
+                gated
+            }
+        }
+    }
+
+    @ViewBuilder private var gated: some View {
         Group {
             switch auth.phase {
             case .starting:

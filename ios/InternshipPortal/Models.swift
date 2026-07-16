@@ -44,6 +44,23 @@ struct Internship: Decodable, Identifiable, Hashable {
     var isEnglishFirst: Bool { (languageType ?? "").localizedCaseInsensitiveContains("english") }
     var matchText: String { score.map { "\($0)%" } ?? "—" }
 
+    /// Which band of the market this listing's company sits in.
+    ///
+    /// `prestigeTier` is messy by history — some rows carry a bare "1"/"2"/"3" from
+    /// the global seed batch, others a sentence like "Japan AI startup / verified
+    /// ATS". Both are real signal, so read both rather than pick one and drop half
+    /// the catalog into "unknown". Spot-checked against the live data: "1" is
+    /// NVIDIA/Nokia/Cloudflare/Blue Origin, "2" is Hitachi/Formlabs/Geotab,
+    /// "3" is the smaller firms.
+    var tier: CompanyTier {
+        let raw = (prestigeTier ?? "").lowercased()
+        if raw.isEmpty { return .scaleUp }
+        if raw == "1" || raw.contains("tier 1") || raw.contains("global elite")
+            || raw.contains("global reputed") { return .flagship }
+        if raw == "3" || raw.contains("startup") { return .startup }
+        return .scaleUp
+    }
+
     /// The web hides the "JST"/time suffix in list rows; mirror that here.
     var shortDeadline: String {
         guard let deadline, !deadline.isEmpty else { return "Not stated" }
@@ -126,6 +143,37 @@ enum ApplicationStatus: String, CaseIterable, Codable, Identifiable {
 /// Model-layer tint token; Theme.swift maps these to real colors so this file
 /// stays free of SwiftUI.
 enum Color6 { case teal, purple, orange, blue, indigo, gray }
+
+/// The three bands the Companies view clusters by.
+enum CompanyTier: String, CaseIterable, Identifiable {
+    case flagship, scaleUp, startup
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .flagship: "Flagships"
+        case .scaleUp: "Scale-ups"
+        case .startup: "Startups"
+        }
+    }
+
+    var blurb: String {
+        switch self {
+        case .flagship: "Tier-1 and global names"
+        case .scaleUp: "Established and growing"
+        case .startup: "Early-stage teams"
+        }
+    }
+
+    var tint: Color6 {
+        switch self {
+        case .flagship: .indigo
+        case .scaleUp: .teal
+        case .startup: .orange
+        }
+    }
+}
 
 struct Milestone: Codable, Identifiable, Hashable {
     var id: String

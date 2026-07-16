@@ -25,6 +25,20 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-17 (later still) — iOS shader pass + Companies bubble field (ADR-0040).**
+  Removed `radarSweep` (read as a weird radar behind the stat strip) and `pressWarp`
+  (warping the card under your finger fought the tap); press feedback is scale-only.
+  Nav is now real Liquid Glass in both layers with a `glassEffectID` selection that
+  flows between tabs. NEW `bubbleField` shader: ONE signed-distance field over the
+  canvas with polynomial smooth-min so bubbles genuinely merge (per-view shaders can
+  only overlap — the merge is the effect), + gradient normals, Snell refraction,
+  rim chromatic aberration, Fresnel, specular. NEW **Companies** view off Applications:
+  three tier clusters (Flagships / Scale-ups / Startups), top 8 each with "+N more"
+  labels, radius ∝ √(role count), deterministic golden-angle spiral packing.
+  `Internship.tier` reads both `prestigeTier` shapes (bare "1"/"2"/"3" from the global
+  seed AND descriptive sentences). `-previewMode YES` (DEBUG-only) skips the auth wall
+  for screenshots. Kept `auroraCanvas` + `shimmer`. Builds clean; verified against live
+  prod (103 companies, real logos refracting inside the glass).
 - **2026-07-17 (later) — iOS: Firebase auth + real Firestore data + SwiftUI previews
   (ADR-0039).** Registered an iOS Firebase app (`1:501333131661:ios:e3d159530820c85377fdc4`;
   the web app id can't be reused — the SDK validates the `:ios:` segment).

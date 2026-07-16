@@ -908,3 +908,48 @@ release device build before shipping.
 **Verified.** Builds clean (iOS 27 SDK, Swift 6); login screen renders; config plist and the
 Google callback URL scheme are both in the bundle; previews compile. **End-to-end sign-in is
 unverified** — entering the account password is the user's to do, not mine.
+
+## ADR-0040 · 2026-07-17 · Shaders earn their place: SDF bubble field in, radar sweep + press-warp out
+**Context.** User review of ADR-0038's shader work: the radar sweep read as "a weird
+radar in the background", the press-warp distortion fought every tap, and the nav's
+selection was a solid capsule rather than glass. Separately: build the Companies view
+the way Wabi's splash is built (SwiftUI + Metal, warping loupe over signed distance
+fields), and show companies as bubbles sized by how big they are.
+**Decision.**
+- **Removed `radarSweep` and `pressWarp`.** Both were decoration that cost
+  comprehension: the sweep put moving rings behind a stat strip that has nothing to do
+  with a radar sweep, and warping the card under your finger reads as the UI
+  malfunctioning rather than as feedback. Press feedback is now only the reference's
+  own `active:scale-[0.98]`. Kept: `auroraCanvas` (the ground) and `shimmer` (loading),
+  which both do a job.
+- **Nav is real Liquid Glass in both layers** — the bar, and a second glass capsule
+  marking the selection that shares one `glassEffectID` inside the
+  `GlassEffectContainer`, so the material flows between tabs instead of cross-fading.
+- **`bubbleField`: ONE SDF over the canvas, not N circle views.** Every bubble is
+  evaluated into a single field and combined with a polynomial smooth-minimum, so
+  neighbours grow a meniscus and merge. This is unreachable with per-view shaders,
+  which can only overlap — the merge IS the effect. Normals come from the field's
+  gradient (4 taps), the field is lifted into a dome, and the view ray is bent through
+  it with real refraction (Snell via Metal's `refract`), plus rim-only chromatic
+  aberration, Fresnel and one specular hotspot. Cost is bounded by canvas size, not
+  company count. `glassOrb` is the single-bubble variant for the entry button.
+- **Companies view = three tier clusters, top 8 each.** All 103 fit on screen and it
+  was mush: 70 companies list exactly one role, so as identical minimum-size dots they
+  carried no information. Clustering by tier gives the shader's merge meaning — a
+  bubble fuses with its own tier. Hidden counts are always labelled ("+44 more");
+  a silently truncated field would lie about the data.
+- **`Internship.tier`** reads BOTH `prestigeTier` shapes, because history left two: a
+  bare "1"/"2"/"3" on the global seed rows and sentences like "Japan AI startup /
+  verified ATS" elsewhere. Verified against live data: "1" is NVIDIA/Nokia/Cloudflare/
+  Blue Origin, "2" is Hitachi/Formlabs/Geotab, "3" is smaller firms. Picking one shape
+  would drop half the catalog into an unknown bucket.
+- **Bubble radius ∝ √(role count)** so four roles reads as four times the *area* of
+  one — area is what the eye compares. Role count is the only "how big" signal the
+  catalog actually has; headcount is not in the data, and deriving it from prestige
+  tiers would be a guess dressed as a fact. Packing is a deterministic golden-angle
+  spiral that shrinks-and-retries until every bubble fits (an early version dumped
+  unplaceable bubbles at the centre, stacking them invisibly).
+- **`-previewMode YES`** launch arg skips the auth wall for screenshots. `#if DEBUG`
+  only, so it cannot exist in a release build. Mirrors the web's `VITE_AUTH_DISABLED`.
+**Verified.** Builds clean (iOS 27 SDK); the field renders 3 clusters against live prod
+data with real logos refracting inside the glass; nav glass verified in-simulator.

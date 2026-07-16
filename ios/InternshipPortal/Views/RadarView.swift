@@ -71,8 +71,6 @@ struct RadarView: View {
             .padding(.horizontal, -20)
             .padding(.bottom, 14)
 
-            // Stat strip sits over the radar sweep — the one place the shader is
-            // literal about what the tab does.
             ScrollView(.horizontal) {
                 HStack(spacing: 12) {
                     StatCard(symbol: "mappin.and.ellipse", tint: .blue, value: "\(store.tokyoCount)", label: "Tokyo")
@@ -83,11 +81,6 @@ struct RadarView: View {
             }
             .scrollIndicators(.hidden)
             .padding(.horizontal, -20)
-            .background(alignment: .center) {
-                RadarSweepBackdrop()
-                    .frame(height: 150)
-                    .allowsHitTesting(false)
-            }
             .padding(.bottom, 18)
 
             switch store.phase {
