@@ -61,7 +61,7 @@ export function useGmailInbox(profile) {
     const internship = { ...cleanBase, source: 'gmail', sourceMeta: { gmailMessageId: action.gmailMessageId, receivedAt: action.receivedAt, subject: action.subject } };
     if (shouldSetStatus) updateStatus(internship, status);
     if (action.interview?.date) {
-      addMilestone(internship.id, { kind: 'interview', date: action.interview.date, time: action.interview.time || null, title: `Interview — ${action.company}` });
+      addMilestone(internship.id, { id: `gmail-${action.gmailMessageId}`, kind: 'interview', date: action.interview.date, time: action.interview.time || null, title: `Interview — ${action.company}` });
     }
     return { id: internship.id, company: action.company, kind: shouldSetStatus ? action.kind : null };
   }, [updateStatus, addMilestone]);

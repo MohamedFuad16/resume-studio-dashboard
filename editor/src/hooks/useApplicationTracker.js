@@ -132,6 +132,13 @@ export function useApplicationTracker(profileId) {
     const current = trackerRef.current;
     const record = current[internshipId];
     if (!record || !/^\d{4}-\d{2}-\d{2}$/.test(milestone?.date || '')) return;
+    // A caller-supplied id is a dedupe key (Gmail derives it from the message id),
+    // so re-draining the same email never duplicates a calendar milestone. Identical
+    // kind+date+time+title also skips, covering milestones created before ids were stable.
+    const existing = Array.isArray(record.milestones) ? record.milestones : [];
+    if (milestone.id && existing.some(m => m?.id === milestone.id)) return;
+    if (existing.some(m => m?.kind === (milestone.kind || 'other') && m?.date === milestone.date
+      && (m?.time || null) === (milestone.time || null) && (m?.title || '') === (milestone.title || milestone.note || ''))) return;
     const next = {
       ...current,
       [internshipId]: {

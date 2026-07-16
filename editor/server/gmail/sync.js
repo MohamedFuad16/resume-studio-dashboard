@@ -5,6 +5,7 @@
 import { getConnection, saveConnection, pushQueue } from './store.js';
 import { getAccessToken, listNewMessageIds, listRecentMessageIds, getProfileHistoryId, getMessage, ReauthRequiredError } from './gmailClient.js';
 import { classifyMessage, enrichCompany, llmAvailable } from './classify.js';
+import { buildSeedCatalog } from '../seeds/catalog.js';
 
 const MIN_CONFIDENCE = Number(process.env.GMAIL_MIN_CONFIDENCE || 0.6);
 const MAX_MESSAGES_PER_SYNC = Number(process.env.GMAIL_MAX_MESSAGES_PER_SYNC || 25);
@@ -21,6 +22,23 @@ const APPLICATION_QUERY = [
 ].join(' OR ');
 
 const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+// Companies we already know — the internship catalog (stored, else seeds) and the
+// server-side tracker — never need a web search: the client resolves their
+// details from its own records/catalog when it drains the queue.
+async function knownCompanyNames(store, profile) {
+  const names = [];
+  const catalog = await store.getJson('internships:catalog', null).catch(() => null);
+  for (const item of (Array.isArray(catalog) && catalog.length ? catalog : buildSeedCatalog())) names.push(norm(item?.company));
+  const tracker = await store.getJson(`tracker:${profile}`, {}).catch(() => ({}));
+  for (const rec of Object.values(tracker && typeof tracker === 'object' ? tracker : {})) names.push(norm(rec?.company));
+  return names.filter(Boolean);
+}
+
+const isKnownCompany = (names, company) => {
+  const needle = norm(company);
+  return Boolean(needle) && names.some(n => n.includes(needle) || needle.includes(n));
+};
 
 export async function syncProfile(store, profile, opts = {}) {
   const conn = await getConnection(store, profile);
@@ -64,6 +82,7 @@ export async function syncProfile(store, profile, opts = {}) {
 
   const actions = [];
   const enrichedByCompany = new Map();
+  let knownNames = null; // loaded lazily on the first enrichment candidate
   for (const id of fresh) {
     let message;
     try { message = await getMessage(token, id); } catch { processed.add(id); continue; }
@@ -74,10 +93,14 @@ export async function syncProfile(store, profile, opts = {}) {
 
     // Enrich once per company for application/offer emails, so the client can
     // create a record with a real posting URL/location/deadline if it's new.
+    // Companies already in the catalog or tracker skip the search entirely.
     let enrichment = null;
     if ((verdict.kind === 'applied' || verdict.kind === 'offer')) {
       const key = norm(verdict.company);
-      if (!enrichedByCompany.has(key)) enrichedByCompany.set(key, await enrichCompany(verdict.company, verdict.role));
+      if (!enrichedByCompany.has(key)) {
+        if (!knownNames) knownNames = await knownCompanyNames(store, profile);
+        enrichedByCompany.set(key, isKnownCompany(knownNames, verdict.company) ? null : await enrichCompany(verdict.company, verdict.role));
+      }
       enrichment = enrichedByCompany.get(key);
     }
 
