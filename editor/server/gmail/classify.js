@@ -36,10 +36,18 @@ export async function classifyMessage(message) {
     `Answer ONLY minified JSON:\n` +
     `{"isApplicationRelated":bool,"kind":"applied|rejected|interview|offer|other","company":str,"role":str,` +
     `"interview":{"date":"YYYY-MM-DD","time":"HH:mm"|null}|null,"confidence":0..1}\n` +
-    `Rules: isApplicationRelated=true only for emails about the user's OWN application to a company ` +
-    `(confirmation, rejection, interview invite/schedule, offer). Marketing, newsletters, job alerts, ` +
-    `and security notices are false. "kind"="interview" only when an interview is being scheduled/invited; ` +
-    `extract its date/time if present. company/role empty string if unknown.`;
+    `Rules: isApplicationRelated=true only for emails about the user's OWN application to a company — ` +
+    `including applications made on the company's own site or a job board (the confirmation still lands here). ` +
+    `Marketing, newsletters, generic job alerts, and security notices are false.\n` +
+    `kind:\n` +
+    `- "applied": application confirmation / registration / pre-entry / "thank you for applying" / エントリー・応募完了.\n` +
+    `- "interview": ANY selection step past "applied" — an interview invite/schedule, OR a coding test / online / ` +
+    `technical assessment (e.g. Codility, HackerRank, "invites you to a test") / screening / 選考・コーディングテスト・Webテスト. ` +
+    `Extract a date/time into "interview" if one is present (a coding-test deadline counts).\n` +
+    `- "rejected": rejection / "not selected" / "selection result" that declines / 不合格・お見送り.\n` +
+    `- "offer": an offer / 内定.\n` +
+    `- "other": application-related but none of the above.\n` +
+    `company/role empty string if unknown.`;
   try {
     const resp = await ai.chat.completions.create(
       {

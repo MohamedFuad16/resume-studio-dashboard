@@ -546,7 +546,8 @@ app.post('/api/integrations/gmail/sync-now', async (req, res) => {
   try {
     setNoStore(res);
     const profile = validateProfileId(req.query.profile || 'mohamed_fuad');
-    const result = await syncProfile(store, profile);
+    const backfill = Math.min(Number(req.query.backfill) || 0, 180);
+    const result = await syncProfile(store, profile, backfill > 0 ? { backfillDays: backfill } : {});
     res.json({ ok: true, ...result });
   } catch (error) {
     sendRequestError(res, error);

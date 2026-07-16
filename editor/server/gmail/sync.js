@@ -11,9 +11,18 @@ const MAX_MESSAGES_PER_SYNC = Number(process.env.GMAIL_MAX_MESSAGES_PER_SYNC || 
 const PROCESSED_CAP = 500;
 let counter = 0;
 
+// Backfill uses a keyword search (EN + JA) so application mail surfaces regardless
+// of newsletter volume — a plain recent-N scan buried the real signals under noise.
+const APPLICATION_QUERY = [
+  '"thank you for applying"', '"thank you for your application"', 'application', 'applied',
+  'interview', '"coding test"', '"online assessment"', 'assessment', 'Codility', 'HackerRank',
+  'screening', 'rejected', '"not selected"', '"selection result"', 'offer',
+  'エントリー', '応募', '選考', '面接', 'コーディングテスト', 'Webテスト', 'インターン', '不合格', 'お見送り', '内定',
+].join(' OR ');
+
 const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-export async function syncProfile(store, profile) {
+export async function syncProfile(store, profile, opts = {}) {
   const conn = await getConnection(store, profile);
   if (!conn?.refreshTokenEnc) return { skipped: 'not-connected' };
 
@@ -25,10 +34,14 @@ export async function syncProfile(store, profile) {
     throw error;
   }
 
-  // Which messages are new since the stored cursor.
+  // Which messages to scan. Normal sync = new mail since the cursor. Backfill =
+  // a one-time wider scan of older mail (does NOT move the incremental cursor).
   let messageIds = [];
   let nextHistoryId = conn.historyId;
-  if (conn.historyId) {
+  const backfillDays = Number(opts.backfillDays || 0);
+  if (backfillDays > 0) {
+    messageIds = await listRecentMessageIds(token, `newer_than:${backfillDays}d -in:sent -in:draft (${APPLICATION_QUERY})`, 100);
+  } else if (conn.historyId) {
     const res = await listNewMessageIds(token, conn.historyId);
     if (res.stale) {
       messageIds = await listRecentMessageIds(token);
@@ -42,8 +55,9 @@ export async function syncProfile(store, profile) {
     nextHistoryId = await getProfileHistoryId(token);
   }
 
+  const cap = backfillDays > 0 ? 80 : MAX_MESSAGES_PER_SYNC;
   const processed = new Set(conn.processedMessageIds || []);
-  const fresh = messageIds.filter(id => !processed.has(id)).slice(0, MAX_MESSAGES_PER_SYNC);
+  const fresh = messageIds.filter(id => !processed.has(id)).slice(0, cap);
 
   const actions = [];
   const enrichedByCompany = new Map();
