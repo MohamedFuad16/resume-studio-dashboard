@@ -7,7 +7,7 @@ const POLL_MS = 90000;
 const KIND_TO_STATUS = { applied: 'applied', rejected: 'rejected', interview: 'interview', offer: 'applied' };
 // Status precedence within one drain: a terminal outcome (rejected) must not be
 // overwritten by an earlier application/interview email for the same company.
-const STATUS_RANK = { saved: 0, applied: 1, interview: 2, rejected: 3 };
+const STATUS_RANK = { saved: 0, applying: 1, applied: 1, interview: 2, rejected: 3 };
 const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 const slug = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
@@ -41,6 +41,9 @@ export function useGmailInbox(profile) {
         : catItem
           ? { id: catItem.id, company: catItem.company, role: catItem.role, location: catItem.location, deadline: catItem.deadline, deadlineDate: catItem.deadlineDate, url: catItem.url, companyDomain: catItem.companyDomain, logoUrl: catItem.logoUrl }
           : { id: `gmail-${slug(action.company)}`, company: action.company, role: action.role || 'Application', location: action.enrichment?.location || '', deadline: action.enrichment?.deadline || 'Not stated', deadlineDate: action.enrichment?.deadlineDate || null, url: action.enrichment?.url || '' };
+      // Statuses are monotonic across drains too: a record already at
+      // "interview" can't be pulled back to "applied" by a re-classified email.
+      if (existing) base._rank = STATUS_RANK[existing.status] ?? 0;
       session.set(companyNeedle, base);
     }
     // Backfill better details from whichever email has them (the application email
