@@ -953,3 +953,35 @@ fields), and show companies as bubbles sized by how big they are.
   only, so it cannot exist in a release build. Mirrors the web's `VITE_AUTH_DISABLED`.
 **Verified.** Builds clean (iOS 27 SDK); the field renders 3 clusters against live prod
 data with real logos refracting inside the glass; nav glass verified in-simulator.
+
+## ADR-0041 · 2026-07-17 · Two glass bugs: glass-on-glass greys out, and a fixed dome shoulder makes a "border"
+**Context.** User review: the nav "is grayed out, not proper liquid glass — it has to
+be so liquid", and the Companies bubbles "have a weird border on the edges" instead of
+reading as a 3D globe like Wabi's.
+**Bug 1 — glass cannot sample other glass.** The nav had `.glassEffect` on the bar AND
+a second `.glassEffect` capsule for the selection nested inside it. Apple's rule (and
+the community reference) is explicit: *glass cannot sample other glass; the container
+provides the shared sampling region*. Nested glass has nothing to refract but its
+parent, so it resolves to flat grey — precisely the reported symptom. **Fix:** exactly
+one glass layer (the bar, `.regular.interactive()`), with the selection a plain capsule
+riding `matchedGeometryEffect` + `.bouncy`, so it flows between tabs. The liquidity is
+the material's own (press-scale, shimmer, touch-point illumination) plus content
+lensing underneath — not a second sheet of glass.
+Related tuning rules from the same source, worth keeping: tint is for *semantic*
+meaning only and must stay subtle (heavy tint kills the lensing); `.clear` is the
+variant for high-transparency contexts over colourful media, `.regular` over quiet
+ground. Note glass over this app's near-white canvas will always read light — it can
+only lens what is behind it.
+**Bug 2 — the "border" was two mistakes, neither of them the geometry.**
+1. The rim was being *painted*: the shader forced `color.a` up at the edge and mixed
+   the rim toward white, tracing a bright ring around every bubble. Removed entirely.
+   Solid glass just shows its contents compressed; the edge is *darker* because you
+   look through more glass.
+2. The dome used a fixed 26pt shoulder (`sqrt(-d / 26)`), so every bubble was a FLAT
+   disc with a constant-width refracting ring at its edge — a border by construction,
+   and worse the bigger the bubble. **Fix:** the SDF now carries the local radius
+   alongside the distance (blended through the smooth-min by the same weight), so the
+   dome is a true hemisphere: `height = sqrt(-d(2R + d)) / R`, with the lateral term
+   `(R + d)/R`. That is the exact sphere normal, it scales per bubble, and the
+   refraction is now continuous from centre to rim.
+**Verified.** Builds clean (iOS 27 SDK). Visual sign-off left to the user by request.

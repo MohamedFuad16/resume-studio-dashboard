@@ -128,22 +128,27 @@ struct RootView: View {
 
 /// The floating tab bar, in Liquid Glass.
 ///
-/// Both layers are real glass: the bar itself, and a second glass capsule marking
-/// the selected tab. Because the selection shares one `glassEffectID` inside a
-/// `GlassEffectContainer`, moving tabs makes the two lenses merge and separate —
-/// the material flows between them instead of a highlight cross-fading in place.
-/// That fluidity is the entire point of the material, and it is why the selection
-/// is not just a tinted `Capsule` any more.
+/// ONE glass layer, and only one. Glass cannot sample other glass — a
+/// `.glassEffect` nested inside a view that already has one has nothing to refract
+/// but its parent, and resolves to flat grey. The previous version put a glass
+/// capsule for the selection inside a glass bar and looked exactly like that:
+/// frosted, dead, not liquid.
+///
+/// So the bar is the glass, and the selection is a plain capsule that slides
+/// between tabs with `matchedGeometryEffect`. The liquidity comes from the material
+/// itself — `.interactive()` gives it press-scaling, shimmer, and touch-point
+/// illumination — plus a bouncy spring on the indicator, which stretches as it
+/// travels. Content scrolling underneath is what the glass actually lenses.
 struct GlassNav: View {
     @Binding var tab: Tab
-    @Namespace private var glass
+    @Namespace private var indicator
 
     var body: some View {
-        GlassEffectContainer(spacing: 20) {
+        GlassEffectContainer(spacing: 22) {
             HStack(spacing: 2) {
                 ForEach(Tab.allCases) { item in
-                    NavButton(item: item, isActive: tab == item, glass: glass) {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.72)) {
+                    NavButton(item: item, isActive: tab == item, indicator: indicator) {
+                        withAnimation(.bouncy(duration: 0.45, extraBounce: 0.15)) {
                             tab = item
                         }
                     }
@@ -159,7 +164,7 @@ struct GlassNav: View {
 private struct NavButton: View {
     var item: Tab
     var isActive: Bool
-    var glass: Namespace.ID
+    var indicator: Namespace.ID
     var action: () -> Void
 
     var body: some View {
@@ -176,13 +181,12 @@ private struct NavButton: View {
             .padding(.vertical, 7)
             .background {
                 if isActive {
-                    // .clear + glassEffect, not a filled shape: the fill is the
-                    // material, and giving it the shared ID is what lets it flow
-                    // to the next tab rather than fade.
+                    // A plain capsule, deliberately: glass-in-glass is what greyed
+                    // this out before. It rides matchedGeometryEffect so the shape
+                    // flows to the next tab rather than fading in place.
                     Capsule()
-                        .fill(.clear)
-                        .glassEffect(.regular.tint(Palette.card.opacity(0.55)), in: .capsule)
-                        .glassEffectID("selection", in: glass)
+                        .fill(.white.opacity(0.75))
+                        .matchedGeometryEffect(id: "tab-indicator", in: indicator)
                 }
             }
             .contentShape(.rect)

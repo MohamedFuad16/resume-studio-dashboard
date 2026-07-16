@@ -105,11 +105,18 @@ static inline float smin(float a, float b, float k) {
     return mix(b, a, h) - k * h * (1.0 - h);
 }
 
-/// Signed distance to the merged field. `bubbles` is packed (x, y, radius) triples.
-/// Negative inside, positive outside.
-static inline float fieldSDF(float2 p, device const float *bubbles, int count,
-                             float blend, float time) {
+/// Signed distance to the merged field, AND the local sphere radius.
+///
+/// The radius has to travel with the distance. Reconstructing a dome needs to know
+/// how big the sphere under this pixel is: with a fixed shoulder instead, every
+/// bubble becomes a flat disc with a constant-width refracting ring around it —
+/// which is exactly what reads as "a weird border on the edges".
+///
+/// Returns (distance, radius). `bubbles` is packed (x, y, radius) triples.
+static inline float2 fieldSDF(float2 p, device const float *bubbles, int count,
+                              float blend, float time) {
     float d = 1e9;
+    float rr = 30.0;
     for (int i = 0; i + 2 < count; i += 3) {
         // Each bubble drifts on its own phase, so the field breathes and the
         // bridges between neighbours stretch and thin as they move.
@@ -118,62 +125,83 @@ static inline float fieldSDF(float2 p, device const float *bubbles, int count,
         c.x += sin(time * 0.31 + phase) * 2.5;
         c.y += cos(time * 0.27 + phase * 1.3) * 3.0;
         float r = bubbles[i + 2];
-        d = smin(d, length(p - c) - r, blend);
+        float di = length(p - c) - r;
+
+        // Smooth union, with the radius blended by the same weight so the dome
+        // stays continuous across a merge.
+        float h = clamp(0.5 + 0.5 * (di - d) / max(blend, 1e-4), 0.0, 1.0);
+        d = mix(di, d, h) - blend * h * (1.0 - h);
+        rr = mix(r, rr, h);
     }
-    return d;
+    return float2(d, rr);
 }
 
 [[stitchable]] half4 bubbleField(float2 position, SwiftUI::Layer layer, float2 size,
                                  device const float *bubbles, int count,
                                  float time, float blend, float ior, float chroma) {
-    float d = fieldSDF(position, bubbles, count, blend, time);
+    float2 field = fieldSDF(position, bubbles, count, blend, time);
+    float d = field.x;
+    float radius = max(field.y, 1.0);
 
     // Antialias the silhouette over ~1pt of the distance field — free, because the
     // SDF already measures exactly that.
-    float mask = smoothstep(0.75, -0.75, d);
+    float mask = smoothstep(0.6, -0.6, d);
     if (mask <= 0.001) return half4(0.0);
 
     // Surface normal from the field's gradient. Central differences: 4 extra field
     // evaluations, which is the honest price of not faking the lighting.
     const float e = 1.25;
-    float dx = fieldSDF(position + float2(e, 0), bubbles, count, blend, time)
-             - fieldSDF(position - float2(e, 0), bubbles, count, blend, time);
-    float dy = fieldSDF(position + float2(0, e), bubbles, count, blend, time)
-             - fieldSDF(position - float2(0, e), bubbles, count, blend, time);
-    float2 grad = float2(dx, dy) / (2.0 * e);
+    float dx = fieldSDF(position + float2(e, 0), bubbles, count, blend, time).x
+             - fieldSDF(position - float2(e, 0), bubbles, count, blend, time).x;
+    float dy = fieldSDF(position + float2(0, e), bubbles, count, blend, time).x
+             - fieldSDF(position - float2(0, e), bubbles, count, blend, time).x;
+    float2 grad = normalize(float2(dx, dy) + 1e-5);   // unit radial direction
 
-    // Lift the 2D field into a dome: `height` is 1 deep inside the blob and 0 at the
-    // rim, which is what turns a flat mask into something that reads as a sphere.
-    // The 26pt shoulder is the apparent "thickness" of the glass.
-    float height = sqrt(saturate(-d / 26.0));
-    float3 normal = normalize(float3(grad * (1.0 - height), height + 0.06));
+    // Lift the field into a TRUE hemisphere rather than a fixed shoulder. For a
+    // sphere of radius R, a point at distance (R + d) from the centre sits at
+    // height sqrt(-d(2R + d)) — exact, and it scales with each bubble, so a big
+    // bubble is a big dome instead of a disc with a ring.
+    float height = sqrt(max(-d * (2.0 * radius + d), 0.0)) / radius;   // 1 centre → 0 rim
+
+    // Radial component: 0 at the centre, 1 at the rim. Together with `height` this
+    // is the real sphere normal.
+    float lateral = saturate((radius + d) / radius);
+    float3 normal = normalize(float3(grad * lateral, max(height, 1e-3)));
 
     // The warping loupe: bend the view ray through the surface and read the layer
-    // underneath from where the glass says it should come from.
+    // from where the glass says the light came from. At the rim the ray turns
+    // sharply inward, which compresses the contents toward the edge exactly the way
+    // a ball lens does; at the centre it passes straight through.
     float3 bent = refract(float3(0.0, 0.0, -1.0), normal, 1.0 / max(ior, 1.0001));
-    float2 offset = bent.xy * 34.0 * (1.0 - height);
+    float2 offset = bent.xy * radius * 0.55;
 
-    float edge = smoothstep(0.55, 0.0, height);        // rim-only effects
+    // Chromatic aberration: wavelengths bend by different amounts. Rim-only, which
+    // is where a real lens shows it.
+    float edge = smoothstep(0.75, 0.0, height);
     float2 spread = offset * chroma * edge;
     half r = layer.sample(position + offset + spread).r;
     half4 g = layer.sample(position + offset);
     half b = layer.sample(position + offset - spread).b;
     half4 color = half4(r, g.g, b, g.a);
 
-    // Bubbles are mostly transparent; the tint underneath supplies the colour, so
-    // lift the interior toward white rather than painting it.
-    color.rgb = mix(color.rgb, half3(1.0), half(edge * 0.28));
-    color.a = max(color.a, half(edge * 0.55));
+    // NOTE: nothing here forces alpha or paints the rim white. An earlier version
+    // did both, and that — not the geometry — was the visible "border": a bright
+    // ring traced around every bubble. Solid glass simply shows its contents,
+    // compressed; the edge is dark because you are looking through more glass.
+    color.rgb *= half(1.0 - 0.30 * pow(1.0 - height, 4.0));
 
     // One light, up and to the left, matching the card shadows elsewhere.
-    float3 lightDir = normalize(float3(-0.45, -0.75, 0.5));
-    float spec = pow(saturate(dot(normal, lightDir)), 32.0);
-    float rim = pow(saturate(1.0 - height), 6.0) * 0.5;
-    color.rgb += half3(spec * 0.9 + rim * 0.35);
-    color.a = max(color.a, half(saturate(spec + rim * 0.6)));
+    float3 lightDir = normalize(float3(-0.45, -0.7, 0.55));
+    float spec = pow(saturate(dot(normal, lightDir)), 42.0);
+    color.rgb += half3(spec * 0.95) * color.a;
+
+    // A second, broad sheen across the upper half reads as the window reflected in
+    // the glass, and is most of what makes a sphere look like a sphere.
+    float sheen = pow(saturate(dot(normal, normalize(float3(-0.3, -0.9, 0.3)))), 4.0);
+    color.rgb += half3(sheen * 0.10) * color.a;
 
     // Shade the far side so the dome has volume.
-    color.rgb -= half3(pow(saturate(dot(normal, -lightDir)), 3.0) * 0.08);
+    color.rgb -= half3(pow(saturate(dot(normal, -lightDir)), 3.0) * 0.07) * color.a;
 
     return color * half(mask);
 }
@@ -208,45 +236,33 @@ static inline float fieldSDF(float2 p, device const float *bubbles, int count,
     float z = sqrt(max(1.0 - nd * nd, 0.0));
     float3 normal = normalize(float3(toCenter / max(radius, 1.0), z));
 
-    // Bend the incoming view ray (straight into the screen) through the surface.
-    float3 incident = float3(0.0, 0.0, -1.0);
-    float3 bent = refract(incident, normal, 1.0 / max(ior, 1.0001));
+    // Bend the incoming view ray (straight into the screen) through the surface and
+    // read the contents from where the glass says the light came from.
+    float3 bent = refract(float3(0.0, 0.0, -1.0), normal, 1.0 / max(ior, 1.0001));
+    float2 offset = bent.xy * radius * 0.55;
 
-    // Walk the refracted ray to the plane holding the contents. The (1 - z) factor
-    // keeps the centre almost undistorted and the rim strongly bent, which is what
-    // a real marble does.
-    float2 offset = bent.xy * radius * (1.0 - z) * 0.85;
-
-    // Chromatic aberration: wavelengths bend by different amounts, so sample each
-    // channel at a slightly different offset. Only visible near the rim, which is
-    // exactly where a real lens shows it.
-    float edge = smoothstep(0.35, 1.0, nd);
+    float edge = smoothstep(0.75, 0.0, z);
     float2 spread = offset * chroma * edge;
     half r = layer.sample(position + offset + spread).r;
     half4 g = layer.sample(position + offset);
     half b = layer.sample(position + offset - spread).b;
     half4 color = half4(r, g.g, b, g.a);
 
-    // Contents fade out at the very rim, where a real sphere shows mostly
-    // reflection rather than transmission.
-    float fresnel = pow(1.0 - z, 3.0);
-    color.rgb = mix(color.rgb, half3(1.0), half(fresnel * 0.22));
-    color.a = max(color.a, half(fresnel * 0.5));
+    // Kept in step with bubbleField: no forced alpha, no white rim. Solid glass
+    // shows its contents compressed, and darkens at the edge because you are
+    // looking through more of it.
+    color.rgb *= half(1.0 - 0.30 * pow(1.0 - z, 4.0));
 
-    // Specular hotspot, up and to the left — one light, consistent with the card
-    // shadows elsewhere in the app.
-    float3 lightDir = normalize(float3(-0.45, -0.75, 0.55));
-    float spec = pow(max(dot(normal, lightDir), 0.0), 28.0);
-    color.rgb += half3(spec * 0.85);
-    color.a = max(color.a, half(spec * 0.9));
+    float3 lightDir = normalize(float3(-0.45, -0.7, 0.55));
+    float spec = pow(saturate(dot(normal, lightDir)), 42.0);
+    color.rgb += half3(spec * 0.95) * color.a;
 
-    // A soft inner shadow opposite the light gives the sphere volume.
-    float shade = pow(max(dot(normal, -lightDir), 0.0), 3.0);
-    color.rgb -= half3(shade * 0.10);
+    float sheen = pow(saturate(dot(normal, normalize(float3(-0.3, -0.9, 0.3)))), 4.0);
+    color.rgb += half3(sheen * 0.10) * color.a;
+
+    color.rgb -= half3(pow(saturate(dot(normal, -lightDir)), 3.0) * 0.07) * color.a;
 
     // Antialias the silhouette across roughly one pixel.
     float aa = 1.5 / max(radius, 1.0);
-    color *= half(smoothstep(1.0, 1.0 - aa, nd));
-
-    return color;
+    return color * half(smoothstep(1.0, 1.0 - aa, nd));
 }
