@@ -525,7 +525,6 @@ export default function App() {
   ]);
 
   const cmpTimer = useRef(null);
-  const loaded   = useRef(false);
   const lastCompiled = useRef('');
   const chatAbortRef = useRef(null);
 
@@ -718,8 +717,10 @@ export default function App() {
       if (!skipUrl) {
         syncUrlWithProfile(id);
       }
-      lastCompiled.current = ''; // force recompile
-      compile(normalized, template);
+      // Force a recompile on the next editor visit; the lazy compile effect
+      // picks it up immediately if the editor is the current view.
+      lastCompiled.current = '';
+      if (appView === 'editor') compile(normalized, template);
       toast(isJa ? `履歴書を切り替えました: ${id}` : `Switched to resume: ${id}`, 'success');
     } catch {
       toast(isJa ? `履歴書を読み込めませんでした: ${id}` : `Failed to switch resume: ${id}`, 'error');
@@ -801,8 +802,14 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [activeProfile, template, compile]);
 
-  // Recompile on template switch
-  useEffect(() => { if (resume) compile(resume, template); }, [template]);
+  // Compile lazily: the PDF preview is only visible in the Editor view, so
+  // compiling from the dashboard (where the app lands) wasted a full LaTeX run
+  // on every page load. `compile` no-ops when data+template are unchanged, so
+  // re-entering the editor doesn't recompile needlessly.
+  useEffect(() => {
+    if (resume && appView === 'editor') compile(resume, template);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resume, template, appView]);
 
   useEffect(() => {
     setTemplate(prev => {
@@ -815,14 +822,6 @@ export default function App() {
       return [{ role: 'assistant', text: chatWelcome(lang === 'ja') }];
     });
   }, [lang]);
-
-  // Initial compile once loaded
-  useEffect(() => {
-    if (resume && !loaded.current) {
-      loaded.current = true;
-      compile(resume, template);
-    }
-  }, [resume]);
 
   // ── Change handler ───────────────────────────────────────
   const change = useCallback((next, options = {}) => {
