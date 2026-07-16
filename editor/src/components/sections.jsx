@@ -215,34 +215,34 @@ export function PersonalSec({ data: d, onChange, isJa }) {
             {isJa ? "連絡先" : "Contact"}
           </div>
           <div className="flds">
-            <div className="row2">
-              <div className="f">
-                <span className="fl">{isJa ? "電話番号" : "Phone"}</span>
+            {/* Phone and email each get a full row — sharing one row clipped the
+                email's local part and domain select. */}
+            <div className="f">
+              <span className="fl">{isJa ? "電話番号" : "Phone"}</span>
+              <input
+                className={`fi ${phoneOk ? '' : 'invalid'}`}
+                name="phone"
+                value={d.phone || ''}
+                onChange={e => s('phone', e.target.value)}
+                placeholder="080-0000-0000"
+                inputMode="tel"
+              />
+              {!phoneOk && <small className="field-error">{isJa ? '電話番号は11桁で入力してください（現在 ' + phoneDigits.length + ' 桁）。' : `Enter an 11-digit Japanese phone number (currently ${phoneDigits.length} digits).`}</small>}
+            </div>
+            <div className="f">
+              <span className="fl">{isJa ? "メールアドレス" : "Email"}</span>
+              <div className="email-split">
                 <input
-                  className={`fi ${phoneOk ? '' : 'invalid'}`}
-                  name="phone"
-                  value={d.phone || ''}
-                  onChange={e => s('phone', e.target.value)}
-                  placeholder="080-0000-0000"
-                  inputMode="tel"
+                  className="fi"
+                  value={emailLocal}
+                  onChange={e => setEmail(e.target.value, emailDomain)}
+                  placeholder="mohamed.fuad"
+                  inputMode="email"
                 />
-                {!phoneOk && <small className="field-error">{isJa ? '電話番号は11桁で入力してください（現在 ' + phoneDigits.length + ' 桁）。' : `Enter an 11-digit Japanese phone number (currently ${phoneDigits.length} digits).`}</small>}
-              </div>
-              <div className="f">
-                <span className="fl">{isJa ? "メールアドレス" : "Email"}</span>
-                <div className="email-split">
-                  <input
-                    className="fi"
-                    value={emailLocal}
-                    onChange={e => setEmail(e.target.value, emailDomain)}
-                    placeholder="mohamed.fuad"
-                    inputMode="email"
-                  />
-                  <span>@</span>
-                  <select className="fi" value={emailDomain} onChange={e => setEmail(emailLocal, e.target.value)}>
-                    {emailDomains.map(domain => <option key={domain} value={domain}>{domain}</option>)}
-                  </select>
-                </div>
+                <span>@</span>
+                <select className="fi" value={emailDomain} onChange={e => setEmail(emailLocal, e.target.value)}>
+                  {emailDomains.map(domain => <option key={domain} value={domain}>{domain}</option>)}
+                </select>
               </div>
             </div>
             <div className="zip-lookup">
@@ -267,17 +267,16 @@ export function PersonalSec({ data: d, onChange, isJa }) {
             {isJa ? "オンラインリンク" : "Online"}
           </div>
           <div className="flds">
-            <div className="row2">
-              <div className="f link-field">
-                <span className="fl"><span className="brand-mark linkedin"><LinkedinMark /></span> LinkedIn URL</span>
-                <input className={`fi ${linkedinOk ? '' : 'invalid'}`} name="linkedin" value={d.linkedin || ''} onChange={e => s('linkedin', e.target.value)} placeholder="https://linkedin.com/in/username" />
-                {!linkedinOk && <small className="field-error">Use a linkedin.com/in profile URL.</small>}
-              </div>
-              <div className="f link-field">
-                <span className="fl"><span className="brand-mark github"><GithubMark /></span> GitHub URL</span>
-                <input className={`fi ${githubOk ? '' : 'invalid'}`} name="github" value={d.github || ''} onChange={e => s('github', e.target.value)} placeholder="https://github.com/username" />
-                {!githubOk && <small className="field-error">Use a github.com profile URL.</small>}
-              </div>
+            {/* Full-width rows: side-by-side, both URLs were half-hidden. */}
+            <div className="f link-field">
+              <span className="fl"><span className="brand-mark linkedin"><LinkedinMark /></span> LinkedIn URL</span>
+              <input className={`fi ${linkedinOk ? '' : 'invalid'}`} name="linkedin" value={d.linkedin || ''} onChange={e => s('linkedin', e.target.value)} placeholder="https://linkedin.com/in/username" />
+              {!linkedinOk && <small className="field-error">Use a linkedin.com/in profile URL.</small>}
+            </div>
+            <div className="f link-field">
+              <span className="fl"><span className="brand-mark github"><GithubMark /></span> GitHub URL</span>
+              <input className={`fi ${githubOk ? '' : 'invalid'}`} name="github" value={d.github || ''} onChange={e => s('github', e.target.value)} placeholder="https://github.com/username" />
+              {!githubOk && <small className="field-error">Use a github.com profile URL.</small>}
             </div>
           </div>
         </div>

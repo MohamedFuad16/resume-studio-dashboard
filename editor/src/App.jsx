@@ -675,8 +675,11 @@ export default function App() {
       lastCompiled.current = cacheKey;
 
       // Force reload by appending v=timestamp, and use open parameters to hide chrome & document outline
+      // FitH (page-width) rather than Fit: the frame is sized to the page's
+      // aspect ratio, so page-width fills it edge-to-edge with no dark
+      // letterboxing from the embedded viewer.
       const hash = zoom === 'Fit'
-        ? 'view=Fit&toolbar=0&navpanes=0&pagemode=none&scrollbar=1'
+        ? 'view=FitH&toolbar=0&navpanes=0&pagemode=none&scrollbar=1'
         : `toolbar=0&navpanes=0&pagemode=none&scrollbar=1&zoom=${zoom}`;
       const separator = url.includes('?') ? '&' : '?';
       setPdfSrc(`${url}${separator}v=${Date.now()}#${hash}`);
@@ -1305,17 +1308,18 @@ export default function App() {
         {/* PDF preview */}
         <main className="preview" data-testid="preview-container">
           <div className="preview-toolbar">
-            <span className="p-title">{isJa ? '履歴書プレビュー' : 'Resume Preview'}</span>
-            <div className="preview-controls">
+            <span className="p-title">
+              {isJa ? '履歴書プレビュー' : 'Resume Preview'}
+              {/* Auto-compiled on every change — the manual Update button is gone,
+                  but the E2E hook stays as an invisible recompile trigger. */}
               <button
-                className="btn preview-update"
                 data-testid="compile-btn"
+                style={{ display: 'none' }}
                 onClick={() => compile(resume, template, { force: true })}
-                disabled={compiling}
-              >
-                <I n="sync" s={12} style={{ animation: compiling ? 'spin 0.6s linear infinite' : 'none' }} />
-                {compiling ? (isJa ? '更新中' : 'Updating') : (isJa ? '更新' : 'Update')}
-              </button>
+              />
+              {compiling ? <span className="p-compiling"><I n="sync" s={11} style={{ animation: 'spin 0.6s linear infinite' }} />{isJa ? '更新中' : 'Updating'}</span> : null}
+            </span>
+            <div className="preview-controls">
               <div className="p-zoom-grp">
                 <span className="p-zoom-lbl">Zoom</span>
                 {['Fit', 60, 80, 100, 120].map(z => (
@@ -1327,7 +1331,7 @@ export default function App() {
                       if (pdfSrc) {
                         const baseUrl = pdfSrc.split('#')[0];
                         const hash = z === 'Fit'
-                          ? 'view=Fit&toolbar=0&navpanes=0&pagemode=none&scrollbar=1'
+                          ? 'view=FitH&toolbar=0&navpanes=0&pagemode=none&scrollbar=1'
                           : `toolbar=0&navpanes=0&pagemode=none&scrollbar=1&zoom=${z}`;
                         setPdfSrc(`${baseUrl}#${hash}`);
                       }

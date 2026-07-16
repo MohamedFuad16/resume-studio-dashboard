@@ -6262,13 +6262,15 @@ body,
   border-radius: 8px;
 }
 
+/* One tag input per row — the 2-column grid capped each input's width and
+   cramped the pills. */
 .skills-selector-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 14px;
 }
 
-.skills-selector-grid .tag-inp-container:last-child { grid-column: 1 / -1; }
+.skills-selector-grid .tag-inp-container:last-child { grid-column: auto; }
 .skills-selector-grid .tag-inp-box {
   min-height: 54px;
   max-height: none;
@@ -7720,8 +7722,8 @@ body,
   display: flex;
   align-items: center;
   gap: 18px;
-  padding: 18px 24px;
-  border-bottom: 1px solid #eef0f4;
+  padding: 18px 24px 12px;
+  border-bottom: 0;
 }
 .editor-topbar-title { min-width: 0; }
 .editor-topbar-title h2 { margin: 0; color: #18243a; font-size: 15px; letter-spacing: -.015em; }
@@ -7789,7 +7791,7 @@ body,
 .editor-view .btn:disabled { opacity: .55; cursor: default; }
 
 /* ── Split: form column + preview ──────────────────────────────────── */
-.editor-view .sidebar { width: min(820px, 52vw); border-right: 1px solid #eef0f4; background: #fff; }
+.editor-view .sidebar { width: min(820px, 52vw); border-right: 0; background: #fff; }
 .editor-workspace { grid-template-columns: 218px minmax(0, 1fr); }
 @media (max-width: 1320px) {
   .editor-view .sidebar { width: min(760px, 58vw); }
@@ -7804,12 +7806,12 @@ body,
   .section-row.active { background: #e8edf5; }
 }
 
-/* Section rail — quiet nav list, no boxes */
-.section-rail { border-right: 1px solid #eef0f4; background: #fbfcfe; }
+/* Section rail — quiet nav list, no boxes, no divider lines */
+.section-rail { border-right: 0; background: #fbfcfe; }
 .rail-head {
   height: 46px;
   padding: 0 16px;
-  border-bottom: 1px solid #eef0f4;
+  border-bottom: 0;
   color: #8b95a6;
   font-size: 10px;
   font-weight: 750;
@@ -7854,12 +7856,12 @@ body,
 
 /* Pane head — compact, aligned with app headings */
 .editor-pane { background: #fff; }
-.editor-pane-head { min-height: 0; padding: 18px 24px 14px; border-bottom: 1px solid #eef0f4; }
+.editor-pane-head { min-height: 0; padding: 18px 24px 10px; border-bottom: 0; }
 .pane-kicker { margin-bottom: 4px; color: #8b95a6; font-size: 10px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
 .editor-pane-head h1 { font-size: 19px; letter-spacing: -.02em; }
 
-/* Section shell — heading only, no accordion box */
-.sec-hd { min-height: 0; padding: 0 0 12px; border-bottom: 1px solid #eef0f4; }
+/* Section shell — heading only, no accordion box, no rule under it */
+.sec-hd { min-height: 0; padding: 0 0 12px; border-bottom: 0; }
 .sec-icon { width: 28px; height: 28px; border: 0; border-radius: 9px; background: #eef1f6; color: #64748b; }
 .sec-name { font-size: 13.5px !important; font-weight: 700 !important; color: #18243a; letter-spacing: -.01em; }
 .sec-badge { background: #eef1f6; color: #64748b; font-size: 10.5px; padding: 2px 8px; }
@@ -7894,19 +7896,18 @@ body,
 .editor-view .fi.invalid { border-color: #d54b50; }
 .editor-view .field-error { color: #d54b50; font-size: 10.5px; }
 
-/* Personal-info blocks and list items — dividers instead of boxes */
+/* Personal-info blocks and list items — pure whitespace, no dividers */
 .editor-view .pg-block,
 .editor-view .item {
-  padding: 0 0 20px;
-  margin-bottom: 20px;
+  padding: 0 0 26px;
+  margin-bottom: 6px;
   border: 0;
   border-radius: 0;
-  border-bottom: 1px solid #eef0f4;
   background: transparent;
   box-shadow: none;
 }
 .editor-view .pg-block:last-child,
-.editor-view .item:last-of-type { border-bottom: 0; margin-bottom: 8px; }
+.editor-view .item:last-of-type { padding-bottom: 8px; }
 .editor-view .pg-block-label {
   padding: 0 0 12px;
   margin: 0;
@@ -8012,22 +8013,42 @@ body,
 /* ── Preview column ────────────────────────────────────────────────── */
 .editor-view .preview { background: #f4f6f9; }
 .editor-view .preview-toolbar {
-  min-height: 56px;
+  min-height: 44px;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px 14px;
-  padding: 10px 18px;
-  border-bottom: 1px solid #eef0f4;
-  background: #fff;
+  margin-bottom: 10px;
+  padding: 0 2px;
+  border-bottom: 0;
+  background: transparent;
 }
-.editor-view .preview-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
-.editor-view .p-title { white-space: nowrap; }
+.editor-view .preview-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; margin-left: auto; }
+.editor-view .p-title { display: inline-flex; align-items: center; gap: 10px; white-space: nowrap; }
 .editor-view .p-title { color: #18243a; font-size: 12.5px; font-weight: 700; letter-spacing: -.01em; }
-.editor-view .preview-update {
-  border-color: #18243a;
-  background: #18243a;
-  color: #fff;
+/* Auto-compile status chip (replaces the manual Update button). */
+.p-compiling {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #e8edf5;
+  color: #34435c;
+  font-size: 10.5px;
+  font-weight: 700;
 }
-.editor-view .preview-update:hover:not(:disabled) { border-color: #24334e; background: #24334e; color: #fff; }
+/* Frame sized to the page (A4 + the embedded viewer's toolbar strip), so a
+   page-width fit fills it — no dark letterboxing below the page. */
+.editor-view .pdf-frame {
+  width: min(100%, 720px);
+  height: auto;
+  max-height: none;
+  aspect-ratio: 2 / 3;
+  border: 1px solid #e7ebf2;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(30, 41, 59, 0.08);
+}
 .editor-view .p-zoom-grp {
   display: inline-flex;
   align-items: center;
