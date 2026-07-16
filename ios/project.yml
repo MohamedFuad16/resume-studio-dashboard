@@ -1,0 +1,24 @@
+# XcodeGen project definition for the Internship Portal iOS app.
+# Regenerate the .xcodeproj with:  xcodegen generate  (run from ios/)
+# The .xcodeproj is generated output — only this file is source of truth.
+name: InternshipPortal
+options:
+  bundleIdPrefix: com.mohamedfuad
+  deploymentTarget:
+    iOS: "27.0"
+  createIntermediateGroups: true
+targets:
+  InternshipPortal:
+    type: application
+    platform: iOS
+    sources: [InternshipPortal]
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        PRODUCT_BUNDLE_IDENTIFIER: com.mohamedfuad.internshipportal
+        SWIFT_VERSION: "6.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        INFOPLIST_KEY_UILaunchScreen_Generation: true
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_CFBundleDisplayName: Internship Portal
+        CODE_SIGNING_ALLOWED: "NO"

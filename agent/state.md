@@ -25,6 +25,13 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-16 — Native iOS app scaffold (`ios/`, ADR-0034).** SwiftUI app on the iOS 27.0
+  SDK (Xcode 27 beta via DEVELOPER_DIR; xcodegen; .xcodeproj gitignored). Planner-pastel
+  design language (near-white canvas, pastel track-glyph circles, one green accent, ink
+  tab selection) over the system Liquid Glass shell; login keeps the web identity. Four
+  content tabs (Home/Roles/Timeline/Settings) — NO search tab; search is an inline pill in
+  Roles. Live against the public Azure catalog (Home/Roles verified on an iPhone 17 Pro sim
+  via --browse/--tab hooks). No Firebase yet; Editor deferred.
 - **2026-07-16 — Gmail ingest Phase 2 (2a connect + 2b sync pipeline), branch
   `feat/gmail-catalog-automation` (commits 5513866, 52beba0, 05ad392, c20954d; ADR-0035).**
   Read-only Gmail OAuth (server-side, raw fetch, node:crypto AES-256-GCM token — NO new deps;

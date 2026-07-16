@@ -701,6 +701,52 @@ gradient, `border-right: 0` — separation comes from the gutter, never a hard l
 dropdown still escapes the sidebar (opens upward; sidebar keeps `overflow: visible`). Dashboard
 type scale reduced (h1 clamp 20–26px, section h2 15px, stat numerals 17px) as the new baseline.
 
+---
+
+## ADR-0034 · 2026-07-16 · Native iOS app (ios/), planner-pastel design language
+**Status:** Accepted
+**Context:** User asked for an iOS version of the Internship Portal in Xcode on the
+"iOS 27 liquid glass" design. The machine has Xcode 27.0 beta (27A5209h) with the
+iOS 27.0 SDK — but xcode-select points at CommandLineTools and sudo is unavailable,
+so every build exports DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer.
+Mid-build, the user supplied a reference set (task-planner / wellness pastel UI) and
+asked for a complete redesign to match it, starting from the Dashboard.
+**Decisions:**
+1. **Project layout** — `ios/project.yml` (XcodeGen) is the source of truth; the
+   .xcodeproj is generated and gitignored (`cd ios && xcodegen generate`). SwiftUI,
+   Swift 6, deployment target iOS 27.0, CODE_SIGNING_ALLOWED=NO (simulator only).
+2. **Design language** (Theme.swift) — the planner reference: near-white canvas
+   #F5F6F7, white cards (radius 22), near-black ink #16191C, pastel circular icon
+   tiles (green/lavender/peach/sky, hash-stable per company), thin outlined chips,
+   ONE saturated green accent #2FB56B (actions + match scores), ember orange for
+   urgency. Rows are the reference's anatomy one to one: 56pt pastel circle with a
+   TRACK glyph (frontend→macwindow, AI→brain, cloud→cloud, …; never a logo or
+   lettermark), bold title + gray value chip, muted subtitle, no chevron. System
+   Liquid Glass supplies the shell: native TabView (floating glass bar,
+   .tabBarMinimizeBehavior) with selection tinted INK like the reference. The
+   LOGIN screen alone keeps the web's warm-paper + serif + black pills (ADR-0028).
+   This supersedes the first draft's web-token port (ink/blue #1A56F0) — the web
+   and iOS apps now deliberately diverge.
+3. **IA + data** — four content tabs (Home / Roles / Timeline / Settings) and NO
+   search tab or nav-bar search: per user direction, search is a small pill INSIDE
+   the Roles list (browsing is the primary mode). No Firebase yet. LoginView is the
+   real design with sign-in stubbed; "Browse without an account" uses the PUBLIC
+   catalog: PortalAPI fetches /api/internships from portal-compile-jp (Azure).
+   Home = greeting header + stat chips + glowing top-match card +
+   Tokyo-first/Beyond-Tokyo sections; Roles = sectioned catalog
+   (Priority/Tokyo/Worldwide) with the inline search pill; Timeline = upcoming
+   deadlineDate roles grouped by day (JST, per BUG-009); Settings = status + web
+   links + back-to-sign-in. Editor deliberately deferred (no mobile LaTeX design).
+4. **Headless verification hooks** — simulators can't be tapped from simctl, so the
+   app accepts `--browse` (skip auth gate) and `--tab <dashboard|timeline|settings|radar>`
+   launch arguments; screenshots via `xcrun simctl io <udid> screenshot`. Verified on
+   an iPhone 17 Pro simulator (runtime downloaded via `xcodebuild -downloadPlatform iOS`).
+**Consequences:** Login/Radar/Timeline/Settings/Detail still carry the first-draft
+styling in places (Radar uses a plain List; detail uses glass chips) — the planner
+restyle has landed on Dashboard + shared row components only. Firebase auth, the
+per-user pipeline (saved/applied/rejected), and real UI tests (XCUITest instead of
+launch-arg screenshots) are the known next steps. NavModel (tab selection in the
+environment) exists so in-content controls can switch tabs.
 ## ADR-0034 · 2026-07-16 · Self-healing catalog via a machine-owned JSON overlay; sonar default
 **Context:** The daily "Validate Catalog" action hard-failed every day on 2 naturally-dead
 greenhouse listings that nothing retired. The catalog's source of truth is hand-formatted seed
