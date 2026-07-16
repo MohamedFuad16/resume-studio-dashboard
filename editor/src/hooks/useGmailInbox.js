@@ -8,8 +8,12 @@ const KIND_TO_STATUS = { applied: 'applied', rejected: 'rejected', interview: 'i
 // Status precedence within one drain: a terminal outcome (rejected) must not be
 // overwritten by an earlier application/interview email for the same company.
 const STATUS_RANK = { saved: 0, applying: 1, applied: 1, interview: 2, rejected: 3 };
-const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-const slug = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+// Keep CJK: a purely-Japanese company name (株式会社カナリー) must not normalize
+// to an empty string, or its actions get silently dropped. Corporate prefixes are
+// stripped so 株式会社ABEJA matches the catalog's "ABEJA".
+const CORP = /株式会社|合同会社|有限会社|\(株\)|（株）/g;
+const norm = s => String(s || '').replace(CORP, '').toLowerCase().replace(/[^a-z0-9぀-ヿ一-鿿]+/gu, ' ').trim();
+const slug = s => String(s || '').replace(CORP, '').toLowerCase().replace(/[^a-z0-9぀-ヿ一-鿿]+/gu, '-').replace(/^-|-$/g, '');
 
 // Drains the server-side Gmail action queue into the Firestore-backed tracker /
 // calendar. Runs full-auto: on load and on an interval while the tab is open, it

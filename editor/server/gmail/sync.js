@@ -21,7 +21,11 @@ const APPLICATION_QUERY = [
   'エントリー', '応募', '選考', '面接', 'コーディングテスト', 'Webテスト', 'インターン', '不合格', 'お見送り', '内定',
 ].join(' OR ');
 
-const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+// Keep CJK and strip corporate prefixes, mirroring the client: a purely-Japanese
+// company name must not normalize to '' (empty enrich-map keys collide, and the
+// known-company check can never match one).
+const norm = s => String(s || '').replace(/株式会社|合同会社|有限会社|\(株\)|（株）/g, '')
+  .toLowerCase().replace(/[^a-z0-9぀-ヿ一-鿿]+/gu, '-').replace(/^-|-$/g, '');
 
 // Companies we already know — the internship catalog (stored, else seeds) and the
 // server-side tracker — never need a web search: the client resolves their
