@@ -25,6 +25,26 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-16 — Gmail pipeline hardened via a REAL 90-day inbox audit (commits `0007973`,
+  `46e89ea`, `4ed7638`; BUG-012/013/014).** Ran the full backfill three times against the
+  real inbox (local server, same Gmail account as prod). Results: 12 companies auto-tracked
+  with accurate kinds — 6 rejected (incl. JA 選考結果/ご応募のお礼-with-rejecting-body
+  patterns), 3 interview (Rakuten Codility test invite correctly counted), 3 applied;
+  interview milestones extracted w/ date+time; catalog matches carried real URLs. Fixes
+  from the audit: (1) missing OPENROUTER_API_KEY now surfaces as `{skipped:'no-llm-key'}`
+  instead of silently consuming messages (prod ran keyless!); backfill ignores the processed
+  list. (2) Known companies (catalog OR tracker) skip the sonar search — user rule: update
+  the dashboard record, never re-research. Verified: re-run queued 0 enrichments. (3)
+  Calendar milestones dedupe (deterministic gmail-<msgId> id + content match) — verified: a
+  full re-drain added 0 duplicates. (4) Statuses are monotonic across drains (nano
+  flip-flop on Turing's "Next steps" email downgraded interview→applied once — now
+  impossible). Prod: Azure on `portal-compile:46e89ea` (rev `--0000005`), frontend
+  redeployed to portal.mohamedfuad.com (3×). **STILL BLOCKED: prod has NO
+  OPENROUTER_API_KEY** — needs user-approved
+  `az containerapp secret set -n portal-compile-jp -g internship-portal --secrets
+  openrouter-api-key=<key>` + env `OPENROUTER_API_KEY=secretref:openrouter-api-key`; until
+  then prod Gmail sync skips. After the key: run one
+  `POST /api/integrations/gmail/sync-now?profile=mohamed_fuad&backfill=90` on Azure.
 - **2026-07-16 — Gmail Phase 2 DEPLOYED TO PROD + refinement pass (commits `0c8b812`,
   `2f0452d`).** Azure `portal-compile-jp` now runs image `portal-compile:2f0452d`
   (revision `--0000003`) with the 4 Gmail env vars; prod frontend (portal.mohamedfuad.com)

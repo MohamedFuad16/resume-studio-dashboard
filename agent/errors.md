@@ -2,6 +2,31 @@
 
 ## Fixed
 
+### BUG-012 — Gmail pipeline silently no-ops without OPENROUTER_API_KEY, poisoning the processed list — FIXED 2026-07-16
+- **Date:** 2026-07-16 · **Files:** `editor/server/gmail/sync.js`, `classify.js`
+- **Symptom:** Prod backfill returned `{scanned:80, actions:0}` in 16s. Every message was
+  marked processed, so a later (fixed) sync would have skipped them forever.
+- **Root cause:** `classifyMessage` returns null when `OPENROUTER_API_KEY` is unset (the
+  same env gap as BUG-010 — the Azure app still lacks the key), and sync treated null as
+  "not application-related" while still adding the id to `processedMessageIds`.
+- **Fix:** sync bails up-front with `{skipped:'no-llm-key'}`; a null verdict no longer
+  marks the message processed; backfill ignores the processed list entirely (one-time
+  rescan; the queue dedupes by `message:kind`). Verified on prod revision `--0000004`.
+
+### BUG-013 — Re-drained Gmail interview emails duplicated calendar milestones — FIXED 2026-07-16
+- **Files:** `editor/src/hooks/useApplicationTracker.js`, `useGmailInbox.js`
+- **Observed live:** after a backfill + a loop re-sync, Money Forward and enechain each had
+  two identical interview milestones (`addMilestone` appended blindly).
+- **Fix:** Gmail milestones carry a deterministic id (`gmail-<messageId>`); `addMilestone`
+  skips a duplicate id AND identical kind+date+time+title (covers pre-fix random-id rows).
+
+### BUG-014 — nano re-classification could downgrade a tracker status — FIXED 2026-07-16
+- **File:** `editor/src/hooks/useGmailInbox.js`
+- **Observed live:** on a backfill re-run, Turing's borderline "Next steps" email
+  classified `applied` (previously `interview`) and pulled the record back.
+- **Fix:** the drain seeds its per-company rank from the existing record's status, making
+  statuses monotonic across drains (saved/applying < applied < interview < rejected).
+
 ### BUG-010 — Live company search dead without a Settings key (env fallback broken) — FIXED locally 2026-07-09
 - **Date:** 2026-07-09 · **Files:** `editor/server/load-env.js` (new), `editor/server/index.js`
 - **Symptom:** Searching a company not in the catalog showed the research panel, but the
