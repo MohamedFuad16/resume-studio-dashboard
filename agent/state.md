@@ -25,6 +25,21 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-16 — Gmail Phase 2 DEPLOYED TO PROD + refinement pass (commits `0c8b812`,
+  `2f0452d`).** Azure `portal-compile-jp` now runs image `portal-compile:2f0452d`
+  (revision `--0000003`) with the 4 Gmail env vars; prod frontend (portal.mohamedfuad.com)
+  bundle points at the Azure API; Gmail connected in prod (mohamed.fuad.jp@gmail.com) and a
+  live sync-now on the new revision verified clean (token + /data survived the roll).
+  Refinements: (1) server — `sync-now?backfill=<days>` (cap 180) one-time keyword-filtered
+  scan of older mail (EN+JA application terms; doesn't move the history cursor; 80-msg cap),
+  classify prompt now counts coding tests / online assessments as "interview" + JA vocab;
+  (2) client — the drain sorts oldest-first and converges per-company (one record for
+  applied+rejected of the same company; terminal status never downgraded; details backfilled
+  across emails), connected card shows a green presence dot instead of the Live badge and no
+  post-OAuth success banner. Build green, E2E 5/5 (needed `npx playwright install chromium`
+  after a Playwright bump). **PENDING: Vercel prod redeploy** (`vercel deploy --prod --yes`
+  from repo root) to ship the client-side drain/card changes — blocked on user approval this
+  session. Branch pushed; not merged to main.
 - **2026-07-16 — Gmail ingest Phase 2 (2a connect + 2b sync pipeline), branch
   `feat/gmail-catalog-automation` (commits 5513866, 52beba0, 05ad392, c20954d; ADR-0035).**
   Read-only Gmail OAuth (server-side, raw fetch, node:crypto AES-256-GCM token — NO new deps;
