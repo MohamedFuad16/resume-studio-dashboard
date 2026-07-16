@@ -13,6 +13,22 @@
   marks the message processed; backfill ignores the processed list entirely (one-time
   rescan; the queue dedupes by `message:kind`). Verified on prod revision `--0000004`.
 
+### BUG-015 — GSAP SVG tweens froze invisible / clobbered chip position — FIXED 2026-07-16
+- **File:** `editor/src/components/DashboardCharts.jsx`
+- **Observed:** trend bars stuck at `scaleY(0)`/partial matrices; the peak count chip
+  jumped to the chart top. Three distinct causes: (1) `gsap.context()` + `revert()` in the
+  effect cleanup froze tweens mid-flight under React re-renders (months memo changes as
+  records load, StrictMode double-mounts); (2) tweening a `<g>` that positions itself via
+  an SVG `transform="translate(...)"` attribute — GSAP replaces the attribute; (3) rAF is
+  throttled/paused in background/embedded tabs, so `fromTo` starts (invisible state
+  applied) but never advances.
+- **Fix:** plain `fromTo` tweens with cleanup = `kill()` + `gsap.set(clearProps)` (worst
+  case = final state, never invisible); never tween attr-positioned SVG nodes; a
+  `setTimeout → tween.progress(1)` fail-safe finishes the animation if rAF stalls.
+- **Related:** `--intern-*` CSS vars were scoped to `.internship-radar`; the exported
+  DetailPanel rendered colorless in other views until they were also declared on
+  `.intern-detail`.
+
 ### BUG-013 — Re-drained Gmail interview emails duplicated calendar milestones — FIXED 2026-07-16
 - **Files:** `editor/src/hooks/useApplicationTracker.js`, `useGmailInbox.js`
 - **Observed live:** after a backfill + a loop re-sync, Money Forward and enechain each had

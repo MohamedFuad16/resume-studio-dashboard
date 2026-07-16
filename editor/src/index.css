@@ -3242,7 +3242,10 @@ body,
 }
 
 /* ── Internship Radar ─────────────────────────────────── */
-.internship-radar {
+/* The detail drawer also renders outside the radar (Applications view,
+   dashboard Recent applications), so it must carry the palette itself. */
+.internship-radar,
+.intern-detail {
   /* Neutralised for the same reason as --career-blue above. */
   --intern-blue: #101113;
   --intern-blue-dark: #000000;
@@ -3252,6 +3255,8 @@ body,
   --intern-bg: #f5f7fa;
   --intern-line: #dce1e8;
   --intern-soft-line: #e9edf2;
+}
+.internship-radar {
   height: calc(100vh - 58px);
   overflow-y: auto;
   padding: 28px;
@@ -3323,7 +3328,9 @@ body,
   max-width: 1720px;
   min-height: 92px;
   display: grid;
-  grid-template-columns: repeat(3, minmax(150px, 1fr)) auto;
+  /* 4 stat cells + the CTA. Stats size to content so a label like
+     "tracked applications" never wraps onto two lines. */
+  grid-template-columns: repeat(4, minmax(0, auto)) 1fr;
   align-items: center;
   gap: 0;
   margin: 0 auto 16px;
@@ -3337,7 +3344,7 @@ body,
 .intern-summary > div {
   min-height: 56px;
   display: grid;
-  grid-template-columns: 34px auto 1fr;
+  grid-template-columns: 34px auto auto;
   align-items: center;
   gap: 10px;
   padding: 0 24px;
@@ -3362,6 +3369,7 @@ body,
   color: #c0c9d6;
   font-size: 12px;
   font-weight: 560;
+  white-space: nowrap;
 }
 
 .intern-summary > button {
@@ -3370,10 +3378,11 @@ body,
   align-items: center;
   justify-content: center;
   gap: 10px;
+  justify-self: end;
   margin-left: 24px;
   padding: 0 17px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 999px;
   background: var(--intern-blue);
   color: #fff;
   font: inherit;
@@ -3384,42 +3393,48 @@ body,
 }
 .intern-summary > button:hover { background: #2770ff; transform: translateY(-1px); }
 
+/* Borderless, full-width: the table reads as part of the page, not a card. */
 .intern-workspace {
-  max-width: 1720px;
   margin: 0 auto;
   overflow: hidden;
-  border: 1px solid var(--intern-line);
-  border-radius: 12px;
   background: #fff;
-  box-shadow: 0 8px 24px rgba(27, 39, 55, 0.05);
 }
 
+/* Toolbar: search + sort on the first row, one tidy row of pill filters below.
+   Pills follow the app-wide standard set by the Applications tabs (999px
+   radius, quiet border, navy fill when active). */
 .intern-toolbar {
-  min-height: 66px;
   display: grid;
-  grid-template-columns: minmax(260px, 360px) minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 18px;
-  padding: 11px 14px;
+  gap: 12px;
+  padding: 16px;
   border-bottom: 1px solid var(--intern-line);
   background: #fff;
   scroll-margin-top: 10px;
 }
 
+.intern-toolbar-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
 .intern-search {
-  min-height: 42px;
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 12px;
-  border: 1px solid #cfd6e0;
-  border-radius: 8px;
+  padding: 0 10px 0 16px;
+  border: 1px solid #dfe4ec;
+  border-radius: 999px;
   color: #6b7584;
-  background: #fff;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  background: #f8fafc;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
 .intern-search:focus-within {
   border-color: var(--intern-blue);
+  background: #fff;
   box-shadow: 0 0 0 3px rgba(10, 87, 255, 0.1);
 }
 .intern-search input {
@@ -3435,12 +3450,18 @@ body,
 }
 .intern-search input::placeholder { color: #8993a2; }
 .intern-search button {
+  width: 28px;
+  height: 28px;
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
+  border-radius: 50%;
   background: transparent;
   color: #747f8f;
   cursor: pointer;
 }
+.intern-search button:hover { background: #eef1f6; color: #111318; }
 
 .intern-filter-row {
   min-width: 0;
@@ -3457,43 +3478,47 @@ body,
 .intern-sort select {
   min-height: 36px;
   flex: 0 0 auto;
-  border: 1px solid #d3d9e2;
-  border-radius: 7px;
+  border: 1px solid #e3e7ee;
+  border-radius: 999px;
   background: #fff;
-  color: #303640;
+  color: #58657a;
   font: inherit;
-  font-size: 11px;
-  font-weight: 650;
+  font-size: 11.5px;
+  font-weight: 600;
 }
 .intern-filter-label,
 .intern-filter-row button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 0 10px;
+  gap: 7px;
+  padding: 0 14px;
 }
-.intern-filter-row button { cursor: pointer; }
-.intern-filter-row button:hover,
+.intern-filter-row button { cursor: pointer; transition: background 120ms ease, border-color 120ms ease, color 120ms ease; }
+.intern-filter-row button:hover { border-color: #cfd6e2; color: #18243a; }
 .intern-filter-row button.active {
-  border-color: var(--intern-blue);
-  color: var(--intern-blue);
-  background: #f5f8ff;
+  border-color: #18243a;
+  color: #fff;
+  background: #18243a;
 }
+.intern-filter-row button.active svg { color: #cbd5e1; }
 .intern-filter-row select,
-.intern-sort select { padding: 0 28px 0 10px; cursor: pointer; }
+.intern-sort select { padding: 0 30px 0 14px; cursor: pointer; }
+.intern-filter-row select:hover,
+.intern-sort select:hover { border-color: #cfd6e2; color: #18243a; }
 .intern-filter-row .intern-clear {
   border-color: transparent;
   color: #6b7584;
   background: transparent;
 }
 .intern-filter-row .intern-clear:hover { border-color: transparent; color: #111318; background: #f1f3f6; }
-.intern-filter-label { display: none; }
+.intern-filter-label { border-style: dashed; background: #fbfcfe; color: #7c8798; }
 
 .intern-sort {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   color: #8b94a1;
   font-size: 10px;
   font-weight: 700;
@@ -3856,7 +3881,6 @@ body,
 
 @media (max-width: 1250px) {
   .internship-radar { padding: 22px; }
-  .intern-toolbar { grid-template-columns: minmax(220px, 320px) minmax(0, 1fr) auto; gap: 10px; }
 }
 
 @media (max-width: 1050px) {
@@ -3866,8 +3890,6 @@ body,
   .intern-content { grid-template-columns: minmax(0, 1fr); }
   .intern-detail.desktop { display: none; }
   .intern-detail.mobile { display: block; border-bottom: 1px solid var(--intern-line); background: #f7f9fd; }
-  .intern-toolbar { grid-template-columns: minmax(240px, 1fr) auto; }
-  .intern-filter-row { grid-column: 1 / -1; grid-row: 2; }
 }
 
 @media (max-width: 860px) {
@@ -3940,10 +3962,9 @@ body,
   .intern-summary > div strong { color: var(--intern-blue); font-size: 22px; }
   .intern-summary > div span { color: #4e5867; font-size: 10px; }
   .intern-summary > button { min-height: 40px; margin-top: 14px; }
-  .intern-toolbar { grid-template-columns: minmax(0, 1fr) auto; padding: 12px; }
+  .intern-toolbar { padding: 12px; }
   .intern-search { min-height: 46px; }
   .intern-sort span { display: none; }
-  .intern-filter-label { display: inline-flex; }
   .intern-filter-row { padding-bottom: 1px; }
   .intern-filter-row select,
   .intern-filter-row button,
@@ -4101,21 +4122,10 @@ body,
 .profile-socials b { font-size: 12px; }
 .profile-socials small { min-width: 0; overflow: hidden; color: #6d788b; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 
-.profile-completion { min-width: 0; display: flex; align-items: center; gap: 18px; padding-left: 26px; border-left: 1px solid #e3e8ef; }
-/* Readiness donut: thick ring like the analytics reference — conic fill masked
-   to a fat band, soft track, roomy center figure. */
-.completion-ring { position: relative; width: 108px; height: 108px; flex: 0 0 auto; display: grid; place-items: center; align-content: center; border-radius: 50%; }
-.completion-ring::before {
-  content: ''; position: absolute; inset: 0; border-radius: 50%;
-  background: conic-gradient(var(--halo-bg, #1a56f0) var(--completion), #e9edf4 0);
-  -webkit-mask: radial-gradient(circle closest-side, transparent calc(100% - 15px), #000 calc(100% - 14px));
-  mask: radial-gradient(circle closest-side, transparent calc(100% - 15px), #000 calc(100% - 14px));
-}
-.completion-ring strong { font-size: 21px; letter-spacing: -.02em; }
-.completion-ring span { color: #7a8596; font-size: 9.5px; }
-.profile-completion b { font-size: 13px; }
-.profile-completion p { margin: 5px 0 10px; color: #68758a; font-size: 11px; line-height: 1.45; }
-.profile-completion button,
+/* Status breakdown lives in the hero (replaced the old resume-readiness ring):
+   a compact donut + legend against the hero's left divider. */
+.profile-breakdown { min-width: 0; display: grid; align-content: center; gap: 10px; padding-left: 26px; border-left: 1px solid #e3e8ef; }
+.profile-breakdown > b { font-size: 13px; }
 .section-heading button,
 .application-empty button { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: transparent; color: var(--career-blue); font: inherit; font-size: 11px; font-weight: 750; cursor: pointer; }
 
@@ -4137,32 +4147,36 @@ body,
 
 .dashboard-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; margin-top: 26px; }
 
-/* ── Dashboard analytics row: trend bars + status donut ─────────────── */
-.dashboard-analytics { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; }
-.analytics-card { min-width: 0; padding: 18px 20px 14px; border: 1px solid #e7ebf2; border-radius: 16px; background: #fff; }
+/* ── Dashboard analytics row: trend card + Tokyo opportunities (the
+      status donut moved into the hero next to the identity block) ────── */
+.dashboard-analytics { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; }
+.analytics-heading-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.analytics-heading-row > button { min-height: 30px; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; border: 1px solid #dce3ee; border-radius: 999px; background: transparent; color: #34435c; font: inherit; font-size: 11px; font-weight: 750; cursor: pointer; white-space: nowrap; }
+.analytics-tokyo .tokyo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.analytics-card { min-width: 0; padding: 18px 0 14px; border: 0; border-radius: 0; background: transparent; }
 .analytics-heading h2 { margin: 0; color: var(--career-ink); font-size: 14.5px; letter-spacing: -.015em; }
 .analytics-heading p { margin: 4px 0 0; color: #788398; font-size: 11px; }
-.trend-chart { width: 100%; height: auto; margin-top: 6px; display: block; }
+/* Full-width card: cap the SVG so its text doesn't scale up comically wide. */
+.trend-chart { width: 100%; max-width: 980px; height: auto; margin: 6px auto 0; display: block; }
 .trend-tick { fill: #97a1b1; font-size: 10px; }
 .trend-month { fill: #6f7b8e; font-size: 10.5px; font-weight: 650; }
 .trend-chip { opacity: 0; transition: opacity .12s ease; }
 .trend-bar.peak .trend-chip, .trend-bar:hover .trend-chip { opacity: 1; }
 .trend-bar:hover .trend-bar-mark { fill: var(--halo-bg, #1a56f0); stroke: none; }
-.trend-chip-bg { fill: #fff; stroke: #e2e7f0; filter: drop-shadow(0 3px 8px rgba(15, 23, 42, .14)); }
-.trend-chip-text { fill: #172033; font-size: 11px; font-weight: 780; }
-.donut-wrap { display: grid; grid-template-columns: 128px minmax(0, 1fr); align-items: center; gap: 16px; margin-top: 8px; }
-.donut-wrap svg { width: 128px; height: 128px; }
+.trend-chip-bg { fill: #fff; stroke: #e2e7f0; filter: drop-shadow(0 2px 4px rgba(15, 23, 42, .1)); }
+.trend-chip-text { fill: #172033; font-size: 10.5px; font-weight: 780; }
+.donut-wrap { display: grid; grid-template-columns: 112px minmax(0, 1fr); align-items: center; gap: 16px; }
+.donut-wrap svg { width: 112px; height: 112px; }
 .donut-total { fill: #0f172a; font-size: 24px; font-weight: 820; letter-spacing: -.02em; }
 .donut-total-label { fill: #7a8596; font-size: 9.5px; font-weight: 650; }
-.donut-legend { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.donut-legend { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; align-content: center; }
 .donut-legend li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; gap: 8px; }
 .donut-legend i { width: 10px; height: 10px; border-radius: 3px; }
 .donut-legend span { color: #4b5768; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .donut-legend b { color: #172033; font-size: 12px; }
 .donut-legend-empty { color: #8b95a5; font-size: 11px; }
 
-/* ── Tokyo opportunities: full-width card row below Projects ────────── */
-.tokyo-heading { margin-top: 30px; }
+/* ── Tokyo opportunities: card grid (lives beside the trend chart) ──── */
 .tokyo-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
 .tokyo-card { min-width: 0; display: grid; gap: 4px; padding: 14px; border: 1px solid #e7ebf2; border-radius: 14px; background: #fff; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color .12s ease, box-shadow .12s ease; }
 .tokyo-card:hover { border-color: #c8d6ef; box-shadow: 0 6px 18px rgba(23, 32, 51, .07); }
@@ -4180,7 +4194,7 @@ body,
 .section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .section-heading h2 { margin: 0; color: var(--career-ink); font-size: 15px; letter-spacing: -.015em; }
 .section-heading p { margin: 5px 0 0; color: #788398; font-size: 11px; }
-.section-heading button { min-height: 30px; padding: 0 9px; border: 1px solid #dce3ee; border-radius: 7px; color: #34435c; }
+.section-heading button { min-height: 30px; padding: 0 12px; border: 1px solid #dce3ee; border-radius: 999px; color: #34435c; }
 
 .application-list { margin-top: 18px; }
 .application-list-head,
@@ -4189,6 +4203,9 @@ body,
 .application-row { min-height: 68px; padding: 8px 10px; border-bottom: 1px solid #edf0f4; color: #59667b; font-size: 10.5px; }
 .application-company { min-width: 0; display: flex; align-items: center; gap: 10px; }
 .application-company > span:last-child { min-width: 0; display: grid; gap: 3px; }
+/* Company name is a click target: opens the internship detail drawer. */
+.application-company-trigger { min-width: 0; display: grid; gap: 3px; padding: 0; border: 0; background: transparent; font: inherit; text-align: left; cursor: pointer; }
+.application-company-trigger:hover b { color: var(--career-blue); }
 .application-company b { overflow: hidden; color: #18243a; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .application-company small { overflow: hidden; color: #748095; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .application-row > span:not(.application-company) { display: flex; align-items: center; gap: 5px; }
@@ -4248,7 +4265,8 @@ body,
   min-height: 28px;
   display: inline-flex;
   align-items: center;
-  padding: 0 9px;
+  gap: 7px;
+  padding: 0 11px;
   border: 1px solid #dce6f4;
   border-radius: 999px;
   background: #f7f7f6;
@@ -4256,6 +4274,7 @@ body,
   font-size: 10px;
   font-weight: 760;
 }
+.intern-chip-list span img { width: 13px; height: 13px; object-fit: contain; }
 .intern-check-list,
 .intern-process-list {
   display: grid;
@@ -4302,6 +4321,15 @@ body,
 .intern-source > div { padding: 9px 10px; border: 1px solid #e8edf4; border-radius: 9px; background: #fbfcfe; }
 .intern-status-control { display: grid; grid-template-columns: 1fr; gap: 6px; padding-top: 5px; color: #7c8798; font-size: 9px; font-weight: 750; text-transform: uppercase; letter-spacing: .05em; }
 .intern-status-control select { width: 100%; min-height: 37px; text-transform: none; letter-spacing: 0; }
+/* Status moved to the top of the drawer: label + select on one row, under the meta chips. */
+.intern-status-control.intern-status-top {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0 16px;
+  border-bottom: 1px solid var(--intern-soft-line);
+}
+.intern-status-control.intern-status-top select { min-height: 38px; }
 .chat-composer .btn-primary:disabled { opacity: .55; cursor: wait; }
 .chat-actions { display: grid; gap: 8px; }
 .chat-cancel { justify-content: center; border-color: #f1b8bd; color: #b4232c; background: #fff7f7; }
@@ -4324,7 +4352,7 @@ body,
 
 @media (max-width: 1180px) {
   .profile-hero { grid-template-columns: minmax(330px, 1.2fr) minmax(250px, .8fr); }
-  .profile-completion { grid-column: 1 / -1; padding: 18px 0 0; border-top: 1px solid #e3e8ef; border-left: 0; }
+  .profile-breakdown { grid-column: 1 / -1; padding: 18px 0 0; border-top: 1px solid #e3e8ef; border-left: 0; }
   .pipeline-strip { grid-template-columns: repeat(3, minmax(120px, 1fr)); }
   .pipeline-title { grid-column: 1 / -1; border-bottom: 1px solid #e5e9f0; }
   .project-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -4334,7 +4362,7 @@ body,
   .profile-dashboard { padding: 18px 14px 36px; }
   .profile-hero { grid-template-columns: 1fr; gap: 20px; padding: 22px 18px; }
   .profile-socials { grid-template-columns: 1fr 1fr; }
-  .profile-completion { grid-column: auto; }
+  .profile-breakdown { grid-column: auto; }
   .pipeline-strip { grid-template-columns: repeat(2, 1fr); }
   .pipeline-title { grid-column: 1 / -1; }
   .dashboard-grid { grid-template-columns: 1fr; }
@@ -4365,9 +4393,6 @@ body,
 @media (max-width: 560px) {
   .intern-heading h1 { font-size: 30px; }
   .intern-heading p { font-size: 12px; }
-  .intern-toolbar { grid-template-columns: minmax(0, 1fr); }
-  .intern-sort { grid-row: 3; justify-content: flex-end; }
-  .intern-filter-row { grid-column: 1; }
   .intern-sort select { min-height: 36px; }
   .intern-summary > div span { max-width: 84px; line-height: 1.25; }
   .intern-table-head { display: none; }
@@ -5115,10 +5140,7 @@ body,
 .chat-composer .btn-primary { min-width: 84px; }
 
 @media (max-width: 1600px) {
-  .intern-toolbar { grid-template-columns: minmax(280px, 1fr) auto; }
   .intern-filter-row {
-    grid-column: 1 / -1;
-    grid-row: 2;
     flex-wrap: wrap;
     overflow: visible;
   }
@@ -5255,25 +5277,9 @@ body,
 }
 
 /* ── Internship radar calendar/search polish, final overrides ───── */
-.intern-toolbar {
-  grid-template-columns: minmax(320px, 1fr) auto;
-  align-items: start;
-  gap: 10px 14px;
-  overflow: visible;
-}
-
-.intern-toolbar .intern-search { grid-column: 1; grid-row: 1; }
-.intern-toolbar .intern-sort {
-  grid-column: 2;
-  grid-row: 1;
-  justify-self: end;
-  padding: 0;
-  background: transparent;
-  white-space: nowrap;
-}
+.intern-toolbar { overflow: visible; }
+.intern-toolbar .intern-sort { white-space: nowrap; }
 .intern-toolbar .intern-filter-row {
-  grid-column: 1 / -1;
-  grid-row: 2;
   flex-wrap: wrap;
   overflow: visible;
   gap: 8px;
@@ -5833,12 +5839,9 @@ body,
 }
 
 @media (max-width: 760px) {
-  .intern-toolbar { grid-template-columns: minmax(0, 1fr); }
-  .intern-toolbar .intern-sort,
-  .intern-toolbar .intern-search,
-  .intern-toolbar .intern-filter-row { grid-column: 1; }
-  .intern-toolbar .intern-sort { grid-row: 3; justify-self: stretch; }
-  .intern-sort select { width: 100%; min-width: 0; }
+  .intern-toolbar-top { flex-wrap: wrap; }
+  .intern-toolbar .intern-sort { width: 100%; }
+  .intern-sort select { flex: 1; width: 100%; min-width: 0; }
   .company-research-intro,
   .company-research-result {
     grid-template-columns: 38px minmax(0, 1fr);
@@ -6007,6 +6010,20 @@ body,
   box-shadow: 0 0 0 3px rgba(10, 87, 255, .12);
 }
 
+/* Toolbar selects follow the app-wide pill standard (Applications tabs). */
+.intern-filter-row select,
+.intern-sort select {
+  min-height: 36px;
+  padding: 0 32px 0 14px;
+  border-color: #e3e7ee;
+  border-radius: 999px;
+  color: #58657a;
+  font-size: 11.5px;
+  background-position: right 13px center;
+}
+.intern-filter-row select:hover,
+.intern-sort select:hover { border-color: #cfd6e2; color: #18243a; }
+
 /* Size status selects to their content so the chevron sits beside the label (no mid gap) */
 .intern-row-status,
 .intern-status-control select,
@@ -6107,11 +6124,12 @@ body,
 }
 
 .intern-detail.drawer {
-  width: min(470px, 92vw);
+  width: min(560px, 94vw);
   height: 100%;
   min-height: 0;
   overflow-y: auto;
-  padding: 22px 24px 30px;
+  /* Extra top padding so the head doesn't hug the drawer edge. */
+  padding: 34px 24px 30px;
   border-left: 1px solid #dce3ed;
   background: #fff;
   box-shadow: -22px 0 56px rgba(15, 29, 51, .18);
@@ -6136,25 +6154,26 @@ body,
 .intern-detail-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
-  padding: 15px 0;
+  gap: 8px;
+  padding: 16px 0 18px;
   border-bottom: 1px solid #e8edf4;
 }
 
 .intern-detail-meta .intern-meta-token {
-  min-height: 30px;
+  min-height: 32px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   box-sizing: border-box;
-  padding: 6px 10px;
+  padding: 7px 13px;
   border: 1px solid #dfe6f0;
   border-radius: 999px;
   background: #f8fafc;
   color: #4b5870;
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 10.5px;
+  font-weight: 650;
   line-height: 1.25;
+  white-space: nowrap;
 }
 
 .intern-detail-meta .intern-meta-token svg { color: #65758c; }
@@ -6188,7 +6207,7 @@ body,
       '. duration duration duration'
       '. deadline status apply';
   }
-  .intern-detail.drawer { width: min(520px, 100vw); padding: 20px 18px 28px; }
+  .intern-detail.drawer { width: min(560px, 100vw); padding: 20px 18px 28px; }
   .intern-detail-head { grid-template-columns: 52px minmax(0, 1fr) 62px 34px; gap: 10px; }
   .intern-detail-head > .company-logo { width: 52px; height: 52px; }
 }
@@ -7352,7 +7371,9 @@ body,
 .calendar-view .calendar-days {
   flex: 1;
   min-height: 0;
-  grid-auto-rows: minmax(0, 1fr);
+  /* min-content floor: a day with several event pills grows its row (the view
+     scrolls) instead of the pills overflowing the rounded cell. */
+  grid-auto-rows: minmax(min-content, 1fr);
 }
 .calendar-view .calendar-day {
   min-height: 0;
@@ -7513,6 +7534,9 @@ body,
 .profile-info-body a { font-size: 13px; color: #2563eb; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .profile-info-body a:hover { text-decoration: underline; }
 
+.profile-skill-groups { display: grid; gap: 16px; }
+.profile-skill-group { display: grid; gap: 8px; }
+.profile-skill-group > small { color: #8b95a6; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
 .profile-skill-tags { display: flex; flex-wrap: wrap; gap: 8px; }
 .profile-skill-tag { padding: 5px 11px; border: 1px solid #e3e7ee; border-radius: 999px; background: #f8fafc; color: #34445e; font-size: 11.5px; font-weight: 600; }
 

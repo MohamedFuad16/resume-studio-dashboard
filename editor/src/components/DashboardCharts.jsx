@@ -1,10 +1,12 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
+import gsap from 'gsap';
 import { statusLabel } from '../hooks/useApplicationTracker.js';
 
 // Dashboard analytics: a monthly application-trend bar chart and a status
-// breakdown donut. Plain SVG, no chart library. Colors are validated against
-// the white card surface (dataviz six-checks); the legend carries the counts,
-// so identity never rides on color alone.
+// breakdown donut. Plain SVG, no chart library; GSAP drives the entrance
+// animations. Colors are validated against the white card surface (dataviz
+// six-checks); the legend carries the counts, so identity never rides on
+// color alone.
 const STATUS_COLORS = { applying: '#1baf7a', applied: '#2a78d6', interview: '#eda100', rejected: '#e34948' };
 const DONUT_ORDER = ['applying', 'applied', 'interview', 'rejected'];
 const APPLICATION_STATUSES_SET = new Set(DONUT_ORDER);
@@ -17,7 +19,25 @@ const recordInstant = record => {
   return date && !Number.isNaN(date.getTime()) ? date : null;
 };
 
+// A bar that sits flush on the axis: square bottom corners, rounded top only.
+// (A plain <rect rx> rounds all four corners, so bars looked detached from
+// the baseline.)
+const barPath = (x, top, width, height) => {
+  const r = Math.min(9, width / 2, height);
+  const bottom = top + height;
+  return [
+    `M${x} ${bottom}`,
+    `V${top + r}`,
+    `Q${x} ${top} ${x + r} ${top}`,
+    `H${x + width - r}`,
+    `Q${x + width} ${top} ${x + width} ${top + r}`,
+    `V${bottom}`,
+    'Z',
+  ].join(' ');
+};
+
 export function ApplicationTrendChart({ records, isJa }) {
+  const svgRef = useRef(null);
   const locale = isJa ? 'ja-JP' : 'en-US';
   const months = useMemo(() => {
     const fmt = new Intl.DateTimeFormat(locale, { month: 'short' });
@@ -44,14 +64,43 @@ export function ApplicationTrendChart({ records, isJa }) {
   const yMax = Math.max(2, Math.ceil(max / 2) * 2);
   const ticks = [0, yMax / 2, yMax];
 
-  const W = 560; const H = 210; const PAD_L = 26; const PAD_B = 26; const PAD_T = 30;
-  const plotW = W - PAD_L - 8; const plotH = H - PAD_T - PAD_B;
+  const W = 640; const H = 224; const PAD_L = 30; const PAD_B = 28; const PAD_T = 38;
+  const plotW = W - PAD_L - 10; const plotH = H - PAD_T - PAD_B;
   const band = plotW / months.length;
-  const barW = Math.min(38, band * 0.52);
+  const barW = Math.min(34, band * 0.42);
   const y = v => PAD_T + plotH - (v / yMax) * plotH;
 
+  // GSAP entrance: bars grow up from the baseline with a stagger while month
+  // labels fade in. Cleanup clears the inline props so an interrupted run
+  // (re-render mid-tween) can never leave the chart half-drawn or invisible.
+  // NOTE: don't tween .trend-chip — GSAP would overwrite its SVG
+  // `transform="translate(...)"` positioning; CSS handles its fade.
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return undefined;
+    const bars = svg.querySelectorAll('.trend-bar-mark');
+    const labels = svg.querySelectorAll('.trend-month');
+    const tweens = [
+      gsap.fromTo(bars,
+        { scaleY: 0, transformOrigin: '50% 100%' },
+        { scaleY: 1, duration: 0.85, ease: 'power3.out', stagger: 0.07, overwrite: 'auto' }),
+      gsap.fromTo(labels,
+        { opacity: 0 },
+        { opacity: 1, duration: 0.45, ease: 'power2.out', stagger: 0.07, delay: 0.15, overwrite: 'auto' }),
+    ];
+    // rAF can be throttled/paused in background or embedded tabs, freezing the
+    // tweens at their (invisible) start state — force-finish after the runtime.
+    const settle = window.setTimeout(() => tweens.forEach(tween => tween.progress(1)), 1800);
+    return () => {
+      window.clearTimeout(settle);
+      tweens.forEach(tween => tween.kill());
+      gsap.set(bars, { clearProps: 'all' });
+      gsap.set(labels, { clearProps: 'all' });
+    };
+  }, [months]);
+
   return (
-    <svg className="trend-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={isJa ? '月別の応募数' : 'Applications per month'}>
+    <svg ref={svgRef} className="trend-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={isJa ? '月別の応募数' : 'Applications per month'}>
       <defs>
         <pattern id="trend-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
           <rect width="6" height="6" fill="#eef1f6" />
@@ -60,8 +109,8 @@ export function ApplicationTrendChart({ records, isJa }) {
       </defs>
       {ticks.map(tick => (
         <g key={tick}>
-          <line x1={PAD_L} x2={W - 8} y1={y(tick)} y2={y(tick)} stroke={tick === 0 ? '#cdd5e1' : '#eceff5'} strokeWidth="1" />
-          <text x={PAD_L - 7} y={y(tick) + 3} textAnchor="end" className="trend-tick">{tick}</text>
+          <line x1={PAD_L} x2={W - 10} y1={y(tick)} y2={y(tick)} stroke={tick === 0 ? '#cdd5e1' : '#eceff5'} strokeWidth="1" />
+          <text x={PAD_L - 8} y={y(tick) + 3} textAnchor="end" className="trend-tick">{tick}</text>
         </g>
       ))}
       {months.map((month, index) => {
@@ -72,15 +121,15 @@ export function ApplicationTrendChart({ records, isJa }) {
         return (
           <g key={month.key} className={`trend-bar ${highlighted ? 'peak' : ''}`}>
             <rect className="trend-bar-hit" x={PAD_L + band * index} y={PAD_T - 16} width={band} height={plotH + 16} fill="transparent" />
-            <rect
+            <path
               className="trend-bar-mark"
-              x={x} y={top} width={barW} height={h} rx="7" ry="7"
+              d={barPath(x, top, barW, h)}
               fill={highlighted ? 'var(--halo-bg, #1a56f0)' : 'url(#trend-hatch)'}
               stroke={highlighted ? 'none' : '#dde3ee'} strokeWidth={highlighted ? 0 : 1}
             />
-            <g className="trend-chip" transform={`translate(${x + barW / 2}, ${top - 12})`}>
-              <rect x="-24" y="-13" width="48" height="20" rx="10" className="trend-chip-bg" />
-              <text y="1" textAnchor="middle" className="trend-chip-text">{month.count}</text>
+            <g className="trend-chip" transform={`translate(${x + barW / 2}, ${top - 11})`}>
+              <rect x="-19" y="-12" width="38" height="19" rx="9.5" className="trend-chip-bg" />
+              <text y="2" textAnchor="middle" className="trend-chip-text">{month.count}</text>
             </g>
             <text x={x + barW / 2} y={H - 8} textAnchor="middle" className="trend-month">{month.label}</text>
           </g>
@@ -91,6 +140,7 @@ export function ApplicationTrendChart({ records, isJa }) {
 }
 
 export function StatusBreakdownDonut({ counts, isJa }) {
+  const wrapRef = useRef(null);
   const slices = DONUT_ORDER
     .map(status => ({ status, count: counts[status] || 0, color: STATUS_COLORS[status] }))
     .filter(slice => slice.count > 0);
@@ -100,8 +150,46 @@ export function StatusBreakdownDonut({ counts, isJa }) {
   const GAP = slices.length > 1 ? 2.5 : 0; // surface gap between segments
   let offset = 0;
 
+  // GSAP entrance: segments sweep clockwise in sequence, the total counts up,
+  // and legend rows slide in. Cleanup clears inline props so an interrupted
+  // run falls back to the attribute-defined (final) state.
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return undefined;
+    const slicesEls = wrap.querySelectorAll('.donut-slice');
+    const legendEls = wrap.querySelectorAll('.donut-legend li');
+    const totalEl = wrap.querySelector('.donut-total');
+    const tweens = [];
+    slicesEls.forEach((el, i) => {
+      const dash = Number(el.dataset.dash) || 0;
+      tweens.push(gsap.fromTo(el,
+        { strokeDasharray: `0 ${C}` },
+        { strokeDasharray: `${dash} ${C - dash}`, duration: 0.8, ease: 'power2.inOut', delay: i * 0.12, overwrite: 'auto' }));
+    });
+    if (totalEl && total > 0) {
+      const counter = { value: 0 };
+      tweens.push(gsap.to(counter, {
+        value: total, duration: 0.8, ease: 'power2.out',
+        onUpdate: () => { totalEl.textContent = String(Math.round(counter.value)); },
+      }));
+    }
+    tweens.push(gsap.fromTo(legendEls,
+      { opacity: 0, x: -8 },
+      { opacity: 1, x: 0, duration: 0.4, ease: 'power2.out', stagger: 0.08, delay: 0.25, overwrite: 'auto' }));
+    // Same fail-safe as the trend chart: never leave the donut invisible if
+    // rAF is throttled and the tweens can't run.
+    const settle = window.setTimeout(() => tweens.forEach(tween => tween.progress(1)), 2000);
+    return () => {
+      window.clearTimeout(settle);
+      tweens.forEach(tween => tween.kill());
+      gsap.set(slicesEls, { clearProps: 'all' });
+      gsap.set(legendEls, { clearProps: 'all' });
+      if (totalEl) totalEl.textContent = String(total);
+    };
+  }, [total, C, slices.length]);
+
   return (
-    <div className="donut-wrap">
+    <div className="donut-wrap" ref={wrapRef}>
       <svg viewBox="0 0 140 140" role="img" aria-label={isJa ? '応募状況の内訳' : 'Application status breakdown'}>
         <circle cx="70" cy="70" r={R} fill="none" stroke="#eef1f6" strokeWidth={STROKE} />
         {slices.map(slice => {
@@ -110,6 +198,8 @@ export function StatusBreakdownDonut({ counts, isJa }) {
           const el = (
             <circle
               key={slice.status}
+              className="donut-slice"
+              data-dash={dash}
               cx="70" cy="70" r={R} fill="none"
               stroke={slice.color} strokeWidth={STROKE} strokeLinecap={slices.length > 1 ? 'butt' : 'round'}
               strokeDasharray={`${dash} ${C - dash}`}

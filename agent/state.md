@@ -25,6 +25,38 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-16 (pm, round 2 — user feedback).** Radar: header "Tune my resume" button
+  dropped (summary CTA is the only one); sort select sits beside the search bar again;
+  `.intern-workspace` is borderless/full-width (no card box around the table). Drawer:
+  width 470→560px so meta chips fit; the STATUS select moved to the TOP (row under the
+  meta chips, `.intern-status-top`), out of the bottom actions. Trend chart re-proportioned
+  (W640/H224, slimmer bars cap 34, radius 9, smaller count chip + softer shadow). Calendar
+  overflow fix: `.calendar-view .calendar-days` rows were `minmax(0,1fr)` so 2+ event
+  pills spilled out of short cells → `minmax(min-content,1fr)` (row grows, view scrolls).
+- **2026-07-16 (pm) — GSAP charts, pill design standard, shared detail drawer.**
+  (1) `gsap` added (editor dep). `DashboardCharts.jsx`: trend bars are now flat-bottomed
+  paths (rounded top only) so they sit on the axis, GSAP staggered grow-in + donut sweep;
+  tweens carry a setTimeout fail-safe (`progress(1)`) because throttled/background rAF can
+  freeze them, and cleanup uses kill+clearProps (never `context.revert`, which froze bars
+  mid-flight under React re-renders). Don't tween elements with an SVG `transform=` attr —
+  GSAP clobbers it (peak-count chip). (2) Dashboard: resume-readiness ring REMOVED; hero's
+  3rd column is now the Status-breakdown donut (`.profile-breakdown`); analytics row =
+  Application trend + Tokyo opportunities side by side, borderless `.analytics-card`s;
+  Tokyo section removed from below Projects. (3) **Pill radius (999px, Applications-tab
+  style, navy `#18243a` active fill) is the app-wide control standard** — radar toolbar
+  rebuilt: search alone on row 1, filter pills + SORT select on row 2; removed
+  Filters-label chip, Priority toggle, All-statuses select (and their state); summary CTA
+  is now "Tune my resume" (was Review priority list); `tracked applications` label no
+  longer wraps (summary grid `repeat(4,auto) 1fr` + nowrap). (4) `DetailPanel` exported
+  from `InternshipDashboard.jsx` and opened by clicking company names in ApplicationsView
+  AND dashboard Recent applications (`.application-company-trigger`); panel guards
+  synthetic Gmail records (no score/url/fitNote/source); `--intern-*` CSS vars are now
+  declared on `.intern-detail` too (they were radar-scoped, drawer rendered unstyled
+  outside it). Drawer: +top padding, tech-stack chips show brand icons via
+  `resolveTechIcon` — whose substring matching is now word-bounded ("agenTS"→TypeScript,
+  "sourCe"→C false hits fixed). (5) ProfileView skills grouped
+  (Languages/Frameworks/Tools). Build green; verified in browser on :5176
+  (`client-noauth` launch config added).
 - **2026-07-16 — Dashboard analytics + calendar tooltip fix + Gmail internships-only +
   CJK company names (commits `b4095c2`, `f231e60`).** (1) Dashboard (CRM-reference design):
   analytics row under the pipeline strip — monthly "Application trend" bars (hatched
