@@ -7021,6 +7021,15 @@ body,
   display: flex;
   flex: 1;
   min-height: 0;
+  /* The login mock's sidebar surface ("New application / All Saved /
+     Dashboard…"): the .auth-art palette as it reads THROUGH the mock's 62%
+     white frost — a muted, near-flat pastel wash, not the vivid sky. One
+     continuous backdrop for the whole signed-in screen (sidebar + behind the
+     cards), no color break anywhere. */
+  background:
+    radial-gradient(120% 80% at 50% 100%, rgba(247, 201, 160, 0.35) 0%, rgba(247, 201, 160, 0) 60%),
+    radial-gradient(90% 60% at 15% 85%, rgba(240, 168, 130, 0.28) 0%, rgba(240, 168, 130, 0) 55%),
+    linear-gradient(190deg, #dee8f2 0%, #ebeff3 30%, #faece2 68%, #fcf2e8 100%);
 }
 
 .app-sidebar {
@@ -7030,9 +7039,9 @@ body,
   flex-direction: column;
   gap: 3px;
   padding: 14px 12px;
-  /* Subtle vertical wash: cool grey at the top easing into a warm peach at the
-     bottom (reference design). The gradient lives here, not on the backdrop. */
-  background: linear-gradient(180deg, #e9ebef 0%, #eee9e3 48%, #f6e7d7 100%);
+  /* Transparent: the shared .app-body gradient IS the sidebar background —
+     identical to the backdrop behind the white cards, no divider anywhere. */
+  background: transparent;
   border-right: 0;
   /* Must NOT clip: the profile dropdown is absolutely positioned inside the
      footer and has to escape the bar's 236px (64px collapsed) width. Content
@@ -7129,9 +7138,9 @@ body,
   border: 1px solid transparent;
   border-radius: 10px;
   background: transparent;
-  color: #3a3f47;
+  color: #3f3f46;
   font: inherit;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   letter-spacing: -0.005em;
   text-align: left;
@@ -7295,9 +7304,9 @@ body,
   min-width: 0;
   display: flex;
   flex-direction: column;
-  /* Soft gutter around the content card. The sidebar gradient bleeds into this,
-     and the white content card floats inside — no hard dividing line. */
-  background: linear-gradient(180deg, #eceef1 0%, #efeae4 55%, #f4e9dc 100%);
+  /* Transparent gutter: the shared .app-body sunset gradient shows around the
+     floating white view cards — no color break against the sidebar. */
+  background: transparent;
   padding: 12px 12px 12px 4px;
 }
 
@@ -7385,23 +7394,33 @@ body,
   border-radius: 12px;
 }
 
-/* Today's date — the red badge from the reference. Built from layers rather than
-   a flat fill: a radial gradient lit from the top edge, an inset highlight for
-   the raised lip, a red-tinted drop shadow so it sits above the cell, and a fine
-   grain overlay. The numeral is pale pink, not white, as in the reference. The
-   cell itself stays neutral — the badge is the whole marker. (The reference's
-   dark background is deliberately NOT applied; that is for dark mode later.) */
+/* Date badges — the layered "raised pin" treatment from the reference now
+   applies to EVERY date: a radial gradient lit from the top edge, an inset
+   highlight for the raised lip, a tinted drop shadow, and a fine grain
+   overlay. All days are blue; today alone is red. */
 .calendar-view .calendar-day.today {
   border-color: var(--b0);
   box-shadow: none;
 }
-.calendar-view .calendar-day.today .calendar-day-number {
+.calendar-view .calendar-day-number {
   position: relative;
   min-width: 26px;
   width: 26px;
   height: 26px;
+  margin: 2px 0 4px;
   padding: 0;
   border-radius: 50%;
+  background: radial-gradient(115% 115% at 50% 0%, #6b96ff 0%, #2f66f2 55%, #1547c7 100%);
+  color: #d9e4ff;
+  box-shadow:
+    0 2px 7px rgba(21, 71, 199, 0.4),
+    0 1px 2px rgba(21, 71, 199, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -1px 0 rgba(7, 26, 88, 0.35);
+  text-shadow: 0 1px 1px rgba(7, 26, 88, 0.4);
+  overflow: hidden;
+}
+.calendar-view .calendar-day.today .calendar-day-number {
   background: radial-gradient(115% 115% at 50% 0%, #ff6470 0%, #ee2b3a 55%, #d1121f 100%);
   color: #ffd2d7;
   box-shadow:
@@ -7410,11 +7429,10 @@ body,
     inset 0 1px 0 rgba(255, 255, 255, 0.45),
     inset 0 -1px 0 rgba(120, 0, 8, 0.35);
   text-shadow: 0 1px 1px rgba(120, 0, 8, 0.4);
-  overflow: hidden;
 }
 /* Week view labels the day as "Jul 16" — a fixed 26px circle can't hold that,
-   so the today badge becomes a pill there. */
-.calendar-view .calendar-grid.week .calendar-day.today .calendar-day-number {
+   so the badges become pills there. */
+.calendar-view .calendar-grid.week .calendar-day-number {
   width: auto;
   min-width: 26px;
   height: auto;
@@ -7423,8 +7441,8 @@ body,
   border-radius: 999px;
 }
 /* Grain — a fine dot pattern at low opacity, so the fill reads matte like the
-   reference rather than flat digital red. */
-.calendar-view .calendar-day.today .calendar-day-number::after {
+   reference rather than flat digital color. */
+.calendar-view .calendar-day-number::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -7486,8 +7504,10 @@ body,
   height: auto;
   flex: 1;
   min-height: 0;
-  /* Every view is an inset white card floating in the app-main gutter. */
+  /* White card floating on the shared .app-body gradient. The card's own
+     edge (border) is what separates it — nothing else draws a line. */
   background: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.9);
   border-radius: 16px;
   box-shadow: 0 1px 2px rgba(30, 41, 59, 0.04), 0 10px 30px rgba(30, 41, 59, 0.06);
 }
@@ -7545,6 +7565,48 @@ body,
 .profile-info-body b { font-size: 13px; color: #18243a; }
 .profile-info-body a { font-size: 13px; color: #2563eb; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .profile-info-body a:hover { text-decoration: underline; }
+
+/* Inline profile editing (moved here from Settings). */
+.profile-edit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; }
+.profile-edit-field { display: grid; gap: 6px; }
+.profile-edit-field > span { color: #8b95a6; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.profile-edit-field input {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid #e3e7ee;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #18243a;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 550;
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+.profile-edit-field input:focus { border-color: #2563eb; background: #fff; box-shadow: 0 0 0 3px rgba(37, 99, 235, .1); }
+.profile-edit-error { margin-top: 12px; color: #d54b50; font-size: 11.5px; font-weight: 600; }
+.profile-edit-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.profile-edit-actions button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  border: 1px solid #e3e7ee;
+  border-radius: 999px;
+  background: #fff;
+  color: #58657a;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.profile-edit-actions button:hover:not(:disabled) { border-color: #cfd6e2; color: #18243a; }
+.profile-edit-actions .profile-edit-save { border-color: #18243a; background: #18243a; color: #fff; }
+.profile-edit-actions .profile-edit-save:hover:not(:disabled) { background: #24334e; color: #fff; }
+.profile-edit-actions button:disabled { opacity: .55; cursor: default; }
+@media (max-width: 720px) { .profile-edit-grid { grid-template-columns: 1fr; } }
 
 .profile-skill-groups { display: grid; gap: 16px; }
 .profile-skill-group { display: grid; gap: 8px; }
@@ -7644,4 +7706,338 @@ body,
   background: var(--hover);
   color: var(--t3);
   box-shadow: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   EDITOR REDESIGN (2026-07) — the editor joins the app's design language:
+   borderless sections, pill controls (Applications-tab standard, navy
+   #18243a active), soft #f8fafc inputs with a blue focus ring, small type.
+   Final override layer: later-in-file wins over the legacy editor styles.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Topbar: title | template pills | save + export ────────────────── */
+.editor-topbar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 24px;
+  border-bottom: 1px solid #eef0f4;
+}
+.editor-topbar-title { min-width: 0; }
+.editor-topbar-title h2 { margin: 0; color: #18243a; font-size: 15px; letter-spacing: -.015em; }
+.editor-topbar-title p { margin: 4px 0 0; color: #788398; font-size: 11px; white-space: nowrap; }
+.editor-template-pills {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.editor-template-label {
+  color: #8b95a6;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.editor-view .tpl {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+  border: 1px solid #e3e7ee;
+  border-radius: 999px;
+  background: #fff;
+  color: #58657a;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--ease), border-color var(--ease), color var(--ease);
+}
+.editor-view .tpl:hover { border-color: #cfd6e2; color: #18243a; }
+.editor-view .tpl.active,
+.editor-view .tpl.active.on-en,
+.editor-view .tpl.active.on-ja {
+  border-color: #18243a;
+  background: #18243a;
+  color: #fff;
+}
+.editor-topbar-actions { display: flex; align-items: center; gap: 8px; }
+
+/* ── Buttons inside the editor: the pill standard ──────────────────── */
+.editor-view .btn {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 14px;
+  border: 1px solid #e3e7ee;
+  border-radius: 999px;
+  background: #fff;
+  color: #58657a;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background var(--ease), border-color var(--ease), color var(--ease);
+}
+.editor-view .btn:hover:not(:disabled) { border-color: #cfd6e2; color: #18243a; background: #fff; }
+.editor-view .btn:disabled { opacity: .55; cursor: default; }
+
+/* ── Split: form column + preview ──────────────────────────────────── */
+.editor-view .sidebar { width: 560px; border-right: 1px solid #eef0f4; background: #fff; }
+.editor-workspace { grid-template-columns: 218px minmax(0, 1fr); }
+
+/* Section rail — quiet nav list, no boxes */
+.section-rail { border-right: 1px solid #eef0f4; background: #fbfcfe; }
+.rail-head {
+  height: 46px;
+  padding: 0 16px;
+  border-bottom: 1px solid #eef0f4;
+  color: #8b95a6;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.rail-head strong { min-width: 24px; height: 22px; border-radius: 999px; background: #eef1f6; color: #58657a; font-size: 11px; }
+.section-list { padding: 8px; }
+.section-row {
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  grid-template-areas: "status copy count";
+  min-height: 54px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 12px;
+  margin-bottom: 2px;
+  gap: 2px 10px;
+}
+.section-row:hover { background: #f1f4f9; }
+.section-row.active { background: #e8edf5; box-shadow: none; }
+.section-status {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 9px;
+  background: #eef1f6;
+  color: #64748b;
+}
+.section-row.active .section-status { background: #18243a; border-color: #18243a; color: #fff; }
+.section-title { font-size: 12.5px; font-weight: 650; color: #18243a; }
+.section-meta { margin-top: 2px; font-size: 10px; color: #8b95a6; }
+.section-count {
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #eef1f6;
+  color: #64748b;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.section-row.active .section-count { background: rgba(24, 36, 58, .1); color: #18243a; }
+
+/* Pane head — compact, aligned with app headings */
+.editor-pane { background: #fff; }
+.editor-pane-head { min-height: 0; padding: 18px 24px 14px; border-bottom: 1px solid #eef0f4; }
+.pane-kicker { margin-bottom: 4px; color: #8b95a6; font-size: 10px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
+.editor-pane-head h1 { font-size: 19px; letter-spacing: -.02em; }
+
+/* Section shell — heading only, no accordion box */
+.sec-hd { min-height: 0; padding: 0 0 12px; border-bottom: 1px solid #eef0f4; }
+.sec-icon { width: 28px; height: 28px; border: 0; border-radius: 9px; background: #eef1f6; color: #64748b; }
+.sec-name { font-size: 13.5px !important; font-weight: 700 !important; color: #18243a; letter-spacing: -.01em; }
+.sec-badge { background: #eef1f6; color: #64748b; font-size: 10.5px; padding: 2px 8px; }
+.sec-chev { color: #94a3b8; }
+
+/* Field labels + inputs — soft fills, blue focus ring, no hard boxes */
+.editor-view .fl {
+  color: #8b95a6;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.editor-view .fi,
+.editor-view .fta,
+.editor-view .tag-inp-box {
+  min-height: 38px;
+  border: 1px solid #e3e7ee;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #18243a;
+  font-size: 12.5px;
+  font-weight: 550;
+}
+.editor-view .fi:focus,
+.editor-view .fta:focus,
+.editor-view .tag-inp-box.focus {
+  border-color: #2563eb;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .1);
+}
+.editor-view .fi.invalid { border-color: #d54b50; }
+.editor-view .field-error { color: #d54b50; font-size: 10.5px; }
+
+/* Personal-info blocks and list items — dividers instead of boxes */
+.editor-view .pg-block,
+.editor-view .item {
+  padding: 0 0 20px;
+  margin-bottom: 20px;
+  border: 0;
+  border-radius: 0;
+  border-bottom: 1px solid #eef0f4;
+  background: transparent;
+  box-shadow: none;
+}
+.editor-view .pg-block:last-child,
+.editor-view .item:last-of-type { border-bottom: 0; margin-bottom: 8px; }
+.editor-view .pg-block-label {
+  padding: 0 0 12px;
+  margin: 0;
+  border-bottom: 0;
+  color: #18243a;
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: -.01em;
+}
+.editor-view .item-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 0;
+}
+.editor-view .item-label { font-size: 12.5px; font-weight: 700; color: #18243a; }
+.editor-view .item-hd-actions { display: flex; align-items: center; gap: 6px; }
+.editor-view .item-move {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e3e7ee;
+  border-radius: 999px;
+  background: #fff;
+  color: #64748b;
+  cursor: pointer;
+  transition: border-color var(--ease), color var(--ease);
+}
+.editor-view .item-move:hover:not(:disabled) { border-color: #cfd6e2; color: #18243a; }
+.editor-view .item-move:disabled { opacity: .35; cursor: default; }
+.editor-view .item-del {
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  border: 1px solid #e3e7ee !important;
+  border-radius: 999px !important;
+  background: #fff !important;
+  color: #8b95a6 !important;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.editor-view .item-del:hover { border-color: #f3c1c3 !important; color: #d54b50 !important; background: #fff7f7 !important; }
+
+/* Add buttons — dashed pills */
+.editor-view .btn-add-item,
+.editor-view .btn-add-bullet {
+  min-height: 38px;
+  border: 1px dashed #cfd6e2;
+  border-radius: 999px;
+  background: #fbfcfe;
+  color: #58657a;
+  font-size: 12px;
+  font-weight: 650;
+}
+.editor-view .btn-add-item:hover,
+.editor-view .btn-add-bullet:hover { border-color: #18243a; border-style: solid; background: #fff; color: #18243a; }
+.editor-view .bullet-del {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #e3e7ee;
+  border-radius: 999px;
+  background: #fff;
+  color: #8b95a6;
+}
+.editor-view .bullet-del:hover { border-color: #f3c1c3; color: #d54b50; background: #fff7f7; }
+
+/* Tag pills + dropdowns */
+.editor-view .tag-pill {
+  border: 1px solid #dce6f4;
+  border-radius: 999px;
+  background: #f5f8ff;
+  color: #24466f;
+  font-size: 11px;
+  font-weight: 650;
+}
+.editor-view .tag-dropdown {
+  border: 1px solid #e7ebf2;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(15, 29, 51, .12);
+}
+.editor-view .month-ongoing-toggle {
+  border-radius: 999px;
+}
+.editor-view .photo-preview { border-radius: 14px; background: #eef1f6; border: 0; }
+.editor-view .photo-upload,
+.editor-view .photo-remove { border-radius: 999px; }
+.flat-skills-input-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.flat-skills-input-row .fi { flex: 1; }
+.flat-skills-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Export dropdown */
+.editor-view .exp-menu { border: 1px solid #e7ebf2; border-radius: 14px; box-shadow: 0 12px 32px rgba(15, 29, 51, .12); }
+.editor-view .exp-item:hover { background: #f4f6f9; }
+
+/* ── Preview column ────────────────────────────────────────────────── */
+.editor-view .preview { background: #f4f6f9; }
+.editor-view .preview-toolbar {
+  min-height: 56px;
+  padding: 0 18px;
+  border-bottom: 1px solid #eef0f4;
+  background: #fff;
+}
+.editor-view .p-title { color: #18243a; font-size: 12.5px; font-weight: 700; letter-spacing: -.01em; }
+.editor-view .preview-update {
+  border-color: #18243a;
+  background: #18243a;
+  color: #fff;
+}
+.editor-view .preview-update:hover:not(:disabled) { border-color: #24334e; background: #24334e; color: #fff; }
+.editor-view .p-zoom-grp {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid #e3e7ee;
+  border-radius: 999px;
+  background: #fff;
+}
+.editor-view .p-zoom-lbl { padding: 0 6px 0 10px; color: #8b95a6; font-size: 10px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
+.editor-view .zoom-btn {
+  min-height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #58657a;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.editor-view .zoom-btn:hover { background: #f1f4f9; color: #18243a; }
+.editor-view .zoom-btn.active { background: #18243a; color: #fff; }
+
+@media (max-width: 1100px) {
+  .editor-topbar { flex-wrap: wrap; }
+  .editor-template-pills { order: 3; flex-basis: 100%; justify-content: flex-start; }
 }

@@ -25,6 +25,21 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-16 (eve) — editor overhaul + app-shell gradient + profile editing.**
+  (1) EDITOR redesigned to the app language (final override layer at the end of
+  index.css): one `.editor-topbar` (title + template pills + Save/Export — the old `.tb`
+  toolbar and `.editor-commandbar` rows are gone from the JSX), CHAT TAB REMOVED (chat
+  state/functions remain in App.jsx, unused), section rail restyled (no R-xx ids),
+  borderless sections/items with dividers, soft #f8fafc inputs w/ blue focus ring, pill
+  buttons everywhere, dashed add-pills, pill zoom segment; `ItemHeader` in sections.jsx
+  replaces the inline-styled ▲▼/Remove buttons (same data-testids).
+  (2) APP SHELL: `.app-body` carries the login `.auth-art` palette as a MUTED pastel
+  composite (user rejected the vivid sky gradient AND frosted cards — went through 4
+  iterations; final = flat-ish pastel wash backdrop, transparent sidebar, white cards
+  with border, no divider lines). (3) Calendar: every date gets the raised-badge
+  treatment — blue for all days, red for today; week view uses pills. (4) Settings'
+  Profile card removed; Profile view now edits personal details inline
+  (`onSavePersonal` prop from App → saveProfileImmediately). (5) Sidebar nav font 13px.
 - **2026-07-16 (pm, round 3 — user feedback).** Drawer head is
   `logo | title | status select | score | close` — status sits beside the match %
   (`.intern-status-head`; the round-2 `.intern-status-top` row was removed; wraps to its

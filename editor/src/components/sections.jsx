@@ -10,6 +10,50 @@ function LinkedinMark() {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.45 20.45h-3.56v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.34V8.98h3.42v1.57h.05c.47-.9 1.64-1.85 3.37-1.85 3.61 0 4.27 2.37 4.27 5.46v6.29ZM5.32 7.41a2.07 2.07 0 1 1 0-4.13 2.07 2.07 0 0 1 0 4.13ZM7.1 20.45H3.54V8.98H7.1v11.47Z" /></svg>;
 }
 
+/* ── Shared list-item header: label + move/delete controls ─────────────
+   One implementation for every list section (education/experience/projects/
+   activities) — icon buttons on the app's pill standard, no inline styles.
+   data-testids keep the exact legacy names the E2E suite expects. */
+function ItemHeader({ label, index, total, onMove, onDelete, kind, isJa }) {
+  return (
+    <div className="item-hd">
+      <span className="item-label">{label}</span>
+      <div className="item-hd-actions">
+        <button
+          type="button"
+          className="item-move"
+          disabled={index === 0}
+          onClick={() => onMove(index, -1)}
+          data-testid={`move-up-${kind}-${index}`}
+          title={isJa ? '上へ移動' : 'Move up'}
+          aria-label={isJa ? '上へ移動' : 'Move up'}
+        >
+          <I n="chev" s={12} style={{ transform: 'rotate(180deg)' }} />
+        </button>
+        <button
+          type="button"
+          className="item-move"
+          disabled={index === total - 1}
+          onClick={() => onMove(index, 1)}
+          data-testid={`move-down-${kind}-${index}`}
+          title={isJa ? '下へ移動' : 'Move down'}
+          aria-label={isJa ? '下へ移動' : 'Move down'}
+        >
+          <I n="chev" s={12} />
+        </button>
+        <button
+          type="button"
+          className="item-del"
+          onClick={() => onDelete(index)}
+          data-testid={`delete-${kind}-${index}`}
+        >
+          <I n="x" s={11} /> {isJa ? '削除' : 'Remove'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ── Personal — card-grouped layout ────────────────────── */
 export function PersonalSec({ data: d, onChange, isJa }) {
   const s = (k, v) => onChange({ ...d, [k]: v });
@@ -306,42 +350,7 @@ export function EducationSec({ data, onChange, isJa }) {
           : (e.school || e.institution || `School ${i + 1}`);
         return (
           <div key={i} className="item">
-            <div className="item-hd" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span className="item-label">{itemLabel}</span>
-              <div className="item-hd-actions" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <button 
-                  type="button"
-                  className="btn-move" 
-                  disabled={i === 0} 
-                  onClick={() => move(i, -1)} 
-                  data-testid={`move-up-education-${i}`}
-                  style={{ background: 'none', border: 'none', cursor: i === 0 ? 'not-allowed' : 'pointer', opacity: i === 0 ? 0.3 : 0.7, padding: '4px 6px', fontSize: '12px' }}
-                  title="Move Up"
-                >
-                  ▲
-                </button>
-                <button 
-                  type="button"
-                  className="btn-move" 
-                  disabled={i === data.length - 1} 
-                  onClick={() => move(i, 1)} 
-                  data-testid={`move-down-education-${i}`}
-                  style={{ background: 'none', border: 'none', cursor: i === data.length - 1 ? 'not-allowed' : 'pointer', opacity: i === data.length - 1 ? 0.3 : 0.7, padding: '4px 6px', fontSize: '12px' }}
-                  title="Move Down"
-                >
-                  ▼
-                </button>
-                <button 
-                  type="button"
-                  className="item-del" 
-                  onClick={() => del(i)} 
-                  data-testid={`delete-education-${i}`}
-                  style={{ color: 'var(--err)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', fontSize: '12px', fontWeight: '500' }}
-                >
-                  {isJa ? "削除" : "Remove"}
-                </button>
-              </div>
-            </div>
+            <ItemHeader label={itemLabel} index={i} total={data.length} onMove={move} onDelete={del} kind="education" isJa={isJa} />
             <div className="flds">
               {isJa ? (
                 <>
@@ -405,42 +414,7 @@ export function ExperienceSec({ data, onChange, isJa }) {
           : (e.company || `Company ${i + 1}`);
         return (
           <div key={i} className="item">
-            <div className="item-hd" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span className="item-label">{itemLabel}</span>
-              <div className="item-hd-actions" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <button 
-                  type="button"
-                  className="btn-move" 
-                  disabled={i === 0} 
-                  onClick={() => move(i, -1)} 
-                  data-testid={`move-up-experience-${i}`}
-                  style={{ background: 'none', border: 'none', cursor: i === 0 ? 'not-allowed' : 'pointer', opacity: i === 0 ? 0.3 : 0.7, padding: '4px 6px', fontSize: '12px' }}
-                  title="Move Up"
-                >
-                  ▲
-                </button>
-                <button 
-                  type="button"
-                  className="btn-move" 
-                  disabled={i === data.length - 1} 
-                  onClick={() => move(i, 1)} 
-                  data-testid={`move-down-experience-${i}`}
-                  style={{ background: 'none', border: 'none', cursor: i === data.length - 1 ? 'not-allowed' : 'pointer', opacity: i === data.length - 1 ? 0.3 : 0.7, padding: '4px 6px', fontSize: '12px' }}
-                  title="Move Down"
-                >
-                  ▼
-                </button>
-                <button 
-                  type="button"
-                  className="item-del" 
-                  onClick={() => del(i)} 
-                  data-testid={`delete-experience-${i}`}
-                  style={{ color: 'var(--err)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', fontSize: '12px', fontWeight: '500' }}
-                >
-                  {isJa ? "削除" : "Remove"}
-                </button>
-              </div>
-            </div>
+            <ItemHeader label={itemLabel} index={i} total={data.length} onMove={move} onDelete={del} kind="experience" isJa={isJa} />
             <div className="flds">
               {isJa ? (
                 <>
@@ -512,42 +486,7 @@ export function ProjectsSec({ data, onChange, isJa }) {
           : (p.title || `Project ${i + 1}`);
         return (
           <div key={i} className="item">
-            <div className="item-hd" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span className="item-label">{itemLabel}</span>
-              <div className="item-hd-actions" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <button 
-                  type="button"
-                  className="btn-move" 
-                  disabled={i === 0} 
-                  onClick={() => move(i, -1)} 
-                  data-testid={`move-up-project-${i}`}
-                  style={{ background: 'none', border: 'none', cursor: i === 0 ? 'not-allowed' : 'pointer', opacity: i === 0 ? 0.3 : 0.7, padding: '4px 6px', fontSize: '12px' }}
-                  title="Move Up"
-                >
-                  ▲
-                </button>
-                <button 
-                  type="button"
-                  className="btn-move" 
-                  disabled={i === data.length - 1} 
-                  onClick={() => move(i, 1)} 
-                  data-testid={`move-down-project-${i}`}
-                  style={{ background: 'none', border: 'none', cursor: i === data.length - 1 ? 'not-allowed' : 'pointer', opacity: i === data.length - 1 ? 0.3 : 0.7, padding: '4px 6px', fontSize: '12px' }}
-                  title="Move Down"
-                >
-                  ▼
-                </button>
-                <button 
-                  type="button"
-                  className="item-del" 
-                  onClick={() => del(i)} 
-                  data-testid={`delete-project-${i}`}
-                  style={{ color: 'var(--err)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', fontSize: '12px', fontWeight: '500' }}
-                >
-                  {isJa ? "削除" : "Remove"}
-                </button>
-              </div>
-            </div>
+            <ItemHeader label={itemLabel} index={i} total={data.length} onMove={move} onDelete={del} kind="project" isJa={isJa} />
             <div className="flds">
               {isJa ? (
                 <>
@@ -601,42 +540,7 @@ export function ActivitiesSec({ data, onChange, isJa }) {
           : (a.title || `Activity ${i + 1}`);
         return (
           <div key={i} className="item">
-            <div className="item-hd" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span className="item-label">{itemLabel}</span>
-              <div className="item-hd-actions" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <button 
-                  type="button"
-                  className="btn-move" 
-                  disabled={i === 0} 
-                  onClick={() => move(i, -1)} 
-                  data-testid={`move-up-activity-${i}`}
-                  style={{ background: 'none', border: 'none', cursor: i === 0 ? 'not-allowed' : 'pointer', opacity: i === 0 ? 0.3 : 0.7, padding: '4px 6px', fontSize: '12px' }}
-                  title="Move Up"
-                >
-                  ▲
-                </button>
-                <button 
-                  type="button"
-                  className="btn-move" 
-                  disabled={i === data.length - 1} 
-                  onClick={() => move(i, 1)} 
-                  data-testid={`move-down-activity-${i}`}
-                  style={{ background: 'none', border: 'none', cursor: i === data.length - 1 ? 'not-allowed' : 'pointer', opacity: i === data.length - 1 ? 0.3 : 0.7, padding: '4px 6px', fontSize: '12px' }}
-                  title="Move Down"
-                >
-                  ▼
-                </button>
-                <button 
-                  type="button"
-                  className="item-del" 
-                  onClick={() => del(i)} 
-                  data-testid={`delete-activity-${i}`}
-                  style={{ color: 'var(--err)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', fontSize: '12px', fontWeight: '500' }}
-                >
-                  {isJa ? "削除" : "Remove"}
-                </button>
-              </div>
-            </div>
+            <ItemHeader label={itemLabel} index={i} total={data.length} onMove={move} onDelete={del} kind="activity" isJa={isJa} />
             <div className="flds">
               {isJa ? (
                 <>
@@ -961,42 +865,25 @@ export function SkillsSec({ data, onChange, isJa }) {
     return (
       <Sec icon="zap" label={isJa ? "スキル" : "Skills"} testId="section-skills-title" open>
         <div className="flds flds-mt">
-          <div className="flat-skills-input-row" style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-            <input 
-              type="text" 
-              className="fi" 
-              data-testid="new-skill-input" 
-              value={newSkill} 
-              onChange={e => setNewSkill(e.target.value)} 
-              placeholder={isJa ? "新しいスキルを追加..." : "Add a new skill..."} 
+          <div className="flat-skills-input-row">
+            <input
+              type="text"
+              className="fi"
+              data-testid="new-skill-input"
+              value={newSkill}
+              onChange={e => setNewSkill(e.target.value)}
+              placeholder={isJa ? "新しいスキルを追加..." : "Add a new skill..."}
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-              style={{ flex: 1, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg)', color: 'var(--text)' }}
             />
-            <button 
-              type="button" 
-              className="btn" 
-              data-testid="add-skill-btn" 
-              onClick={add}
-              style={{ padding: '8px 16px', background: 'var(--blue)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-            >
-              {isJa ? "追加" : "Add"}
+            <button type="button" className="btn" data-testid="add-skill-btn" onClick={add}>
+              <I n="plus" s={12} /> {isJa ? "追加" : "Add"}
             </button>
           </div>
-          <div className="flat-skills-tags" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          <div className="flat-skills-tags">
             {data.map((s, idx) => (
-              <span 
-                key={idx} 
-                className="tag-pill" 
-                data-testid={`skill-tag-${s}`}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 8px', background: 'var(--b0)', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '12px', color: 'var(--t1)' }}
-              >
-                {s}
-                <button 
-                  type="button" 
-                  data-testid={`delete-skill-${s}`} 
-                  onClick={() => del(s)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', padding: 0, color: 'var(--t3)' }}
-                >
+              <span key={idx} className="tag-pill" data-testid={`skill-tag-${s}`}>
+                <span className="tag-pill-label">{s}</span>
+                <button type="button" className="tag-pill-remove" data-testid={`delete-skill-${s}`} onClick={() => del(s)}>
                   <I n="x" s={10} />
                 </button>
               </span>
