@@ -1185,7 +1185,7 @@ export default function App() {
       ) : appView === 'radar' ? (
         <InternshipDashboard isJa={isJa} activeProfile={activeProfile} resume={resume} onOpenEditor={() => setAppView('editor')} onOpenSettings={() => setAppView('settings')} />
       ) : appView === 'applications' ? (
-        <ApplicationsView isJa={isJa} activeProfile={activeProfile} onOpenRadar={() => setAppView('radar')} />
+        <ApplicationsView isJa={isJa} activeProfile={activeProfile} onOpenRadar={() => setAppView('radar')} onOpenEditor={() => setAppView('editor')} />
       ) : appView === 'profile' ? (
         <ProfileView resume={resume} isJa={isJa} onOpenEditor={() => setAppView('editor')} />
       ) : appView === 'calendar' ? (

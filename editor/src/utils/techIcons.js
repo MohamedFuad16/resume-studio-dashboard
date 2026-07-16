@@ -154,12 +154,17 @@ export function resolveTechIcon(name) {
   const normalized = normalizeName(name);
   const original = String(name == null ? '' : name).trim();
 
-  // 1) exact alias match, then 2) longest substring alias match (faithful to
-  // the previous inline behavior, but specificity-first to limit false hits).
+  // 1) exact alias match, then 2) longest WORD-BOUNDED alias match. A raw
+  // substring match produced false hits ("autonomous agenTS" → TypeScript,
+  // "open sourCe" → C), so alias keys must appear as whole words.
   let match = TECH_ICON_ALIASES[normalized];
   if (!match && normalized) {
+    const containsWord = key => {
+      const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp(`(^|[^a-z0-9+#])${escaped}([^a-z0-9+#]|$)`).test(normalized);
+    };
     const entry = Object.entries(TECH_ICON_ALIASES)
-      .filter(([key]) => normalized.includes(key))
+      .filter(([key]) => containsWord(key))
       .sort((a, b) => b[0].length - a[0].length)[0];
     match = entry ? entry[1] : null;
   }

@@ -86,9 +86,10 @@ export async function listNewMessageIds(accessToken, startHistoryId) {
   return { messageIds: [...ids], historyId: latestHistoryId };
 }
 
-// Fallback when history is stale: recent inbox messages by query.
-export async function listRecentMessageIds(accessToken, query = 'newer_than:2d -in:sent -in:draft') {
-  const q = new URLSearchParams({ q: query, maxResults: '25' });
+// Recent inbox messages by query — used as the stale-history fallback and for a
+// one-time backfill scan of older mail.
+export async function listRecentMessageIds(accessToken, query = 'newer_than:2d -in:sent -in:draft', maxResults = 25) {
+  const q = new URLSearchParams({ q: query, maxResults: String(Math.min(maxResults, 100)) });
   const page = await gmailGet(accessToken, `/messages?${q.toString()}`);
   return (page.messages || []).map(m => m.id);
 }

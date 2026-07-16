@@ -67,7 +67,9 @@ export default function GmailConnectCard({ profile, isJa }) {
   useEffect(() => {
     const result = qp('gmail');
     if (!result) return;
-    setNotice({ connected: t.okConnected, denied: t.denied, norefresh: t.norefresh }[result] || t.errConnect);
+    // Success needs no banner — the connected card already shows the state.
+    // Only surface the failure cases.
+    if (result !== 'connected') setNotice({ denied: t.denied, norefresh: t.norefresh }[result] || t.errConnect);
     const url = new URL(window.location.href);
     url.searchParams.delete('gmail');
     window.history.replaceState(null, '', url.toString());
@@ -102,7 +104,7 @@ export default function GmailConnectCard({ profile, isJa }) {
   return (
     <section className="settings-card gmail-card">
       <header>
-        <h2><span className="gmail-logo" aria-hidden="true"><GmailLogo size={18} /></span> {t.title}</h2>
+        <h2>{t.title}</h2>
         <p>{t.hint}</p>
       </header>
 
@@ -124,7 +126,7 @@ export default function GmailConnectCard({ profile, isJa }) {
       {configured && connected && (
         <>
           <div className="gmail-connected">
-            <span className="gmail-avatar" aria-hidden="true"><GmailLogo size={22} /></span>
+            <span className="gmail-avatar" aria-hidden="true"><GmailLogo size={22} /><span className="gmail-avatar-dot" /></span>
             <div className="gmail-account">
               <b>{status.email || t.connected}</b>
               <small>
@@ -133,7 +135,6 @@ export default function GmailConnectCard({ profile, isJa }) {
                 {t.lastSync}: {status.lastSyncAt ? new Date(status.lastSyncAt).toLocaleString() : t.never}
               </small>
             </div>
-            <span className="gmail-badge"><span className="gmail-dot" aria-hidden="true" /> {t.live}</span>
             <button type="button" className="btn gmail-disconnect" onClick={disconnect} disabled={busy}>{t.disconnect}</button>
           </div>
           {status.lastError === 'reauth_required' && (
