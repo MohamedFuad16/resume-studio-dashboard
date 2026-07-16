@@ -2,6 +2,36 @@
 
 ## Fixed
 
+### BUG-016 — Every radar deadline rendered urgent-coral — FIXED 2026-07-16
+- **File:** `editor/src/index.css`
+- **Symptom:** "Not stated" and far-future deadlines showed in the same coral as
+  urgent ones; `.urgent` only changed font-weight.
+- **Fix:** base `.intern-deadline` stays neutral; coral moved onto `.urgent`.
+
+### BUG-017 — Phone (≤560px) radar rows crushed the company column — FIXED 2026-07-16
+- **File:** `editor/src/index.css`
+- **Symptom:** At 375px, JA company names wrapped one character per line (~80px column),
+  the deadline chip wrapped vertically, and a hidden status select left an empty grid cell.
+- **Root cause:** FOUR `.intern-row` grid definitions again (BUG-002 pattern): the
+  intended ≤560px grid sat EARLIER in the file than two later ≤860px grids (incl. one in
+  the "final overrides" section at ~6200), so at equal specificity the tablet grid won on
+  phones; a separate `.intern-row-status{display:none}` kept the status area empty.
+- **Fix:** dead ≤560px grid + status-hide removed; one phone grid added AFTER the final
+  ≤860px block (company spans the row; match/deadline full-width; status+apply bottom row).
+  Lesson (again): every `.intern-row` grid must live in ONE ordered cascade — check
+  `grep -n 'grid-template-areas' index.css` before adding another.
+
+### BUG-018 — 6× GET /api/tracker + a LaTeX compile on every page load — FIXED 2026-07-16
+- **Files:** `editor/src/hooks/useApplicationTracker.js`, `editor/src/App.jsx`,
+  `editor/server/index.js`, `editor/vite.config.js`
+- **Symptom:** One dashboard load fired 6 tracker GETs (5 hook mounts × StrictMode) and a
+  full `POST /api/compile` (tectonic) although the Editor wasn't visible; every
+  `/api/internships` request rebuilt + double-stringified the whole catalog; the client
+  was one 1.18 MB chunk.
+- **Fix:** module-level tracker cache + in-flight dedupe (catalog-hook pattern); compile
+  effect gated on `appView === 'editor'`; 60 s in-process catalog memo; Vite
+  `manualChunks` (react / firebase / ui). See ADR-0037.
+
 ### BUG-012 — Gmail pipeline silently no-ops without OPENROUTER_API_KEY, poisoning the processed list — FIXED 2026-07-16
 - **Date:** 2026-07-16 · **Files:** `editor/server/gmail/sync.js`, `classify.js`
 - **Symptom:** Prod backfill returned `{scanned:80, actions:0}` in 16s. Every message was

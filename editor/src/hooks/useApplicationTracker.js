@@ -43,11 +43,33 @@ export function statusLabel(status, isJa = false) {
   return item ? (isJa ? item.labelJa : item.label) : (isJa ? '未管理' : 'Track');
 }
 
+// Module-level per-profile cache + in-flight dedupe (same pattern as
+// useInternshipCatalog). The hook is mounted by several views at once (App shell,
+// dashboard, applications view, radar, Gmail drain), and each mount used to issue
+// its own GET /api/tracker on load. Mutations keep the cache fresh via commit();
+// cross-mount state sync stays on TRACKER_EVENT.
+const trackerCache = new Map();    // profileId -> normalized tracker
+const trackerRequests = new Map(); // profileId -> in-flight promise
+
+async function loadTracker(profileId, { force = false } = {}) {
+  if (!force && trackerCache.has(profileId)) return trackerCache.get(profileId);
+  if (!force && trackerRequests.has(profileId)) return trackerRequests.get(profileId);
+  const request = trackerApi.get(profileId)
+    .then(parsed => {
+      const tracker = normalizeTracker(parsed);
+      trackerCache.set(profileId, tracker);
+      return tracker;
+    })
+    .finally(() => { trackerRequests.delete(profileId); });
+  trackerRequests.set(profileId, request);
+  return request;
+}
+
 export function useApplicationTracker(profileId) {
   const activeProfile = normalizeProfileId(profileId);
-  const [tracker, setTracker] = useState(EMPTY_TRACKER);
-  const trackerRef = useRef(EMPTY_TRACKER);
-  const [loading, setLoading] = useState(true);
+  const [tracker, setTracker] = useState(() => trackerCache.get(activeProfile) || EMPTY_TRACKER);
+  const trackerRef = useRef(tracker);
+  const [loading, setLoading] = useState(() => !trackerCache.has(activeProfile));
   const [error, setError] = useState('');
 
   const replaceTracker = useCallback(next => {
@@ -55,11 +77,11 @@ export function useApplicationTracker(profileId) {
     setTracker(next);
   }, []);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const refresh = useCallback(async ({ force = true } = {}) => {
+    if (force || !trackerCache.has(activeProfile)) setLoading(true);
     try {
       setError('');
-      replaceTracker(normalizeTracker(await trackerApi.get(activeProfile)));
+      replaceTracker(await loadTracker(activeProfile, { force }));
     } catch (fetchError) {
       setError(fetchError.message || 'Could not load application tracker');
     } finally {
@@ -68,6 +90,7 @@ export function useApplicationTracker(profileId) {
   }, [activeProfile, replaceTracker]);
 
   const commit = useCallback(next => {
+    trackerCache.set(activeProfile, next);
     trackerApi.save(activeProfile, next)
       .then(() => window.dispatchEvent(new CustomEvent(TRACKER_EVENT, { detail: { profileId: activeProfile, tracker: next } })))
       .catch(saveError => {
@@ -85,9 +108,9 @@ export function useApplicationTracker(profileId) {
   }, [activeProfile, replaceTracker]);
 
   useEffect(() => {
-    replaceTracker(EMPTY_TRACKER);
-    refresh();
-  }, [refresh, replaceTracker]);
+    replaceTracker(trackerCache.get(activeProfile) || EMPTY_TRACKER);
+    refresh({ force: false });
+  }, [activeProfile, refresh, replaceTracker]);
 
   const updateStatus = useCallback((internship, status) => {
     const current = trackerRef.current;

@@ -25,6 +25,17 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-16 (eve) — Performance + UI bug pass (ADR-0037, BUG-016/017/018).** Pulled
+  origin/main into `ios-local` (merge commit; only `agent/state.md` conflicted). Fixes:
+  LaTeX compile now lazy (only in the Editor view — a dashboard load no longer POSTs
+  /api/compile); `useApplicationTracker` got a module-level per-profile cache +
+  in-flight dedupe (6 → 1 tracker GET per load); `readInternshipCatalog` 60 s in-process
+  memo (was rebuilding + double-stringifying the catalog per request); Vite manualChunks
+  split the 1.18 MB bundle into react/firebase/ui vendor chunks; deadline coral now
+  urgent-only; JA leaks mapped (Occasional hiring, Remote in USA/Canada, SpaceX site);
+  phone-width radar rows re-gridded (company was ~80px wide; the ≤560px grid was dead —
+  overridden by a later ≤860px grid). Build green, E2E 5/5, verified in-browser at
+  375/1366px in EN+JA.
 - **2026-07-16 — Native iOS app scaffold (`ios/`, ADR-0036).** SwiftUI app on the iOS 27.0
   SDK (Xcode 27 beta via DEVELOPER_DIR; xcodegen; .xcodeproj gitignored). Planner-pastel
   design language (near-white canvas, pastel track-glyph circles, one green accent, ink

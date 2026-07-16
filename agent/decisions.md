@@ -788,3 +788,33 @@ restyle has landed on Dashboard + shared row components only. Firebase auth, the
 per-user pipeline (saved/applied/rejected), and real UI tests (XCUITest instead of
 launch-arg screenshots) are the known next steps. NavModel (tab selection in the
 environment) exists so in-content controls can switch tabs.
+
+## ADR-0037 · 2026-07-16 · Performance + UI bug pass: lazy compile, shared tracker cache, catalog memo, vendor chunks
+**Context.** A full audit (browser walk + network trace + JA sweep) found: (1) a LaTeX
+compile (`POST /api/compile`) fired on every page load even though the app lands on the
+Dashboard; (2) `useApplicationTracker` was mounted 5× with no shared cache → 6
+`GET /api/tracker` on one load; (3) `readInternshipCatalog()` rebuilt + re-validated the
+seed catalog and double-`JSON.stringify`ed a ~1 MB drift check on every request; (4) the
+client shipped as one 1.18 MB JS chunk; (5) `.intern-deadline` was coral for every row
+(urgent had no color of its own); (6) JA mode leaked English ("Occasional hiring…",
+"Remote in USA/Canada", SpaceX location); (7) at ≤560px the radar rows used the tablet
+grid (a 4th `.intern-row` grid later in the file overrode the phone one), crushing the
+company column to ~80px and leaving an empty cell where the hidden status select sat.
+**Decision.**
+- App.jsx compiles lazily: one effect gated on `appView === 'editor'` (deps: resume,
+  template, appView) replaced the on-mount + on-template effects; `compile` still
+  dedupes via `lastCompiled`. Profile switch just clears the cache key.
+- `useApplicationTracker` got the same module-level per-profile snapshot + in-flight
+  dedupe as `useInternshipCatalog`; `commit()` refreshes the cache; TRACKER_EVENT still
+  syncs mounts; `refresh({force:false})` on mount.
+- `readInternshipCatalog` memoizes the resolved catalog in-process for 60 s
+  (`rememberCatalog`); all writers refresh the memo. TTL bounds staleness on
+  multi-instance hosts (Vercel); Azure is single-replica.
+- Vite `manualChunks`: vendor-react / vendor-firebase / vendor-ui (lucide+gsap).
+  Firebase stays static (auth gate needs it at startup; `auth`/`db` are sync exports).
+- CSS: urgent-only coral; JA mappings added; a phone `.intern-row` grid now lives AFTER
+  the final ≤860px block (source order is the winner at equal specificity) — company
+  spans the row, match/deadline stack full-width, status+apply share the bottom row.
+**Verified.** Build green, E2E 5/5, one tracker GET and zero compiles on a dashboard
+load, single compile on first Editor entry, JA + mobile verified in-browser at
+375/1366px.
