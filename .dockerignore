@@ -18,3 +18,7 @@ graphify-out
 graphify_root
 .agents
 .workflow
+
+# Never bake local env/secrets into the image (prod env comes from the host)
+editor/.env
+editor/.env.*
