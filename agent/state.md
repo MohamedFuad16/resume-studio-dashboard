@@ -25,7 +25,7 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
-- **2026-07-16 — Native iOS app scaffold (`ios/`, ADR-0034).** SwiftUI app on the iOS 27.0
+- **2026-07-16 — Native iOS app scaffold (`ios/`, ADR-0036).** SwiftUI app on the iOS 27.0
   SDK (Xcode 27 beta via DEVELOPER_DIR; xcodegen; .xcodeproj gitignored). Planner-pastel
   design language (near-white canvas, pastel track-glyph circles, one green accent, ink
   tab selection) over the system Liquid Glass shell; login keeps the web identity. Four

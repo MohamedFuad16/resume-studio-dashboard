@@ -701,9 +701,50 @@ gradient, `border-right: 0` — separation comes from the gutter, never a hard l
 dropdown still escapes the sidebar (opens upward; sidebar keeps `overflow: visible`). Dashboard
 type scale reduced (h1 clamp 20–26px, section h2 15px, stat numerals 17px) as the new baseline.
 
+## ADR-0034 · 2026-07-16 · Self-healing catalog via a machine-owned JSON overlay; sonar default
+**Context:** The daily "Validate Catalog" action hard-failed every day on 2 naturally-dead
+greenhouse listings that nothing retired. The catalog's source of truth is hand-formatted seed
+JS arrays across 3 files — unsafe for a bot to edit surgically.
+**Decision:** (1) Add `seeds/auto-refresh.json` + `auto-refresh.js` — a machine-owned overlay the
+daily job regenerates *wholesale*, never touching seed arrays. It filters retired ids and patches
+deadlines; wired as the outermost `buildSeedCatalog()` overlay and unioned into
+`isRetiredInternshipId()` so all catalog paths honor it. (2) `server/refresh-catalog.js` reuses the
+validator's liveness checker to find HTTP-dead listings, then double-checks each with the search
+model — retire ONLY if the model doesn't say "still open" (HTTP-dead + still-open = conflict,
+logged, left active for the human reviewing the auto-PR). (3) Workflow split: `validate` (push/PR,
+format+round-trip, no flaky link gate) and `refresh` (schedule/manual → heal → re-validate →
+open PR via peter-evans/create-pull-request). (4) Search model default → `perplexity/sonar`
+(native web search, seconds vs gpt-5-mini:online's 120-245s); `:online` no longer stacked on
+perplexity/*.
+**Consequences:** No more daily red X — a heal run is green and proposes a reviewable PR (per the
+auto-PR decision). Needs the `OPENROUTER_API_KEY` GH secret for LLM verification (degrades to
+HTTP-only without it) and repo setting "Allow GitHub Actions to create and approve pull requests".
+Naturally-dead links no longer block pushes (caught within 24h by refresh instead). Retirements
+are reversible (edit the JSON). Harbinger is the live example of a conflict (company still hiring,
+specific URL dead) — kept active for a human to re-URL rather than auto-deleted.
+
+## ADR-0035 · 2026-07-16 · Gmail ingest: server-side read-only OAuth + client-drained queue
+**Context:** Auto-add application emails to the tracker/calendar, 24/7, single-user. Tracker data
+lives in client-direct Firestore (owner-only rules) — a server can't write it without
+firebase-admin + a service account.
+**Decision:** (1) Server-side Gmail (raw fetch, node:crypto — no googleapis/firebase-admin/cron
+deps). Read-only scope. Refresh token AES-256-GCM-encrypted in the server KV store. (2) OAuth
+callback derives the post-auth redirect from the request host (works on any prod domain).
+(3) Pipeline: gpt-5-nano triage → sonar enrichment → sync pushes normalized actions to a
+per-profile server queue; the CLIENT drains the queue into Firestore (Option C) — it owns the
+match against existing records, so no admin SDK and no rule changes. Full-auto (user choice).
+(4) 24/7 poll is a setInterval gated by isDirectRun, so it runs on the single-replica Azure
+container but never in Vercel serverless.
+**Consequences:** Works while the browser is closed (server keeps the queue fresh; client
+reconciles on next open). Needs durable server storage + a persistent process = the Azure
+container, NOT Vercel serverless (ephemeral). Prod deploy therefore must route the API (or at
+least the Gmail routes) to Azure. 7-day testing-mode token expiry is avoided by publishing the
+OAuth app to production; the reconnect banner is event-driven (fires only on a real invalid_grant),
+not a timer. Gmail brand mark is nominative use to label the integration + tag ingested rows.
+
 ---
 
-## ADR-0034 · 2026-07-16 · Native iOS app (ios/), planner-pastel design language
+## ADR-0036 · 2026-07-16 · Native iOS app (ios/), planner-pastel design language
 **Status:** Accepted
 **Context:** User asked for an iOS version of the Internship Portal in Xcode on the
 "iOS 27 liquid glass" design. The machine has Xcode 27.0 beta (27A5209h) with the
@@ -747,43 +788,3 @@ restyle has landed on Dashboard + shared row components only. Firebase auth, the
 per-user pipeline (saved/applied/rejected), and real UI tests (XCUITest instead of
 launch-arg screenshots) are the known next steps. NavModel (tab selection in the
 environment) exists so in-content controls can switch tabs.
-## ADR-0034 · 2026-07-16 · Self-healing catalog via a machine-owned JSON overlay; sonar default
-**Context:** The daily "Validate Catalog" action hard-failed every day on 2 naturally-dead
-greenhouse listings that nothing retired. The catalog's source of truth is hand-formatted seed
-JS arrays across 3 files — unsafe for a bot to edit surgically.
-**Decision:** (1) Add `seeds/auto-refresh.json` + `auto-refresh.js` — a machine-owned overlay the
-daily job regenerates *wholesale*, never touching seed arrays. It filters retired ids and patches
-deadlines; wired as the outermost `buildSeedCatalog()` overlay and unioned into
-`isRetiredInternshipId()` so all catalog paths honor it. (2) `server/refresh-catalog.js` reuses the
-validator's liveness checker to find HTTP-dead listings, then double-checks each with the search
-model — retire ONLY if the model doesn't say "still open" (HTTP-dead + still-open = conflict,
-logged, left active for the human reviewing the auto-PR). (3) Workflow split: `validate` (push/PR,
-format+round-trip, no flaky link gate) and `refresh` (schedule/manual → heal → re-validate →
-open PR via peter-evans/create-pull-request). (4) Search model default → `perplexity/sonar`
-(native web search, seconds vs gpt-5-mini:online's 120-245s); `:online` no longer stacked on
-perplexity/*.
-**Consequences:** No more daily red X — a heal run is green and proposes a reviewable PR (per the
-auto-PR decision). Needs the `OPENROUTER_API_KEY` GH secret for LLM verification (degrades to
-HTTP-only without it) and repo setting "Allow GitHub Actions to create and approve pull requests".
-Naturally-dead links no longer block pushes (caught within 24h by refresh instead). Retirements
-are reversible (edit the JSON). Harbinger is the live example of a conflict (company still hiring,
-specific URL dead) — kept active for a human to re-URL rather than auto-deleted.
-
-## ADR-0035 · 2026-07-16 · Gmail ingest: server-side read-only OAuth + client-drained queue
-**Context:** Auto-add application emails to the tracker/calendar, 24/7, single-user. Tracker data
-lives in client-direct Firestore (owner-only rules) — a server can't write it without
-firebase-admin + a service account.
-**Decision:** (1) Server-side Gmail (raw fetch, node:crypto — no googleapis/firebase-admin/cron
-deps). Read-only scope. Refresh token AES-256-GCM-encrypted in the server KV store. (2) OAuth
-callback derives the post-auth redirect from the request host (works on any prod domain).
-(3) Pipeline: gpt-5-nano triage → sonar enrichment → sync pushes normalized actions to a
-per-profile server queue; the CLIENT drains the queue into Firestore (Option C) — it owns the
-match against existing records, so no admin SDK and no rule changes. Full-auto (user choice).
-(4) 24/7 poll is a setInterval gated by isDirectRun, so it runs on the single-replica Azure
-container but never in Vercel serverless.
-**Consequences:** Works while the browser is closed (server keeps the queue fresh; client
-reconciles on next open). Needs durable server storage + a persistent process = the Azure
-container, NOT Vercel serverless (ephemeral). Prod deploy therefore must route the API (or at
-least the Gmail routes) to Azure. 7-day testing-mode token expiry is avoided by publishing the
-OAuth app to production; the reconnect banner is event-driven (fires only on a real invalid_grant),
-not a timer. Gmail brand mark is nominative use to label the integration + tag ingested rows.

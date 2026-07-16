@@ -202,11 +202,12 @@ struct MatchSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     Image(systemName: icon)
+                        .font(.title3.weight(.regular))
                         .foregroundStyle(Theme.muted)
                     Text(title)
-                        .font(.title3.weight(.semibold))
+                        .font(.title2.weight(.semibold))
                         .foregroundStyle(Theme.ink)
                 }
                 Spacer()
@@ -242,15 +243,15 @@ struct ValueChip: View {
 
     var body: some View {
         Text(text)
-            .font(.caption.weight(.medium))
+            .font(.subheadline.weight(.medium))
             .foregroundStyle(Theme.muted)
             // A chip must never wrap mid-word ("Shibuy/a"); it keeps its
             // intrinsic width and the row truncates elsewhere instead.
             .lineLimit(1)
             .fixedSize()
-            .padding(.horizontal, 9)
-            .padding(.vertical, 4)
-            .background(Theme.canvas, in: .capsule)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 5)
+            .background(Theme.chipFill, in: .capsule)
     }
 }
 
@@ -264,10 +265,10 @@ struct InternshipRow: View {
         HStack(spacing: 16) {
             CompanyMark(item: item)
 
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 9) {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 10) {
                     Text(item.displayCompany)
-                        .font(.body.weight(.semibold))
+                        .font(.title3.weight(.semibold))
                         .foregroundStyle(Theme.ink)
                         .lineLimit(1)
                     if let score = item.score {
@@ -275,14 +276,14 @@ struct InternshipRow: View {
                     }
                 }
                 Text(item.displayRole)
-                    .font(.subheadline)
+                    .font(.callout)
                     .foregroundStyle(Theme.muted)
                     .lineLimit(1)
             }
 
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, 14)
         .contentShape(.rect)
     }
 }
@@ -296,9 +297,9 @@ struct CompanyMark: View {
     var body: some View {
         let tile = Theme.tile(for: item.displayCompany)
         Image(systemName: Self.glyph(for: item.track))
-            .font(.system(size: 22, weight: .medium))
+            .font(.system(size: 26, weight: .regular))
             .foregroundStyle(tile.glyph)
-            .frame(width: 56, height: 56)
+            .frame(width: 60, height: 60)
             .background(tile.fill, in: .circle)
     }
 

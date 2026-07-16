@@ -115,11 +115,12 @@ private struct RoleSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 Image(systemName: icon)
+                    .font(.title3.weight(.regular))
                     .foregroundStyle(Theme.muted)
                 Text(title)
-                    .font(.title3.weight(.semibold))
+                    .font(.title2.weight(.semibold))
                     .foregroundStyle(Theme.ink)
                 Spacer()
                 Text("\(items.count)")
