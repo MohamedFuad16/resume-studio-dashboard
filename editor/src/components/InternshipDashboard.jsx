@@ -9,7 +9,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
-  Filter,
   Globe2,
   LoaderCircle,
   MapPin,
@@ -26,6 +25,7 @@ import { CompanyLogo } from './CompanyLogo.jsx';
 import InterviewDateModal from './InterviewDateModal.jsx';
 import { displayCompany, displayRole, displayValue, internshipDetails, splitLanguageRequirement } from '../utils/internshipDisplay.js';
 import { appliedCompaniesForProfile, appliedCompanyRank, compareCompanyAwareMatch } from '../utils/internshipRanking.js';
+import { resolveTechIcon } from '../utils/techIcons.js';
 
 const DESKTOP_PAGE_SIZE = 14;
 const MOBILE_PAGE_SIZE = 6;
@@ -369,7 +369,9 @@ const isJapanBased = item => item.region === 'Japan'
   || item.country === 'Japan'
   || /\b(?:Japan|Tokyo|Osaka|Kyoto|Yokohama|Fukuoka|Nagoya|日本|東京|大阪|京都)\b/i.test(`${item.location || ''} ${item.city || ''}`);
 const isRemoteRole = item => /remote|リモート/i.test(`${item.location || ''} ${item.workMode || ''}`);
-const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEditor, isJa = false }) => {
+// Exported so the Applications view and the dashboard's Recent applications can
+// open the same detail drawer when a company row is clicked.
+export const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEditor, isJa = false }) => {
   const t = copy[isJa ? 'ja' : 'en'];
   const details = internshipDetails(item);
   const companyName = displayCompany(item, isJa);
@@ -387,10 +389,18 @@ const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEditor, i
         <strong>{companyName}</strong>
         <p className="intern-role-stack"><span>{roleLead}</span>{roleDetails.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</p>
       </div>
-      <div className="intern-detail-score">
-        <b>{item.score}%</b>
-        <span>{t.matchLabel(item.score)}</span>
-      </div>
+      <label className="intern-status-control intern-status-head">
+        <select value={status} onChange={event => onStatus(item, event.target.value)} aria-label={t.status}>
+          <option value="">{t.notTracked}</option>
+          {APPLICATION_STATUSES.map(option => <option key={option.value} value={option.value}>{statusLabel(option.value, isJa)}</option>)}
+        </select>
+      </label>
+      {Number.isFinite(item.score) ? (
+        <div className="intern-detail-score">
+          <b>{item.score}%</b>
+          <span>{t.matchLabel(item.score)}</span>
+        </div>
+      ) : <span aria-hidden="true" />}
       <button type="button" className="icon-button intern-detail-close" onClick={onClose} aria-label={t.close}><X size={17} /></button>
     </div>
 
@@ -407,19 +417,29 @@ const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEditor, i
       </section>
     )}
 
-    <section className="intern-detail-section">
-      <h3>{t.fitHeading}</h3>
-      <p className="intern-fit-note">{fitNoteDisplay(item, isJa)}</p>
-      <ul className="intern-reasons">
-        {(item.reasons || []).map((reason, index) => <li key={`${reason}-${index}`}><span><Check size={13} /></span>{reasonDisplay(reason, isJa)}</li>)}
-      </ul>
-    </section>
+    {(item.fitNote || (item.reasons || []).length > 0) && (
+      <section className="intern-detail-section">
+        <h3>{t.fitHeading}</h3>
+        <p className="intern-fit-note">{fitNoteDisplay(item, isJa)}</p>
+        <ul className="intern-reasons">
+          {(item.reasons || []).map((reason, index) => <li key={`${reason}-${index}`}><span><Check size={13} /></span>{reasonDisplay(reason, isJa)}</li>)}
+        </ul>
+      </section>
+    )}
 
     {details.techStack.length > 0 && (
       <section className="intern-detail-section">
         <h3>{t.techStack}</h3>
         <div className="intern-chip-list">
-          {details.techStack.map((tech, index) => <span key={`${tech}-${index}`}>{displayValue(tech, isJa)}</span>)}
+          {details.techStack.map((tech, index) => {
+            const icon = resolveTechIcon(tech);
+            return (
+              <span key={`${tech}-${index}`}>
+                <img src={icon.src} alt="" loading="lazy" onError={event => { event.currentTarget.src = icon.fallbackSrc; }} />
+                {displayValue(tech, isJa)}
+              </span>
+            );
+          })}
         </div>
       </section>
     )}
@@ -440,19 +460,22 @@ const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEditor, i
       </ol>
     </section>
 
-    <section className="intern-detail-section intern-source">
-      <div><span>{t.deadline}</span><strong>{formatDeadline(item.deadline, isJa)}</strong></div>
-      <div><span>{t.compensation}</span><strong>{displayValue(item.compensation, isJa)}</strong></div>
-      <div><span>{t.source}</span><strong>{displayValue(item.source, isJa)}</strong></div>
-      <small>{t.verifiedSmall(item.verifiedDate)}</small>
-    </section>
+    {(item.deadline || item.compensation || item.source) && (
+      <section className="intern-detail-section intern-source">
+        {item.deadline ? <div><span>{t.deadline}</span><strong>{formatDeadline(item.deadline, isJa)}</strong></div> : null}
+        {item.compensation ? <div><span>{t.compensation}</span><strong>{displayValue(item.compensation, isJa)}</strong></div> : null}
+        {item.source ? <div><span>{t.source}</span><strong>{displayValue(item.source, isJa)}</strong></div> : null}
+        <small>{t.verifiedSmall(item.verifiedDate)}</small>
+      </section>
+    )}
 
     <div className="intern-detail-actions">
-      <a className="intern-apply intern-apply-large" href={item.url} target="_blank" rel="noreferrer" onClick={() => onApply(item)}>
-        {copy[isJa ? 'ja' : 'en'].applyNow} <ExternalLink size={15} />
-      </a>
+      {item.url ? (
+        <a className="intern-apply intern-apply-large" href={item.url} target="_blank" rel="noreferrer" onClick={() => onApply(item)}>
+          {copy[isJa ? 'ja' : 'en'].applyNow} <ExternalLink size={15} />
+        </a>
+      ) : null}
       <button type="button" className="intern-save-large" onClick={onOpenEditor}>{t.tune} <ArrowUpRight size={15} /></button>
-      <label className="intern-status-control"><span>{t.status}</span><select value={status} onChange={event => onStatus(item, event.target.value)}><option value="">{t.notTracked}</option>{APPLICATION_STATUSES.map(option => <option key={option.value} value={option.value}>{statusLabel(option.value, isJa)}</option>)}</select></label>
     </div>
   </aside>
   );
@@ -524,9 +547,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
   const [track, setTrack] = useState('All');
   const [language, setLanguage] = useState('All');
   const [deadlineFilter, setDeadlineFilter] = useState('All');
-  const [statusFilter, setStatusFilter] = useState('All');
   const [sort, setSort] = useState('japan');
-  const [priorityOnly, setPriorityOnly] = useState(false);
   const [savedOnly, setSavedOnly] = useState(false);
   const [selectedId, setSelectedId] = useState('');
   const [page, setPage] = useState(1);
@@ -600,12 +621,10 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
             : !isJapanBased(item) && !isRemoteRole(item)))
         && (track === 'All' || item.track === track)
         && (language === 'All' || item.languageType === language)
-        && (statusFilter === 'All' || status === statusFilter)
         && (deadlineFilter === 'All'
           || (deadlineFilter === 'Not stated' && !item.deadlineDate)
           || (deadlineFilter === '7 days' && item.deadlineDate && item.deadlineDate <= new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10))
           || (deadlineFilter === '30 days' && item.deadlineDate && item.deadlineDate <= new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)))
-        && (!priorityOnly || item.priority)
         && (!savedOnly || status === 'saved');
     });
     return [...next].sort((a, b) => {
@@ -623,13 +642,13 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
         || Number(Boolean(b.priority)) - Number(Boolean(a.priority))
         || b.score - a.score;
     });
-  }, [visibleCatalog, query, region, track, language, deadlineFilter, statusFilter, sort, priorityOnly, savedOnly, statusFor, appliedCompanies]);
+  }, [visibleCatalog, query, region, track, language, deadlineFilter, sort, savedOnly, statusFor, appliedCompanies]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
   const selected = selectedId ? catalog.find(item => item.id === selectedId) : null;
 
-  useEffect(() => { setPage(1); }, [query, region, track, language, deadlineFilter, statusFilter, sort, priorityOnly, savedOnly]);
+  useEffect(() => { setPage(1); }, [query, region, track, language, deadlineFilter, sort, savedOnly]);
   useEffect(() => {
     const syncPageSize = () => setPageSize(window.innerWidth <= 860 ? MOBILE_PAGE_SIZE : DESKTOP_PAGE_SIZE);
     window.addEventListener('resize', syncPageSize);
@@ -769,16 +788,11 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
     addMilestone(interviewTarget.id, { kind: 'interview', date, time: time || null });
     setInterviewTarget(null);
   };
-  const reviewPriorities = () => {
-    setPriorityOnly(true);
-    setSavedOnly(false);
-    document.querySelector('.intern-toolbar')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
   const clearFilters = () => {
-    setQuery(''); setRegion('All'); setTrack('All'); setLanguage('All'); setDeadlineFilter('All'); setStatusFilter('All'); setPriorityOnly(false); setSavedOnly(false); setSort('japan');
+    setQuery(''); setRegion('All'); setTrack('All'); setLanguage('All'); setDeadlineFilter('All'); setSavedOnly(false); setSort('japan');
   };
 
-  const hasFilters = Boolean(query || region !== 'All' || track !== 'All' || language !== 'All' || deadlineFilter !== 'All' || statusFilter !== 'All' || priorityOnly || savedOnly);
+  const hasFilters = Boolean(query || region !== 'All' || track !== 'All' || language !== 'All' || deadlineFilter !== 'All' || savedOnly);
   const start = filtered.length ? (page - 1) * pageSize + 1 : 0;
   const end = Math.min(page * pageSize, filtered.length);
 
@@ -786,7 +800,6 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
     <main className={`internship-radar ${isJa ? 'ja' : 'en'}`}>
       <section className="intern-heading">
         <div><h1>{t.title}</h1><p><ShieldCheck size={16} /> {t.verified(dynamicStats.total, dynamicStats.target, formatVerifiedDate(latestVerifiedDate, isJa))}</p></div>
-        <button type="button" className="intern-editor-link" onClick={onOpenEditor}>{t.tune} <ArrowUpRight size={15} /></button>
       </section>
 
       <section className="intern-summary" aria-label={t.summaryLabel}>
@@ -794,24 +807,23 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
         <div><Star size={20} /><strong>{dynamicStats.japan}</strong><span>{t.japan}</span></div>
         <div><Globe2 size={20} /><strong>{dynamicStats.englishFirst}</strong><span>{t.english}</span></div>
         <div><BriefcaseBusiness size={20} /><strong>{records.length}</strong><span>{t.tracked}</span></div>
-        <button type="button" onClick={reviewPriorities}>{t.review} <ChevronRight size={17} /></button>
+        <button type="button" onClick={onOpenEditor}>{t.tune} <ArrowUpRight size={17} /></button>
       </section>
 
       <section className="intern-workspace">
         <div className="intern-toolbar">
-          <label className="intern-search"><Search size={18} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder={t.search} aria-label={t.search} />{query ? <button type="button" onClick={() => setQuery('')} aria-label={t.clear}><X size={15} /></button> : null}</label>
+          <div className="intern-toolbar-top">
+            <label className="intern-search"><Search size={17} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder={t.search} aria-label={t.search} />{query ? <button type="button" onClick={() => setQuery('')} aria-label={t.clear}><X size={15} /></button> : null}</label>
+            <label className="intern-sort"><span>{t.sort}</span><select value={sort} onChange={event => setSort(event.target.value)} aria-label={t.sort}><option value="japan">{t.sortJapan}</option><option value="match">{t.sortMatch}</option><option value="deadline">{t.sortDeadline}</option><option value="company">{t.sortCompany}</option></select></label>
+          </div>
           <div className="intern-filter-row">
-            <span className="intern-filter-label"><Filter size={15} /> {t.filters}</span>
             <select value={region} onChange={event => setRegion(event.target.value)} aria-label={t.allLocations}>{regions.map(option => <option key={option} value={option}>{option === 'All' ? t.allLocations : option === 'Japan' ? (isJa ? '日本' : 'Japan') : option === 'Remote' ? (isJa ? 'リモート' : 'Remote') : (isJa ? 'グローバル' : 'Global')}</option>)}</select>
             <select value={track} onChange={event => setTrack(event.target.value)} aria-label={t.allTracks}>{tracks.map(option => <option key={option} value={option}>{option === 'All' ? t.allTracks : trackLabel(option, isJa)}</option>)}</select>
             <select value={language} onChange={event => setLanguage(event.target.value)} aria-label={t.allLanguages}><option value="All">{t.allLanguages}</option><option value="English-first">{t.english}</option><option value="Bilingual">{isJa ? 'バイリンガル' : 'Bilingual'}</option></select>
             <select value={deadlineFilter} onChange={event => setDeadlineFilter(event.target.value)} aria-label={t.allDeadlines}><option value="All">{t.allDeadlines}</option><option value="7 days">{t.next7}</option><option value="30 days">{t.next30}</option><option value="Not stated">{t.notStated}</option></select>
-            <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} aria-label={t.allStatuses}><option value="All">{t.allStatuses}</option>{APPLICATION_STATUSES.filter(option => !APPLIED_TYPE_STATUSES.has(option.value)).map(option => <option key={option.value} value={option.value}>{statusLabel(option.value, isJa)}</option>)}</select>
-            <button type="button" className={priorityOnly ? 'active' : ''} onClick={() => setPriorityOnly(value => !value)}><Star size={14} /> {t.priority}</button>
             <button type="button" className={savedOnly ? 'active' : ''} onClick={() => setSavedOnly(value => !value)}><Bookmark size={14} /> {t.saved(savedCount)}</button>
             {hasFilters ? <button type="button" className="intern-clear" onClick={clearFilters}>{t.clear}</button> : null}
           </div>
-          <label className="intern-sort"><span>{t.sort}</span><select value={sort} onChange={event => setSort(event.target.value)} aria-label={t.sort}><option value="japan">{t.sortJapan}</option><option value="match">{t.sortMatch}</option><option value="deadline">{t.sortDeadline}</option><option value="company">{t.sortCompany}</option></select></label>
         </div>
 
         {canLiveSearchCompany ? (

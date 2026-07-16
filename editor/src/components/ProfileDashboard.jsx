@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRight,
   Bookmark,
@@ -15,7 +15,9 @@ import {
 import { APPLICATION_STATUSES, statusLabel, useApplicationTracker } from '../hooks/useApplicationTracker.js';
 import { useInternshipCatalog } from '../hooks/useInternshipCatalog.js';
 import { CompanyLogo } from './CompanyLogo.jsx';
+import { DetailPanel } from './InternshipDashboard.jsx';
 import InterviewDateModal from './InterviewDateModal.jsx';
+import { ApplicationTrendChart, StatusBreakdownDonut } from './DashboardCharts.jsx';
 import { displayCompany, displayRole, displayValue, formatDisplayDeadline } from '../utils/internshipDisplay.js';
 import { prepareProfilePhoto } from '../utils/imageUpload.js';
 import { appliedCompaniesForProfile, compareCompanyAwareMatch } from '../utils/internshipRanking.js';
@@ -47,11 +49,6 @@ const copy = {
   en: {
     uploadPhoto: 'Upload profile photo',
     graduation: value => `Expected graduation: ${value}`,
-    complete: 'complete',
-    readiness: 'Resume readiness',
-    ready: 'Ready to tailor for each role.',
-    missing: 'Add missing details for stronger applications.',
-    tune: 'Tune resume',
     pipeline: 'Application',
     rolesTracked: count => `${count} ${count === 1 ? 'role' : 'roles'} tracked`,
     recent: 'Recent applications',
@@ -73,16 +70,14 @@ const copy = {
     tokyo: 'Tokyo opportunities',
     tokyoSub: 'Highest-priority matches nearby.',
     viewJapan: 'View all Japan matches',
+    trend: 'Application trend',
+    trendSub: 'Applications sent per month.',
+    breakdown: 'Status breakdown',
   },
   ja: {
     uploadPhoto: 'プロフィール写真をアップロード',
     location: '東京、日本',
     graduation: value => `卒業予定: ${value}`,
-    complete: '完了',
-    readiness: '履歴書の完成度',
-    ready: '応募先ごとに調整できます。',
-    missing: '不足情報を追加すると応募力が上がります。',
-    tune: '履歴書を調整',
     pipeline: '応募状況',
     rolesTracked: count => `${count}件を管理中`,
     recent: '最近の応募',
@@ -104,6 +99,9 @@ const copy = {
     tokyo: '東京の注目募集',
     tokyoSub: '近くで優先度の高い募集です。',
     viewJapan: '日本の募集をすべて見る',
+    trend: '応募の推移',
+    trendSub: '月ごとの応募数です。',
+    breakdown: '状況の内訳',
   },
 };
 
@@ -115,29 +113,13 @@ function LinkedinMark() {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.45 20.45h-3.56v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.34V8.98h3.42v1.57h.05c.47-.9 1.64-1.85 3.37-1.85 3.61 0 4.27 2.37 4.27 5.46v6.29ZM5.32 7.41a2.07 2.07 0 1 1 0-4.13 2.07 2.07 0 0 1 0 4.13ZM7.1 20.45H3.54V8.98H7.1v11.47Z" /></svg>;
 }
 
-function profileCompletion(resume) {
-  const checks = [
-    resume.personal?.nameEn || resume.personal?.nameJa,
-    resume.personal?.email,
-    resume.personal?.phone,
-    resume.personal?.github,
-    resume.personal?.linkedin,
-    resume.summary,
-    resume.education?.length,
-    resume.experience?.filter(item => item.company || item.companyJa).length,
-    resume.projects?.length,
-    resume.skills?.languages,
-  ];
-  return Math.round((checks.filter(Boolean).length / checks.length) * 100);
-}
-
 export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeChange, isJa, activeProfile }) {
   const t = isJa ? copy.ja : copy.en;
   const fileRef = useRef(null);
   const [interviewPending, setInterviewPending] = useState(null);
-  const { records, counts, updateStatus, addMilestone } = useApplicationTracker(activeProfile);
+  const { records, counts, statusFor, updateStatus, addMilestone } = useApplicationTracker(activeProfile);
   const { catalog } = useInternshipCatalog();
-  const completion = profileCompletion(resume);
+  const [selectedItem, setSelectedItem] = useState(null);
   const recent = useMemo(
     () => records.filter(record => APPLIED_STATUSES.has(record.status)).slice(0, 5),
     [records],
@@ -182,6 +164,18 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
     updateStatus(item, value);
   };
 
+  const onApply = item => {
+    const current = statusFor(item.id);
+    if (!current || current === 'saved') updateStatus(item, 'applying');
+  };
+
+  useEffect(() => {
+    if (!selectedItem) return undefined;
+    const closeOnEscape = event => { if (event.key === 'Escape') setSelectedItem(null); };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [selectedItem]);
+
   const onInterviewConfirm = value => {
     const item = interviewPending;
     if (!item) return;
@@ -216,9 +210,9 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
           {resume.personal?.linkedin ? <a href={resume.personal.linkedin} target="_blank" rel="noreferrer"><span className="brand-mark linkedin"><LinkedinMark /></span><b>LinkedIn</b><small>{resume.personal.linkedin.replace(/^https?:\/\/(www\.)?/, '')}</small></a> : null}
         </div>
 
-        <div className="profile-completion">
-          <div className="completion-ring" style={{ '--completion': `${completion * 3.6}deg` }}><strong>{completion}%</strong><span>{t.complete}</span></div>
-          <div><b>{t.readiness}</b><p>{completion === 100 ? t.ready : t.missing}</p><button type="button" onClick={onOpenEditor}>{t.tune} <ArrowRight size={14} /></button></div>
+        <div className="profile-breakdown">
+          <b>{t.breakdown}</b>
+          <StatusBreakdownDonut counts={counts} isJa={isJa} />
         </div>
       </section>
 
@@ -228,6 +222,29 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
           const Icon = STATUS_ICONS[item.value];
           return <div className={`pipeline-stat ${item.value}`} key={item.value}><Icon size={17} /><span><strong>{counts[item.value] || 0}</strong><small>{statusLabel(item.value, isJa)}</small></span></div>;
         })}
+      </section>
+
+      <section className="dashboard-analytics">
+        <div className="analytics-card analytics-trend">
+          <div className="analytics-heading"><h2>{t.trend}</h2><p>{t.trendSub}</p></div>
+          <ApplicationTrendChart records={records} isJa={isJa} />
+        </div>
+        <div className="analytics-card analytics-tokyo">
+          <div className="analytics-heading analytics-heading-row">
+            <div><h2>{t.tokyo}</h2><p>{t.tokyoSub}</p></div>
+            <button type="button" onClick={onOpenRadar}>{t.viewJapan} <ArrowRight size={15} /></button>
+          </div>
+          <div className="tokyo-grid">
+            {tokyoMatches.map(item => (
+              <button type="button" className="tokyo-card" key={item.id} onClick={onOpenRadar}>
+                <span className="tokyo-card-top"><CompanyLogo item={item} /><strong>{item.score}%</strong></span>
+                <b>{displayCompany(item, isJa)}</b>
+                <small>{displayRole(item.role, isJa)}</small>
+                <em><MapPin size={11} />{dashboardValue(item.location, isJa)}</em>
+              </button>
+            ))}
+          </div>
+        </div>
       </section>
 
       <div className="dashboard-grid">
@@ -240,7 +257,7 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
                 || { ...record, id: record.internshipId, url: record.applyUrl };
               return (
                 <article className="application-row" key={record.internshipId}>
-                  <span className="application-company"><CompanyLogo item={item} /><span><b>{displayCompany(item, isJa)}</b><small>{displayRole(item.role || record.role, isJa)}</small></span></span>
+                  <span className="application-company"><CompanyLogo item={item} /><button type="button" className="application-company-trigger" onClick={() => setSelectedItem(item)} aria-label={isJa ? `${displayCompany(item, isJa)}の詳細を開く` : `Open details for ${displayCompany(item, isJa)}`}><b>{displayCompany(item, isJa)}</b><small>{displayRole(item.role || record.role, isJa)}</small></button></span>
                   <span><MapPin size={13} />{dashboardValue(record.location, isJa)}</span>
                   <span className="application-deadline">{formatDisplayDeadline(record.deadline, isJa)}</span>
                   <select value={record.status} onChange={event => onStatusChange(item, event.target.value)} aria-label={isJa ? `${record.company}の応募状況` : `Status for ${record.company}`}>
@@ -272,23 +289,23 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
               </a>
             ))}
           </div>
-        </section>
 
-        <aside className="dashboard-rail">
-          <div className="rail-heading"><div><h2>{t.tokyo}</h2><p>{t.tokyoSub}</p></div><span className="rail-heading-mark" aria-hidden="true"><MapPin size={17} /></span></div>
-          <div className="tokyo-list">
-            {tokyoMatches.map(item => (
-              <button type="button" key={item.id} onClick={onOpenRadar}>
-                <CompanyLogo item={item} />
-                <span><b>{displayCompany(item, isJa)}</b><small>{displayRole(item.role, isJa)}</small><em><MapPin size={11} />{dashboardValue(item.location, isJa)}</em></span>
-                <strong>{item.score}%</strong>
-              </button>
-            ))}
-          </div>
-          <button className="rail-action" type="button" onClick={onOpenRadar}>{t.viewJapan} <ArrowRight size={15} /></button>
-        </aside>
+        </section>
       </div>
       {/* Application timeline moved to its own view (sidebar → Application timeline). */}
+      {selectedItem ? (
+        <div className="intern-detail-backdrop" role="presentation" onClick={event => { if (event.target === event.currentTarget) setSelectedItem(null); }}>
+          <DetailPanel
+            item={selectedItem}
+            status={statusFor(selectedItem.id) || ''}
+            onStatus={onStatusChange}
+            onApply={onApply}
+            onClose={() => setSelectedItem(null)}
+            onOpenEditor={onOpenEditor}
+            isJa={isJa}
+          />
+        </div>
+      ) : null}
       <InterviewDateModal
         open={Boolean(interviewPending)}
         applicationLabel={interviewPending ? `${displayCompany(interviewPending, isJa)} — ${displayRole(interviewPending.role, isJa)}` : ''}

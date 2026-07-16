@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Bookmark, CalendarClock, CircleSlash, FilePenLine, Inbox, Send } from 'lucide-react';
 import { APPLICATION_STATUSES, statusLabel, useApplicationTracker } from '../hooks/useApplicationTracker.js';
 import { useInternshipCatalog } from '../hooks/useInternshipCatalog.js';
 import { CompanyLogo } from './CompanyLogo.jsx';
 import GmailMark from './GmailMark.jsx';
+import { DetailPanel } from './InternshipDashboard.jsx';
 import InterviewDateModal from './InterviewDateModal.jsx';
 import { displayCompany, displayRole, displayValue, formatDisplayDeadline } from '../utils/internshipDisplay.js';
 
@@ -48,12 +49,13 @@ const copy = {
   },
 };
 
-export default function ApplicationsView({ isJa, activeProfile, onOpenRadar }) {
+export default function ApplicationsView({ isJa, activeProfile, onOpenRadar, onOpenEditor }) {
   const t = isJa ? copy.ja : copy.en;
-  const { records, counts, updateStatus, addMilestone } = useApplicationTracker(activeProfile);
+  const { records, counts, statusFor, updateStatus, addMilestone } = useApplicationTracker(activeProfile);
   const { catalog } = useInternshipCatalog();
   const [filter, setFilter] = useState('all');
   const [interviewPending, setInterviewPending] = useState(null);
+  const [selectedItem, setSelectedItem] = useState(null);
 
   const visible = useMemo(
     () => (filter === 'all' ? records : records.filter(record => record.status === filter)),
@@ -72,6 +74,17 @@ export default function ApplicationsView({ isJa, activeProfile, onOpenRadar }) {
     if (/^\d{4}-\d{2}-\d{2}$/.test(date)) addMilestone(item.id, { kind: 'interview', date, time: time || null });
     setInterviewPending(null);
   };
+  const onApply = item => {
+    const current = statusFor(item.id);
+    if (!current || current === 'saved') updateStatus(item, 'applying');
+  };
+
+  useEffect(() => {
+    if (!selectedItem) return undefined;
+    const closeOnEscape = event => { if (event.key === 'Escape') setSelectedItem(null); };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [selectedItem]);
 
   const tabs = [{ value: 'all', label: t.all, count: records.length }, ...APPLICATION_STATUSES.map(s => ({ value: s.value, label: statusLabel(s.value, isJa), count: counts[s.value] || 0 }))];
 
@@ -111,7 +124,7 @@ export default function ApplicationsView({ isJa, activeProfile, onOpenRadar }) {
             || { ...record, id: record.internshipId, url: record.applyUrl };
           return (
             <article className="application-row" key={record.internshipId}>
-              <span className="application-company"><CompanyLogo item={item} /><span><b>{displayCompany(item, isJa)}{record.source === 'gmail' && <span className="src-gmail" title={isJa ? 'Gmailから追加' : 'Added from Gmail'}><GmailMark size={12} /></span>}</b><small>{displayRole(item.role || record.role, isJa)}</small></span></span>
+              <span className="application-company"><CompanyLogo item={item} /><button type="button" className="application-company-trigger" onClick={() => setSelectedItem(item)} aria-label={isJa ? `${displayCompany(item, isJa)}の詳細を開く` : `Open details for ${displayCompany(item, isJa)}`}><b>{displayCompany(item, isJa)}{record.source === 'gmail' && <span className="src-gmail" title={isJa ? 'Gmailから追加' : 'Added from Gmail'}><GmailMark size={12} /></span>}</b><small>{displayRole(item.role || record.role, isJa)}</small></button></span>
               <span>{displayValue(record.location, isJa)}</span>
               <span className="application-deadline">{formatDisplayDeadline(record.deadline, isJa)}</span>
               <select value={record.status} onChange={event => onStatusChange(item, event.target.value)} aria-label={isJa ? `${record.company}の応募状況` : `Status for ${record.company}`}>
@@ -125,6 +138,20 @@ export default function ApplicationsView({ isJa, activeProfile, onOpenRadar }) {
           <div className="application-empty"><span className="application-empty-icon" aria-hidden="true"><Inbox size={20} /></span><b>{t.empty}</b><span>{t.emptySub}</span><button type="button" onClick={onOpenRadar}>{t.explore}</button></div>
         )}
       </div>
+
+      {selectedItem ? (
+        <div className="intern-detail-backdrop" role="presentation" onClick={event => { if (event.target === event.currentTarget) setSelectedItem(null); }}>
+          <DetailPanel
+            item={selectedItem}
+            status={statusFor(selectedItem.id) || ''}
+            onStatus={onStatusChange}
+            onApply={onApply}
+            onClose={() => setSelectedItem(null)}
+            onOpenEditor={onOpenEditor}
+            isJa={isJa}
+          />
+        </div>
+      ) : null}
 
       <InterviewDateModal
         open={Boolean(interviewPending)}

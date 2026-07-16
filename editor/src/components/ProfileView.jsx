@@ -9,6 +9,7 @@ const copy = {
     contact: 'Contact & links',
     email: 'Email', phone: 'Phone', github: 'GitHub', linkedin: 'LinkedIn',
     education: 'Education', experience: 'Experience', skills: 'Skills', summary: 'Summary',
+    skillLanguages: 'Languages', skillFrameworks: 'Frameworks & libraries', skillTools: 'Tools & platforms', skillOther: 'Other',
     resumes: 'Résumés & CVs',
     resumesSub: 'The résumé the app manages for you. File storage for extra CVs is coming soon.',
     openEditor: 'Open in Editor', activeResume: 'Active résumé',
@@ -22,6 +23,7 @@ const copy = {
     contact: '連絡先・リンク',
     email: 'メール', phone: '電話', github: 'GitHub', linkedin: 'LinkedIn',
     education: '学歴', experience: '職歴', skills: 'スキル', summary: '概要',
+    skillLanguages: '言語', skillFrameworks: 'フレームワーク・ライブラリ', skillTools: 'ツール・プラットフォーム', skillOther: 'その他',
     resumes: '履歴書・CV',
     resumesSub: 'アプリが管理する履歴書です。追加のCVファイル保存は近日対応予定です。',
     openEditor: 'エディタで開く', activeResume: '現在の履歴書',
@@ -53,9 +55,16 @@ export default function ProfileView({ resume, isJa, onOpenEditor }) {
   const education = resume.education || [];
   const experience = resume.experience || [];
   const skills = resume.skills || {};
-  const skillLine = Array.isArray(skills)
-    ? skills.filter(Boolean).join(', ')
-    : [skills.languages, skills.frameworks, skills.tools].filter(Boolean).join(', ');
+  // Skills grouped by kind (languages / frameworks / tools) so the panel reads
+  // as tidy labeled rows instead of one long chip soup.
+  const splitSkills = value => String(value || '').split(/,\s*/).map(s => s.trim()).filter(Boolean);
+  const skillGroups = (Array.isArray(skills)
+    ? [{ label: t.skillOther, items: skills.filter(Boolean) }]
+    : [
+        { label: t.skillLanguages, items: splitSkills(skills.languages) },
+        { label: t.skillFrameworks, items: splitSkills(skills.frameworks) },
+        { label: t.skillTools, items: splitSkills(skills.tools) },
+      ]).filter(group => group.items.length);
   const summary = isJa ? (resume.summaryJa || resume.summary) : (resume.summaryEn || resume.summary);
   const firstEdu = education[0];
   const eduLine = firstEdu
@@ -92,11 +101,18 @@ export default function ProfileView({ resume, isJa, onOpenEditor }) {
           </div>
         </section>
 
-        {skillLine ? (
+        {skillGroups.length ? (
           <section className="profile-panel">
             <h3><Sparkles size={15} /> {t.skills}</h3>
-            <div className="profile-skill-tags">
-              {skillLine.split(/,\s*/).filter(Boolean).map((s, i) => <span key={`${s}-${i}`} className="profile-skill-tag">{s}</span>)}
+            <div className="profile-skill-groups">
+              {skillGroups.map(group => (
+                <div className="profile-skill-group" key={group.label}>
+                  <small>{group.label}</small>
+                  <div className="profile-skill-tags">
+                    {group.items.map((s, i) => <span key={`${s}-${i}`} className="profile-skill-tag">{s}</span>)}
+                  </div>
+                </div>
+              ))}
             </div>
           </section>
         ) : null}

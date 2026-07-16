@@ -32,6 +32,96 @@ build and 5 E2E tests green.
   content tabs (Home/Roles/Timeline/Settings) — NO search tab; search is an inline pill in
   Roles. Live against the public Azure catalog (Home/Roles verified on an iPhone 17 Pro sim
   via --browse/--tab hooks). No Firebase yet; Editor deferred.
+- **2026-07-16 (pm, round 3 — user feedback).** Drawer head is
+  `logo | title | status select | score | close` — status sits beside the match %
+  (`.intern-status-head`; the round-2 `.intern-status-top` row was removed; wraps to its
+  own row ≤560px via explicit grid placements). Radar summary strip: outer border removed
+  (`border: 0` on the 4236-area override). Calendar week view: today badge is a pill
+  (fixed 26px circle overflowed the "Jul 16" label).
+- **2026-07-16 (pm, round 2 — user feedback).** Radar: header "Tune my resume" button
+  dropped (summary CTA is the only one); sort select sits beside the search bar again;
+  `.intern-workspace` is borderless/full-width (no card box around the table). Drawer:
+  width 470→560px so meta chips fit; the STATUS select moved to the TOP (row under the
+  meta chips, `.intern-status-top`), out of the bottom actions. Trend chart re-proportioned
+  (W640/H224, slimmer bars cap 34, radius 9, smaller count chip + softer shadow). Calendar
+  overflow fix: `.calendar-view .calendar-days` rows were `minmax(0,1fr)` so 2+ event
+  pills spilled out of short cells → `minmax(min-content,1fr)` (row grows, view scrolls).
+- **2026-07-16 (pm) — GSAP charts, pill design standard, shared detail drawer.**
+  (1) `gsap` added (editor dep). `DashboardCharts.jsx`: trend bars are now flat-bottomed
+  paths (rounded top only) so they sit on the axis, GSAP staggered grow-in + donut sweep;
+  tweens carry a setTimeout fail-safe (`progress(1)`) because throttled/background rAF can
+  freeze them, and cleanup uses kill+clearProps (never `context.revert`, which froze bars
+  mid-flight under React re-renders). Don't tween elements with an SVG `transform=` attr —
+  GSAP clobbers it (peak-count chip). (2) Dashboard: resume-readiness ring REMOVED; hero's
+  3rd column is now the Status-breakdown donut (`.profile-breakdown`); analytics row =
+  Application trend + Tokyo opportunities side by side, borderless `.analytics-card`s;
+  Tokyo section removed from below Projects. (3) **Pill radius (999px, Applications-tab
+  style, navy `#18243a` active fill) is the app-wide control standard** — radar toolbar
+  rebuilt: search alone on row 1, filter pills + SORT select on row 2; removed
+  Filters-label chip, Priority toggle, All-statuses select (and their state); summary CTA
+  is now "Tune my resume" (was Review priority list); `tracked applications` label no
+  longer wraps (summary grid `repeat(4,auto) 1fr` + nowrap). (4) `DetailPanel` exported
+  from `InternshipDashboard.jsx` and opened by clicking company names in ApplicationsView
+  AND dashboard Recent applications (`.application-company-trigger`); panel guards
+  synthetic Gmail records (no score/url/fitNote/source); `--intern-*` CSS vars are now
+  declared on `.intern-detail` too (they were radar-scoped, drawer rendered unstyled
+  outside it). Drawer: +top padding, tech-stack chips show brand icons via
+  `resolveTechIcon` — whose substring matching is now word-bounded ("agenTS"→TypeScript,
+  "sourCe"→C false hits fixed). (5) ProfileView skills grouped
+  (Languages/Frameworks/Tools). Build green; verified in browser on :5176
+  (`client-noauth` launch config added).
+- **2026-07-16 — Dashboard analytics + calendar tooltip fix + Gmail internships-only +
+  CJK company names (commits `b4095c2`, `f231e60`).** (1) Dashboard (CRM-reference design):
+  analytics row under the pipeline strip — monthly "Application trend" bars (hatched
+  de-emphasis, peak month accent + value chip; Gmail records bucket by email receivedAt
+  from sourceMeta) + "Status breakdown" donut (center total, legend counts; palette
+  dataviz-validated); readiness ring rebuilt as a thick masked conic donut; Tokyo
+  opportunities moved below Projects as a 4-card row (right rail deleted). New
+  `components/DashboardCharts.jsx` (plain SVG). (2) Calendar tooltip bug root cause:
+  `.calendar-view .calendar-day{overflow:hidden}` clipped the hover card; also removed the
+  duplicate native title, added data-col/row placement (flip below on row 0, pin on edge
+  cols), hover z-index. (3) Gmail: classify emits `isInternship`; sync drops
+  freelance/gig/annotation/part-time applications (micro1 "AI interview" + Turing "LLM
+  Trainer" gigs removed from the local tracker; the user must delete them from prod
+  Firestore via the UI if drained there). (4) CJK-aware norm/slug (株式会社カナリー was
+  silently dropped; 株式会社ABEJA now matches catalog ABEJA). All shipped: Vercel prod +
+  Azure image `portal-compile:f231e60`. Build green, E2E 5/5, verified in-browser
+  (dashboard, tokyo row, calendar tooltip).
+- **2026-07-16 — Gmail pipeline hardened via a REAL 90-day inbox audit (commits `0007973`,
+  `46e89ea`, `4ed7638`; BUG-012/013/014).** Ran the full backfill three times against the
+  real inbox (local server, same Gmail account as prod). Results: 12 companies auto-tracked
+  with accurate kinds — 6 rejected (incl. JA 選考結果/ご応募のお礼-with-rejecting-body
+  patterns), 3 interview (Rakuten Codility test invite correctly counted), 3 applied;
+  interview milestones extracted w/ date+time; catalog matches carried real URLs. Fixes
+  from the audit: (1) missing OPENROUTER_API_KEY now surfaces as `{skipped:'no-llm-key'}`
+  instead of silently consuming messages (prod ran keyless!); backfill ignores the processed
+  list. (2) Known companies (catalog OR tracker) skip the sonar search — user rule: update
+  the dashboard record, never re-research. Verified: re-run queued 0 enrichments. (3)
+  Calendar milestones dedupe (deterministic gmail-<msgId> id + content match) — verified: a
+  full re-drain added 0 duplicates. (4) Statuses are monotonic across drains (nano
+  flip-flop on Turing's "Next steps" email downgraded interview→applied once — now
+  impossible). Prod: Azure on `portal-compile:46e89ea` (rev `--0000005`), frontend
+  redeployed to portal.mohamedfuad.com (3×). **STILL BLOCKED: prod has NO
+  OPENROUTER_API_KEY** — needs user-approved
+  `az containerapp secret set -n portal-compile-jp -g internship-portal --secrets
+  openrouter-api-key=<key>` + env `OPENROUTER_API_KEY=secretref:openrouter-api-key`; until
+  then prod Gmail sync skips. After the key: run one
+  `POST /api/integrations/gmail/sync-now?profile=mohamed_fuad&backfill=90` on Azure.
+- **2026-07-16 — Gmail Phase 2 DEPLOYED TO PROD + refinement pass (commits `0c8b812`,
+  `2f0452d`).** Azure `portal-compile-jp` now runs image `portal-compile:2f0452d`
+  (revision `--0000003`) with the 4 Gmail env vars; prod frontend (portal.mohamedfuad.com)
+  bundle points at the Azure API; Gmail connected in prod (mohamed.fuad.jp@gmail.com) and a
+  live sync-now on the new revision verified clean (token + /data survived the roll).
+  Refinements: (1) server — `sync-now?backfill=<days>` (cap 180) one-time keyword-filtered
+  scan of older mail (EN+JA application terms; doesn't move the history cursor; 80-msg cap),
+  classify prompt now counts coding tests / online assessments as "interview" + JA vocab;
+  (2) client — the drain sorts oldest-first and converges per-company (one record for
+  applied+rejected of the same company; terminal status never downgraded; details backfilled
+  across emails), connected card shows a green presence dot instead of the Live badge and no
+  post-OAuth success banner. Build green, E2E 5/5 (needed `npx playwright install chromium`
+  after a Playwright bump). **PENDING: Vercel prod redeploy** (`vercel deploy --prod --yes`
+  from repo root) to ship the client-side drain/card changes — blocked on user approval this
+  session. Branch pushed; not merged to main.
 - **2026-07-16 — Gmail ingest Phase 2 (2a connect + 2b sync pipeline), branch
   `feat/gmail-catalog-automation` (commits 5513866, 52beba0, 05ad392, c20954d; ADR-0035).**
   Read-only Gmail OAuth (server-side, raw fetch, node:crypto AES-256-GCM token — NO new deps;
