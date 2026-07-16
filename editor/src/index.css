@@ -7789,8 +7789,20 @@ body,
 .editor-view .btn:disabled { opacity: .55; cursor: default; }
 
 /* ── Split: form column + preview ──────────────────────────────────── */
-.editor-view .sidebar { width: 560px; border-right: 1px solid #eef0f4; background: #fff; }
+.editor-view .sidebar { width: min(820px, 52vw); border-right: 1px solid #eef0f4; background: #fff; }
 .editor-workspace { grid-template-columns: 218px minmax(0, 1fr); }
+@media (max-width: 1320px) {
+  .editor-view .sidebar { width: min(760px, 58vw); }
+}
+/* ≤980 the .split stacks into a column (legacy media rules) — the form column
+   goes full-width again and the rail becomes a horizontal chip strip. */
+@media (max-width: 980px) {
+  .editor-view .sidebar,
+  .editor-view .sidebar.closed { width: 100%; border-right: 0; }
+  .editor-workspace { grid-template-columns: 1fr; }
+  .section-row { background: #f4f6f9; }
+  .section-row.active { background: #e8edf5; }
+}
 
 /* Section rail — quiet nav list, no boxes */
 .section-rail { border-right: 1px solid #eef0f4; background: #fbfcfe; }
