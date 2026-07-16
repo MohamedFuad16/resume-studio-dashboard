@@ -25,6 +25,15 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-16 (night) — post-overhaul bug sweep.** Two regressions from the editor
+  redesign's late override layer, both caused by end-of-file rules outranking legacy
+  media queries: (1) `.editor-view .sidebar{width:560px}` pinned the form column inside
+  the ≤980 stacked layout → adaptive `min(820px,52vw)` + ≤980 full-width & 1-col
+  workspace restored (`a5a9ac9`); (2) preview toolbar zoom pills clipped at narrow
+  preview widths → toolbar wraps (`7f47fce`). Verified clean: e2e smoke ×2, EN+JA all
+  views, 390/500/900/1440 widths, editor add/move/delete + export menu + skills inputs,
+  drawer head wrap ≤560. NOTE: the embedded preview pane freezes rAF AND CSS animations
+  — a mid-animation drawer measures 42px off-screen there; not a real bug.
 - **2026-07-16 (eve) — editor overhaul + app-shell gradient + profile editing.**
   (1) EDITOR redesigned to the app language (final override layer at the end of
   index.css): one `.editor-topbar` (title + template pills + Save/Export — the old `.tb`
