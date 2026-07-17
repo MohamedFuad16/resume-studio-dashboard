@@ -83,7 +83,23 @@ struct InternshipPortalApp: App {
             .task {
                 // Ask once the UI is up, not during init: a permission sheet over a
                 // launch screen is the classic way to get told no.
-                await Notifier.requestAuthorization()
+                // `-skipNotifPrompt YES` suppresses it for screenshot/UI runs, where
+                // the system sheet would otherwise sit over every screen.
+                if !UserDefaults.standard.bool(forKey: "skipNotifPrompt") {
+                    await Notifier.requestAuthorization()
+                }
+
+                #if DEBUG
+                // DEBUGGING PHASE: replay first-run onboarding ONCE per review tag,
+                // so it can be seen on a device that already onboarded — without
+                // forcing four screens on every single foreground. Bump the tag to
+                // show it again. Remove this block before shipping.
+                let tag = "onboarding-review-2026-07-18a"
+                if UserDefaults.standard.string(forKey: "onboardingReviewTag") != tag {
+                    hasOnboarded = false
+                    UserDefaults.standard.set(tag, forKey: "onboardingReviewTag")
+                }
+                #endif
             }
         }
     }

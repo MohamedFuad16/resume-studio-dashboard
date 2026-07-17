@@ -66,7 +66,8 @@ struct OnboardingView: View {
                         ForEach(Self.pages) { item in
                             OnboardingPage(
                                 symbol: item.symbol, tint: item.tint,
-                                title: item.title, message: item.message
+                                title: item.title, message: item.message,
+                                isActive: item.id == page
                             )
                             .tag(item.id)
                         }
@@ -113,17 +114,31 @@ struct OnboardingView: View {
 }
 
 /// One screen: a big glass orb holding the feature's glyph, then the words.
+///
+/// When the page becomes active its orb rises and settles and the words fade up
+/// after it — the same bottom-to-centre motion as the splash cluster, one orb at a
+/// time — so paging through onboarding feels like the intro continuing rather than
+/// four static cards.
 private struct OnboardingPage: View {
     var symbol: String
     var tint: Color6
     var title: String
     var message: String
+    var isActive: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(spacing: 0) {
+        let on = isActive || reduceMotion
+
+        return VStack(spacing: 0) {
             Spacer()
 
             FeatureOrb(symbol: symbol, tint: tint, diameter: 168)
+                .offset(y: on ? 0 : 60)
+                .scaleEffect(on ? 1 : 0.82)
+                .opacity(on ? 1 : 0)
+                .animation(reduceMotion ? nil : .spring(response: 0.7, dampingFraction: 0.7), value: on)
                 .padding(.bottom, 40)
 
             Text(title)
@@ -133,6 +148,9 @@ private struct OnboardingPage: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 14)
+                .opacity(on ? 1 : 0)
+                .offset(y: on ? 0 : 12)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.45).delay(0.18), value: on)
 
             Text(message)
                 .font(.system(size: 15))
@@ -141,6 +159,9 @@ private struct OnboardingPage: View {
                 .lineSpacing(4)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 36)
+                .opacity(on ? 1 : 0)
+                .offset(y: on ? 0 : 12)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.45).delay(0.28), value: on)
 
             Spacer()
             Spacer()

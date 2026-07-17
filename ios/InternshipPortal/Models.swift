@@ -8,18 +8,34 @@ import Foundation
 
 // MARK: - Catalog
 
-/// Logo sources for a company.
+/// A logo.dev publishable token. Publishable by design (like a Stripe pk_): it is
+/// meant to ship in a client. Swap in your own free one from https://logo.dev —
+/// registering ties the quota to your account instead of this shared demo key.
+private let logoDevToken = "pk_X-1ZO13GSgeOoUrIuJ6GMQ"
+
+/// Logo sources for a company, best-first.
+///
+/// logo.dev leads because it is the only source that returns a UNIFORM 256×256 for
+/// every domain — measured against the real list, gstatic gave Geotab a 16px
+/// favicon (the pixelation) and NVIDIA nothing usable, while logo.dev returned a
+/// clean 256 for both. The rest stay as a fallback chain so a logo still resolves
+/// if logo.dev is ever unreachable: gstatic's faviconV2 (Nokia/Mercari 128–192),
+/// the site's own apple-touch-icon, then DuckDuckGo. LogoLoader keeps the LARGEST
+/// result, so ordering is a preference, not a commitment — a bigger fallback still
+/// wins if logo.dev happens to be small.
 ///
 /// NOT google.com/s2/favicons: it answers with an HTML redirect page, never an
-/// image, so every logo silently fell through to DuckDuckGo's 32px favicon —
-/// that was the "low quality" across the whole app. Verified per-source against
-/// the real domains: gstatic's faviconV2 is the reliable one (Nokia/Mercari 128px
-/// where DDG gives 32), DDG occasionally wins big (HENNGE 256), and a site's own
-/// apple-touch-icon is best when it exists (Rakuten 192) but is usually an HTML
-/// 404 page. So: ask all of them and let LogoLoader keep the LARGEST.
+/// image, so everything fell through to DuckDuckGo's 32px favicon — the original
+/// "low quality" across the app.
 func logoCandidateURLs(logoUrl: String?, domain: String?) -> [String] {
     var list: [String] = []
     if let domain, !domain.isEmpty {
+        // fallback=404 is load-bearing: without it, logo.dev answers a domain it
+        // has no real logo for with a generated MONOGRAM at 256px, which would then
+        // beat a real 128px favicon from gstatic (LogoLoader keeps the largest).
+        // With it, logo.dev 404s when it has nothing real, and the chain falls
+        // through to the actual favicon instead of a grey letter.
+        list.append("https://img.logo.dev/\(domain)?token=\(logoDevToken)&size=256&format=png&retina=true&fallback=404")
         list.append("https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://\(domain)&size=256")
         list.append("https://\(domain)/apple-touch-icon.png")
         list.append("https://icons.duckduckgo.com/ip3/\(domain).ico")

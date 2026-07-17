@@ -410,13 +410,18 @@ struct BubbleContents: View {
             }) {
                 monogramView
             }
-            // ALWAYS inset, even when the mark brings its own field. Brand tiles
-            // are squares whose artwork runs to the corners (Nokia's slash goes
-            // corner to corner) — filling a CIRCLE with one crops the mark, which
-            // is what read as "oversized". Insetting keeps the mark whole, and the
-            // tile's own background disappears into the sphere behind it because
-            // that sphere is painted the very same colour.
-            .padding(diameter * 0.17)
+            // Two kinds of artwork, two treatments:
+            //
+            // A FULL-BLEED coloured tile (Canary's teal, Cloudflare's orange) fills
+            // the sphere edge to edge — the tile IS the sphere. Insetting it left a
+            // square of the tile's real colour sitting on a circle painted the
+            // SAMPLED colour, and sampling never matches exactly, so you saw the
+            // square's outline. Filling hides the sampled field entirely behind the
+            // real artwork, and the seam with it.
+            //
+            // A BARE mark on transparent (Nokia, Rakuten) still insets on white,
+            // where the padding keeps a corner-to-corner mark from being cropped.
+            .padding(brand == nil ? diameter * 0.17 : 0)
             .clipShape(.circle)
 
             // Tracked companies wear a presence badge at mid-radius, where the

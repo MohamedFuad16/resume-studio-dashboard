@@ -57,28 +57,30 @@ struct SplashView: View {
                 VStack(spacing: 0) {
                     Spacer(minLength: proxy.size.height * 0.12)
 
-                    bubbleCluster(width: w, height: fieldHeight)
+                    bubbleCluster(width: w, height: fieldHeight, riseFrom: proxy.size.height)
                         .frame(width: w, height: fieldHeight)
-                        .scaleEffect(appeared ? 1 : 0.92)
-                        .opacity(appeared ? 1 : 0)
 
                     VStack(spacing: 10) {
                         Text("Internship Portal")
-                            .font(.system(size: 30, weight: .semibold, design: .serif))
+                            .font(.system(size: 33, weight: .semibold, design: .serif))
+                            .tracking(-0.5)
                             .foregroundStyle(Palette.ink)
                         Text("Every application, one calm place.")
-                            .font(.system(size: 15))
+                            .font(.system(size: 15, weight: .regular))
                             .foregroundStyle(Palette.ink500)
                     }
+                    // The words arrive after the cluster has gathered, so the eye
+                    // follows the bubbles up first, then reads.
                     .opacity(appeared ? 1 : 0)
-                    .offset(y: appeared ? 0 : 10)
+                    .offset(y: appeared ? 0 : 14)
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.5).delay(0.75), value: appeared)
 
                     Spacer()
                 }
             }
         }
         .onAppear {
-            withAnimation(reduceMotion ? .none : .spring(response: 0.7, dampingFraction: 0.8)) {
+            withAnimation(reduceMotion ? .none : .spring(response: 0.8, dampingFraction: 0.74)) {
                 appeared = true
             }
         }
@@ -89,8 +91,8 @@ struct SplashView: View {
             #endif
             // DEBUGGING PHASE: the splash plays on EVERY launch, at a length you
             // can actually look at, because it is under active review. Drop this
-            // back to ~1.8s (and consider once-per-session) before shipping.
-            try? await Task.sleep(for: .seconds(reduceMotion ? 1.2 : 2.6))
+            // back to ~2.0s (and consider once-per-session) before shipping.
+            try? await Task.sleep(for: .seconds(reduceMotion ? 1.2 : 2.8))
             onFinished()
         }
         .accessibilityElement()
@@ -98,20 +100,40 @@ struct SplashView: View {
     }
 
     /// The cluster: the same floating GlassOrbs the Companies view draws — large
-    /// behind, small in front, each with its own shadow and out-of-step bob — so
-    /// the splash and the market view are visibly the same material.
-    private func bubbleCluster(width: CGFloat, height: CGFloat) -> some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { timeline in
+    /// behind, small in front — but here they FLOW UP from below the screen and
+    /// gather into formation. Each orb rises from `riseFrom` (a full screen-height
+    /// below its resting place) to its cluster position, staggered so the big
+    /// central bubble lands first and the satellites drift up to attach around it.
+    /// A continuous, out-of-step bob keeps the settled cluster alive.
+    private func bubbleCluster(width: CGFloat, height: CGFloat, riseFrom: CGFloat) -> some View {
+        // Back-to-front, and that same order drives the stagger: the largest
+        // (Rakuten) leads, the small satellites follow.
+        let ordered = Self.orbs.sorted { $0.r > $1.r }
+
+        return TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: reduceMotion)) { timeline in
             let t = ShaderClock.seconds(timeline.date)
 
             ZStack(alignment: .topLeading) {
-                ForEach(Self.orbs.sorted { $0.r > $1.r }) { orb in
+                ForEach(Array(ordered.enumerated()), id: \.element.id) { index, orb in
                     let d = orb.r * width * 2
                     let bob = reduceMotion ? 0 : sin(t * 0.5 + Double(orb.id) * 0.9) * 2.5
+                    let delay = reduceMotion ? 0 : Double(index) * 0.08
 
                     GlassOrb(bubble: orb.bubble, diameter: d)
                         .shadow(color: .black.opacity(0.16), radius: d * 0.11, y: d * 0.08)
+                        // Continuous life, applied first so it composes with the rise.
                         .offset(y: bob)
+                        // The rise + a little scale-up as they settle. Separate from
+                        // the bob offset so the one-time spring and the per-frame bob
+                        // don't fight over the same value.
+                        .offset(y: appeared ? 0 : riseFrom)
+                        .scaleEffect(appeared ? 1 : 0.8, anchor: .center)
+                        .opacity(appeared ? 1 : 0)
+                        .animation(
+                            reduceMotion ? nil
+                                : .spring(response: 0.85, dampingFraction: 0.72).delay(delay),
+                            value: appeared
+                        )
                         .position(x: orb.x * width, y: orb.y * width)
                 }
             }

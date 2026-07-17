@@ -196,16 +196,94 @@ private struct AuthField: View {
     }
 }
 
-/// Google's mark, drawn rather than bundled — four arcs, no asset, no licence file.
+/// Google's four-colour "G", the official mark drawn from its own path geometry
+/// (translated from Google's 48×48 brand SVG to absolute Bézier coordinates), so
+/// it is pixel-faithful rather than an arc approximation — and still no bundled
+/// asset or licence file. Four filled paths: blue, green, yellow, red.
 private struct GoogleMark: View {
     var body: some View {
         ZStack {
-            Circle().fill(.white).frame(width: 20, height: 20)
-            Text("G")
-                .font(.system(size: 13, weight: .bold, design: .default))
-                .foregroundStyle(Color(hex: 0x4285F4))
+            Circle().fill(.white)
+            GoogleG().padding(4)
         }
+        .frame(width: 22, height: 22)
         .accessibilityHidden(true)
+    }
+}
+
+private struct GoogleG: View {
+    var body: some View {
+        ZStack {
+            shape(Self.blue).fill(Color(hex: 0x4285F4))
+            shape(Self.green).fill(Color(hex: 0x34A853))
+            shape(Self.yellow).fill(Color(hex: 0xFBBC05))
+            shape(Self.red).fill(Color(hex: 0xEA4335))
+        }
+        .aspectRatio(1, contentMode: .fit)
+    }
+
+    /// Each segment as (start, [(control1, control2, end)]) in the 48×48 space,
+    /// scaled into the view. Lines are curves with both controls on the segment.
+    private func shape(_ seg: Segment) -> some Shape {
+        GPath(segment: seg)
+    }
+
+    typealias P = CGPoint
+    struct Segment { let start: P; let curves: [(P, P, P)] }
+
+    // Coordinates in a 48×48 box (y-down), from Google's brand SVG.
+    static let blue = Segment(start: P(x: 45.12, y: 24.5), curves: [
+        (P(x: 45.12, y: 22.94), P(x: 44.98, y: 21.44), P(x: 44.72, y: 20.0)),
+        (P(x: 44.72, y: 20.0), P(x: 24, y: 20.0), P(x: 24, y: 20.0)),
+        (P(x: 24, y: 20.0), P(x: 24, y: 28.51), P(x: 24, y: 28.51)),
+        (P(x: 24, y: 28.51), P(x: 35.84, y: 28.51), P(x: 35.84, y: 28.51)),
+        (P(x: 35.33, y: 31.26), P(x: 33.78, y: 33.59), P(x: 31.45, y: 35.15)),
+        (P(x: 31.45, y: 35.15), P(x: 31.45, y: 40.67), P(x: 31.45, y: 40.67)),
+        (P(x: 31.45, y: 40.67), P(x: 38.56, y: 40.67), P(x: 38.56, y: 40.67)),
+        (P(x: 42.72, y: 36.84), P(x: 45.12, y: 31.20), P(x: 45.12, y: 24.5)),
+    ])
+    static let green = Segment(start: P(x: 24, y: 46), curves: [
+        (P(x: 29.94, y: 46), P(x: 34.92, y: 44.03), P(x: 38.56, y: 40.67)),
+        (P(x: 38.56, y: 40.67), P(x: 31.45, y: 35.15), P(x: 31.45, y: 35.15)),
+        (P(x: 29.48, y: 36.47), P(x: 26.96, y: 37.25), P(x: 24.0, y: 37.25)),
+        (P(x: 18.27, y: 37.25), P(x: 13.42, y: 33.38), P(x: 11.69, y: 28.18)),
+        (P(x: 11.69, y: 28.18), P(x: 4.34, y: 28.18), P(x: 4.34, y: 28.18)),
+        (P(x: 4.34, y: 28.18), P(x: 4.34, y: 33.88), P(x: 4.34, y: 33.88)),
+        (P(x: 7.96, y: 40.98), P(x: 15.4, y: 46), P(x: 24, y: 46)),
+    ])
+    static let yellow = Segment(start: P(x: 11.69, y: 28.18), curves: [
+        (P(x: 11.25, y: 26.86), P(x: 11, y: 25.45), P(x: 11, y: 24)),
+        (P(x: 11, y: 22.55), P(x: 11.25, y: 21.14), P(x: 11.69, y: 19.82)),
+        (P(x: 11.69, y: 19.82), P(x: 11.69, y: 14.12), P(x: 11.69, y: 14.12)),
+        (P(x: 11.69, y: 14.12), P(x: 4.34, y: 14.12), P(x: 4.34, y: 14.12)),
+        (P(x: 2.85, y: 17.09), P(x: 2, y: 20.45), P(x: 2, y: 24)),
+        (P(x: 2, y: 27.55), P(x: 2.85, y: 30.91), P(x: 4.34, y: 33.88)),
+        (P(x: 4.34, y: 33.88), P(x: 11.69, y: 28.18), P(x: 11.69, y: 28.18)),
+    ])
+    static let red = Segment(start: P(x: 24, y: 10.75), curves: [
+        (P(x: 27.23, y: 10.75), P(x: 30.13, y: 11.86), P(x: 32.41, y: 14.04)),
+        (P(x: 32.41, y: 14.04), P(x: 38.72, y: 7.73), P(x: 38.72, y: 7.73)),
+        (P(x: 34.91, y: 4.18), P(x: 29.93, y: 2), P(x: 24, y: 2)),
+        (P(x: 15.4, y: 2), P(x: 7.96, y: 7.02), P(x: 4.34, y: 14.12)),
+        (P(x: 4.34, y: 14.12), P(x: 11.69, y: 19.82), P(x: 11.69, y: 19.82)),
+        (P(x: 13.42, y: 14.62), P(x: 18.27, y: 10.75), P(x: 24.0, y: 10.75)),
+    ])
+}
+
+/// Renders one GoogleG.Segment, scaling its 48×48 coordinates into the frame.
+private struct GPath: Shape {
+    let segment: GoogleG.Segment
+
+    func path(in rect: CGRect) -> Path {
+        let s = min(rect.width, rect.height) / 48
+        func f(_ p: CGPoint) -> CGPoint { CGPoint(x: p.x * s, y: p.y * s) }
+        var path = Path()
+        path.move(to: f(segment.start))
+        for (c1, c2, end) in segment.curves {
+            path.addCurve(to: f(end), control1: f(c1), control2: f(c2))
+        }
+        path.closeSubpath()
+        return path
     }
 }
 

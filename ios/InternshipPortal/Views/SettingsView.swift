@@ -233,7 +233,12 @@ struct SettingsView: View {
             .background(Palette.canvas)
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
-            .confirmationDialog("Sign out?", isPresented: $confirmSignOut, titleVisibility: .visible) {
+            // .alert, not .confirmationDialog: a confirmation dialog anchors to its
+            // presenting view, and attached here to the ScrollView it rendered as a
+            // popover bubble pinned to the top-left corner instead of a sheet. An
+            // alert always centres, which is also the right weight for a
+            // destructive confirm with a one-line explanation.
+            .alert("Sign out?", isPresented: $confirmSignOut) {
                 Button("Sign out", role: .destructive) { auth.signOut() }
                 Button("Cancel", role: .cancel) {}
             } message: {
@@ -669,13 +674,15 @@ struct GmailSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { await refresh() }
         .refreshable { await refresh() }
-        .confirmationDialog(String(localized: "Rebuild from Gmail?"), isPresented: $confirmRebuild, titleVisibility: .visible) {
+        // Alerts, not confirmation dialogs — same reason as Sign out: attached to a
+        // Form/ScrollView a confirmation dialog mis-anchors as a corner popover.
+        .alert(String(localized: "Rebuild from Gmail?"), isPresented: $confirmRebuild) {
             Button(String(localized: "Rebuild"), role: .destructive) { rebuild() }
             Button(String(localized: "Cancel"), role: .cancel) {}
         } message: {
             Text(String(localized: "Deletes every application Gmail added and re-derives them from your mail. Anything you added by hand is kept. Takes a couple of minutes."))
         }
-        .confirmationDialog(String(localized: "Disconnect Gmail?"), isPresented: $confirmDisconnect, titleVisibility: .visible) {
+        .alert(String(localized: "Disconnect Gmail?"), isPresented: $confirmDisconnect) {
             Button(String(localized: "Disconnect"), role: .destructive) { disconnect() }
             Button(String(localized: "Cancel"), role: .cancel) {}
         } message: {
