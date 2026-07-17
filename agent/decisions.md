@@ -985,3 +985,44 @@ only lens what is behind it.
    `(R + d)/R`. That is the exact sphere normal, it scales per bubble, and the
    refraction is now continuous from centre to rim.
 **Verified.** Builds clean (iOS 27 SDK). Visual sign-off left to the user by request.
+
+## ADR-0042 · 2026-07-17 · Native TabView; bubble shading rebuilt to the Wabi model; splash + icon
+**Context.** User review round 2: the nav "still weird — remove any double ring,
+redo it from what you find online"; the orbs "don't look like Wabi's" (their
+reference: bright luminous spheres, contents legible); and the app needed splash
+screens.
+**Nav — stop imitating the system bar; use it.** Third iteration. Glass-in-glass
+went grey (ADR-0041); a plain white indicator inside the glass pill read as two
+rings fighting. The conclusion is that the fluid part of Liquid Glass — the droplet
+that slides/stretches between items, lensing while it moves, minimize-on-scroll —
+lives in the SYSTEM TabView and is not reachable from public API. Custom bars can
+only ever be a worse copy, so the app now uses native `TabView` +
+`.tabBarMinimizeBehavior(.onScrollDown)` + `.tint(ink)`. Our `Tab` enum is renamed
+`AppTab` because the iOS 18 TabView syntax has its own `SwiftUI.Tab` type, and
+shadowing it breaks every `Tab("…")` line. TabScroll's 132pt bottom inset dropped
+to 28 (the system bar contributes to the safe area).
+**Bubbles — a bubble, not a marble.** Research (lensball photography, soap-film
+shaders) + the Wabi hero image agree on the recipe, and it is the OPPOSITE of solid
+glass on two axes: (1) the rim is BRIGHT — light wraps the silhouette in two lobes
+(key + opposite caustic); darkness at the rim is what read as a border; (2) the
+contents get MILD centre magnification (`offset = -outward · r · mag · (1-height)`,
+mag 0.34) so the picture stays legible, laminated inside — hard Snell bending
+crushed it into the rim. Plus: whisper of thin-film iridescence riding the rim (two
+hue cycles per revolution), one broad sheen + one tight hotspot, 6% white haze,
+rim-glow feeding alpha so meniscus bridges glow like one skin of glass. Both
+shaders share one `shadeBubble()` so the field and single orbs cannot drift apart.
+Contents richer too: logo 42%→56% of diameter, painted white pole removed (it
+doubled the shader's highlight and looked plastic).
+**Splash + launch.** `SplashView`: a merged cluster of app-glyph bubbles (same
+`bubbleField` shader — the splash is made of the app's own material) over the
+wordmark; fades after ~1.8s (0.6s + no motion under Reduce Motion; `-holdSplash
+YES` DEBUG hook for screenshots). It also covers Firebase's session-restore beat,
+so returning users never see a spinner. Static `UILaunchScreen` uses a new
+`LaunchBackground` color asset (#F4F7F6) → cold start is canvas → bubbles → app
+with no white flash. App icon: a CoreGraphics-rendered glass orb (1024pt; NOTE:
+`NSImage.lockFocus` renders at 2x on Retina — actool rejects a 2048px file that
+claims 1024, "did not have any applicable content"; `sips -z 1024 1024` fixes it).
+**Verified.** Build clean; simulator screenshots of all three: native glass bar
+(content lensing under it), bubble clusters with bright rims and merged glow, and
+the splash. On-device feel (droplet slide between tabs, minimize-on-scroll) left to
+the user.

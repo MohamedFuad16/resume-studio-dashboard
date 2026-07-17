@@ -195,8 +195,8 @@ struct BubbleField: View {
                         // being readable. ~9 lets a cluster read as one body while
                         // each company keeps its own dome.
                         .float(9),
-                        .float(1.45),   // IOR — roughly crown glass
-                        .float(0.18)    // chromatic spread at the rim
+                        .float(0.34),   // magnification — the gentle lens-ball bulge
+                        .float(0.05)    // chromatic fringe at the rim, barely-there
                     ),
                     // Must cover the largest offset the loupe can produce (34pt),
                     // plus the drift, or the refraction clips at the edges.
@@ -332,23 +332,17 @@ struct BubbleContents: View {
 
     var body: some View {
         ZStack {
+            // Sky-to-depth gradient: light where the key light sits, saturated at
+            // the bottom, so the magnification has real structure to bulge. The
+            // white highlights come from the shader now, not painted here — the
+            // old painted white pole doubled with the shader's and looked plastic.
             Circle()
                 .fill(
                     RadialGradient(
-                        colors: [bubble.tint.bg, bubble.tint.fg.opacity(0.5)],
-                        center: .init(x: 0.35, y: 0.3),
-                        startRadius: 0,
-                        endRadius: diameter * 0.7
-                    )
-                )
-
-            // A bright pole and a dark pole give the refraction something with real
-            // structure to bend; a flat fill refracts into a flat fill.
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [.white.opacity(0.7), .clear, bubble.tint.fg.opacity(0.45)],
-                        startPoint: .topLeading, endPoint: .bottomTrailing
+                        colors: [bubble.tint.bg, bubble.tint.fg.opacity(0.72)],
+                        center: .init(x: 0.38, y: 0.28),
+                        startRadius: diameter * 0.06,
+                        endRadius: diameter * 0.85
                     )
                 )
 
@@ -365,7 +359,9 @@ struct BubbleContents: View {
                     monogramView
                 }
             }
-            .frame(width: diameter * 0.42, height: diameter * 0.42)
+            // Bigger mark: the Wabi orbs read because their contents FILL the
+            // sphere. A small logo on a flat ball reads as a button, not a world.
+            .frame(width: diameter * 0.56, height: diameter * 0.56)
 
             // Tracked companies wear a ring, so status survives the glass.
             if let status = bubble.status {
@@ -397,8 +393,8 @@ struct GlassOrb: View {
             .layerEffect(
                 ShaderLibrary.glassOrb(
                     .float2(CGSize(width: diameter, height: diameter)),
-                    .float(1.45),
-                    .float(0.16)
+                    .float(0.34),
+                    .float(0.05)
                 ),
                 maxSampleOffset: CGSize(width: diameter, height: diameter)
             )

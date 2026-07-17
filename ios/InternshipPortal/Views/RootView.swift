@@ -1,12 +1,18 @@
-// The app shell: four tabs behind a floating pill nav, plus the shared sheets.
+// The app shell: four tabs plus the shared sheets.
 //
-// The reference hand-builds its nav as a floating white pill rather than using a
-// system tab bar, so this does too — but on iOS 26+ the pill is real Liquid Glass
-// (GlassEffectContainer + .glassEffect), which the web can only approximate with a
-// shadow. Content scrolls *under* it, which is the whole point of the material.
+// The tab bar is the SYSTEM TabView, on purpose, after two hand-rolled attempts:
+// a glass selection capsule nested in a glass bar went flat grey (glass cannot
+// sample other glass), and a plain white indicator inside the glass pill read as
+// two rings fighting. The fluid part of Liquid Glass — the droplet that slides and
+// stretches between items, the lensing while it moves, the minimize-on-scroll —
+// lives in the system bar and is not reachable from public API. On iOS 26+ the
+// native bar IS the floating liquid pill; trying to imitate it above it only ever
+// produces a worse copy.
 import SwiftUI
 
-enum Tab: String, CaseIterable, Identifiable {
+/// Named AppTab, not Tab: the iOS 18+ TabView syntax has its own `SwiftUI.Tab`
+/// type, and shadowing it turns every `Tab("…")` line into our enum.
+enum AppTab: String, CaseIterable, Identifiable {
     case home, radar, applications, calendar
 
     var id: String { rawValue }
@@ -52,7 +58,7 @@ enum Route: Identifiable, Hashable {
 
 struct RootView: View {
     @Environment(CatalogStore.self) private var store
-    @State private var tab: Tab = Tab(rawValue: UserDefaults.standard.string(forKey: "tab") ?? "") ?? .home
+    @State private var tab: AppTab = AppTab(rawValue: UserDefaults.standard.string(forKey: "tab") ?? "") ?? .home
     @State private var route: Route?
 
     /// Screenshot/QA hook: `simctl launch … -tab radar -sheet first` opens straight
@@ -65,27 +71,29 @@ struct RootView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            AmbientCanvas(active: route == nil) {
-                Group {
-                    switch tab {
-                    case .home: HomeView(tab: $tab, route: $route)
-                    case .radar: RadarView(route: $route)
-                    case .applications: ApplicationsView(route: $route)
-                    case .calendar: CalendarView(route: $route)
-                    }
-                }
-                .transition(.opacity.combined(with: .offset(y: 8)))
+        TabView(selection: $tab) {
+            SwiftUI.Tab(AppTab.home.label, systemImage: AppTab.home.symbol, value: AppTab.home) {
+                AmbientCanvas(active: route == nil) { HomeView(tab: $tab, route: $route) }
             }
-
-            GlassNav(tab: $tab)
-                .padding(.bottom, 8)
+            SwiftUI.Tab(AppTab.radar.label, systemImage: AppTab.radar.symbol, value: AppTab.radar) {
+                AmbientCanvas(active: route == nil) { RadarView(route: $route) }
+            }
+            SwiftUI.Tab(AppTab.applications.label, systemImage: AppTab.applications.symbol, value: AppTab.applications) {
+                AmbientCanvas(active: route == nil) { ApplicationsView(route: $route) }
+            }
+            SwiftUI.Tab(AppTab.calendar.label, systemImage: AppTab.calendar.symbol, value: AppTab.calendar) {
+                AmbientCanvas(active: route == nil) { CalendarView(route: $route) }
+            }
         }
+        // The bar shrinks to a droplet while you scroll a long list — the system
+        // behaviour, and half of what makes the material feel alive.
+        .tabBarMinimizeBehavior(.onScrollDown)
+        // Selected items wear the app's ink, not the default blue.
+        .tint(Palette.ink)
         .task {
             await store.load()
             applyLaunchHooks()
         }
-        .animation(.easeOut(duration: 0.2), value: tab)
         .overlay(alignment: .bottom) { toast }
         .sheet(item: $route) { route in
             switch route {
@@ -116,7 +124,7 @@ struct RootView: View {
             .padding(.vertical, 14)
             .background(Palette.ink, in: .rect(cornerRadius: Radius.row, style: .continuous))
             .floatShadow()
-            .padding(.bottom, 104)
+            .padding(.bottom, 76)   // rides above the system tab bar
             .transition(.move(edge: .bottom).combined(with: .opacity))
             .task {
                 try? await Task.sleep(for: .seconds(3))
@@ -126,79 +134,9 @@ struct RootView: View {
     }
 }
 
-/// The floating tab bar, in Liquid Glass.
-///
-/// ONE glass layer, and only one. Glass cannot sample other glass — a
-/// `.glassEffect` nested inside a view that already has one has nothing to refract
-/// but its parent, and resolves to flat grey. The previous version put a glass
-/// capsule for the selection inside a glass bar and looked exactly like that:
-/// frosted, dead, not liquid.
-///
-/// So the bar is the glass, and the selection is a plain capsule that slides
-/// between tabs with `matchedGeometryEffect`. The liquidity comes from the material
-/// itself — `.interactive()` gives it press-scaling, shimmer, and touch-point
-/// illumination — plus a bouncy spring on the indicator, which stretches as it
-/// travels. Content scrolling underneath is what the glass actually lenses.
-struct GlassNav: View {
-    @Binding var tab: Tab
-    @Namespace private var indicator
-
-    var body: some View {
-        GlassEffectContainer(spacing: 22) {
-            HStack(spacing: 2) {
-                ForEach(Tab.allCases) { item in
-                    NavButton(item: item, isActive: tab == item, indicator: indicator) {
-                        withAnimation(.bouncy(duration: 0.45, extraBounce: 0.15)) {
-                            tab = item
-                        }
-                    }
-                }
-            }
-            .padding(6)
-            .glassEffect(.regular.interactive(), in: .capsule)
-        }
-        .floatShadow()
-    }
-}
-
-private struct NavButton: View {
-    var item: Tab
-    var isActive: Bool
-    var indicator: Namespace.ID
-    var action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 3) {
-                Image(systemName: item.symbol)
-                    .font(.system(size: 19, weight: isActive ? .semibold : .regular))
-                    .frame(height: 26)
-                Text(item.label)
-                    .font(.system(size: 10, weight: .medium))
-            }
-            .foregroundStyle(isActive ? Palette.ink : Palette.ink400)
-            .frame(width: 72)
-            .padding(.vertical, 7)
-            .background {
-                if isActive {
-                    // A plain capsule, deliberately: glass-in-glass is what greyed
-                    // this out before. It rides matchedGeometryEffect so the shape
-                    // flows to the next tab rather than fading in place.
-                    Capsule()
-                        .fill(.white.opacity(0.75))
-                        .matchedGeometryEffect(id: "tab-indicator", in: indicator)
-                }
-            }
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(item.label)
-        .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
-    }
-}
-
-/// Standard scroll container for a tab: reference padding (px-5 pt-10) and enough
-/// bottom inset that the last row clears the floating nav.
+/// Standard scroll container for a tab: reference padding (px-5 pt-10). The system
+/// tab bar contributes to the safe area, so only a small bottom inset is needed —
+/// content scrolls under the glass, which is what the material wants.
 struct TabScroll<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
@@ -209,7 +147,7 @@ struct TabScroll<Content: View>: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 16)      // reference: pt-10, less the navigation-free safe area
-            .padding(.bottom, 132)  // clears the floating nav + home indicator
+            .padding(.bottom, 28)
         }
         .scrollIndicators(.hidden)
     }
@@ -221,16 +159,4 @@ struct TabScroll<Content: View>: View {
     RootView()
         .environment(CatalogStore.preview)
         .environment(AuthService())
-}
-
-#Preview("Nav bar") {
-    @Previewable @State var tab: Tab = .home
-    ZStack {
-        Palette.canvas
-        VStack {
-            Spacer()
-            GlassNav(tab: $tab)
-        }
-    }
-    .ignoresSafeArea()
 }

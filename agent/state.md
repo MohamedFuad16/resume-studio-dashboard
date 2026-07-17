@@ -25,6 +25,19 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-17 (night) — Native TabView, Wabi bubble shading, splash + icon
+  (ADR-0042).** Nav round 3: hand-rolled glass bars can only be worse copies — the
+  fluid droplet/minimize behaviour lives in the system bar — so the app now uses
+  native `TabView` + `.tabBarMinimizeBehavior(.onScrollDown)`; `Tab` enum renamed
+  `AppTab` (shadows `SwiftUI.Tab`). Bubble shaders rebuilt to the bubble model:
+  BRIGHT two-lobe rim (dark rim = the old "border"), mild centre magnification
+  (mag 0.34) instead of hard Snell, rim iridescence, sheen+hotspot, shared
+  `shadeBubble()` across field/orb; logo 56% of diameter, painted white pole
+  removed. NEW SplashView (merged app-glyph bubble cluster + wordmark, ~1.8s,
+  Reduce Motion aware, `-holdSplash` hook), `LaunchBackground` color asset (no
+  white flash), CoreGraphics-rendered glass-orb app icon (gotcha: lockFocus renders
+  2x — actool rejects 2048px-claiming-1024; sips it down). All three
+  screenshot-verified on the sim.
 - **2026-07-17 (later still) — iOS shader pass + Companies bubble field (ADR-0040).**
   Removed `radarSweep` (read as a weird radar behind the stat strip) and `pressWarp`
   (warping the card under your finger fought the tap); press feedback is scale-only.

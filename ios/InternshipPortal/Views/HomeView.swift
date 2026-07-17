@@ -4,7 +4,7 @@ import SwiftUI
 
 struct HomeView: View {
     @Environment(CatalogStore.self) private var store
-    @Binding var tab: Tab
+    @Binding var tab: AppTab
     @Binding var route: Route?
 
     private var greeting: String {
@@ -156,21 +156,21 @@ struct StreakPill: View {
 // MARK: - Previews
 
 #Preview("Home — with data") {
-    @Previewable @State var tab: Tab = .home
+    @Previewable @State var tab: AppTab = .home
     @Previewable @State var route: Route?
     AmbientCanvas { HomeView(tab: $tab, route: $route) }
         .environment(CatalogStore.preview)
 }
 
 #Preview("Home — nothing tracked") {
-    @Previewable @State var tab: Tab = .home
+    @Previewable @State var tab: AppTab = .home
     @Previewable @State var route: Route?
     AmbientCanvas { HomeView(tab: $tab, route: $route) }
         .environment(CatalogStore.previewEmpty)
 }
 
 #Preview("Home — loading") {
-    @Previewable @State var tab: Tab = .home
+    @Previewable @State var tab: AppTab = .home
     @Previewable @State var route: Route?
     AmbientCanvas { HomeView(tab: $tab, route: $route) }
         .environment(CatalogStore.previewLoading)

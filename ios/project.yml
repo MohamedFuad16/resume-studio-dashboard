@@ -40,7 +40,10 @@ targets:
       path: InternshipPortal/Info.plist
       properties:
         CFBundleDisplayName: Internship Portal
-        UILaunchScreen: {}
+        # Canvas-coloured static launch screen, so a cold start goes
+        # canvas → splash → app with no white flash in between.
+        UILaunchScreen:
+          UIColorName: LaunchBackground
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         ITSAppUsesNonExemptEncryption: false
         CFBundleURLTypes:

@@ -136,9 +136,51 @@ static inline float2 fieldSDF(float2 p, device const float *bubbles, int count,
     return float2(d, rr);
 }
 
+// Shared bubble shading, matched to the Wabi reference by eye and by the physics
+// it photographs (lensball + soap film):
+//   • contents get MILD centre magnification — the picture is laminated inside the
+//     sphere and stays legible, not crushed into the rim by hard Snell bending;
+//   • the rim is BRIGHT, in two lobes (key light + the caustic opposite it) —
+//     light wraps a bubble's silhouette; darkness there reads as a border;
+//   • a whisper of thin-film iridescence rides the rim;
+//   • one broad sheen (curved + glossy) and one tight hotspot (hard surface);
+//   • a breath of white haze, because glass sits between you and the contents.
+static inline half4 shadeBubble(half4 color, float3 normal, float height,
+                                float2 outward, float mask) {
+    // Haze.
+    color.rgb = mix(color.rgb, half3(1.0), half(0.06) * color.a);
+
+    // One key light, up and to the left — same light as the app's card shadows.
+    float3 lightDir = normalize(float3(-0.42, -0.74, 0.53));
+    float ndl = saturate(dot(normal, lightDir));
+    color.rgb += half3(pow(ndl, 5.0) * 0.20 + pow(ndl, 64.0) * 0.85) * color.a;
+
+    // Bright rim, two lobes: lit side, and the refocused caustic opposite.
+    float rim = pow(1.0 - height, 5.0);
+    float lobes = 0.40 + 0.60 * pow(ndl, 2.0)
+                + 0.70 * pow(saturate(dot(normal, -lightDir)), 2.0);
+
+    // Thin-film colour walking around the circumference, rim-only and subtle.
+    float angle = atan2(outward.y, outward.x);
+    float phase = angle * 0.3183 + height * 0.6;   // two hue cycles per revolution
+    half3 film = half3(0.5) + half3(0.5) * half3(
+        half(cos(6.28318 * (phase + 0.00))),
+        half(cos(6.28318 * (phase + 0.33))),
+        half(cos(6.28318 * (phase + 0.67))));
+    half3 rimColor = mix(half3(1.0), film, half(0.30));
+
+    half glow = half(rim * lobes);
+    color.rgb += rimColor * glow * 0.85h;
+    // The rim glows even where the contents thin out (meniscus bridges), which is
+    // what makes merged bubbles read as one skin of glass.
+    color.a = saturate(color.a + glow * 0.4h);
+
+    return color * half(mask);
+}
+
 [[stitchable]] half4 bubbleField(float2 position, SwiftUI::Layer layer, float2 size,
                                  device const float *bubbles, int count,
-                                 float time, float blend, float ior, float chroma) {
+                                 float time, float blend, float mag, float chroma) {
     float2 field = fieldSDF(position, bubbles, count, blend, time);
     float d = field.x;
     float radius = max(field.y, 1.0);
@@ -168,42 +210,20 @@ static inline float2 fieldSDF(float2 p, device const float *bubbles, int count,
     float lateral = saturate((radius + d) / radius);
     float3 normal = normalize(float3(grad * lateral, max(height, 1e-3)));
 
-    // The warping loupe: bend the view ray through the surface and read the layer
-    // from where the glass says the light came from. At the rim the ray turns
-    // sharply inward, which compresses the contents toward the edge exactly the way
-    // a ball lens does; at the centre it passes straight through.
-    float3 bent = refract(float3(0.0, 0.0, -1.0), normal, 1.0 / max(ior, 1.0001));
-    float2 offset = bent.xy * radius * 0.55;
+    // The bubble's loupe: mild magnification, not hard Snell bending. Sampling is
+    // pulled toward the local centre, strongest at the rim, so the contents bulge
+    // gently like a picture laminated inside a lens ball — and stay legible.
+    float2 offset = -grad * radius * mag * (1.0 - height);
 
-    // Chromatic aberration: wavelengths bend by different amounts. Rim-only, which
-    // is where a real lens shows it.
-    float edge = smoothstep(0.75, 0.0, height);
-    float2 spread = offset * chroma * edge;
+    // Chromatic fringe, rim-only, tiny.
+    float edge = pow(1.0 - height, 3.0);
+    float2 spread = grad * radius * chroma * edge;
     half r = layer.sample(position + offset + spread).r;
     half4 g = layer.sample(position + offset);
     half b = layer.sample(position + offset - spread).b;
     half4 color = half4(r, g.g, b, g.a);
 
-    // NOTE: nothing here forces alpha or paints the rim white. An earlier version
-    // did both, and that — not the geometry — was the visible "border": a bright
-    // ring traced around every bubble. Solid glass simply shows its contents,
-    // compressed; the edge is dark because you are looking through more glass.
-    color.rgb *= half(1.0 - 0.30 * pow(1.0 - height, 4.0));
-
-    // One light, up and to the left, matching the card shadows elsewhere.
-    float3 lightDir = normalize(float3(-0.45, -0.7, 0.55));
-    float spec = pow(saturate(dot(normal, lightDir)), 42.0);
-    color.rgb += half3(spec * 0.95) * color.a;
-
-    // A second, broad sheen across the upper half reads as the window reflected in
-    // the glass, and is most of what makes a sphere look like a sphere.
-    float sheen = pow(saturate(dot(normal, normalize(float3(-0.3, -0.9, 0.3)))), 4.0);
-    color.rgb += half3(sheen * 0.10) * color.a;
-
-    // Shade the far side so the dome has volume.
-    color.rgb -= half3(pow(saturate(dot(normal, -lightDir)), 3.0) * 0.07) * color.a;
-
-    return color * half(mask);
+    return shadeBubble(color, normal, height, grad, mask);
 }
 
 // ── glassOrb ─────────────────────────────────────────────────────────────
@@ -221,7 +241,7 @@ static inline float2 fieldSDF(float2 p, device const float *bubbles, int count,
 // with Snell's law (Metal's refract()). It costs nothing extra and behaves
 // correctly at the rim, where a fudge flattens out and reads like a fisheye photo.
 [[stitchable]] half4 glassOrb(float2 position, SwiftUI::Layer layer,
-                              float2 size, float ior, float chroma) {
+                              float2 size, float mag, float chroma) {
     float2 center = size * 0.5;
     float radius = min(size.x, size.y) * 0.5;
     float2 toCenter = position - center;
@@ -235,34 +255,21 @@ static inline float2 fieldSDF(float2 p, device const float *bubbles, int count,
     // Height of the sphere surface at this pixel (unit sphere, orthographic view).
     float z = sqrt(max(1.0 - nd * nd, 0.0));
     float3 normal = normalize(float3(toCenter / max(radius, 1.0), z));
+    float2 outward = toCenter / max(dist, 1e-4);
 
-    // Bend the incoming view ray (straight into the screen) through the surface and
-    // read the contents from where the glass says the light came from.
-    float3 bent = refract(float3(0.0, 0.0, -1.0), normal, 1.0 / max(ior, 1.0001));
-    float2 offset = bent.xy * radius * 0.55;
+    // Same bubble loupe as bubbleField: gentle centre magnification.
+    float2 offset = -outward * dist * mag * (1.0 - z);
 
-    float edge = smoothstep(0.75, 0.0, z);
-    float2 spread = offset * chroma * edge;
+    float edge = pow(1.0 - z, 3.0);
+    float2 spread = outward * radius * chroma * edge;
     half r = layer.sample(position + offset + spread).r;
     half4 g = layer.sample(position + offset);
     half b = layer.sample(position + offset - spread).b;
     half4 color = half4(r, g.g, b, g.a);
 
-    // Kept in step with bubbleField: no forced alpha, no white rim. Solid glass
-    // shows its contents compressed, and darkens at the edge because you are
-    // looking through more of it.
-    color.rgb *= half(1.0 - 0.30 * pow(1.0 - z, 4.0));
-
-    float3 lightDir = normalize(float3(-0.45, -0.7, 0.55));
-    float spec = pow(saturate(dot(normal, lightDir)), 42.0);
-    color.rgb += half3(spec * 0.95) * color.a;
-
-    float sheen = pow(saturate(dot(normal, normalize(float3(-0.3, -0.9, 0.3)))), 4.0);
-    color.rgb += half3(sheen * 0.10) * color.a;
-
-    color.rgb -= half3(pow(saturate(dot(normal, -lightDir)), 3.0) * 0.07) * color.a;
-
     // Antialias the silhouette across roughly one pixel.
     float aa = 1.5 / max(radius, 1.0);
-    return color * half(smoothstep(1.0, 1.0 - aa, nd));
+    float mask = smoothstep(1.0, 1.0 - aa, nd);
+
+    return shadeBubble(color, normal, z, outward, mask);
 }

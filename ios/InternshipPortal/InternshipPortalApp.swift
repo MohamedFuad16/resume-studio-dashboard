@@ -21,19 +21,34 @@ struct InternshipPortalApp: App {
         _auth = State(initialValue: AuthService())
     }
 
+    @State private var showSplash = true
+
     var body: some Scene {
         WindowGroup {
-            AuthGate()
-                .environment(store)
-                .environment(auth)
-                // The design is a single, deliberate light world (the reference's
-                // #F4F7F6 paper). A naive dark inversion would fight every token,
-                // so the app commits rather than half-supporting both.
-                .preferredColorScheme(.light)
-                .onOpenURL { url in
-                    // Google Sign-In's callback into com.googleusercontent.apps.*
-                    GIDSignIn.sharedInstance.handle(url)
+            ZStack {
+                AuthGate()
+
+                // The intro splash sits over the gate and fades; it also covers the
+                // beat where Firebase restores the session, so a returning user
+                // goes canvas → bubbles → Home without ever seeing a spinner.
+                if showSplash {
+                    SplashView {
+                        withAnimation(.easeOut(duration: 0.45)) { showSplash = false }
+                    }
+                    .zIndex(1)
+                    .transition(.opacity)
                 }
+            }
+            .environment(store)
+            .environment(auth)
+            // The design is a single, deliberate light world (the reference's
+            // #F4F7F6 paper). A naive dark inversion would fight every token,
+            // so the app commits rather than half-supporting both.
+            .preferredColorScheme(.light)
+            .onOpenURL { url in
+                // Google Sign-In's callback into com.googleusercontent.apps.*
+                GIDSignIn.sharedInstance.handle(url)
+            }
         }
     }
 }
