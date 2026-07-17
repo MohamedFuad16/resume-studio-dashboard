@@ -3536,9 +3536,9 @@ body,
 .intern-table-head,
 .intern-row {
   display: grid;
-  grid-template-columns: 32px minmax(0, 2fr) 68px minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, .9fr) minmax(0, .9fr) 106px 66px 32px;
+  grid-template-columns: 40px minmax(0, 2.4fr) 64px minmax(0, 1fr) minmax(0, 1fr) minmax(0, .75fr) minmax(0, .85fr) 100px 62px 32px;
   align-items: center;
-  column-gap: 12px;
+  column-gap: 14px;
 }
 
 .intern-table-head {
@@ -4239,8 +4239,8 @@ body,
 .intern-summary > div span { color: #727f93; }
 .intern-content { grid-template-columns: minmax(0, 1fr) 390px; }
 .intern-table-head,
-.intern-row { grid-template-columns: 32px minmax(0, 2fr) 68px minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, .9fr) minmax(0, .9fr) 106px 66px 32px; column-gap: 12px; }
-.intern-row { min-height: 96px; padding-block: 14px; }
+.intern-row { grid-template-columns: 40px minmax(0, 2.4fr) 64px minmax(0, 1fr) minmax(0, 1fr) minmax(0, .75fr) minmax(0, .85fr) 100px 62px 32px; column-gap: 14px; }
+.intern-row { min-height: 88px; padding-block: 14px; }
 .intern-company-mark { display: none; }
 .intern-row-status { width: 100%; }
 .intern-detail-head { grid-template-columns: 58px minmax(0, 1fr) auto; gap: 14px; align-items: center; }
@@ -4951,13 +4951,24 @@ body,
 
 .intern-table-head,
 .intern-row {
-  grid-template-columns: 32px minmax(0, 2fr) 68px minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, .9fr) minmax(0, .9fr) 106px 66px 32px;
-  column-gap: 12px;
+  grid-template-columns: 40px minmax(0, 2.4fr) 64px minmax(0, 1fr) minmax(0, 1fr) minmax(0, .75fr) minmax(0, .85fr) 100px 62px 32px;
+  column-gap: 14px;
 }
 
 .intern-table-head { padding-inline: 14px; }
-.intern-row { min-height: 102px; padding: 14px; }
+.intern-row { min-height: 88px; padding: 14px; }
 .intern-company-cell { align-items: center; gap: 12px; }
+/* Header ↔ content alignment: the company header sits over the NAME (past the
+   40px logo + 12px gap), and Rank is centred in its 40px column like the
+   numeral below it. Location/language headers align naturally now that the
+   per-row icons are gone. */
+.intern-table-head > span:first-child { text-align: center; }
+.intern-table-head > span:nth-child(2) { padding-left: 46px; } /* 34px logo + 12px gap */
+.intern-rank { text-align: center; }
+/* Multi-line location/language cells: the first line carries the signal, the
+   qualifier lines are muted so the table reads calm. */
+.intern-location-stack > span:not(:first-child),
+.intern-language-stack > span:not(:first-child) { color: #93a0b0; }
 .intern-company-cell > span:last-child { display: grid; align-content: center; gap: 3px; }
 .intern-company-cell strong { line-height: 1.2; }
 
@@ -5132,8 +5143,8 @@ body,
   .intern-content { grid-template-columns: minmax(0, 1fr) 340px; }
   .intern-table-head,
   .intern-row {
-    grid-template-columns: 36px minmax(220px, 1.5fr) 64px minmax(106px, .85fr) minmax(124px, 1fr) 92px 100px 90px 58px 30px;
-    column-gap: 8px;
+    grid-template-columns: 36px minmax(210px, 1.7fr) 60px minmax(100px, .9fr) minmax(110px, .95fr) 88px 96px 92px 56px 30px;
+    column-gap: 10px;
   }
 }
 
@@ -5141,8 +5152,8 @@ body,
   .intern-content { grid-template-columns: minmax(0, 1fr) 320px; }
   .intern-table-head,
   .intern-row {
-    grid-template-columns: 34px minmax(220px, 1.45fr) 62px minmax(108px, .85fr) 92px 100px 88px 58px 30px;
-    column-gap: 8px;
+    grid-template-columns: 34px minmax(210px, 1.6fr) 58px minmax(104px, .9fr) 88px 96px 90px 56px 30px;
+    column-gap: 10px;
   }
   .intern-table-head > :nth-child(5),
   .intern-row > .intern-language { display: none; }
@@ -5154,8 +5165,8 @@ body,
   .intern-detail.mobile { display: block; }
   .intern-table-head,
   .intern-row {
-    grid-template-columns: 34px minmax(240px, 1.5fr) 66px minmax(118px, .9fr) minmax(138px, 1fr) 98px 104px 92px 60px 32px;
-    column-gap: 9px;
+    grid-template-columns: 36px minmax(230px, 1.7fr) 62px minmax(112px, .95fr) minmax(126px, 1fr) 94px 100px 94px 58px 32px;
+    column-gap: 10px;
   }
   .intern-table-head > :nth-child(5),
   .intern-row > .intern-language { display: flex; }
@@ -6023,8 +6034,8 @@ body,
 .intern-table-head,
 .intern-row {
   min-width: 0;
-  grid-template-columns: 32px minmax(0, 2fr) 68px minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, .9fr) minmax(0, .9fr) 106px 66px 32px;
-  column-gap: 12px;
+  grid-template-columns: 40px minmax(0, 2.4fr) 64px minmax(0, 1fr) minmax(0, 1fr) minmax(0, .75fr) minmax(0, .85fr) 100px 62px 32px;
+  column-gap: 14px;
   cursor: pointer;
 }
 

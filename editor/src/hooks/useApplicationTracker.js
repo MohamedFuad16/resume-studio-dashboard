@@ -90,14 +90,25 @@ export function useApplicationTracker(profileId) {
     }
   }, [activeProfile, replaceTracker]);
 
+  // Trailing-debounced save. A Gmail drain applies many actions back-to-back and
+  // each updateStatus() used to POST the FULL tracker — 10 actions = 10 identical
+  // growing snapshots (and 10 Firestore writes in prod). Every commit carries the
+  // complete tracker, so collapsing the burst to its LAST snapshot is lossless.
+  // The local cache + trackerRef update synchronously, so reads stay fresh; the
+  // timer deliberately survives unmount so a pending save is never dropped.
+  const commitTimer = useRef(null);
   const commit = useCallback(next => {
     trackerCache.set(activeProfile, next);
-    trackerApi.save(activeProfile, next)
-      .then(() => window.dispatchEvent(new CustomEvent(TRACKER_EVENT, { detail: { profileId: activeProfile, tracker: next } })))
-      .catch(saveError => {
-        setError(saveError.message || 'Could not save application tracker');
-        refresh();
-      });
+    if (commitTimer.current) clearTimeout(commitTimer.current);
+    commitTimer.current = setTimeout(() => {
+      commitTimer.current = null;
+      trackerApi.save(activeProfile, next)
+        .then(() => window.dispatchEvent(new CustomEvent(TRACKER_EVENT, { detail: { profileId: activeProfile, tracker: next } })))
+        .catch(saveError => {
+          setError(saveError.message || 'Could not save application tracker');
+          refresh();
+        });
+    }, 150);
   }, [activeProfile, refresh]);
 
   useEffect(() => {

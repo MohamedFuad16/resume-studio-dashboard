@@ -25,6 +25,20 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-18 (later) — Radar table spacing overhaul + tracker save debounce.**
+  (1) Radar list de-cluttered: MapPin/Globe2 icons removed from row location/language
+  cells (text only; secondary lines muted `#93a0b0`); grid re-proportioned in **all
+  five** `.intern-table-head`/`.intern-row` definitions (base + 1450/1250/1050 media)
+  to `40px minmax(0,2.4fr) 64px 1fr 1fr .75fr .85fr 100px 62px 32px`, gap 14, rows
+  88px min. Header↔content alignment made exact: company header `padding-left: 46px`
+  (34px logo + 12px gap), rank centered in both head and cell — JS-measured
+  pixel-perfect (all 10 column x-positions equal; header text x 383 = name x 383).
+  (2) `useApplicationTracker.commit` now **150ms trailing-debounced**: a Gmail drain
+  applying N actions used to fire N sequential full-tracker POSTs (10 observed);
+  every commit carries the complete snapshot so collapsing to the last one is
+  lossless. Verified: 3 rapid toggles → exactly 1 POST. Triple sync-cycle at load is
+  dev-only StrictMode double-mount, not a bug. Build + 5/5 E2E green; mobile 390px
+  radar verified no-overflow.
 - **2026-07-18 — Web UI polish batch (dashboard/radar/calendar/editor/mobile).** Branch
   rebased onto latest main (which already had `a371e34` lazy-compile/tracker-cache/phone-
   radar-grid). (1) Dashboard trend chart → smooth **line/area** chart (Catmull-Rom + GSAP
