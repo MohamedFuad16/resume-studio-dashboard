@@ -138,31 +138,51 @@ extension CatalogStore {
         }
         let doomed = tracker.filter { $0.value.source == "gmail" }.count
 
-        // Kick a fresh scan, then WAIT for the queue to fill. A rebuild can't use
-        // the atomic single-drain path the routine sync uses: the auto-drain (now
-        // held off by isRebuilding) would otherwise race it for the same queue, and
-        // a rebuild must reconstruct from the WHOLE backfill, not whatever happened
-        // to be queued at one instant. The re-scan is fast — companies are already
-        // known, so it skips the per-company web enrichment that made the first
-        // scan slow — but still a minute, so poll rather than guess a fixed wait.
+        // STEP 1 — purge every Gmail-derived row NOW and persist. This is the part
+        // that must not depend on timing: the stale rows an old classifier wrote
+        // (a Revolut role never applied to, micro1, gig "internships", phantom
+        // interviews, dates stamped as today) are gone the moment Rebuild runs,
+        // whether or not the re-scan below finishes in time. Hand-added rows carry
+        // a different `source` and are untouched.
+        let previous = tracker
+        tracker = tracker.filter { $0.value.source != "gmail" }
+        do {
+            if let uid, let profileID {
+                try await FirestoreData.saveTracker(tracker, uid: uid, profile: profileID)
+            } else {
+                try await PortalAPI.saveTracker(tracker)
+            }
+        } catch {
+            tracker = previous
+            toast = String(localized: "Couldn't rebuild — check your connection.")
+            return
+        }
+        // The re-adds that follow are old news, not new arrivals.
+        Notifier.resetBaseline()
+
+        // STEP 2 — re-scan and re-add only what the CURRENT classifier confirms.
+        // Whatever is already queued applies immediately; a fresh backfill fills in
+        // the rest. The re-scan is fast (known companies skip web enrichment) but
+        // still ~a minute, so poll. If it doesn't land in time, the routine drain
+        // picks it up on the next open — the bad rows are already gone regardless.
         toast = String(localized: "Rebuilding from Gmail — re-reading your inbox…")
         await PortalAPI.gmailSyncNow(profile: profile, backfillDays: days)
 
         var actions = (try? await PortalAPI.gmailPending(profile: profile)) ?? []
         var waited = 0
-        while actions.isEmpty && waited < 90 {
+        while actions.isEmpty && waited < 120 {
             try? await Task.sleep(for: .seconds(6))
             waited += 6
             actions = (try? await PortalAPI.gmailPending(profile: profile)) ?? []
         }
 
-        guard !actions.isEmpty else {
-            toast = String(localized: "No internships found in Gmail to rebuild from.")
-            return
+        if !actions.isEmpty {
+            // Already purged above, so this applies additively onto the clean base.
+            let added = await applyGmailActions(actions, profile: profile, replacingGmailRows: false)
+            toast = String(localized: "Rebuilt \(added) from Gmail — \(doomed) old rows cleared.")
+        } else {
+            toast = String(localized: "Cleared \(doomed) old rows — your internships will reappear as Gmail re-syncs.")
         }
-
-        let added = await applyGmailActions(actions, profile: profile, replacingGmailRows: true)
-        toast = String(localized: "Rebuilt \(added) from Gmail — \(doomed) old rows cleared.")
     }
 
     /// The routine drain: pull whatever Gmail has queued, apply it additively, ack

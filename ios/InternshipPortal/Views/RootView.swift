@@ -65,6 +65,20 @@ struct RootView: View {
     /// to a tab, and optionally to the first internship's sheet. Launch arguments
     /// prefixed with `-` land in UserDefaults automatically.
     private func applyLaunchHooks() {
+        #if DEBUG
+        // DEBUGGING PHASE: run the Gmail rebuild ONCE per tag, here (after load, so
+        // the Firestore profile is resolved and the purge writes to the right
+        // place). Bump the tag to force a fresh repair on the next cold launch.
+        // Same mechanism as the onboarding-review reset — a stored tag, not a
+        // launch argument, because devicectl doesn't reliably pass args into
+        // NSUserDefaults' argument domain.
+        let rebuildTag = "gmail-rebuild-2026-07-18a"
+        if UserDefaults.standard.string(forKey: "gmailRebuildTag") != rebuildTag {
+            UserDefaults.standard.set(rebuildTag, forKey: "gmailRebuildTag")
+            Task { await store.rebuildFromGmail() }
+        }
+        #endif
+
         guard UserDefaults.standard.string(forKey: "sheet") == "first",
               let first = store.internships.first else { return }
         route = .internship(first)

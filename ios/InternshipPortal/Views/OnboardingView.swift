@@ -4,7 +4,23 @@
 //
 // Sequence on a first cold launch: static launch screen → splash → these → login.
 // One AppStorage flag; returning users never see it again.
+import AudioToolbox
 import SwiftUI
+import UIKit
+
+/// A soft tactile + audible "stick" for a bubble arriving into the cluster. Haptic
+/// carries the feel on device; the system "pop" carries the sound. Respects Reduce
+/// Motion by simply not being called from the animation path.
+@MainActor
+enum SoftFeedback {
+    private static let generator = UIImpactFeedbackGenerator(style: .soft)
+    static func prepare() { generator.prepare() }
+    static func stick() {
+        generator.impactOccurred(intensity: 0.75)
+        generator.prepare()
+        AudioServicesPlaySystemSound(1520)   // a soft, bubble-like "pop"
+    }
+}
 
 struct OnboardingView: View {
     /// Called when the user finishes or skips; the parent fades this out.
@@ -196,6 +212,9 @@ private struct OnboardingCluster: View {
         Sat(id: 5, company: "1Password", domain: "1password.com", tint: .indigo, x: 0.5, y: 0.9, r: 0.07),
     ]
 
+    /// Per-bubble stagger, so the cluster assembles rather than snapping in.
+    private func delay(_ id: Int) -> Double { reduceMotion ? 0 : Double(id) * 0.14 }
+
     var body: some View {
         GeometryReader { proxy in
             let w = proxy.size.width
@@ -205,11 +224,15 @@ private struct OnboardingCluster: View {
                 let t = ShaderClock.seconds(timeline.date)
 
                 ZStack(alignment: .topLeading) {
-                    // Satellites first (behind), then the feature glyph on top.
+                    // The satellites fly in FROM THE SIDES: a bubble that belongs on
+                    // the left of the cluster enters from off-screen left, one on the
+                    // right from off-screen right, the centre-bottom one rises. They
+                    // converge and settle around the glyph — "coming from the sides
+                    // and sticking together."
                     ForEach(Self.sats) { sat in
                         let d = sat.r * w * 2
                         let bob = reduceMotion ? 0 : sin(t * 0.5 + Double(sat.id) * 0.9) * 3
-                        let delay = reduceMotion ? 0 : Double(sat.id) * 0.07
+                        let entry = entryOffset(for: sat, width: w)
 
                         GlassOrb(
                             bubble: CompanyBubble(
@@ -221,10 +244,14 @@ private struct OnboardingCluster: View {
                         )
                         .shadow(color: .black.opacity(0.14), radius: d * 0.1, y: d * 0.07)
                         .offset(y: bob)
-                        .offset(y: isActive ? 0 : 80)
+                        .offset(x: isActive ? 0 : entry.width, y: isActive ? 0 : entry.height)
                         .scaleEffect(isActive ? 1 : 0.7)
                         .opacity(isActive ? 1 : 0)
-                        .animation(reduceMotion ? nil : .spring(response: 0.8, dampingFraction: 0.72).delay(delay), value: isActive)
+                        .animation(
+                            reduceMotion ? nil
+                                : .spring(response: 0.75, dampingFraction: 0.72).delay(delay(sat.id)),
+                            value: isActive
+                        )
                         .position(x: sat.x * w, y: sat.y * w)
                     }
 
@@ -238,6 +265,30 @@ private struct OnboardingCluster: View {
                 .frame(width: w, height: w)
             }
             .frame(width: w, height: proxy.size.height, alignment: .center)
+        }
+        // Sound + haptic timed to each bubble's arrival. Fires on first appearance
+        // of an already-active page (page 0) and whenever a page becomes active.
+        .onAppear { if isActive { playAssembly() } }
+        .onChange(of: isActive) { _, on in if on { playAssembly() } }
+    }
+
+    /// Where a bubble starts before it flies in: off-screen on the side it lives on,
+    /// or from below if it sits on the centre line.
+    private func entryOffset(for sat: Sat, width w: CGFloat) -> CGSize {
+        if abs(sat.x - 0.5) < 0.12 { return CGSize(width: 0, height: w * 0.9) } // centre → rise
+        return CGSize(width: sat.x < 0.5 ? -w : w, height: 0)                    // side → slide in
+    }
+
+    /// One soft pop per bubble, timed to when its spring settles.
+    private func playAssembly() {
+        guard !reduceMotion else { return }
+        SoftFeedback.prepare()
+        for sat in Self.sats {
+            let at = delay(sat.id) + 0.32
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(at))
+                SoftFeedback.stick()
+            }
         }
     }
 }
