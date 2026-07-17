@@ -7549,6 +7549,15 @@ body,
   box-shadow: 0 1px 2px rgba(30, 41, 59, 0.04), 0 10px 30px rgba(30, 41, 59, 0.06);
 }
 
+/* Calendar is NOT framed as a card — the day cells are the surfaces. Remove the
+   outer card's fill/border/shadow so it sits flat on the app gutter. */
+.app-main > .calendar-view {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
 /* Editor: commandbar + split live inside one card; overflow clips the square
    split panes to the card's radius. The old .split height calc fought the flex
    chain inside the wrapper, so it flexes instead. */
@@ -8099,17 +8108,23 @@ body,
   border-radius: 12px;
   box-shadow: 0 12px 32px rgba(15, 29, 51, .12);
 }
-/* Education/experience end-date: the month input and the Expected/Present pill
-   sit on one line at equal height and aligned; the pill wraps below only when
-   the column is genuinely too narrow. */
-.editor-view .month-field-row { flex-wrap: wrap; align-items: stretch; gap: 8px; }
-.editor-view .month-input { min-height: 38px; }
+/* Education/experience end-date: the month input takes the full column width;
+   the Expected/Present toggle is a COMPACT chip tucked directly beneath it
+   (left-aligned, small) so it reads as an attribute of the field rather than a
+   big button floating in the column. */
+.editor-view .month-field-row { flex-wrap: wrap; align-items: stretch; gap: 6px 8px; }
+.editor-view .month-input { min-height: 38px; flex: 1 0 100%; }
 .editor-view .month-ongoing-toggle {
-  min-height: 38px;
-  border-radius: 10px;
+  min-height: 28px;
+  padding: 0 11px;
+  border-radius: 999px;
   border-color: #e3e7ee;
-  color: #58657a;
+  background: #fff;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 650;
 }
+.editor-view .month-ongoing-toggle:hover { border-color: #cfd6e2; color: #18243a; }
 .editor-view .month-ongoing-toggle.on { background: #18243a; border-color: #18243a; color: #fff; }
 .editor-view .photo-preview { border-radius: 14px; background: #eef1f6; border: 0; }
 .editor-view .photo-upload,

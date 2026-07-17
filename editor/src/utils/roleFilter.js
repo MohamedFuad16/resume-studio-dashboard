@@ -23,6 +23,8 @@ const GIG_PATTERNS = [
   /クラウドワーク/,
   /transcrib(er|ing)|transcription/i,
   /\brater\b|\bevaluator\b/i,
+  // Data/content reviewer gigs (e.g. micro1 "AI Data Reviewer").
+  /\b(ai|data|content|search|image|speech|voice)\s+reviewer\b/i,
   /\bfreelance\b/i,
   /フリーランス/,
   /\bgig\b/i,
@@ -32,8 +34,25 @@ const GIG_PATTERNS = [
   /survey\s+(taker|panel|participant)/i,
 ];
 
+// Crowdwork / AI-gig PLATFORMS — every record from these is a gig, whatever the
+// role text says (their confirmation emails often carry a generic "Application"
+// role the classifier couldn't refine). Matched on the normalized company.
+const GIG_COMPANY_PATTERNS = [
+  /^micro1(ai)?$/,      // micro1 / micro1.ai — AI-interview + data-gig platform
+  /^remotasks?$/,
+  /^appen$/,
+  /^outlier(ai)?$/,     // Scale's crowdwork brand (not Scale AI itself, which hires engineers)
+  /^clickworker$/,
+];
+
+const companyKey = value =>
+  String(value || '').replace(/株式会社|合同会社|有限会社|\(株\)|（株）/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '');
+
 /** True when the role/company reads as a freelance/gig task, not an internship. */
 export function isGigRole(record) {
+  const key = companyKey(record?.company);
+  if (key && GIG_COMPANY_PATTERNS.some(pattern => pattern.test(key))) return true;
   const haystack = `${record?.role || ''} ${record?.company || ''}`;
   return GIG_PATTERNS.some(pattern => pattern.test(haystack));
 }

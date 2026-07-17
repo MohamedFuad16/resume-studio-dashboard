@@ -536,6 +536,8 @@ export default function App() {
 
   const cmpTimer = useRef(null);
   const lastCompiled = useRef('');
+  // Object URL of the current preview PDF blob (revoked when replaced).
+  const pdfBlobRef = useRef(null);
   const chatAbortRef = useRef(null);
 
   // ── Toasts ───────────────────────────────────────────────
@@ -668,30 +670,38 @@ export default function App() {
 
       const url = apiUrl(result.pdfUrl);
 
-      // Verify PDF content to support corrupt PDF payload error boundary
+      // Fetch the PDF and serve it from a SAME-ORIGIN blob URL. The compile
+      // backend runs on a different origin (Azure) and sends
+      // `X-Frame-Options: SAMEORIGIN`, so embedding its URL directly in the
+      // preview <iframe> is blocked by the browser ("… will not allow this page
+      // to be displayed"). A blob: URL is same-origin as the app, so it frames
+      // fine in every browser (this also runs the corrupt-PDF signature check).
+      let blobUrl;
       try {
         const checkRes = await fetch(url);
         if (!checkRes.ok) throw new Error(`PDF request failed (${checkRes.status})`);
-        const bytes = new Uint8Array(await checkRes.arrayBuffer());
+        const buffer = await checkRes.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
         const signature = String.fromCharCode(...bytes.slice(0, 5));
         if (signature !== '%PDF-') {
           throw new Error('pdf-render-error-alert: Corrupt PDF header');
         }
+        blobUrl = window.URL.createObjectURL(new Blob([buffer], { type: 'application/pdf' }));
       } catch (err) {
         throw new Error(`PDF Render Error: ${err.message}`);
       }
 
       lastCompiled.current = cacheKey;
 
-      // Force reload by appending v=timestamp, and use open parameters to hide chrome & document outline
-      // FitH (page-width) rather than Fit: the frame is sized to the page's
-      // aspect ratio, so page-width fills it edge-to-edge with no dark
-      // letterboxing from the embedded viewer.
+      // Open parameters hide the viewer chrome & outline. FitH (page-width)
+      // fills the frame edge-to-edge with no dark letterboxing. Each blob URL is
+      // unique, so no cache-buster is needed; revoke the previous one.
       const hash = zoom === 'Fit'
         ? 'view=FitH&toolbar=0&navpanes=0&pagemode=none&scrollbar=1'
         : `toolbar=0&navpanes=0&pagemode=none&scrollbar=1&zoom=${zoom}`;
-      const separator = url.includes('?') ? '&' : '?';
-      setPdfSrc(`${url}${separator}v=${Date.now()}#${hash}`);
+      if (pdfBlobRef.current) window.URL.revokeObjectURL(pdfBlobRef.current);
+      pdfBlobRef.current = blobUrl;
+      setPdfSrc(`${blobUrl}#${hash}`);
     } catch (e) {
       const message = e instanceof TypeError && /fetch|network/i.test(e.message)
         ? (isJa ? '履歴書サービスに接続できません。サーバーを確認して再試行してください。' : 'Resume service is unavailable. Check the server and retry.')
