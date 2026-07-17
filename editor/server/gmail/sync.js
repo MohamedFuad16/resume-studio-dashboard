@@ -85,17 +85,25 @@ export async function syncProfile(store, profile, opts = {}) {
   const fresh = (backfillDays > 0 ? messageIds : messageIds.filter(id => !processed.has(id))).slice(0, cap);
 
   const actions = [];
+  // Why messages were dropped, as COUNTS ONLY — no subjects, no senders, no quotes.
+  // A sync that returns "0 actions" is otherwise unfalsifiable: a correct filter
+  // and a broken one look identical from outside, and the difference decides
+  // whether the inbox is clean or the ingest is dead.
+  const dropped = { fetchFailed: 0, classifierFailed: 0, notApplication: 0, notInternship: 0, lowConfidence: 0, noCompany: 0 };
   const enrichedByCompany = new Map();
   let knownNames = null; // loaded lazily on the first enrichment candidate
   for (const id of fresh) {
     let message;
-    try { message = await getMessage(token, id); } catch { processed.add(id); continue; }
+    try { message = await getMessage(token, id); } catch { processed.add(id); dropped.fetchFailed++; continue; }
     const verdict = await classifyMessage(message);
-    if (!verdict) continue; // classifier failed — leave unprocessed so a later sync retries
+    if (!verdict) { dropped.classifierFailed++; continue; } // leave unprocessed so a later sync retries
     processed.add(id);
     // Internships only: freelance/gig/annotation/part-time applications (e.g. an
     // LLM-trainer gig or an AI-interview support role) never reach the tracker.
-    if (!verdict.isApplicationRelated || !verdict.isInternship || verdict.confidence < MIN_CONFIDENCE || !verdict.company) continue;
+    if (!verdict.isApplicationRelated) { dropped.notApplication++; continue; }
+    if (!verdict.isInternship) { dropped.notInternship++; continue; }
+    if (verdict.confidence < MIN_CONFIDENCE) { dropped.lowConfidence++; continue; }
+    if (!verdict.company) { dropped.noCompany++; continue; }
 
     // Enrich once per company for application/offer emails, so the client can
     // create a record with a real posting URL/location/deadline if it's new.
@@ -138,5 +146,5 @@ export async function syncProfile(store, profile, opts = {}) {
     processedMessageIds: [...processed].slice(-PROCESSED_CAP),
   });
 
-  return { scanned: fresh.length, actions: actions.length };
+  return { scanned: fresh.length, actions: actions.length, dropped };
 }

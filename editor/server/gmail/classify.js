@@ -43,17 +43,33 @@ const VALID_KINDS = new Set(['applied', 'rejected', 'interview', 'offer', 'other
 //
 // No quote → not an internship. A real internship email always says so somewhere;
 // a gig email never does, whatever the model believes.
+// Written to survive FOLDING (below), which turns "co-op" into "co op" and
+// strips the 「」 around a Japanese quote — so the separators here accept a space.
 const INTERNSHIP_TERM =
-  /(intern(ship)?s?\b|co-?op\b|new.?grad|graduate (programme|program|scheme)|placement year|サマーインターン|インターン(シップ)?|新卒|就業体験)/i;
+  /(intern(ship)?s?\b|co[-\s]?op\b|new[-\s.]?grad|graduate (programme|program|scheme)|placement year|サマーインターン|インターン(シップ)?|新卒|就業体験)/i;
 
-const normalize = text => String(text || '').toLowerCase().replace(/\s+/g, ' ').trim();
+/// Case- and space-insensitive, and — critically — punctuation-insensitive.
+///
+/// The containment check compares a model's quote against the email, and the two
+/// disagree on punctuation constantly: the model returns `"Summer Internship
+/// 2026."` with a trailing period, or wraps the span in quotes, or copies
+/// 「サマーインターン」 with its Japanese brackets. Every one of those is a
+/// faithful quote that a plain substring test rejects. Folding punctuation to
+/// spaces keeps the guarantee that matters — the WORDS must really be in the
+/// email — without failing over a full stop the model added itself.
+const fold = text =>
+  String(text || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
 /// True when `evidence` is a real quote from `haystack` AND names an internship.
 export function internshipEvidenceHolds(evidence, haystack) {
-  const quote = normalize(evidence);
+  const quote = fold(evidence);
   if (quote.length < 4) return false;
   if (!INTERNSHIP_TERM.test(quote)) return false;
-  return normalize(haystack).includes(quote);
+  return fold(haystack).includes(quote);
 }
 
 // Returns null on any failure (never throws the sync). Shape:

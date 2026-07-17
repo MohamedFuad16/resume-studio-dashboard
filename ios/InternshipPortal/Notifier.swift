@@ -50,6 +50,15 @@ enum Notifier {
         UserDefaults.standard.set(true, forKey: "\(announcedKey).seeded")
     }
 
+    /// Forget what has been announced, so the next drain re-establishes the
+    /// baseline silently. Used by the rebuild: it deletes every Gmail record and
+    /// re-adds them, which without this would look like 40 brand-new applications
+    /// and fire 40 banners for mail the user has already read.
+    static func resetBaseline() {
+        UserDefaults.standard.removeObject(forKey: announcedKey)
+        UserDefaults.standard.removeObject(forKey: "\(announcedKey).seeded")
+    }
+
     /// Announce one application, if it has not been announced before.
     ///
     /// - Parameter key: stable per application event (company + status), so a

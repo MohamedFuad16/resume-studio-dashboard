@@ -108,11 +108,42 @@ extension CatalogStore {
         return String(kept).split(separator: " ").joined(separator: " ")
     }
 
+    /// Throw away everything Gmail wrote and rebuild it from a fresh re-scan.
+    ///
+    /// WHY A REBUILD AND NOT A PATCH: the tracker holds rows an older, weaker
+    /// classifier wrote — companies that were never internships, and dates stamped
+    /// with the drain's clock instead of the email's ("applied 6 minutes ago" for
+    /// mail from last week, and a calendar entry on today for an application made
+    /// days earlier). Both are STORED values. Fixing the classifier and the date
+    /// handling changes what gets written NEXT; it cannot reach back into rows
+    /// already saved. Only re-deriving them from the mail can.
+    ///
+    /// Safe because Gmail rows are DERIVED data: the emails are the source of
+    /// truth and are still sitting in the inbox. Anything you added by hand has a
+    /// different `source` and is not touched.
+    func rebuildFromGmail(days: Int = 180) async {
+        let doomed = tracker.filter { $0.value.source == "gmail" }.count
+        // Deliberately NOT "delete, then re-fetch". Deleting first opens a window
+        // where the rows are gone and their replacements exist only in a request
+        // that might fail — a dropped connection would leave the tracker empty
+        // until some later sync happened to succeed. The drain does the swap in a
+        // single write instead: it only drops the old rows once it is holding the
+        // new ones, and it rolls back as one unit if the save fails.
+        let added = await drainGmail(backfillDays: days, replacingGmailRows: true)
+        if added > 0 {
+            toast = String(localized: "Rebuilt from Gmail — \(added) applications, \(doomed) old rows replaced")
+        }
+    }
+
     /// Pull everything waiting, apply it, ack it. Safe to call repeatedly.
     /// - Parameter backfillDays: rescan older mail (ignores the processed list).
     /// - Returns: how many records the drain touched.
+    /// - Parameter replacingGmailRows: rebuild mode. Every existing Gmail-sourced
+    ///   record is dropped and re-derived from this drain's actions, in the same
+    ///   write. Used to repair rows an older classifier got wrong — including the
+    ///   dates it stamped from its own clock rather than the email's.
     @discardableResult
-    func drainGmail(backfillDays: Int? = nil) async -> Int {
+    func drainGmail(backfillDays: Int? = nil, replacingGmailRows: Bool = false) async -> Int {
         let profile = profileID ?? PortalAPI.profile
         guard (try? await PortalAPI.gmailStatus(profile: profile))?.connected == true else { return 0 }
 
@@ -122,12 +153,20 @@ extension CatalogStore {
             return 0
         }
 
+        // Only now, holding real replacements, is it safe to drop the old rows.
+        if replacingGmailRows {
+            // Everything about to be re-added is old news, not new arrivals.
+            Notifier.resetBaseline()
+        }
+
         // Oldest first, so the newest email's status wins (applied → then
         // rejected = rejected), sharing one session map for company convergence.
         let ordered = actions.sorted { ($0.receivedAt ?? "") < ($1.receivedAt ?? "") }
 
         var session: [String: (item: Internship, rank: Int?)] = [:]
-        var next = tracker
+        // Hand-added records keep a different `source` and survive a rebuild; the
+        // emails are the source of truth for the rest and are still in the inbox.
+        var next = replacingGmailRows ? tracker.filter { $0.value.source != "gmail" } : tracker
         var touched = 0
         var acked: [String] = []
         var discovered: [(key: String, company: String, role: String,

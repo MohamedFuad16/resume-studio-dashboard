@@ -561,6 +561,7 @@ struct GmailSettingsView: View {
     @State private var busy = false
     @State private var syncing = false
     @State private var confirmDisconnect = false
+    @State private var confirmRebuild = false
 
     /// Gmail connections are keyed by the SERVER profile id (the web passes its
     /// active profile). Mirror that: the resolved Firestore profile id matches the
@@ -620,10 +621,20 @@ struct GmailSettingsView: View {
                         }
                     }
                     .disabled(syncing)
+
+                    Button(role: .destructive) {
+                        confirmRebuild = true
+                    } label: {
+                        HStack {
+                            if syncing { ProgressView().controlSize(.small) }
+                            Text("Rebuild from Gmail")
+                        }
+                    }
+                    .disabled(syncing)
                 } header: {
                     Text("Resync")
                 } footer: {
-                    Text("Sync now reads new mail. A rescan re-reads 90 days and can take a couple of minutes — useful after a rule change, or when something is missing.")
+                    Text("Sync now reads new mail. A rescan re-reads 90 days and can take a couple of minutes — useful after a rule change, or when something is missing. Rebuild throws away every application Gmail added and re-derives them from your mail: the repair for records an older rule got wrong.")
                 }
             }
 
@@ -658,11 +669,26 @@ struct GmailSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { await refresh() }
         .refreshable { await refresh() }
+        .confirmationDialog(String(localized: "Rebuild from Gmail?"), isPresented: $confirmRebuild, titleVisibility: .visible) {
+            Button(String(localized: "Rebuild"), role: .destructive) { rebuild() }
+            Button(String(localized: "Cancel"), role: .cancel) {}
+        } message: {
+            Text(String(localized: "Deletes every application Gmail added and re-derives them from your mail. Anything you added by hand is kept. Takes a couple of minutes."))
+        }
         .confirmationDialog(String(localized: "Disconnect Gmail?"), isPresented: $confirmDisconnect, titleVisibility: .visible) {
             Button(String(localized: "Disconnect"), role: .destructive) { disconnect() }
             Button(String(localized: "Cancel"), role: .cancel) {}
         } message: {
             Text(String(localized: "Already-tracked applications stay; new mail just stops flowing in."))
+        }
+    }
+
+    private func rebuild() {
+        syncing = true
+        Task {
+            defer { syncing = false }
+            await store.rebuildFromGmail()
+            await refresh()
         }
     }
 
