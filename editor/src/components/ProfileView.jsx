@@ -1,5 +1,5 @@
-import React from 'react';
-import { ArrowRight, FileText, GraduationCap, Mail, MapPin, Phone, Sparkles, Upload } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowRight, FilePenLine, FileText, GraduationCap, Mail, MapPin, Phone, Sparkles, Upload, X } from 'lucide-react';
 import { displayValue } from '../utils/internshipDisplay.js';
 
 const copy = {
@@ -16,6 +16,13 @@ const copy = {
     uploadSoon: 'Upload CV — coming soon',
     none: 'Not set',
     present: 'Present',
+    edit: 'Edit profile',
+    editTitle: 'Edit profile details',
+    editHint: 'These write to the active résumé’s personal details.',
+    nameEn: 'Name (English)', nameJa: 'Name (Japanese)',
+    address: 'Address',
+    save: 'Save changes', saving: 'Saving…', cancel: 'Cancel',
+    saveError: 'Could not save profile.',
   },
   ja: {
     title: 'プロフィール',
@@ -30,6 +37,13 @@ const copy = {
     uploadSoon: 'CVをアップロード — 近日対応',
     none: '未設定',
     present: '現在',
+    edit: 'プロフィールを編集',
+    editTitle: 'プロフィール情報を編集',
+    editHint: 'アクティブな履歴書の個人情報に反映されます。',
+    nameEn: '氏名（英語）', nameJa: '氏名（日本語）',
+    address: '住所',
+    save: '変更を保存', saving: '保存中…', cancel: 'キャンセル',
+    saveError: '保存できませんでした。',
   },
 };
 
@@ -46,9 +60,57 @@ function InfoRow({ icon, label, value, href }) {
   );
 }
 
-export default function ProfileView({ resume, isJa, onOpenEditor }) {
+export default function ProfileView({ resume, isJa, onOpenEditor, onSavePersonal }) {
   const t = isJa ? copy.ja : copy.en;
   const p = resume.personal || {};
+
+  // Inline profile editing (moved here from Settings): edits write straight to
+  // the résumé's personal block via onSavePersonal.
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const startEditing = () => {
+    setForm({
+      nameEn: p.nameEn || '',
+      nameJa: p.nameJa || '',
+      email: p.email || '',
+      phone: p.phone || '',
+      github: p.github || '',
+      linkedin: p.linkedin || '',
+      address: p.address || '',
+    });
+    setSaveError('');
+    setEditing(true);
+  };
+  const saveEdits = async () => {
+    if (saving) return;
+    setSaving(true);
+    setSaveError('');
+    try {
+      await onSavePersonal({
+        ...p,
+        nameEn: form.nameEn.trim(),
+        nameJa: form.nameJa.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        github: form.github.trim(),
+        linkedin: form.linkedin.trim(),
+        address: form.address.trim(),
+      });
+      setEditing(false);
+    } catch (error) {
+      setSaveError(error.message || t.saveError);
+    } finally {
+      setSaving(false);
+    }
+  };
+  const editField = (key, label, type = 'text') => (
+    <label className="profile-edit-field">
+      <span>{label}</span>
+      <input type={type} value={form[key] || ''} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} />
+    </label>
+  );
   const name = isJa
     ? (p.nameJa || p.nameEn || '名前未設定')
     : (p.nameEn || p.nameJa || 'Name not set');
@@ -77,7 +139,12 @@ export default function ProfileView({ resume, isJa, onOpenEditor }) {
 
   return (
     <main className="profile-view">
-      <div className="section-heading"><div><h2>{t.title}</h2><p>{t.subtitle}</p></div></div>
+      <div className="section-heading">
+        <div><h2>{t.title}</h2><p>{t.subtitle}</p></div>
+        {onSavePersonal && !editing ? (
+          <button type="button" onClick={startEditing}><FilePenLine size={13} /> {t.edit}</button>
+        ) : null}
+      </div>
 
       <section className="profile-view-hero">
         <div className="profile-view-avatar">
@@ -91,6 +158,26 @@ export default function ProfileView({ resume, isJa, onOpenEditor }) {
       </section>
 
       <div className="profile-view-grid">
+        {editing ? (
+          <section className="profile-panel profile-panel-wide profile-edit-panel">
+            <h3><FilePenLine size={15} /> {t.editTitle}</h3>
+            <p className="profile-panel-sub">{t.editHint}</p>
+            <div className="profile-edit-grid">
+              {editField('nameEn', t.nameEn)}
+              {editField('nameJa', t.nameJa)}
+              {editField('email', t.email, 'email')}
+              {editField('phone', t.phone, 'tel')}
+              {editField('github', t.github, 'url')}
+              {editField('linkedin', t.linkedin, 'url')}
+              {editField('address', t.address)}
+            </div>
+            {saveError ? <div className="profile-edit-error" role="alert">{saveError}</div> : null}
+            <div className="profile-edit-actions">
+              <button type="button" className="profile-edit-cancel" onClick={() => setEditing(false)} disabled={saving}><X size={13} /> {t.cancel}</button>
+              <button type="button" className="profile-edit-save" onClick={saveEdits} disabled={saving}>{saving ? t.saving : t.save}</button>
+            </div>
+          </section>
+        ) : null}
         <section className="profile-panel">
           <h3>{t.contact}</h3>
           <div className="profile-info-list">

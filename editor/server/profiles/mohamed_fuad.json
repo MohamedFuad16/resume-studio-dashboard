@@ -5,10 +5,12 @@
     "furigana": "もはめど ふあど",
     "dob": "2004-02-28",
     "address": "東京都世田谷区",
+    "postalCode": "",
     "phone": "080-7535-2988",
     "email": "mohamed.fuad.jp@gmail.com",
     "linkedin": "https://linkedin.com/in/mohamed-fuad-6b8483278",
-    "github": "https://github.com/MohamedFuad16"
+    "github": "https://github.com/MohamedFuad16",
+    "photoDataUrl": ""
   },
   "summary": "Third-year Information and Communication Engineering student at Tokai University, expected to graduate in March 2028. I build modern web applications with TypeScript, React, and Node.js, and native macOS tools with Swift and AppKit. My portfolio includes an AI-powered learning assistant, a bilingual university portal, nearby WebRTC file sharing, and a native Codex account-switching utility. I bring practical engineering experience, English/Japanese communication from translation work, and a strong interest in software engineering internships where I can ship useful products.",
   "summaryEn": "Third-year Information and Communication Engineering student at Tokai University, expected to graduate in March 2028. I build modern web applications with TypeScript, React, and Node.js, and native macOS tools with Swift and AppKit. My portfolio includes an AI-powered learning assistant, a bilingual university portal, nearby WebRTC file sharing, and a native Codex account-switching utility. I bring practical engineering experience, English/Japanese communication from translation work, and a strong interest in software engineering internships where I can ship useful products.",
@@ -98,7 +100,7 @@
       "roleJa": "出入国業務アシスタント",
       "location": "Tokyo, Japan",
       "startDate": "Feb 2023",
-      "endDate": "Apr 2023",
+      "endDate": "Present",
       "bullets": [
         "Assisted with document registration, web-verification workflows, and passenger guidance in English and Japanese."
       ],
@@ -214,9 +216,11 @@
     "furigana": "もはめど ふあど",
     "dob": "2004-02-28",
     "address": "東京都世田谷区",
+    "postalCode": "",
     "phone": "080-7535-2988",
     "email": "mohamed.fuad.jp@gmail.com",
     "linkedin": "https://linkedin.com/in/mohamed-fuad-6b8483278",
-    "github": "https://github.com/MohamedFuad16"
+    "github": "https://github.com/MohamedFuad16",
+    "photoDataUrl": ""
   }
 }

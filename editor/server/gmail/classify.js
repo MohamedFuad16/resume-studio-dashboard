@@ -39,7 +39,7 @@ export async function classifyMessage(message) {
     `From: ${message.from}\nSubject: ${message.subject}\nBody:\n"""${(message.text || message.snippet || '').slice(0, 3500)}"""\n\n` +
     `Answer ONLY minified JSON:\n` +
     `{"isApplicationRelated":bool,"isInternship":bool,"kind":"applied|rejected|interview|offer|other","company":str,"role":str,` +
-    `"interview":{"date":"YYYY-MM-DD","time":"HH:mm"|null}|null,"confidence":0..1}\n` +
+    `"interview":{"date":"YYYY-MM-DD","time":"HH:mm"|null}|null,"reapplyMonths":{"min":int,"max":int}|null,"confidence":0..1}\n` +
     `Rules: isApplicationRelated=true only for emails about the user's OWN application to a company — ` +
     `including applications made on the company's own site or a job board (the confirmation still lands here). ` +
     `Marketing, newsletters, generic job alerts, and security notices are false.\n` +
@@ -54,6 +54,10 @@ export async function classifyMessage(message) {
     `- "rejected": rejection / "not selected" / "selection result" that declines / 不合格・お見送り.\n` +
     `- "offer": an offer / 内定.\n` +
     `- "other": application-related but none of the above.\n` +
+    `reapplyMonths: ONLY for a "rejected" email that states how long to WAIT before reapplying ` +
+    `(e.g. "please apply again after 9-12 months", "you may reapply in 6 months", "再度のご応募は12ヶ月後以降"). ` +
+    `Set {"min":9,"max":12} for a "9-12 months" range, {"min":6,"max":6} for a single "6 months". ` +
+    `null when the email states no wait period. Convert "1 year"→12, "half a year"→6.\n` +
     `company/role empty string if unknown.`;
   try {
     const resp = await ai.chat.completions.create(
@@ -73,6 +77,15 @@ export async function classifyMessage(message) {
     const interview = parsed.interview && /^\d{4}-\d{2}-\d{2}$/.test(parsed.interview.date || '')
       ? { date: parsed.interview.date, time: /^\d{2}:\d{2}$/.test(parsed.interview.time || '') ? parsed.interview.time : null }
       : null;
+    // Reapply window only meaningful for rejections. Clamp to a sane 1-36 month
+    // range and ensure max ≥ min, so a hallucinated value can't block forever.
+    let reapplyMonths = null;
+    if (kind === 'rejected' && parsed.reapplyMonths && typeof parsed.reapplyMonths === 'object') {
+      const toMonths = v => (Number.isFinite(v) && v > 0 ? Math.min(36, Math.round(v)) : null);
+      const min = toMonths(parsed.reapplyMonths.min);
+      const max = toMonths(parsed.reapplyMonths.max) ?? min;
+      if (min) reapplyMonths = { min, max: Math.max(min, max || min) };
+    }
     return {
       isApplicationRelated: Boolean(parsed.isApplicationRelated),
       isInternship: Boolean(parsed.isInternship),
@@ -80,6 +93,7 @@ export async function classifyMessage(message) {
       company: String(parsed.company || '').slice(0, 120).trim(),
       role: String(parsed.role || '').slice(0, 160).trim(),
       interview,
+      reapplyMonths,
       confidence: typeof parsed.confidence === 'number' ? Math.max(0, Math.min(1, parsed.confidence)) : 0.5,
     };
   } catch {

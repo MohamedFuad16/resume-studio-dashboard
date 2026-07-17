@@ -1,10 +1,10 @@
 // SettingsPanel — the `appView === 'settings'` view.
 //
-// Three sections: Profile (name EN/JA, email, phone — written through the résumé's
-// personal block), AI / API keys (OpenRouter key + search/audit model slugs, stored
-// per-user via settingsApi), and Data (export JSON, delete profile). The OpenRouter
+// Two sections: AI / API keys (OpenRouter key + search/audit model slugs, stored
+// per-user via settingsApi) and Data (export JSON, delete profile). The OpenRouter
 // key is treated write-only in the UI: once saved we show a masked preview and only
-// overwrite when the user types a new value.
+// overwrite when the user types a new value. Personal details (name/email/phone)
+// moved to the Profile view, which edits the résumé's personal block directly.
 import { useEffect, useState } from 'react';
 import { I } from './ui.jsx';
 import { settingsApi } from '../api/client.js';
@@ -40,10 +40,7 @@ const MODEL_RE = /^[a-z0-9][a-z0-9._/:-]{1,60}$/i;
 const COPY = {
   en: {
     title: 'Settings',
-    subtitle: 'Manage your profile, AI keys, and data.',
-    profile: 'Profile',
-    profileHint: 'These write to the active résumé’s personal details.',
-    nameEn: 'Name (English)', nameJa: 'Name (Japanese)', email: 'Email', phone: 'Phone',
+    subtitle: 'Manage your AI keys and data.',
     ai: 'AI & API keys',
     aiHint: 'Used for live company research and résumé drafting. Your key is stored to your account and never shown again after saving.',
     keyLabel: 'OpenRouter API key', keyPh: 'sk-or-...', keySaved: 'A key is saved. Enter a new one to replace it.',
@@ -71,10 +68,7 @@ const COPY = {
   },
   ja: {
     title: '設定',
-    subtitle: 'プロフィール、AIキー、データを管理します。',
-    profile: 'プロフィール',
-    profileHint: 'アクティブな履歴書の個人情報に反映されます。',
-    nameEn: '氏名（英語）', nameJa: '氏名（日本語）', email: 'メール', phone: '電話',
+    subtitle: 'AIキーとデータを管理します。',
     ai: 'AI・APIキー',
     aiHint: 'ライブ企業リサーチと履歴書作成に使用します。キーはアカウントに保存され、保存後は再表示されません。',
     keyLabel: 'OpenRouter APIキー', keyPh: 'sk-or-...', keySaved: 'キーは保存済みです。変更する場合は新しいキーを入力してください。',
@@ -107,11 +101,10 @@ const COPY = {
 const DELETE_CONFIRM_WORD = 'DELETE';
 
 export default function SettingsPanel({
-  resume, onSaveProfile, onExportJson, onDeleteProfile, onDeleteAccount,
+  onExportJson, onDeleteProfile, onDeleteAccount,
   needsPassword = false, activeProfile, canDelete, isJa = false,
 }) {
   const t = COPY[isJa ? 'ja' : 'en'];
-  const personal = resume?.personal || {};
 
   // One dialog for both irreversible deletes: null | 'profile' | 'account'.
   const [confirmMode, setConfirmMode] = useState(null);
@@ -146,12 +139,6 @@ export default function SettingsPanel({
     }
   };
 
-  const [form, setForm] = useState({
-    nameEn: personal.nameEn || '',
-    nameJa: personal.nameJa || '',
-    email: personal.email || '',
-    phone: personal.phone || '',
-  });
   const [hasKey, setHasKey] = useState(false);
   const [keyInput, setKeyInput] = useState('');
   const [searchModel, setSearchModel] = useState(DEFAULT_SEARCH_MODEL);
@@ -178,14 +165,6 @@ export default function SettingsPanel({
 
     setStatus('saving');
     try {
-      // Profile → résumé personal block.
-      await onSaveProfile({
-        ...personal,
-        nameEn: form.nameEn.trim(),
-        nameJa: form.nameJa.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim(),
-      });
       // Settings → per-user store. Only write the key when a new one was entered.
       const patch = { searchModel: searchModel.trim(), auditModel: auditModel.trim() };
       if (trimmedKey) patch.openrouterKey = trimmedKey;
@@ -212,13 +191,6 @@ export default function SettingsPanel({
     }
   };
 
-  const field = (key, label, type = 'text') => (
-    <label className="settings-field">
-      <span>{label}</span>
-      <input type={type} value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} />
-    </label>
-  );
-
   return (
     // Two elements on purpose: the outer one owns the scrolling so the scrollbar
     // sits at the true right edge of the view, while the inner one caps the
@@ -232,16 +204,6 @@ export default function SettingsPanel({
           <p>{t.subtitle}</p>
         </div>
       </div>
-
-      <section className="settings-card">
-        <header><h2>{t.profile}</h2><p>{t.profileHint}</p></header>
-        <div className="settings-grid">
-          {field('nameEn', t.nameEn)}
-          {field('nameJa', t.nameJa)}
-          {field('email', t.email, 'email')}
-          {field('phone', t.phone, 'tel')}
-        </div>
-      </section>
 
       <section className="settings-card">
         <header><h2>{t.ai}</h2><p>{t.aiHint}</p></header>

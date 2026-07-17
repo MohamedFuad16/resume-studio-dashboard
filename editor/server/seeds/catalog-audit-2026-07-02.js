@@ -2,6 +2,7 @@
 // their original dated research files for provenance, but are excluded from
 // every runtime catalog path.
 import { autoRetiredIds } from './auto-refresh.js';
+import { reinstatedIds20260717 } from './catalog-audit-2026-07-17.js';
 
 export const retiredInternshipIds20260702 = new Set([
   // Explicitly expired or closed.
@@ -52,8 +53,10 @@ const patches20260702 = new Map([
 ]);
 
 export function isRetiredInternshipId(id) {
-  // Union of the one-off 2026-07-02 audit and the daily auto-refresh, so every
-  // catalog path (seeds, stored live-research, custom) drops both.
+  // Union of the one-off 2026-07-02 audit and the daily auto-refresh, minus
+  // anything a later re-audit verified live again (2026-07-17: Mercari's
+  // Class-of-2028 SWE internship reopened on the official board).
+  if (reinstatedIds20260717.has(id)) return false;
   return retiredInternshipIds20260702.has(id) || autoRetiredIds.has(id);
 }
 

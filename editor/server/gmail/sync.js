@@ -120,6 +120,8 @@ export async function syncProfile(store, profile, opts = {}) {
       company: verdict.company,
       role: verdict.role,
       interview: verdict.interview,
+      // Reapply cooldown extracted from a rejection ("apply again after N months").
+      reapplyMonths: verdict.reapplyMonths || null,
       enrichment,
       confidence: verdict.confidence,
       subject: message.subject.slice(0, 200),

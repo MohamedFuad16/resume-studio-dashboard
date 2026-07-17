@@ -22,6 +22,7 @@ import { displayCompany, displayRole, displayValue, formatDisplayDeadline } from
 import { prepareProfilePhoto } from '../utils/imageUpload.js';
 import { appliedCompaniesForProfile, compareCompanyAwareMatch } from '../utils/internshipRanking.js';
 import { resolveTechList } from '../utils/techIcons.js';
+import { companyCooldownMap, cooldownForCompany, cooldownLabel } from '../utils/reapplyCooldown.js';
 
 const STATUS_ICONS = {
   saved: Bookmark,
@@ -131,6 +132,7 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
       .sort((a, b) => compareCompanyAwareMatch(a, b, appliedCompanies))
       .slice(0, 4);
   }, [activeProfile, catalog, records]);
+  const cooldownMap = useMemo(() => companyCooldownMap(records), [records]);
   const name = isJa
     ? (resume.personal?.nameJa || resume.personal?.nameEn || '名前未設定')
     : (resume.personal?.nameEn || resume.personal?.nameJa || 'Name not set');
@@ -257,7 +259,7 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
                 || { ...record, id: record.internshipId, url: record.applyUrl };
               return (
                 <article className="application-row" key={record.internshipId}>
-                  <span className="application-company"><CompanyLogo item={item} /><button type="button" className="application-company-trigger" onClick={() => setSelectedItem(item)} aria-label={isJa ? `${displayCompany(item, isJa)}の詳細を開く` : `Open details for ${displayCompany(item, isJa)}`}><b>{displayCompany(item, isJa)}</b><small>{displayRole(item.role || record.role, isJa)}</small></button></span>
+                  <span className="application-company"><CompanyLogo item={item} /><button type="button" className="application-company-trigger" onClick={() => setSelectedItem(item)} aria-label={isJa ? `${displayCompany(item, isJa)}の詳細を開く` : `Open details for ${displayCompany(item, isJa)}`}><b>{displayCompany(item, isJa)}</b><small>{displayRole(item.role || record.role, isJa)}{(() => { const cd = cooldownForCompany(cooldownMap, record.company); return cd ? <span className="application-cooldown-tag"><CalendarClock size={11} />{cooldownLabel(cd, isJa)}</span> : null; })()}</small></button></span>
                   <span><MapPin size={13} />{dashboardValue(record.location, isJa)}</span>
                   <span className="application-deadline">{formatDisplayDeadline(record.deadline, isJa)}</span>
                   <select value={record.status} onChange={event => onStatusChange(item, event.target.value)} aria-label={isJa ? `${record.company}の応募状況` : `Status for ${record.company}`}>
@@ -302,6 +304,7 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
             onApply={onApply}
             onClose={() => setSelectedItem(null)}
             onOpenEditor={onOpenEditor}
+            cooldown={cooldownForCompany(cooldownMap, selectedItem.company)}
             isJa={isJa}
           />
         </div>

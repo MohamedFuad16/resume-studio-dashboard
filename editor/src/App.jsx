@@ -674,8 +674,11 @@ export default function App() {
       lastCompiled.current = cacheKey;
 
       // Force reload by appending v=timestamp, and use open parameters to hide chrome & document outline
+      // FitH (page-width) rather than Fit: the frame is sized to the page's
+      // aspect ratio, so page-width fills it edge-to-edge with no dark
+      // letterboxing from the embedded viewer.
       const hash = zoom === 'Fit'
-        ? 'view=Fit&toolbar=0&navpanes=0&pagemode=none&scrollbar=1'
+        ? 'view=FitH&toolbar=0&navpanes=0&pagemode=none&scrollbar=1'
         : `toolbar=0&navpanes=0&pagemode=none&scrollbar=1&zoom=${zoom}`;
       const separator = url.includes('?') ? '&' : '?';
       setPdfSrc(`${url}${separator}v=${Date.now()}#${hash}`);
@@ -1186,7 +1189,12 @@ export default function App() {
       ) : appView === 'applications' ? (
         <ApplicationsView isJa={isJa} activeProfile={activeProfile} onOpenRadar={() => setAppView('radar')} onOpenEditor={() => setAppView('editor')} />
       ) : appView === 'profile' ? (
-        <ProfileView resume={resume} isJa={isJa} onOpenEditor={() => setAppView('editor')} />
+        <ProfileView
+          resume={resume}
+          isJa={isJa}
+          onOpenEditor={() => setAppView('editor')}
+          onSavePersonal={async personal => { await saveProfileImmediately({ ...resume, personal }, activeProfile, { refreshFromServer: false }); }}
+        />
       ) : appView === 'calendar' ? (
         // Application timeline — its own view now, rather than a block appended
         // to the bottom of the dashboard.
@@ -1200,11 +1208,9 @@ export default function App() {
         </main>
       ) : appView === 'settings' ? (
         <SettingsPanel
-          resume={resume}
           isJa={isJa}
           activeProfile={activeProfile}
           canDelete={profiles.length > 1}
-          onSaveProfile={async personal => { await saveProfileImmediately({ ...resume, personal }, activeProfile, { refreshFromServer: false }); }}
           onExportJson={onJson}
           onDeleteProfile={id => { handleDeleteProfile(id); setAppView('dashboard'); }}
           // Only offered when there is a real signed-in account. On the no-auth
@@ -1214,178 +1220,105 @@ export default function App() {
         />
       ) : (
         <div className="editor-view">
-          <header className="tb">
-            <div className="tb-inner">
-              <div className="tb-actions">
-                <button className="btn" onClick={saveNow} disabled={save === 'saving'}>
-                  <I n="check" s={12} />
-                  {save === 'saving' ? (isJa ? '保存中' : 'Saving') : (isJa ? '保存' : 'Save')}
+          {/* One clean header row: view title, template pills (the app-wide
+              Applications-tab pill standard), and Save/Export on the right. */}
+          <header className="editor-topbar">
+            <div className="editor-topbar-title">
+              <h2>{isJa ? '履歴書エディタ' : 'Resume Editor'}</h2>
+              <p>{isJa ? '入力内容は自動保存され、PDFに反映されます。' : 'Your data autosaves and compiles into the PDF preview.'}</p>
+            </div>
+            <div className="editor-template-pills" role="tablist" aria-label={isJa ? 'テンプレート' : 'Template'}>
+              <span className="editor-template-label">{lang.toUpperCase()}</span>
+              {currentTemplates.map(t => (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="tab"
+                  data-testid={`template-${testIdMap[t.id]}`}
+                  aria-selected={template === t.id ? "true" : "false"}
+                  className={`tpl ${template === t.id ? `active on-${lang} border-primary` : ''}`}
+                  onClick={() => setTemplate(t.id)}
+                >
+                  {t.label}
                 </button>
-                <ExportMenu onPDF={onPDF} onTex={onTex} onJson={onJson} onAI={onAI} isJa={isJa} />
-              </div>
+              ))}
+            </div>
+            <div className="editor-topbar-actions">
+              <button className="btn" onClick={saveNow} disabled={save === 'saving'}>
+                <I n="check" s={12} />
+                {save === 'saving' ? (isJa ? '保存中' : 'Saving') : (isJa ? '保存' : 'Save')}
+              </button>
+              <ExportMenu onPDF={onPDF} onTex={onTex} onJson={onJson} onAI={onAI} isJa={isJa} />
             </div>
           </header>
-          <div className="editor-commandbar">
-            <div className="editor-command-group template-command">
-              <span className="command-label">{isJa ? 'テンプレート' : 'Template'}</span>
-              <div className="tb-tabs">
-                <div className="tb-tab-grp">
-                  <span className={`tb-grp-lbl ${lang}`}>{lang.toUpperCase()}</span>
-                  {currentTemplates.map(t => (
-                    <button
-                      key={t.id}
-                      data-testid={`template-${testIdMap[t.id]}`}
-                      aria-selected={template === t.id ? "true" : "false"}
-                      className={`tpl ${template === t.id ? `active on-${lang} border-primary` : ''}`}
-                      onClick={() => setTemplate(t.id)}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
 
           {/* ── Main split ───────────────────────────────── */}
           <div className="split">
 
-        {/* Sidebar (collapsible, compiles instantly on blur/focusout) */}
+        {/* Form column (compiles instantly on blur/focusout) */}
         <aside
           className={`sidebar ${sidebar ? '' : 'closed'}`}
           onBlur={(e) => {
-            if (resume && sidebarTab === 'editor') {
+            if (resume) {
               if (!e.currentTarget.contains(e.relatedTarget)) {
                 compile(resume, template);
               }
             }
           }}
         >
-          {/* Sidebar Tabs */}
-          <div className="sidebar-tabs">
-            <button
-              className={`sidebar-tab-btn ${sidebarTab === 'editor' ? 'active' : ''}`}
-              onClick={() => setSidebarTab('editor')}
-            >
-              <I n="user" s={12} style={{ marginRight: 6 }} />
-              {isJa ? '編集' : 'Editor'}
-            </button>
-            <button
-              className={`sidebar-tab-btn ${sidebarTab === 'chat' ? 'active' : ''}`}
-              onClick={() => setSidebarTab('chat')}
-            >
-              <I n="brain" s={12} style={{ marginRight: 6 }} />
-              {isJa ? 'チャット' : 'Chat'}
-            </button>
+          <div className="editor-workspace">
+            <nav className="section-rail" aria-label="Resume sections">
+              <div className="rail-head">
+                <span>{isJa ? '入力項目' : 'Sections'}</span>
+                <strong>{sectionEntries.reduce((sum, entry) => sum + Number(entry.count || 0), 0)}</strong>
+              </div>
+              <div className="section-list">
+                {sectionEntries.map(entry => (
+                  <button
+                    type="button"
+                    key={entry.key}
+                    className={`section-row ${entry.key === activeEntry.key ? 'active' : ''}`}
+                    onClick={() => setActiveSection(entry.key)}
+                  >
+                    <span className={`section-status s-${entry.key}`}><I n={entry.icon} s={13} /></span>
+                    <span className="section-copy">
+                      <span className="section-title">{entry.label}</span>
+                      <span className="section-meta">{entry.meta}</span>
+                    </span>
+                    <span className="section-count">{entry.count}</span>
+                  </button>
+                ))}
+              </div>
+            </nav>
+            <div className="editor-pane">
+              <div className="editor-pane-head">
+                <div>
+                  <span className="pane-kicker">{isJa ? '日本語履歴書' : 'Resume data'}</span>
+                  <h1>{displayName}</h1>
+                </div>
+              </div>
+              <div className="active-section-card">
+                {activeEntry.node}
+              </div>
+            </div>
           </div>
-
-          {sidebarTab === 'editor' ? (
-            <div className="editor-workspace">
-              <nav className="section-rail" aria-label="Resume sections">
-                <div className="rail-head">
-                  <span>{isJa ? '入力項目' : 'Sections'}</span>
-                  <strong>{sectionEntries.reduce((sum, entry) => sum + Number(entry.count || 0), 0)}</strong>
-                </div>
-                <div className="section-list">
-                  {sectionEntries.map((entry, index) => (
-                    <button
-                      type="button"
-                      key={entry.key}
-                      className={`section-row ${entry.key === activeEntry.key ? 'active' : ''}`}
-                      onClick={() => setActiveSection(entry.key)}
-                    >
-                      <span className={`section-status s-${entry.key}`}><I n={entry.icon} s={13} /></span>
-                      <span className="section-copy">
-                        <span className="section-title">{entry.label}</span>
-                        <span className="section-meta">{entry.meta}</span>
-                      </span>
-                      <span className="section-count">{entry.count}</span>
-                      <span className="section-id">R-{String(index + 1).padStart(2, '0')}</span>
-                    </button>
-                  ))}
-                </div>
-              </nav>
-              <div className="editor-pane">
-                <div className="editor-pane-head">
-                  <div>
-                    <span className="pane-kicker">{isJa ? '日本語履歴書' : 'Resume data'}</span>
-                    <h1>{displayName}</h1>
-                  </div>
-                </div>
-                <div className="active-section-card">
-                  {activeEntry.node}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="sidebar-scroll">
-              <div className="resume-chat">
-                <div className="chat-head">
-                  <span className="section-status"><I n="brain" s={14} /></span>
-                  <div>
-                    <h2>{isJa ? '履歴書チャット' : 'Resume chat'}</h2>
-                    <p>{isJa ? '相談も、履歴書への直接編集もできます。' : 'Conversation and direct resume editing in one place.'}</p>
-                  </div>
-                </div>
-                <div className="chat-thread">
-                  {chatMessages.map((msg, index) => (
-                    <div key={index} className={`chat-bubble ${msg.role}`}>
-                      {msg.text}
-                    </div>
-                  ))}
-                </div>
-                <div className="chat-composer">
-                  <textarea
-                    className="fta"
-                    rows={1}
-                    value={chatDraft}
-                    onChange={e => setChatDraft(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                        e.preventDefault();
-                        handleResumeChat();
-                      }
-                    }}
-                    placeholder={isJa ? 'Codexに履歴書について相談…' : 'Message Codex about your resume…'}
-                    aria-label={isJa ? '履歴書チャットへのメッセージ' : 'Message Resume Codex'}
-                  />
-                  <div className="chat-actions">
-                    <button className="btn btn-primary" type="button" onClick={handleResumeChat} disabled={chatSending || !chatDraft.trim()}>
-                      <I n="brain" s={12} />
-                      {chatSending ? (isJa ? '考え中…' : 'Thinking…') : (isJa ? '送信' : 'Send')}
-                    </button>
-                    {chatSending && (
-                      <button className="btn chat-cancel" type="button" onClick={handleCancelChat}>
-                        <I n="x" s={12} />
-                        {isJa ? 'キャンセル' : 'Cancel'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="chat-note">
-                  {isJa
-                    ? 'Codex LLMが現在の履歴書を参照します。変更していない項目は保持し、編集内容を返信で説明します。'
-                    : 'Codex LLM reads the current resume context, preserves unrelated facts, and explains every applied edit.'}
-                </div>
-              </div>
-            </div>
-          )}
         </aside>
 
         {/* PDF preview */}
         <main className="preview" data-testid="preview-container">
           <div className="preview-toolbar">
-            <span className="p-title">{isJa ? '履歴書プレビュー' : 'Resume Preview'}</span>
-            <div className="preview-controls">
+            <span className="p-title">
+              {isJa ? '履歴書プレビュー' : 'Resume Preview'}
+              {/* Auto-compiled on every change — the manual Update button is gone,
+                  but the E2E hook stays as an invisible recompile trigger. */}
               <button
-                className="btn preview-update"
                 data-testid="compile-btn"
+                style={{ display: 'none' }}
                 onClick={() => compile(resume, template, { force: true })}
-                disabled={compiling}
-              >
-                <I n="sync" s={12} style={{ animation: compiling ? 'spin 0.6s linear infinite' : 'none' }} />
-                {compiling ? (isJa ? '更新中' : 'Updating') : (isJa ? '更新' : 'Update')}
-              </button>
+              />
+              {compiling ? <span className="p-compiling"><I n="sync" s={11} style={{ animation: 'spin 0.6s linear infinite' }} />{isJa ? '更新中' : 'Updating'}</span> : null}
+            </span>
+            <div className="preview-controls">
               <div className="p-zoom-grp">
                 <span className="p-zoom-lbl">Zoom</span>
                 {['Fit', 60, 80, 100, 120].map(z => (
@@ -1397,7 +1330,7 @@ export default function App() {
                       if (pdfSrc) {
                         const baseUrl = pdfSrc.split('#')[0];
                         const hash = z === 'Fit'
-                          ? 'view=Fit&toolbar=0&navpanes=0&pagemode=none&scrollbar=1'
+                          ? 'view=FitH&toolbar=0&navpanes=0&pagemode=none&scrollbar=1'
                           : `toolbar=0&navpanes=0&pagemode=none&scrollbar=1&zoom=${z}`;
                         setPdfSrc(`${baseUrl}#${hash}`);
                       }
