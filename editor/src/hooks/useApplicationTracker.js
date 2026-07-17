@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { trackerApi } from '../api/client.js';
+import { isGigRole } from '../utils/roleFilter.js';
 
 export const TRACKER_EVENT = 'resume-studio:application-tracker-change';
 
@@ -199,8 +200,18 @@ export function useApplicationTracker(profileId) {
     replaceTracker(next);
     commit(next);
   }, [commit, replaceTracker]);
+  // `records` is the app's list of internship applications, so freelance/gig
+  // records mis-ingested from Gmail (e.g. "language expert", "email analyst",
+  // "AI trainer") are filtered out HERE — every consumer (dashboard recent +
+  // pipeline, Applications view + its counts, calendar) then treats them as
+  // non-existent. The raw `tracker` object still holds them (nothing is
+  // deleted); `statusFor` reads `tracker` directly, so status writes for any id
+  // still work. Filter is conservative (see roleFilter) — never hides a real
+  // internship.
   const records = useMemo(
-    () => Object.values(tracker).sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')),
+    () => Object.values(tracker)
+      .filter(record => !isGigRole(record))
+      .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')),
     [tracker],
   );
   const counts = useMemo(() => APPLICATION_STATUSES.reduce((acc, item) => {
