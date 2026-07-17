@@ -7703,6 +7703,22 @@ body,
   .side-foot .app-lang-switcher { width: auto; }
 }
 
+/* Phone: tighten the top nav so all 7 icons + language + profile fit within
+   the viewport instead of scrolling the language/profile off-screen. */
+@media (max-width: 560px) {
+  .app-sidebar { gap: 2px; padding: 7px 6px; }
+  .side-nav { gap: 0; }
+  .side-nav-btn { padding: 7px 6px; }
+  .side-nav-btn svg { width: 18px; height: 18px; }
+  .side-badge { min-width: 16px; padding: 1px 4px; font-size: 9px; }
+  .side-foot { gap: 4px; }
+  .side-foot .app-lang-switcher { padding: 2px; }
+  .side-foot .lang-btn { height: 26px; padding: 0 8px; font-size: 11px; }
+  /* Avatar-only profile trigger (name/caret hidden) to save width. */
+  .side-foot .nav-profile-avatar { padding: 5px; gap: 0; }
+  .side-foot .nav-profile-avatar > :not(.nav-avatar-badge) { display: none; }
+}
+
 /* ── Halo applied to the page-level primary CTAs ───────────────────────
    These are declared earlier in this file with their own blue/white fills, so
    they are re-stated here (later = wins) rather than added to the .btn-primary
@@ -7836,7 +7852,18 @@ body,
 @media (max-width: 980px) {
   .editor-view .sidebar,
   .editor-view .sidebar.closed { width: 100%; border-right: 0; }
-  .editor-workspace { grid-template-columns: 1fr; }
+  /* The rail stacks into a horizontal chip strip on mobile — collapse doesn't
+     apply, so force the single-column workspace even when rail-collapsed is set
+     (its persisted state must not leave a narrow rail sliver here). The
+     `.editor-view` prefix outranks the later desktop `.rail-collapsed` rule —
+     media queries add no specificity, so order alone wouldn't win. */
+  .editor-view .editor-workspace,
+  .editor-view .editor-workspace.rail-collapsed { grid-template-columns: 1fr; }
+  .editor-view .rail-toggle { display: none; }
+  .editor-view .rail-collapsed .rail-head { justify-content: flex-start; padding: 0 16px; }
+  .editor-view .rail-collapsed .section-list { padding: 8px; }
+  .editor-view .rail-collapsed .section-copy { display: block; }
+  .editor-view .rail-collapsed .section-row { grid-template-columns: 30px minmax(0, 1fr) auto; justify-items: stretch; }
   .section-row { background: #f4f6f9; }
   .section-row.active { background: #e8edf5; }
 }
@@ -8222,3 +8249,22 @@ body,
   vertical-align: middle;
 }
 .application-cooldown-tag svg { flex: none; }
+
+/* ── Mobile calendar: a compact month grid instead of tall stretched rows ──
+   On desktop the day rows flex to fill the card height; on a phone that makes
+   each week ~300px tall. Here the grid is natural height (rows sized to their
+   content, min 56px) so the month scrolls compactly, and the chrome shrinks. */
+@media (max-width: 560px) {
+  .calendar-view { padding: 12px 10px 16px; }
+  .calendar-view .application-calendar { min-height: 0; }
+  .calendar-view .calendar-grid { flex: none; min-height: 0; }
+  .calendar-view .calendar-days { flex: none; grid-auto-rows: minmax(56px, auto); gap: 4px; }
+  .calendar-view .calendar-weekdays { gap: 4px; }
+  .calendar-view .calendar-weekdays span { font-size: 8.5px; }
+  .calendar-view .calendar-day { padding: 5px 4px; border-radius: 10px; }
+  .calendar-view .calendar-day-number { min-width: 22px; width: 22px; height: 22px; font-size: 10px; margin: 0 auto 3px; }
+  .calendar-view .calendar-day-events { gap: 3px; margin-top: 4px; }
+  .calendar-view .calendar-event { padding: 2px; }
+  .calendar-view .calendar-event-company { display: none; }
+  .calendar-view .calendar-head-actions { flex-wrap: wrap; }
+}
