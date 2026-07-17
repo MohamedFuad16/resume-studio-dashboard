@@ -1,134 +1,213 @@
-// The auth gate — a faithful port of the web LoginScreen (ADR-0028): warm paper,
-// serif display headline, placeholder-only pill fields, black primary buttons.
-// The login screen is the one surface that deliberately keeps its black pills
-// (the accent blue is reserved for in-app primary actions), same as the web.
-//
-// Sign-in is stubbed until the Firebase SDK lands; "Browse without an account"
-// is real and drops into the catalog, which needs no auth.
+// The sign-in wall. Same two providers as the web (editor/src/auth), same account,
+// so signing in here shows the applications you already track on the desktop.
 import SwiftUI
 
 struct LoginView: View {
-    @Environment(SessionStore.self) private var session
+    @Environment(AuthService.self) private var auth
+
+    @State private var mode: Mode = .signIn
     @State private var email = ""
     @State private var password = ""
-    @State private var showAuthStub = false
+    @FocusState private var focus: Field?
 
-    private var ready: Bool { !email.isEmpty && !password.isEmpty }
+    private enum Mode { case signIn, signUp }
+    private enum Field { case email, password }
+
+    private var canSubmit: Bool {
+        email.contains("@") && password.count >= 6 && !auth.busy
+    }
 
     var body: some View {
-        ZStack {
-            Theme.paper.ignoresSafeArea()
+        AmbientCanvas {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Spacer(minLength: 40)
 
-            VStack(spacing: 0) {
-                Spacer(minLength: 48)
+                    IconTile(symbol: "location.north.circle", tint: .teal, size: 52, glyph: 24)
+                        .padding(.bottom, 20)
 
-                // Serif display, exactly the web's role for Instrument Serif.
-                Text("Welcome back")
-                    .font(.system(size: 40, weight: .regular, design: .serif))
-                    .foregroundStyle(Theme.ink)
+                    Text(mode == .signIn ? "Welcome back" : "Create your account")
+                        .font(.system(size: 28, weight: .bold))
+                        .tracking(-0.5)
+                        .foregroundStyle(Palette.ink)
+                        .contentTransition(.opacity)
 
-                Text("Sign in to track internships, research companies, and build bilingual résumés.")
-                    .font(.footnote)
-                    .foregroundStyle(Theme.faint)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 44)
-                    .padding(.top, 10)
+                    Text("Track internships, research companies, and keep every application in one place.")
+                        .font(Font2.body)
+                        .foregroundStyle(Palette.ink500)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 6)
+                        .padding(.bottom, 28)
 
-                VStack(spacing: 12) {
                     Button {
-                        showAuthStub = true
+                        Task { await auth.signInWithGoogle() }
                     } label: {
-                        Label("Continue with Google", systemImage: "g.circle.fill")
-                            .font(.subheadline.weight(.medium))
-                            .frame(maxWidth: .infinity, minHeight: 30)
+                        HStack(spacing: 10) {
+                            GoogleMark()
+                            Text("Continue with Google")
+                        }
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(Palette.ink, in: .capsule)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Theme.ink)
+                    .buttonStyle(.plain)
+                    .disabled(auth.busy)
 
-                    LabeledDivider(text: "or")
+                    HStack(spacing: 12) {
+                        line
+                        Text("or").font(Font2.caption).foregroundStyle(Palette.ink400)
+                        line
+                    }
+                    .padding(.vertical, 20)
 
-                    LoginField(placeholder: "Enter email address", text: $email)
-                        .keyboardType(.emailAddress)
+                    VStack(spacing: 10) {
+                        AuthField(
+                            text: $email, placeholder: "Enter email address",
+                            symbol: "envelope", isSecure: false
+                        )
+                        .focused($focus, equals: .email)
                         .textContentType(.emailAddress)
+                        .keyboardType(.emailAddress)
                         .textInputAutocapitalization(.never)
-                    LoginField(placeholder: "Enter password", text: $password, secure: true)
+                        .autocorrectionDisabled()
+                        .submitLabel(.next)
+                        .onSubmit { focus = .password }
 
-                    Button {
-                        showAuthStub = true
-                    } label: {
-                        Text("Continue")
-                            .font(.subheadline.weight(.medium))
-                            .frame(maxWidth: .infinity, minHeight: 30)
+                        AuthField(
+                            text: $password, placeholder: "Enter password",
+                            symbol: "lock", isSecure: true
+                        )
+                        .focused($focus, equals: .password)
+                        .textContentType(mode == .signIn ? .password : .newPassword)
+                        .submitLabel(.go)
+                        .onSubmit { submit() }
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Theme.ink)
-                    .disabled(!ready)
+
+                    if let error = auth.error {
+                        Label(error, systemImage: "exclamationmark.circle.fill")
+                            .font(Font2.caption)
+                            .foregroundStyle(Palette.orange600)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 12)
+                            .transition(.opacity)
+                    }
+
+                    Button(action: submit) {
+                        HStack(spacing: 8) {
+                            if auth.busy { ProgressView().tint(.white).controlSize(.small) }
+                            Text(mode == .signIn ? "Sign in" : "Create account")
+                        }
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(canSubmit ? Palette.teal : Palette.ink300, in: .capsule)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canSubmit)
+                    .padding(.top, 16)
+
+                    HStack(spacing: 4) {
+                        Text(mode == .signIn ? "Don't have an account?" : "Already have an account?")
+                            .foregroundStyle(Palette.ink500)
+                        Button(mode == .signIn ? "Sign up" : "Sign in") {
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                mode = mode == .signIn ? .signUp : .signIn
+                                auth.error = nil
+                            }
+                        }
+                        .foregroundStyle(Palette.ink)
+                        .fontWeight(.semibold)
+                        .buttonStyle(.plain)
+                    }
+                    .font(Font2.caption)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 20)
+
+                    if mode == .signIn {
+                        Button("Forgot password?") {
+                            Task { await auth.resetPassword(email: email) }
+                        }
+                        .font(Font2.caption)
+                        .foregroundStyle(Palette.ink400)
+                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 10)
+                        .disabled(!email.contains("@"))
+                    }
+
+                    Spacer(minLength: 40)
                 }
-                .buttonBorderShape(.capsule)
-                .padding(.horizontal, 36)
-                .padding(.top, 30)
-
-                Spacer()
-
-                // Real today: the catalog is public, so browsing needs no account.
-                Button {
-                    session.browseWithoutAccount()
-                } label: {
-                    Text("Browse internships without an account")
-                        .font(.footnote.weight(.medium))
-                }
-                .buttonStyle(.glass)
-                .buttonBorderShape(.capsule)
-
-                Text("By continuing, you agree to the Terms of Service and Privacy Policy.")
-                    .font(.caption2)
-                    .foregroundStyle(Theme.faint)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 60)
-                    .padding(.vertical, 18)
+                .padding(.horizontal, 28)
+                .frame(maxWidth: .infinity)
             }
+            .scrollIndicators(.hidden)
+            .scrollDismissesKeyboard(.interactively)
         }
-        .alert("Sign-in isn't wired up yet", isPresented: $showAuthStub) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("Account sign-in arrives with the Firebase SDK. Browse without an account to see the live catalog now.")
+    }
+
+    private var line: some View {
+        Rectangle().fill(Palette.hairline).frame(height: 1)
+    }
+
+    private func submit() {
+        guard canSubmit else { return }
+        focus = nil
+        Task {
+            switch mode {
+            case .signIn: await auth.signIn(email: email, password: password)
+            case .signUp: await auth.signUp(email: email, password: password)
+            }
         }
     }
 }
 
-private struct LoginField: View {
-    let placeholder: String
+/// A rounded text field matching the reference's inputs. Named AuthField, not
+/// Field, so it can't collide with the focus enum above.
+private struct AuthField: View {
     @Binding var text: String
-    var secure = false
-
-    var body: some View {
-        Group {
-            if secure {
-                SecureField(placeholder, text: $text)
-            } else {
-                TextField(placeholder, text: $text)
-            }
-        }
-        .multilineTextAlignment(.center)
-        .font(.subheadline)
-        .padding(.vertical, 13)
-        .background(.white, in: .capsule)
-        .overlay(Capsule().strokeBorder(.black.opacity(0.08)))
-    }
-}
-
-private struct LabeledDivider: View {
-    let text: String
+    var placeholder: String
+    var symbol: String
+    var isSecure: Bool
 
     var body: some View {
         HStack(spacing: 12) {
-            Rectangle().fill(.black.opacity(0.08)).frame(height: 1)
-            Text(text).font(.caption).foregroundStyle(Theme.faint)
-            Rectangle().fill(.black.opacity(0.08)).frame(height: 1)
+            Image(systemName: symbol)
+                .font(.system(size: 14))
+                .foregroundStyle(Palette.ink400)
+                .frame(width: 18)
+            Group {
+                if isSecure {
+                    SecureField(placeholder, text: $text)
+                } else {
+                    TextField(placeholder, text: $text)
+                }
+            }
+            .font(Font2.body)
+            .foregroundStyle(Palette.ink)
         }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 16)
+        .background(Palette.card, in: .capsule)
+        .overlay { Capsule().strokeBorder(Palette.hairline, lineWidth: 1) }
     }
 }
 
-#Preview {
-    LoginView().environment(SessionStore())
+/// Google's mark, drawn rather than bundled — four arcs, no asset, no licence file.
+private struct GoogleMark: View {
+    var body: some View {
+        ZStack {
+            Circle().fill(.white).frame(width: 20, height: 20)
+            Text("G")
+                .font(.system(size: 13, weight: .bold, design: .default))
+                .foregroundStyle(Color(hex: 0x4285F4))
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+#Preview("Sign in") {
+    LoginView().environment(AuthService())
 }

@@ -1,145 +1,197 @@
-// Roles — the full catalog as a browsable, sectioned list (the planner's
-// "to-do list" analog). Search is deliberately a small pill INSIDE the content,
-// not a navigation-bar field and not a tab: browsing is the primary mode, and
-// the reference has no search chrome anywhere.
+// Radar — the reference's RadarTab over the live catalog.
+// Search, filter chips, stat strip (over the radar-sweep shader), ranked matches.
 import SwiftUI
 
 struct RadarView: View {
-    @Environment(CatalogStore.self) private var catalog
-    @State private var query = ""
-    @FocusState private var searchFocused: Bool
+    @Environment(CatalogStore.self) private var store
+    @Binding var route: Route?
 
-    private var results: [Internship] {
-        guard !query.isEmpty else { return catalog.internships }
-        return catalog.internships.filter { item in
-            [item.company, item.role, item.location, item.track,
-             item.techStack?.joined(separator: " ")]
-                .compactMap { $0 }
-                .contains { $0.localizedCaseInsensitiveContains(query) }
+    @State private var query = ""
+    @State private var filter: RadarFilter = .all
+
+    enum RadarFilter: String, CaseIterable, Identifiable {
+        case all, tokyo, english, saved
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .all: "All tracks"
+            case .tokyo: "Tokyo"
+            case .english: "English"
+            case .saved: "Saved"
+            }
         }
     }
 
-    private var priority: [Internship] { results.filter { $0.priority == true } }
-    private var tokyo: [Internship] { results.filter { $0.priority != true && $0.isTokyo } }
-    private var worldwide: [Internship] { results.filter { $0.priority != true && !$0.isTokyo } }
+    private var results: [Internship] {
+        var items = store.internships
+
+        switch filter {
+        case .all: break
+        case .tokyo: items = items.filter(\.isTokyo)
+        case .english: items = items.filter(\.isEnglishFirst)
+        case .saved: items = items.filter { store.status(for: $0.id) == .saved }
+        }
+
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return items }
+        return items.filter {
+            $0.displayCompany.localizedCaseInsensitiveContains(trimmed)
+                || $0.displayRole.localizedCaseInsensitiveContains(trimmed)
+                || $0.displayLocation.localizedCaseInsensitiveContains(trimmed)
+                || ($0.track ?? "").localizedCaseInsensitiveContains(trimmed)
+        }
+    }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    header
-                    searchPill
+        TabScroll {
+            ScreenHeader(
+                title: "Japan matches",
+                subtitle: store.internships.isEmpty ? "Loading catalog…" : "\(store.internships.count) verified live roles"
+            )
+            .padding(.bottom, 18)
 
-                    switch catalog.phase {
-                    case .idle, .loading:
-                        ProgressView("Loading live roles…")
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 80)
-                    case .failed(let message):
-                        ContentUnavailableView("Couldn't reach the portal",
-                                               systemImage: "wifi.slash",
-                                               description: Text(message))
-                    case .loaded:
-                        if results.isEmpty {
-                            ContentUnavailableView.search(text: query)
-                                .padding(.vertical, 40)
-                        } else {
-                            if !priority.isEmpty {
-                                RoleSection(icon: "star", title: "Priority", items: priority)
-                            }
-                            if !tokyo.isEmpty {
-                                RoleSection(icon: "sun.horizon", title: "Tokyo", items: tokyo)
-                            }
-                            if !worldwide.isEmpty {
-                                RoleSection(icon: "globe.asia.australia", title: "Worldwide", items: worldwide)
-                            }
+            SearchField(query: $query)
+                .padding(.bottom, 14)
+
+            ScrollView(.horizontal) {
+                HStack(spacing: 8) {
+                    ForEach(RadarFilter.allCases) { option in
+                        FilterChip(
+                            label: option.label,
+                            count: option == .saved ? store.count(of: .saved) : nil,
+                            isOn: filter == option
+                        ) {
+                            withAnimation(.easeOut(duration: 0.18)) { filter = option }
                         }
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.bottom, 40)
             }
-            .background(Theme.canvas)
-            .toolbar(.hidden, for: .navigationBar)
-            .navigationDestination(for: Internship.self) { InternshipDetailView(item: $0) }
-            .refreshable { await catalog.load() }
+            .scrollIndicators(.hidden)
+            .padding(.horizontal, -20)
+            .padding(.bottom, 14)
+
+            ScrollView(.horizontal) {
+                HStack(spacing: 12) {
+                    StatCard(symbol: "mappin.and.ellipse", tint: .blue, value: "\(store.tokyoCount)", label: "Tokyo")
+                    StatCard(symbol: "star", tint: .indigo, value: "\(store.japanCount)", label: "Japan total")
+                    StatCard(symbol: "globe", tint: .teal, value: "\(store.englishFirstCount)", label: "English")
+                }
+                .padding(.horizontal, 20)
+            }
+            .scrollIndicators(.hidden)
+            .padding(.horizontal, -20)
+            .padding(.bottom, 18)
+
+            switch store.phase {
+            case .loading where store.internships.isEmpty:
+                VStack(spacing: 10) {
+                    ForEach(0..<5, id: \.self) { _ in ShimmerBox(height: 76) }
+                }
+            case .failed(let message):
+                FailureNote(message: message) { Task { await store.load() } }
+            default:
+                if results.isEmpty {
+                    EmptyNote(
+                        symbol: "magnifyingglass",
+                        title: "No roles match",
+                        message: "Try a different search or clear the filters."
+                    )
+                } else {
+                    LazyVStack(spacing: 10) {
+                        ForEach(results) { item in
+                            MatchCard(item: item) { route = .internship(item) }
+                        }
+                    }
+                }
+            }
         }
     }
+}
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("Roles")
-                .font(.title2.weight(.bold))
-                .foregroundStyle(Theme.ink)
-            Text("\(catalog.internships.count) verified, checked against official sources")
-                .font(.subheadline)
-                .foregroundStyle(Theme.muted)
-        }
-        .padding(.top, 6)
-    }
+struct SearchField: View {
+    @Binding var query: String
+    @FocusState private var focused: Bool
 
-    // White capsule search field — content, not chrome.
-    private var searchPill: some View {
-        HStack(spacing: 9) {
+    var body: some View {
+        HStack(spacing: 12) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(Theme.faint)
-            TextField("Company, role, or keyword", text: $query)
-                .focused($searchFocused)
-                .font(.subheadline)
-                .foregroundStyle(Theme.ink)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Palette.ink400)
+            TextField("Search company or role…", text: $query)
+                .font(Font2.body)
+                .foregroundStyle(Palette.ink)
+                .focused($focused)
+                .submitLabel(.search)
                 .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
             if !query.isEmpty {
                 Button {
                     query = ""
-                    searchFocused = false
+                    focused = false
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(Theme.faint)
+                        .font(.system(size: 15))
+                        .foregroundStyle(Palette.ink300)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
             }
         }
-        .padding(.horizontal, 15)
+        .padding(.horizontal, 16)
         .padding(.vertical, 13)
-        .background(Theme.card, in: .capsule)
-        .overlay(Capsule().strokeBorder(Theme.chipLine))
+        .background(Palette.card, in: .rect(cornerRadius: Radius.row, style: .continuous))
+        .cardShadow()
     }
 }
 
-// Section header + shared rows, identical language to the dashboard sections.
-private struct RoleSection: View {
-    let icon: String
-    let title: String
-    let items: [Internship]
+/// The web hangs forever on a failed load; this says what happened and offers the
+/// one action that helps.
+struct FailureNote: View {
+    var message: String
+    var retry: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 10) {
-                Image(systemName: icon)
-                    .font(.title3.weight(.regular))
-                    .foregroundStyle(Theme.muted)
-                Text(title)
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(Theme.ink)
-                Spacer()
-                Text("\(items.count)")
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(Theme.faint)
-            }
-            .padding(.top, 12)
-            .padding(.bottom, 4)
-
-            ForEach(items) { item in
-                NavigationLink(value: item) {
-                    InternshipRow(item: item)
-                }
+        VStack(spacing: 12) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 22))
+                .foregroundStyle(Palette.ink400)
+            Text("Couldn't reach the portal")
+                .font(Font2.rowTitle)
+                .foregroundStyle(Palette.ink)
+            Text(message)
+                .font(Font2.caption)
+                .foregroundStyle(Palette.ink500)
+                .multilineTextAlignment(.center)
+            Button("Try again", action: retry)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .background(Palette.ink, in: .capsule)
                 .buttonStyle(.plain)
-            }
+                .padding(.top, 4)
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
     }
 }
 
-#Preview {
-    MainTabView().environment(SessionStore())
+// MARK: - Previews
+
+#Preview("Radar — ranked list") {
+    @Previewable @State var route: Route?
+    AmbientCanvas { RadarView(route: $route) }
+        .environment(CatalogStore.preview)
+}
+
+#Preview("Radar — loading") {
+    @Previewable @State var route: Route?
+    AmbientCanvas { RadarView(route: $route) }
+        .environment(CatalogStore.previewLoading)
+}
+
+#Preview("Radar — offline") {
+    @Previewable @State var route: Route?
+    AmbientCanvas { RadarView(route: $route) }
+        .environment(CatalogStore.previewFailed)
 }

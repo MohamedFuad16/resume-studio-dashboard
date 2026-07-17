@@ -1,58 +1,115 @@
-// Internship Portal — native iOS client for the same product as editor/ (web).
+// Internship Portal — the iOS client for portal.mohamedfuad.com.
 //
-// Design: iOS 27 Liquid Glass throughout — system TabView, glass toolbars and
-// controls — with the product's own identity mapped on top (see Theme.swift and
-// agent/decisions.md ADR-0028..0031 for the web design language this mirrors):
-// ink #101113, one accent blue #1A56F0 that means "primary action" only, warm
-// paper on the auth screen, serif display for the welcome headline.
-//
-// Auth note: the web app signs in through Firebase (email/password + Google).
-// The Firebase SDK is deliberately NOT wired yet — LoginView is the real design
-// with a stubbed submit, and "Browse without an account" uses the public catalog
-// API, which needs no auth. See SessionStore.
+// The app is deliberately light: the web owns the résumé editor and the LaTeX
+// compile; the phone owns the things you do away from a desk — checking new
+// roles, moving an application forward, and knowing what is next on the calendar.
+import FirebaseCore
+import GoogleSignIn
 import SwiftUI
 
 @main
 struct InternshipPortalApp: App {
-    @State private var session = SessionStore()
+    /// Owned here, injected above RootView. Presented sheets only inherit the
+    /// environment of the view the `.sheet` modifier hangs off — injecting inside
+    /// RootView leaves every sheet without a store.
+    @State private var store = CatalogStore()
+    @State private var auth: AuthService
+
+    init() {
+        // Must run before any Auth/Firestore call. Reads GoogleService-Info.plist.
+        FirebaseApp.configure()
+        _auth = State(initialValue: AuthService())
+    }
+
+    @State private var showSplash = true
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .environment(session)
-                .tint(Theme.accent)
+            ZStack {
+                AuthGate()
+
+                // The intro splash sits over the gate and fades; it also covers the
+                // beat where Firebase restores the session, so a returning user
+                // goes canvas → bubbles → Home without ever seeing a spinner.
+                if showSplash {
+                    SplashView {
+                        withAnimation(.easeOut(duration: 0.45)) { showSplash = false }
+                    }
+                    .zIndex(1)
+                    .transition(.opacity)
+                }
+            }
+            .environment(store)
+            .environment(auth)
+            // The design is a single, deliberate light world (the reference's
+            // #F4F7F6 paper). A naive dark inversion would fight every token,
+            // so the app commits rather than half-supporting both.
+            .preferredColorScheme(.light)
+            .onOpenURL { url in
+                // Google Sign-In's callback into com.googleusercontent.apps.*
+                GIDSignIn.sharedInstance.handle(url)
+            }
         }
     }
 }
 
-struct RootView: View {
-    @Environment(SessionStore.self) private var session
+/// Chooses between the wall and the app, and keeps the store's user in step.
+///
+/// Every tracker read is scoped to `users/{uid}`, so the uid is not a display
+/// detail — it decides which data exists at all. Pushing it into the store from one
+/// place keeps that from drifting.
+struct AuthGate: View {
+    @Environment(AuthService.self) private var auth
+    @Environment(CatalogStore.self) private var store
+
+    /// `simctl launch … -previewMode YES` skips the wall and runs against the KV
+    /// path, for screenshots and UI checks without typing an account password.
+    /// DEBUG-only by construction — the flag does not exist in a release build, so
+    /// it can never become a way past the login screen in the wild. Mirrors the
+    /// web's `VITE_AUTH_DISABLED`, which exists for the same reason (E2E).
+    private var previewMode: Bool {
+        #if DEBUG
+        UserDefaults.standard.bool(forKey: "previewMode")
+        #else
+        false
+        #endif
+    }
 
     var body: some View {
-        if session.isBrowsing {
-            MainTabView()
-        } else {
-            LoginView()
+        Group {
+            if previewMode {
+                RootView().task { await store.setUser(nil) }
+            } else {
+                gated
+            }
         }
     }
-}
 
-// Session state. `isBrowsing` is what gates the shell; real Firebase auth will
-// replace `signInStubbed` and keep the same surface, so views don't churn.
-@Observable
-final class SessionStore {
-    // "--browse" jumps straight past the auth gate — used by headless
-    // simulator runs and UI snapshots, never set in a normal launch.
-    var isBrowsing = ProcessInfo.processInfo.arguments.contains("--browse")
-    var displayName = ""
-
-    func browseWithoutAccount() {
-        displayName = ""
-        isBrowsing = true
-    }
-
-    func signOut() {
-        displayName = ""
-        isBrowsing = false
+    @ViewBuilder private var gated: some View {
+        Group {
+            switch auth.phase {
+            case .starting:
+                // Firebase restores the session asynchronously. Showing the login
+                // form here would flash it at users who are already signed in.
+                AmbientCanvas {
+                    ProgressView().tint(Palette.ink400)
+                }
+            case .signedOut:
+                LoginView()
+                    .transition(.opacity)
+            case .signedIn(let uid, _, _):
+                RootView()
+                    .transition(.opacity)
+                    .task(id: uid) { await store.setUser(uid) }
+            }
+        }
+        .animation(.easeOut(duration: 0.25), value: auth.phase)
+        .onChange(of: auth.phase) { _, phase in
+            // Signing out must drop the previous account's records immediately,
+            // not leave them on screen behind the login form.
+            if case .signedOut = phase {
+                Task { await store.setUser(nil) }
+            }
+        }
     }
 }

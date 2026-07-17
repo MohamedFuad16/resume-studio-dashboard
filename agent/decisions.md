@@ -818,3 +818,211 @@ company column to ~80px and leaving an empty cell where the hidden status select
 **Verified.** Build green, E2E 5/5, one tracker GET and zero compiles on a dashboard
 load, single compile on first Editor entry, JA + mobile verified in-browser at
 375/1366px.
+
+## ADR-0038 · 2026-07-17 · iOS app rebuilt on the AI-Studio reference theme; SwiftUI + Metal + Liquid Glass
+**Context.** ADR-0036's planner-pastel iOS scaffold was scrapped at the user's
+request. The new source of truth is a React reference app (`zip.zip`, AI Studio
+export) that already renders this product's screens — Inter on a `#F4F7F6` ground,
+white cards (r20–28) with `shadow-[0_2px_10px_rgb(0,0,0,0.02)]`, 36px pastel icon
+tiles, teal-600 as the match accent, slate-900 primaries, and a hand-built floating
+pill nav. Requirements: match that styling exactly, use Metal shaders, Liquid Glass
+is mandatory, target the iOS 27 beta.
+**Decision.**
+- **Deleted** `ios/InternshipPortal/**` (ADR-0036 app) and the HTML design mockups.
+  `project.yml` survives; the `.xcodeproj` stays generated (xcodegen) + gitignored.
+- **Tokens** (`Theme.swift`) are transcribed 1:1 from the reference's Tailwind
+  classes as literal hex, so nothing depends on a Tailwind build. **Typeface: SF Pro,
+  not Inter** — same grotesque skeleton at these sizes; bundling a webfont buys
+  licence surface and launch cost, not fidelity.
+- **IA — 4 tabs** (Home · Radar · Applications · Calendar) per the user's spoken
+  spec, which differs from the reference's Home/Radar/Calendar/Profile. Profile +
+  Settings is a sheet off Home's Profile card. The résumé editor stays on the web.
+- **Liquid Glass**: the nav is `GlassEffectContainer` + `.glassEffect(.regular
+  .interactive(), in: .capsule)`; content scrolls under it (verified refracting).
+- **Metal** (`Shaders.metal`): `auroraCanvas` (drifting teal/blue value-noise +
+  grain over the ground), `radarSweep` (rings + rotating wedge behind the Radar stat
+  strip), `shimmer` (loading skeletons), `pressWarp` (distortion under the finger).
+  All are additive over an already-correct layout — a dead shader costs polish, never
+  meaning.
+- **Data**: unchanged contract — Azure `portal-compile-jp`, `GET /api/internships`,
+  `GET|POST /api/tracker?profile=mohamed_fuad`, optimistic writes with rollback.
+**Four Metal/SwiftUI constraints found by building it — all silent failures:**
+1. **float32 time.** Passing `timeIntervalSinceReferenceDate` (~8×10⁸, ulp ≈ 64) to a
+   shader collapses every `fract()`/hash to a constant → the effect renders flat and
+   looks "too subtle" rather than broken. `ShaderClock` now passes seconds-since-launch.
+2. **Chained effects.** `.colorEffect(a).colorEffect(b)` runs only the outermost;
+   aurora + grain had to merge into one pass.
+3. **Raster shaders skip UIKit-backed views.** Wrapping content containing a
+   ScrollView in `.colorEffect` blanks the screen — shaders stay on the background layer.
+4. **`colorEffect` over `Color.clear` never runs** (no rasterisation of a fully
+   transparent layer). Generated content must use the shader as a ShapeStyle
+   (`Rectangle().fill(ShaderLibrary.…)`), which takes no `currentColor`.
+Also: `.environment()` must sit **above** the `.sheet` modifier or presented sheets
+crash with "No Observable object of type CatalogStore found" — the store is now
+injected at the App level.
+**Verified.** Builds clean against iOS 27.0 SDK (Xcode 27.0, Swift 6); runs on an
+iPhone 17 Pro sim against live prod data (173 roles, HENNGE 99%); all four tabs +
+the detail sheet screenshotted; aurora confirmed by pixel sampling (11/255 shift at
+the top, flat at the bottom). Tracker is empty because the KV path holds no records
+for `mohamed_fuad` — signed-in web data lives in Firestore (see ADR-0036 scope note).
+
+## ADR-0039 · 2026-07-17 · iOS signs in with Firebase and reads the real Firestore tracker; SwiftUI previews
+**Context.** The iOS app read the server KV path (`?profile=mohamed_fuad`), which is
+empty — signed-in web data lives in Firestore under `users/{uid}/…` (ADR-0015). So the
+phone showed 0 applications while the web showed 24. The Swift files also had no
+`#Preview`s, so the Xcode canvas was unusable for design review.
+**Decision.**
+- **Registered an iOS Firebase app** (`firebase apps:create ios`) → app id
+  `1:501333131661:ios:e3d159530820c85377fdc4`. The web app id CANNOT be reused: the iOS
+  SDK validates the `:ios:` platform segment of GOOGLE_APP_ID. `GoogleService-Info.plist`
+  is committed (public config — see secrets.md).
+- **SPM via project.yml**: firebase-ios-sdk (FirebaseAuth + FirebaseFirestore ONLY — no
+  Analytics/Messaging/Crashlytics; each extra product is launch time for a feature we
+  don't have) and GoogleSignIn-iOS.
+- **AuthService** — email/password + Google, matching the web's two providers. Firebase's
+  error codes are translated to sentences a person can act on.
+- **FirestoreData** mirrors firestoreData.js exactly: reads
+  `users/{uid}/trackers/{profileId}.data`, resolves the profile id from the real
+  `profiles` collection (owner seed `mohamed_fuad` → `primary` → first) rather than
+  assuming. Records decode one-by-one so a single malformed row can't blank the tracker.
+- **CatalogStore routes by session**: signed in → Firestore (the same documents the web
+  writes); signed out → KV path (kept so E2E/screenshots run without an account).
+  `setUser` clears the previous account's records before loading — never show account A's
+  data to account B, even for a frame. The catalog stays server-global either way.
+- **Previews**: `PreviewData.swift` (`#if DEBUG`) builds stores with real production-shaped
+  rows and NO network, plus loading/empty/failed variants; every view file has `#Preview`s
+  and Kit.swift has a full component gallery.
+**Three traps, all silent:**
+1. **Keychain -34018 → infinite launch spinner.** `CODE_SIGNING_ALLOWED=NO` strips all
+   entitlements; Firebase Auth persists the session in the keychain, so its state listener
+   never fired its first callback and the app hung on the spinner with no way out. Fixed with
+   ad-hoc signing + an explicit entitlements file (`application-identifier` +
+   `keychain-access-groups`). AuthService also has a 5s failsafe that falls back to the
+   login form — an unreachable app is worse than an unnecessary sign-in.
+2. **`Field` name collision** — the `@FocusState` enum shadowed the field view; renamed AuthField.
+3. **Swift 6 `deinit` is nonisolated** and cannot touch @MainActor state; the listener handle
+   is `nonisolated(unsafe)` (written once in init, read once in deinit).
+**Cost.** Firebase adds real launch time: ~30s cold first launch (dyld over ~200MB of
+frameworks) and ~5.7s warm to first paint, in a DEBUG simulator build. Worth watching on a
+release device build before shipping.
+**Verified.** Builds clean (iOS 27 SDK, Swift 6); login screen renders; config plist and the
+Google callback URL scheme are both in the bundle; previews compile. **End-to-end sign-in is
+unverified** — entering the account password is the user's to do, not mine.
+
+## ADR-0040 · 2026-07-17 · Shaders earn their place: SDF bubble field in, radar sweep + press-warp out
+**Context.** User review of ADR-0038's shader work: the radar sweep read as "a weird
+radar in the background", the press-warp distortion fought every tap, and the nav's
+selection was a solid capsule rather than glass. Separately: build the Companies view
+the way Wabi's splash is built (SwiftUI + Metal, warping loupe over signed distance
+fields), and show companies as bubbles sized by how big they are.
+**Decision.**
+- **Removed `radarSweep` and `pressWarp`.** Both were decoration that cost
+  comprehension: the sweep put moving rings behind a stat strip that has nothing to do
+  with a radar sweep, and warping the card under your finger reads as the UI
+  malfunctioning rather than as feedback. Press feedback is now only the reference's
+  own `active:scale-[0.98]`. Kept: `auroraCanvas` (the ground) and `shimmer` (loading),
+  which both do a job.
+- **Nav is real Liquid Glass in both layers** — the bar, and a second glass capsule
+  marking the selection that shares one `glassEffectID` inside the
+  `GlassEffectContainer`, so the material flows between tabs instead of cross-fading.
+- **`bubbleField`: ONE SDF over the canvas, not N circle views.** Every bubble is
+  evaluated into a single field and combined with a polynomial smooth-minimum, so
+  neighbours grow a meniscus and merge. This is unreachable with per-view shaders,
+  which can only overlap — the merge IS the effect. Normals come from the field's
+  gradient (4 taps), the field is lifted into a dome, and the view ray is bent through
+  it with real refraction (Snell via Metal's `refract`), plus rim-only chromatic
+  aberration, Fresnel and one specular hotspot. Cost is bounded by canvas size, not
+  company count. `glassOrb` is the single-bubble variant for the entry button.
+- **Companies view = three tier clusters, top 8 each.** All 103 fit on screen and it
+  was mush: 70 companies list exactly one role, so as identical minimum-size dots they
+  carried no information. Clustering by tier gives the shader's merge meaning — a
+  bubble fuses with its own tier. Hidden counts are always labelled ("+44 more");
+  a silently truncated field would lie about the data.
+- **`Internship.tier`** reads BOTH `prestigeTier` shapes, because history left two: a
+  bare "1"/"2"/"3" on the global seed rows and sentences like "Japan AI startup /
+  verified ATS" elsewhere. Verified against live data: "1" is NVIDIA/Nokia/Cloudflare/
+  Blue Origin, "2" is Hitachi/Formlabs/Geotab, "3" is smaller firms. Picking one shape
+  would drop half the catalog into an unknown bucket.
+- **Bubble radius ∝ √(role count)** so four roles reads as four times the *area* of
+  one — area is what the eye compares. Role count is the only "how big" signal the
+  catalog actually has; headcount is not in the data, and deriving it from prestige
+  tiers would be a guess dressed as a fact. Packing is a deterministic golden-angle
+  spiral that shrinks-and-retries until every bubble fits (an early version dumped
+  unplaceable bubbles at the centre, stacking them invisibly).
+- **`-previewMode YES`** launch arg skips the auth wall for screenshots. `#if DEBUG`
+  only, so it cannot exist in a release build. Mirrors the web's `VITE_AUTH_DISABLED`.
+**Verified.** Builds clean (iOS 27 SDK); the field renders 3 clusters against live prod
+data with real logos refracting inside the glass; nav glass verified in-simulator.
+
+## ADR-0041 · 2026-07-17 · Two glass bugs: glass-on-glass greys out, and a fixed dome shoulder makes a "border"
+**Context.** User review: the nav "is grayed out, not proper liquid glass — it has to
+be so liquid", and the Companies bubbles "have a weird border on the edges" instead of
+reading as a 3D globe like Wabi's.
+**Bug 1 — glass cannot sample other glass.** The nav had `.glassEffect` on the bar AND
+a second `.glassEffect` capsule for the selection nested inside it. Apple's rule (and
+the community reference) is explicit: *glass cannot sample other glass; the container
+provides the shared sampling region*. Nested glass has nothing to refract but its
+parent, so it resolves to flat grey — precisely the reported symptom. **Fix:** exactly
+one glass layer (the bar, `.regular.interactive()`), with the selection a plain capsule
+riding `matchedGeometryEffect` + `.bouncy`, so it flows between tabs. The liquidity is
+the material's own (press-scale, shimmer, touch-point illumination) plus content
+lensing underneath — not a second sheet of glass.
+Related tuning rules from the same source, worth keeping: tint is for *semantic*
+meaning only and must stay subtle (heavy tint kills the lensing); `.clear` is the
+variant for high-transparency contexts over colourful media, `.regular` over quiet
+ground. Note glass over this app's near-white canvas will always read light — it can
+only lens what is behind it.
+**Bug 2 — the "border" was two mistakes, neither of them the geometry.**
+1. The rim was being *painted*: the shader forced `color.a` up at the edge and mixed
+   the rim toward white, tracing a bright ring around every bubble. Removed entirely.
+   Solid glass just shows its contents compressed; the edge is *darker* because you
+   look through more glass.
+2. The dome used a fixed 26pt shoulder (`sqrt(-d / 26)`), so every bubble was a FLAT
+   disc with a constant-width refracting ring at its edge — a border by construction,
+   and worse the bigger the bubble. **Fix:** the SDF now carries the local radius
+   alongside the distance (blended through the smooth-min by the same weight), so the
+   dome is a true hemisphere: `height = sqrt(-d(2R + d)) / R`, with the lateral term
+   `(R + d)/R`. That is the exact sphere normal, it scales per bubble, and the
+   refraction is now continuous from centre to rim.
+**Verified.** Builds clean (iOS 27 SDK). Visual sign-off left to the user by request.
+
+## ADR-0042 · 2026-07-17 · Native TabView; bubble shading rebuilt to the Wabi model; splash + icon
+**Context.** User review round 2: the nav "still weird — remove any double ring,
+redo it from what you find online"; the orbs "don't look like Wabi's" (their
+reference: bright luminous spheres, contents legible); and the app needed splash
+screens.
+**Nav — stop imitating the system bar; use it.** Third iteration. Glass-in-glass
+went grey (ADR-0041); a plain white indicator inside the glass pill read as two
+rings fighting. The conclusion is that the fluid part of Liquid Glass — the droplet
+that slides/stretches between items, lensing while it moves, minimize-on-scroll —
+lives in the SYSTEM TabView and is not reachable from public API. Custom bars can
+only ever be a worse copy, so the app now uses native `TabView` +
+`.tabBarMinimizeBehavior(.onScrollDown)` + `.tint(ink)`. Our `Tab` enum is renamed
+`AppTab` because the iOS 18 TabView syntax has its own `SwiftUI.Tab` type, and
+shadowing it breaks every `Tab("…")` line. TabScroll's 132pt bottom inset dropped
+to 28 (the system bar contributes to the safe area).
+**Bubbles — a bubble, not a marble.** Research (lensball photography, soap-film
+shaders) + the Wabi hero image agree on the recipe, and it is the OPPOSITE of solid
+glass on two axes: (1) the rim is BRIGHT — light wraps the silhouette in two lobes
+(key + opposite caustic); darkness at the rim is what read as a border; (2) the
+contents get MILD centre magnification (`offset = -outward · r · mag · (1-height)`,
+mag 0.34) so the picture stays legible, laminated inside — hard Snell bending
+crushed it into the rim. Plus: whisper of thin-film iridescence riding the rim (two
+hue cycles per revolution), one broad sheen + one tight hotspot, 6% white haze,
+rim-glow feeding alpha so meniscus bridges glow like one skin of glass. Both
+shaders share one `shadeBubble()` so the field and single orbs cannot drift apart.
+Contents richer too: logo 42%→56% of diameter, painted white pole removed (it
+doubled the shader's highlight and looked plastic).
+**Splash + launch.** `SplashView`: a merged cluster of app-glyph bubbles (same
+`bubbleField` shader — the splash is made of the app's own material) over the
+wordmark; fades after ~1.8s (0.6s + no motion under Reduce Motion; `-holdSplash
+YES` DEBUG hook for screenshots). It also covers Firebase's session-restore beat,
+so returning users never see a spinner. Static `UILaunchScreen` uses a new
+`LaunchBackground` color asset (#F4F7F6) → cold start is canvas → bubbles → app
+with no white flash. App icon: a CoreGraphics-rendered glass orb (1024pt; NOTE:
+`NSImage.lockFocus` renders at 2x on Retina — actool rejects a 2048px file that
+claims 1024, "did not have any applicable content"; `sips -z 1024 1024` fixes it).
+**Verified.** Build clean; simulator screenshots of all three: native glass bar
+(content lensing under it), bubble clusters with bright rims and merged glow, and
+the splash. On-device feel (droplet slide between tabs, minimize-on-scroll) left to
+the user.

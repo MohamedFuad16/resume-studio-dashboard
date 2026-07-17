@@ -25,6 +25,64 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-17 (night) — Native TabView, Wabi bubble shading, splash + icon
+  (ADR-0042).** Nav round 3: hand-rolled glass bars can only be worse copies — the
+  fluid droplet/minimize behaviour lives in the system bar — so the app now uses
+  native `TabView` + `.tabBarMinimizeBehavior(.onScrollDown)`; `Tab` enum renamed
+  `AppTab` (shadows `SwiftUI.Tab`). Bubble shaders rebuilt to the bubble model:
+  BRIGHT two-lobe rim (dark rim = the old "border"), mild centre magnification
+  (mag 0.34) instead of hard Snell, rim iridescence, sheen+hotspot, shared
+  `shadeBubble()` across field/orb; logo 56% of diameter, painted white pole
+  removed. NEW SplashView (merged app-glyph bubble cluster + wordmark, ~1.8s,
+  Reduce Motion aware, `-holdSplash` hook), `LaunchBackground` color asset (no
+  white flash), CoreGraphics-rendered glass-orb app icon (gotcha: lockFocus renders
+  2x — actool rejects 2048px-claiming-1024; sips it down). All three
+  screenshot-verified on the sim.
+- **2026-07-17 (later still) — iOS shader pass + Companies bubble field (ADR-0040).**
+  Removed `radarSweep` (read as a weird radar behind the stat strip) and `pressWarp`
+  (warping the card under your finger fought the tap); press feedback is scale-only.
+  Nav is now real Liquid Glass in both layers with a `glassEffectID` selection that
+  flows between tabs. NEW `bubbleField` shader: ONE signed-distance field over the
+  canvas with polynomial smooth-min so bubbles genuinely merge (per-view shaders can
+  only overlap — the merge is the effect), + gradient normals, Snell refraction,
+  rim chromatic aberration, Fresnel, specular. NEW **Companies** view off Applications:
+  three tier clusters (Flagships / Scale-ups / Startups), top 8 each with "+N more"
+  labels, radius ∝ √(role count), deterministic golden-angle spiral packing.
+  `Internship.tier` reads both `prestigeTier` shapes (bare "1"/"2"/"3" from the global
+  seed AND descriptive sentences). `-previewMode YES` (DEBUG-only) skips the auth wall
+  for screenshots. Kept `auroraCanvas` + `shimmer`. Builds clean; verified against live
+  prod (103 companies, real logos refracting inside the glass).
+- **2026-07-17 (later) — iOS: Firebase auth + real Firestore data + SwiftUI previews
+  (ADR-0039).** Registered an iOS Firebase app (`1:501333131661:ios:e3d159530820c85377fdc4`;
+  the web app id can't be reused — the SDK validates the `:ios:` segment).
+  `GoogleService-Info.plist` committed (public config). Added FirebaseAuth + Firestore +
+  GoogleSignIn via SPM in `project.yml`; `Auth.swift` (email/password + Google),
+  `FirestoreData.swift` (reads `users/{uid}/trackers/{profileId}.data`, resolving the
+  profile id from the real `profiles` collection), `LoginView.swift`, and an `AuthGate`.
+  CatalogStore now routes by session: signed in → Firestore (same docs the web writes),
+  signed out → KV path. Every view file has `#Preview`s; `PreviewData.swift` supplies
+  network-free fixtures (loaded/empty/loading/failed) + a Kit component gallery.
+  **Traps:** keychain -34018 from `CODE_SIGNING_ALLOWED=NO` hung the app on its launch
+  spinner forever (fixed: ad-hoc signing + entitlements file + a 5s failsafe); Swift 6
+  deinit can't touch @MainActor state. **Launch cost:** ~30s cold / ~5.7s warm to first
+  paint in a debug sim build — check a release device build before shipping.
+  **STILL UNVERIFIED: end-to-end sign-in** — needs the user to enter their own password.
+- **2026-07-17 — iOS app REBUILT from the AI-Studio React reference (ADR-0038).**
+  The ADR-0036 planner-pastel app was deleted at the user's request; the new theme
+  source of truth is `~/Downloads/zip.zip` (React/Tailwind reference rendering these
+  screens) — Inter→SF Pro, `#F4F7F6` ground, white cards r20–28, teal-600 match
+  accent, floating pill nav. New SwiftUI app in `ios/InternshipPortal/`: 4 tabs
+  (Home · Radar · Applications · Calendar; Profile+Settings is a sheet off Home),
+  detail/record/add-event/interview-date sheets, real **Liquid Glass** nav
+  (`GlassEffectContainer` + `.glassEffect(.regular.interactive())`), and 4 **Metal**
+  shaders (aurora canvas+grain, radar sweep, shimmer skeletons, press warp). Same
+  Azure API contract as before. Builds on the iOS 27.0 SDK (Xcode 27, Swift 6);
+  verified on an iPhone 17 Pro sim against live prod (173 roles, HENNGE 99%), all
+  tabs + detail sheet screenshotted. **Four silent Metal/SwiftUI traps documented in
+  ADR-0038** (float32 shader clock, chained colorEffects, raster shaders vs
+  UIKit-backed views, colorEffect over Color.clear) plus the `.environment()`-above-
+  `.sheet()` crash. NOT yet committed to `main`; iOS tracker reads the KV path, which
+  is empty (signed-in web data is in Firestore).
 - **2026-07-16 (eve) — Performance + UI bug pass (ADR-0037, BUG-016/017/018).** Pulled
   origin/main into `ios-local` (merge commit; only `agent/state.md` conflicted). Fixes:
   LaTeX compile now lazy (only in the Editor view — a dashboard load no longer POSTs

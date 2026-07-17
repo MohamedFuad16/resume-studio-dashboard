@@ -1,77 +1,121 @@
-// The iOS app's design language — the task-planner reference: white cards on a
-// near-white canvas, near-black ink, pastel circular icon tiles, thin outlined
-// chips, and ONE saturated green accent (the "Start" green) used sparingly for
-// actions and positives. This deliberately diverges from the web's
-// blue-on-neutral tokens; the login screen alone keeps its warm paper + black.
+// Design tokens — ported 1:1 from the reference React app (src/App.tsx).
+//
+// Every value here has a counterpart in that file; when the web theme moves, this
+// is the only file that should need editing. Tailwind's slate/teal/etc. ramps are
+// spelled out as literal hex so nothing depends on a Tailwind build.
+//
+// TYPEFACE NOTE: the reference loads Inter. iOS ships SF Pro, which shares Inter's
+// grotesque skeleton and metrics closely enough that bundling a webfont buys
+// nothing but licence surface and a slower launch. Sizes/weights/tracking below
+// mirror the reference exactly.
 import SwiftUI
 
-enum Theme {
-    // ── Canvas & surfaces ────────────────────────────────────────────────
-    /// App background — the near-white canvas behind everything.
-    static let canvas = Color(red: 0.961, green: 0.965, blue: 0.969)   // #F5F6F7
-    /// Cards are plain white; depth comes from air and soft shadows, not borders.
+enum Palette {
+    // Ground & surface
+    static let canvas = Color(hex: 0xF4F7F6)   // phone background
     static let card = Color.white
-    /// Hairline used on outlined chips.
-    static let chipLine = Color(red: 0.902, green: 0.910, blue: 0.918) // #E6E8EA
-    /// Fill of the small value chips ("50 min") — a touch deeper than the canvas.
-    static let chipFill = Color(red: 0.937, green: 0.945, blue: 0.953) // #EFF1F3
+    static let hairline = Color(hex: 0xF1F5F9) // slate-100
+    static let tile = Color(hex: 0xF8FAFC)     // slate-50
 
-    // ── Ink ──────────────────────────────────────────────────────────────
-    /// Primary text — near-black neutral ink.
-    static let ink = Color(red: 0.086, green: 0.098, blue: 0.110)      // #16191C
-    /// Secondary text.
-    static let muted = Color(red: 0.529, green: 0.553, blue: 0.576)    // #878D93
-    /// Tertiary text.
-    static let faint = Color(red: 0.718, green: 0.737, blue: 0.757)    // #B7BCC1
+    // Ink (Tailwind slate ramp)
+    static let ink = Color(hex: 0x0F172A)      // slate-900
+    static let ink600 = Color(hex: 0x475569)   // slate-600
+    static let ink500 = Color(hex: 0x64748B)   // slate-500
+    static let ink400 = Color(hex: 0x94A3B8)   // slate-400
+    static let ink300 = Color(hex: 0xCBD5E1)   // slate-300
 
-    // ── Accents ──────────────────────────────────────────────────────────
-    /// THE accent — the saturated green of the reference's Start button.
-    /// Primary actions and the match score only.
-    static let accent = Color(red: 0.184, green: 0.710, blue: 0.420)   // #2FB56B
-    /// Warm orange — streaks, urgency, deadlines (the reference's second voice).
-    static let ember = Color(red: 0.910, green: 0.522, blue: 0.239)    // #E8853D
-    /// Kept for the match percent (reads as the accent green).
-    static let match = accent
-    /// Deadline badges lean on ember now, not red.
-    static let deadline = ember
-    /// Login keeps the web's warm paper — it is its own little world.
-    static let paper = Color(red: 0xF1 / 255, green: 0xF0 / 255, blue: 0xEE / 255)
+    // Accent — teal carries "match", the one number the app is really about.
+    static let teal = Color(hex: 0x0D9488)     // teal-600
+    static let teal50 = Color(hex: 0xF0FDFA)
+    static let teal400 = Color(hex: 0x2DD4BF)
 
-    // ── Pastel tiles (icon backgrounds) with their glyph colors ──────────
-    // The reference's exact families: periwinkle-indigo and violet carry most
-    // rows, peach is the warm voice, sky the cool one. GREEN IS NOT A TILE —
-    // in the reference it appears only as the accent (focus icon, Start,
-    // presence dot), so tileGreen exists but stays out of the rotation.
-    struct Tile { let fill: Color; let glyph: Color }
-    static let tileIndigo = Tile(fill: Color(red: 0.906, green: 0.922, blue: 0.988),   // #E7EBFC
-                                 glyph: Color(red: 0.345, green: 0.396, blue: 0.910))  // #5865E8
-    static let tileViolet = Tile(fill: Color(red: 0.929, green: 0.906, blue: 0.984),   // #EDE7FB
-                                 glyph: Color(red: 0.545, green: 0.361, blue: 0.965))  // #8B5CF6
-    static let tilePeach = Tile(fill: Color(red: 0.992, green: 0.922, blue: 0.855),    // #FDEBDA
-                                glyph: Color(red: 0.910, green: 0.522, blue: 0.239))   // #E8853D
-    static let tileSky = Tile(fill: Color(red: 0.882, green: 0.929, blue: 0.984),      // #E1EDFB
-                              glyph: Color(red: 0.290, green: 0.525, blue: 0.933))     // #4A86EE
-    static let tileGreen = Tile(fill: Color(red: 0.871, green: 0.937, blue: 0.898),
-                                glyph: Color(red: 0.298, green: 0.686, blue: 0.510))
-    static let tileLavender = tileViolet
-    static let tiles: [Tile] = [tileIndigo, tileViolet, tilePeach, tileSky]
-
-    /// Stable pastel pick for a company name — the reference varies its row
-    /// icons across the pastel set; hashing keeps a company's color steady.
-    static func tile(for name: String) -> Tile {
-        tiles[abs(name.hashValue) % tiles.count]
-    }
-
-    // ── Shape ────────────────────────────────────────────────────────────
-    /// Cards — the reference's big soft corners.
-    static let cardRadius: CGFloat = 22
-    /// Small tiles and inner elements.
-    static let tileRadius: CGFloat = 14
+    // Feature tints (icon tiles + status chips)
+    static let purple = Color(hex: 0x9333EA)
+    static let purple50 = Color(hex: 0xFAF5FF)
+    static let orange = Color(hex: 0xF97316)
+    static let orange50 = Color(hex: 0xFFF7ED)
+    static let orange400 = Color(hex: 0xFB923C) // streak flame
+    static let orange600 = Color(hex: 0xEA580C)
+    static let blue = Color(hex: 0x3B82F6)
+    static let blue50 = Color(hex: 0xEFF6FF)
+    static let blue600 = Color(hex: 0x2563EB)
+    static let indigo = Color(hex: 0x6366F1)
+    static let red = Color(hex: 0xEF4444)       // today marker
 }
 
-// One soft shadow, used everywhere a card floats.
+/// Corner radii, straight from the reference's rounded-[Npx] classes.
+enum Radius {
+    static let card: CGFloat = 24
+    static let row: CGFloat = 20
+    static let hero: CGFloat = 28
+    static let sheet: CGFloat = 32
+    static let nav: CGFloat = 32
+    static let tile: CGFloat = 12
+    static let logo: CGFloat = 14
+    static let avatar: CGFloat = 20
+}
+
+/// The reference uses exactly two shadows. Reproducing both keeps cards feeling
+/// like paper and the nav feeling like it floats above it.
 extension View {
+    /// shadow-[0_2px_10px_rgb(0,0,0,0.02)]
     func cardShadow() -> some View {
-        shadow(color: Theme.ink.opacity(0.05), radius: 14, y: 6)
+        shadow(color: .black.opacity(0.02), radius: 5, x: 0, y: 2)
+    }
+
+    /// shadow-[0_8px_30px_rgb(0,0,0,0.12)]
+    func floatShadow() -> some View {
+        shadow(color: .black.opacity(0.12), radius: 15, x: 0, y: 8)
+    }
+}
+
+/// Type scale — the px sizes the reference sets, as SF Pro.
+enum Font2 {
+    static func title(_ size: CGFloat = 24) -> Font { .system(size: size, weight: .semibold) }
+    static let sectionTitle = Font.system(size: 16, weight: .semibold)
+    static let cardTitle = Font.system(size: 14, weight: .medium)
+    static let rowTitle = Font.system(size: 14, weight: .semibold)
+    static let body = Font.system(size: 14)
+    static let caption = Font.system(size: 12)
+    static let micro = Font.system(size: 11, weight: .medium)
+    static let nano = Font.system(size: 10, weight: .medium)
+    static let statValue = Font.system(size: 18, weight: .bold)
+    static let heroValue = Font.system(size: 24, weight: .bold)
+}
+
+extension Color {
+    init(hex: UInt32) {
+        self.init(
+            .sRGB,
+            red: Double((hex >> 16) & 0xFF) / 255,
+            green: Double((hex >> 8) & 0xFF) / 255,
+            blue: Double(hex & 0xFF) / 255,
+            opacity: 1
+        )
+    }
+}
+
+/// Maps a model-layer tint (Models.swift stays SwiftUI-free) to real colors.
+extension Color6 {
+    var fg: Color {
+        switch self {
+        case .teal: Palette.teal
+        case .purple: Palette.purple
+        case .orange: Palette.orange600
+        case .blue: Palette.blue600
+        case .indigo: Palette.indigo
+        case .gray: Palette.ink500
+        }
+    }
+
+    var bg: Color {
+        switch self {
+        case .teal: Palette.teal50
+        case .purple: Palette.purple50
+        case .orange: Palette.orange50
+        case .blue: Palette.blue50
+        case .indigo: Color(hex: 0xEEF2FF)
+        case .gray: Palette.hairline
+        }
     }
 }
