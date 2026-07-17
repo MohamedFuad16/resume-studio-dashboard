@@ -194,20 +194,37 @@ final class CatalogStore {
         var out: [CalendarEvent] = []
         for record in records {
             let company = record.displayCompany
+            let logos = record.logoCandidates
 
             if let deadline = record.deadlineDate, deadline.count == 10 {
                 out.append(CalendarEvent(
                     id: "\(record.id)-deadline", date: deadline, company: company,
                     title: "Application deadline", time: nil, kind: "deadline",
-                    recordId: record.id
+                    recordId: record.id, logoCandidates: logos
                 ))
-            } else if [.applying, .applied, .interview].contains(record.appStatus),
-                      let stamp = record.updatedAt ?? record.createdAt,
-                      let date = ISO8601DateFormatter.parse(stamp) {
+            }
+
+            // The APPLIED marker sits on the application email's day (createdAt),
+            // never `updatedAt` — updatedAt tracks the latest email, so for a
+            // rejected role it would drop the "applied" dot on the rejection's day.
+            // Both dates come straight from Gmail (see GmailDrain), so the calendar
+            // reflects when you actually applied and when you actually heard back.
+            if let applied = ISO8601DateFormatter.parse(record.createdAt) {
                 out.append(CalendarEvent(
-                    id: "\(record.id)-applied", date: Self.dayKey(date), company: company,
-                    title: "Application logged", time: nil, kind: "applied",
-                    recordId: record.id
+                    id: "\(record.id)-applied", date: Self.dayKey(applied), company: company,
+                    title: "Applied", time: nil, kind: "applied",
+                    recordId: record.id, logoCandidates: logos
+                ))
+            }
+
+            // The REJECTED marker sits on the rejection email's day (updatedAt, the
+            // latest email, once the outcome is a rejection).
+            if record.appStatus == .rejected,
+               let rejected = ISO8601DateFormatter.parse(record.updatedAt) {
+                out.append(CalendarEvent(
+                    id: "\(record.id)-rejected", date: Self.dayKey(rejected), company: company,
+                    title: "Rejected", time: nil, kind: "rejected",
+                    recordId: record.id, logoCandidates: logos
                 ))
             }
 
@@ -217,7 +234,7 @@ final class CatalogStore {
                     id: milestone.id, date: date, company: company,
                     title: milestone.title?.isEmpty == false ? milestone.title! : milestone.kindLabel,
                     time: milestone.time, kind: milestone.kind ?? "other",
-                    recordId: record.id
+                    recordId: record.id, logoCandidates: logos
                 ))
             }
         }

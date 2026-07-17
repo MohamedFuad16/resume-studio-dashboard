@@ -113,12 +113,13 @@ struct OnboardingView: View {
     }
 }
 
-/// One screen: a big glass orb holding the feature's glyph, then the words.
+/// One screen: a floating cluster of real, colourful company bubbles around the
+/// feature's glyph, then the words.
 ///
-/// When the page becomes active its orb rises and settles and the words fade up
-/// after it — the same bottom-to-centre motion as the splash cluster, one orb at a
-/// time — so paging through onboarding feels like the intro continuing rather than
-/// four static cards.
+/// The single pastel orb read as bland; the market the app is about is colourful,
+/// so onboarding shows it — actual brand bubbles (Rakuten red, NVIDIA green,
+/// Cloudflare orange, Mercari blue) drifting around the feature glyph. When the
+/// page becomes active they rise and settle, staggered, and the words follow.
 private struct OnboardingPage: View {
     var symbol: String
     var tint: Color6
@@ -134,12 +135,9 @@ private struct OnboardingPage: View {
         return VStack(spacing: 0) {
             Spacer()
 
-            FeatureOrb(symbol: symbol, tint: tint, diameter: 168)
-                .offset(y: on ? 0 : 60)
-                .scaleEffect(on ? 1 : 0.82)
-                .opacity(on ? 1 : 0)
-                .animation(reduceMotion ? nil : .spring(response: 0.7, dampingFraction: 0.7), value: on)
-                .padding(.bottom, 40)
+            OnboardingCluster(centerSymbol: symbol, centerTint: tint, isActive: on)
+                .frame(height: 260)
+                .padding(.bottom, 36)
 
             Text(title)
                 .font(Font2.title(28))
@@ -150,7 +148,7 @@ private struct OnboardingPage: View {
                 .padding(.bottom, 14)
                 .opacity(on ? 1 : 0)
                 .offset(y: on ? 0 : 12)
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.45).delay(0.18), value: on)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.45).delay(0.3), value: on)
 
             Text(message)
                 .font(.system(size: 15))
@@ -161,12 +159,86 @@ private struct OnboardingPage: View {
                 .padding(.horizontal, 36)
                 .opacity(on ? 1 : 0)
                 .offset(y: on ? 0 : 12)
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.45).delay(0.28), value: on)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.45).delay(0.4), value: on)
 
             Spacer()
             Spacer()
         }
         .padding(.horizontal, 20)
+    }
+}
+
+/// The feature glyph as the central glass orb, with real company bubbles floating
+/// around it. Same material and motion as the splash and Companies clusters.
+private struct OnboardingCluster: View {
+    var centerSymbol: String
+    var centerTint: Color6
+    var isActive: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private struct Sat: Identifiable {
+        let id: Int
+        let company: String
+        let domain: String
+        let tint: Color6
+        let x: CGFloat  // × field width
+        let y: CGFloat  // × field width
+        let r: CGFloat  // × field width
+    }
+
+    // A deliberately colourful spread — red, green, orange, blue, ink.
+    private static let sats: [Sat] = [
+        Sat(id: 1, company: "Rakuten", domain: "rakuten.com", tint: .indigo, x: 0.19, y: 0.30, r: 0.115),
+        Sat(id: 2, company: "NVIDIA", domain: "nvidia.com", tint: .teal, x: 0.83, y: 0.26, r: 0.10),
+        Sat(id: 3, company: "Cloudflare", domain: "cloudflare.com", tint: .orange, x: 0.16, y: 0.72, r: 0.085),
+        Sat(id: 4, company: "Mercari", domain: "mercari.com", tint: .blue, x: 0.84, y: 0.72, r: 0.095),
+        Sat(id: 5, company: "1Password", domain: "1password.com", tint: .indigo, x: 0.5, y: 0.9, r: 0.07),
+    ]
+
+    var body: some View {
+        GeometryReader { proxy in
+            let w = proxy.size.width
+            let centerD = w * 0.34
+
+            TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: reduceMotion || !isActive)) { timeline in
+                let t = ShaderClock.seconds(timeline.date)
+
+                ZStack(alignment: .topLeading) {
+                    // Satellites first (behind), then the feature glyph on top.
+                    ForEach(Self.sats) { sat in
+                        let d = sat.r * w * 2
+                        let bob = reduceMotion ? 0 : sin(t * 0.5 + Double(sat.id) * 0.9) * 3
+                        let delay = reduceMotion ? 0 : Double(sat.id) * 0.07
+
+                        GlassOrb(
+                            bubble: CompanyBubble(
+                                id: sat.domain, name: sat.company,
+                                logoCandidates: logoCandidateURLs(logoUrl: nil, domain: sat.domain, name: sat.company),
+                                roleCount: 1, bestScore: 0, status: nil, tier: .flagship, tint: sat.tint
+                            ),
+                            diameter: d
+                        )
+                        .shadow(color: .black.opacity(0.14), radius: d * 0.1, y: d * 0.07)
+                        .offset(y: bob)
+                        .offset(y: isActive ? 0 : 80)
+                        .scaleEffect(isActive ? 1 : 0.7)
+                        .opacity(isActive ? 1 : 0)
+                        .animation(reduceMotion ? nil : .spring(response: 0.8, dampingFraction: 0.72).delay(delay), value: isActive)
+                        .position(x: sat.x * w, y: sat.y * w)
+                    }
+
+                    FeatureOrb(symbol: centerSymbol, tint: centerTint, diameter: centerD)
+                        .offset(y: reduceMotion ? 0 : sin(t * 0.5) * 2)
+                        .scaleEffect(isActive ? 1 : 0.8)
+                        .opacity(isActive ? 1 : 0)
+                        .animation(reduceMotion ? nil : .spring(response: 0.75, dampingFraction: 0.75), value: isActive)
+                        .position(x: 0.5 * w, y: 0.5 * w)
+                }
+                .frame(width: w, height: w)
+            }
+            .frame(width: w, height: proxy.size.height, alignment: .center)
+        }
     }
 }
 

@@ -9,33 +9,41 @@ import Foundation
 // MARK: - Catalog
 
 /// A logo.dev publishable token. Publishable by design (like a Stripe pk_): it is
-/// meant to ship in a client. Swap in your own free one from https://logo.dev —
-/// registering ties the quota to your account instead of this shared demo key.
-private let logoDevToken = "pk_X-1ZO13GSgeOoUrIuJ6GMQ"
+/// meant to ship in a client. This is the account's own token.
+private let logoDevToken = "pk_cXTPmWEGSKqlW4iufc75ig"
 
 /// Logo sources for a company, best-first.
 ///
-/// logo.dev leads because it is the only source that returns a UNIFORM 256×256 for
-/// every domain — measured against the real list, gstatic gave Geotab a 16px
+/// logo.dev leads because it is the only source that returns a UNIFORM 256–512px
+/// for every company — measured against the real list, gstatic gave Geotab a 16px
 /// favicon (the pixelation) and NVIDIA nothing usable, while logo.dev returned a
-/// clean 256 for both. The rest stay as a fallback chain so a logo still resolves
-/// if logo.dev is ever unreachable: gstatic's faviconV2 (Nokia/Mercari 128–192),
-/// the site's own apple-touch-icon, then DuckDuckGo. LogoLoader keeps the LARGEST
-/// result, so ordering is a preference, not a commitment — a bigger fallback still
-/// wins if logo.dev happens to be small.
+/// clean high-res logo for both. Two logo.dev routes:
+///   • by DOMAIN when we have one (most precise — the exact company), then
+///   • by NAME, which matters because Gmail-ingested companies often arrive with a
+///     name but no domain; logo.dev resolves the brand from the name itself.
+/// The favicon services stay as a fallback so a logo still resolves if logo.dev is
+/// unreachable. LogoLoader keeps the LARGEST result, so order is a preference, not
+/// a commitment — a bigger fallback still wins if logo.dev happens to be small.
+///
+/// fallback=404 on the logo.dev routes is load-bearing: without it, logo.dev
+/// answers a name/domain it has no real logo for with a generated MONOGRAM at
+/// 256px, which would then beat a real favicon (LogoLoader keeps the largest).
+/// With it, logo.dev 404s when it has nothing real and the chain falls through to
+/// the actual favicon instead of a grey letter.
 ///
 /// NOT google.com/s2/favicons: it answers with an HTML redirect page, never an
 /// image, so everything fell through to DuckDuckGo's 32px favicon — the original
 /// "low quality" across the app.
-func logoCandidateURLs(logoUrl: String?, domain: String?) -> [String] {
+func logoCandidateURLs(logoUrl: String?, domain: String?, name: String? = nil) -> [String] {
     var list: [String] = []
     if let domain, !domain.isEmpty {
-        // fallback=404 is load-bearing: without it, logo.dev answers a domain it
-        // has no real logo for with a generated MONOGRAM at 256px, which would then
-        // beat a real 128px favicon from gstatic (LogoLoader keeps the largest).
-        // With it, logo.dev 404s when it has nothing real, and the chain falls
-        // through to the actual favicon instead of a grey letter.
         list.append("https://img.logo.dev/\(domain)?token=\(logoDevToken)&size=256&format=png&retina=true&fallback=404")
+    }
+    if let name, !name.isEmpty,
+       let encoded = name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) {
+        list.append("https://img.logo.dev/name/\(encoded)?token=\(logoDevToken)&size=256&format=png&retina=true&fallback=404")
+    }
+    if let domain, !domain.isEmpty {
         list.append("https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://\(domain)&size=256")
         list.append("https://\(domain)/apple-touch-icon.png")
         list.append("https://icons.duckduckgo.com/ip3/\(domain).ico")
@@ -82,7 +90,7 @@ struct Internship: Decodable, Identifiable, Hashable {
 
     /// The logos to try, best first — see `logoCandidateURLs`.
     var logoCandidates: [String] {
-        logoCandidateURLs(logoUrl: logoUrl, domain: companyDomain)
+        logoCandidateURLs(logoUrl: logoUrl, domain: companyDomain, name: company)
     }
 
     /// Which band of the market this listing's company sits in.
@@ -274,7 +282,7 @@ struct TrackerRecord: Codable, Identifiable, Hashable {
 
     /// Same candidate chain as Internship.logoCandidates.
     var logoCandidates: [String] {
-        logoCandidateURLs(logoUrl: logoUrl, domain: companyDomain)
+        logoCandidateURLs(logoUrl: logoUrl, domain: companyDomain, name: company)
     }
 
     /// Relative "Applied 2 days ago" line the reference's ApplicationCard shows.
@@ -300,12 +308,15 @@ struct CalendarEvent: Identifiable, Hashable {
     let time: String?
     let kind: String
     let recordId: String
+    /// The company's logo chain, so a day's events show real marks, not glyphs.
+    var logoCandidates: [String] = []
 
     var tint: Color6 {
         switch kind {
         case "deadline": .gray
         case "interview", "coding-test": .orange
         case "applied", "application-submitted": .teal
+        case "rejected": .rose
         default: .blue
         }
     }
@@ -326,6 +337,18 @@ extension ISO8601DateFormatter {
     static func parse(_ value: String?) -> Date? {
         guard let value else { return nil }
         if let date = flexible.date(from: value) { return date }
-        return ISO8601DateFormatter().date(from: value)
+        if let date = ISO8601DateFormatter().date(from: value) { return date }
+        // Legacy safety net: some rows were written with the email's raw RFC 2822
+        // Date header ("Fri, 03 Jul 2026 12:00:00 +0900") before the server started
+        // normalising to ISO. Parse those rather than dropping the date entirely.
+        return Self.rfc2822.date(from: value)
     }
+
+    /// RFC 2822 email-date parser (POSIX locale so weekday/month names are English).
+    private static let rfc2822: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "EEE, dd MMM yyyy HH:mm:ss Z"
+        return f
+    }()
 }

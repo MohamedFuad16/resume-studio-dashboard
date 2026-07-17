@@ -124,18 +124,27 @@ enum LogoLoader {
         ) else { return nil }
         ctx.draw(cg, in: CGRect(x: 0, y: 0, width: side, height: side))
 
-        // One pixel in from the very edge: favicons often carry a stray
-        // semi-transparent outline on the outermost row.
+        // Sample the ring one pixel in (favicons carry a stray outline on the
+        // outermost row), but SKIP THE CORNERS. Brand tiles are rounded squares:
+        // their sides are the field colour, their corners are white or transparent.
+        // Averaging the whole ring let those corners poison the result — Nokia's
+        // blue tile read as "not one flat field" (blue sides + white corners) and
+        // got rejected, so it insets as a blue square on a white circle. The sides
+        // alone tell the truth.
         var samples: [(Double, Double, Double)] = []
         var ringCount = 0
         let inset = 1
+        let cornerSkip = 4
         for y in inset..<(side - inset) {
             for x in inset..<(side - inset)
             where x == inset || y == inset || x == side - inset - 1 || y == side - inset - 1 {
+                let nearX = x <= inset + cornerSkip || x >= side - inset - 1 - cornerSkip
+                let nearY = y <= inset + cornerSkip || y >= side - inset - 1 - cornerSkip
+                if nearX && nearY { continue }   // a corner cell — skip it
                 ringCount += 1
                 let i = (y * side + x) * 4
                 let a = Double(pixels[i + 3]) / 255
-                if a < 0.9 { continue }   // skip transparent + antialiased corners
+                if a < 0.9 { continue }   // transparent / antialiased → not the field
                 samples.append((Double(pixels[i]) / 255 / a,
                                 Double(pixels[i + 1]) / 255 / a,
                                 Double(pixels[i + 2]) / 255 / a))
@@ -143,20 +152,31 @@ enum LogoLoader {
         }
 
         var result: Color?
-        // A rounded tile still shows its field along most of each side; a bare mark
-        // shows almost nothing. 45% opaque separates the two cleanly.
-        if samples.count >= Int(Double(ringCount) * 0.45), !samples.isEmpty {
-            let n = Double(samples.count)
-            let mean = (samples.reduce(0) { $0 + $1.0 } / n,
-                        samples.reduce(0) { $0 + $1.1 } / n,
-                        samples.reduce(0) { $0 + $1.2 } / n)
-            // Reject a busy edge (a photo, a gradient): not one flat field, and a
-            // confident wrong colour is worse than falling back to white.
-            let spread = samples
-                .map { max(abs($0.0 - mean.0), abs($0.1 - mean.1), abs($0.2 - mean.2)) }
-                .max() ?? 0
-            if spread < 0.20 {
-                result = Color(.sRGB, red: mean.0, green: mean.1, blue: mean.2)
+        // Need most of the (corner-free) ring to be opaque for a field to exist at
+        // all; a bare mark on transparent shows almost nothing here.
+        if samples.count >= max(4, Int(Double(ringCount) * 0.5)) {
+            // The field is the DOMINANT colour, not the average: find the sample
+            // whose neighbours (within 0.12) are most numerous. A tile with a subtle
+            // gradient still clusters; a busy/photographic edge does not, so it
+            // stays nil and falls back to white rather than inventing a colour.
+            var best: (c: (Double, Double, Double), count: Int) = (samples[0], 0)
+            for candidate in samples {
+                let count = samples.filter {
+                    max(abs($0.0 - candidate.0), abs($0.1 - candidate.1), abs($0.2 - candidate.2)) < 0.12
+                }.count
+                if count > best.count { best = (candidate, count) }
+            }
+            if Double(best.count) >= Double(samples.count) * 0.6 {
+                let cluster = samples.filter {
+                    max(abs($0.0 - best.c.0), abs($0.1 - best.c.1), abs($0.2 - best.c.2)) < 0.12
+                }
+                let n = Double(cluster.count)
+                result = Color(
+                    .sRGB,
+                    red: cluster.reduce(0) { $0 + $1.0 } / n,
+                    green: cluster.reduce(0) { $0 + $1.1 } / n,
+                    blue: cluster.reduce(0) { $0 + $1.2 } / n
+                )
             }
         }
         backgrounds[key] = result

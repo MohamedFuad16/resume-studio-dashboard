@@ -80,7 +80,12 @@ extension PortalAPI {
         url.append(queryItems: query)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.timeoutInterval = 250
+        // A backfill runs far longer than any client should wait — the server keeps
+        // going after we disconnect, and its actions land in the queue regardless.
+        // 45s is enough to kick it off and let a normal (incremental) sync finish;
+        // the drain that follows reads whatever is queued by then. Waiting the full
+        // gateway timeout (240s) only bought a four-minute spinner.
+        request.timeoutInterval = backfillDays == nil ? 30 : 45
         _ = try? await URLSession.shared.data(for: request)
     }
 }
@@ -249,7 +254,7 @@ extension CatalogStore {
                          role: base.displayRole,
                          status: status,
                          candidates: logoCandidateURLs(
-                            logoUrl: base.logoUrl, domain: base.companyDomain
+                            logoUrl: base.logoUrl, domain: base.companyDomain, name: base.company
                          ))
                     )
                 }

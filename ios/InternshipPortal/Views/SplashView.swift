@@ -30,7 +30,7 @@ struct SplashView: View {
         var bubble: CompanyBubble {
             CompanyBubble(
                 id: domain, name: company,
-                logoCandidates: logoCandidateURLs(logoUrl: nil, domain: domain),
+                logoCandidates: logoCandidateURLs(logoUrl: nil, domain: domain, name: company),
                 roleCount: 1, bestScore: 0, status: nil, tier: .flagship, tint: tint
             )
         }

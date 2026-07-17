@@ -264,7 +264,26 @@ private struct EventRow: View {
         PressableCard(action: action) {
             Card(radius: Radius.row, padding: 14) {
                 HStack(spacing: 12) {
-                    IconTile(symbol: symbol, tint: event.tint, size: 40, glyph: 16)
+                    // The company's real logo when we have one, the kind glyph
+                    // otherwise — so a day reads as "Rakuten, HENNGE" at a glance.
+                    if event.logoCandidates.isEmpty {
+                        IconTile(symbol: symbol, tint: event.tint, size: 40, glyph: 16)
+                    } else {
+                        LogoImage(candidates: event.logoCandidates) {
+                            IconTile(symbol: symbol, tint: event.tint, size: 40, glyph: 16)
+                        }
+                        .frame(width: 40, height: 40)
+                        .clipShape(.rect(cornerRadius: Radius.tile, style: .continuous))
+                        .overlay {
+                            // A small kind badge so applied vs rejected still reads.
+                            Image(systemName: symbol)
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(.white)
+                                .padding(3)
+                                .background(event.tint.fg, in: .circle)
+                                .offset(x: 15, y: 15)
+                        }
+                    }
                     VStack(alignment: .leading, spacing: 2) {
                         Text(event.company)
                             .font(Font2.rowTitle)
@@ -294,6 +313,7 @@ private struct EventRow: View {
         case "interview": "calendar.badge.clock"
         case "coding-test": "chevron.left.forwardslash.chevron.right"
         case "applied", "application-submitted": "paperplane"
+        case "rejected": "xmark"
         case "follow-up": "arrow.uturn.right"
         default: "circle"
         }

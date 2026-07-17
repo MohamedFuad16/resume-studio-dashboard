@@ -71,14 +71,10 @@ struct InternshipPortalApp: App {
                 // with a banner — no pull-to-refresh, no Settings trip.
                 Task { await store.drainGmail() }
 
-                // DEBUGGING PHASE: replay the splash on every foreground.
-                // Reopening from the home screen RESUMES a suspended process —
-                // App.init never runs again — so a cold-launch-only splash is one
-                // you can never actually see. Remove this (and shorten SplashView's
-                // timer) once the design is settled.
-                #if DEBUG
-                if !showSplash { showSplash = true }
-                #endif
+                // NB: the splash is shown on COLD LAUNCH only. It used to replay on
+                // every foreground, but taking a screenshot briefly deactivates and
+                // reactivates the app, which made the splash flash back every time
+                // you tried to capture a screen.
             }
             .task {
                 // Ask once the UI is up, not during init: a permission sheet over a
