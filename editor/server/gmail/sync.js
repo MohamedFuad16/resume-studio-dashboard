@@ -64,6 +64,15 @@ export async function syncProfile(store, profile, opts = {}) {
   const backfillDays = Number(opts.backfillDays || 0);
   if (backfillDays > 0) {
     messageIds = await listRecentMessageIds(token, `newer_than:${backfillDays}d -in:sent -in:draft (${APPLICATION_QUERY})`, 100);
+    // TEMP PROBE: is the mailbox itself readable, or is the FILTER the thing
+    // returning nothing? Count a bare recent query and a total. Counts only.
+    try {
+      const bare = await listRecentMessageIds(token, `newer_than:${backfillDays}d`, 100);
+      const any = await listRecentMessageIds(token, `in:anywhere`, 5);
+      console.log(`gmail-probe[${profile}] filtered=${messageIds.length} bareRecent=${bare.length} anyMail=${any.length}`);
+    } catch (e) {
+      console.log(`gmail-probe[${profile}] error=${e.status || e.message}`);
+    }
   } else if (conn.historyId) {
     const res = await listNewMessageIds(token, conn.historyId);
     if (res.stale) {
