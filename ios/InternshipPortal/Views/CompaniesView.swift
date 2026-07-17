@@ -1,16 +1,16 @@
-// Companies — the market as three clusters of merged glass bubbles.
+// Companies — the market as clusters of floating glass bubbles.
 //
-// Built like Wabi's splash: a single signed-distance field over one canvas, warped
-// by a loupe shader, rather than N independent circle views. Neighbours merge with
-// a meniscus because they are evaluated into the same field (see `bubbleField` in
-// Shaders.metal); separate views could only ever overlap.
+// Each bubble is its OWN body, like the Wabi hero: independent spheres that
+// overlap in depth (large behind, small in front), each with its own glass
+// shading and drop shadow. The earlier SDF metaball field merged neighbours into
+// one skin — physically clever, but it read as smeared borders instead of
+// floating bubbles, which is the look that actually matters.
 //
 // Two design rules do the work here:
-//   • Only the leading companies in each tier get a bubble. All 103 fit on screen,
-//     but 70 of them list exactly one role — as identical minimum-size dots they
-//     carried no information and turned the field into foam.
-//   • Clusters are the grouping, so the shader's merge means something: bubbles
-//     fuse with their own tier and stay clear of the others.
+//   • Only the leading companies in each tier get a bubble (the rest are one tap
+//     away behind "+N more"). All 103 fit on screen, but 70 list exactly one
+//     role — as identical minimum-size dots they carried no information.
+//   • Clusters group by tier, so where bubbles crowd together it means something.
 import SwiftUI
 
 /// One company, aggregated across the catalog and the tracker.
@@ -39,7 +39,8 @@ struct PlacedBubble: Identifiable, Equatable {
 struct BubbleCluster: Identifiable {
     let tier: CompanyTier
     let shown: [CompanyBubble]
-    let hiddenCount: Int
+    let all: [CompanyBubble]
+    var hiddenCount: Int { max(0, all.count - shown.count) }
     var id: String { tier.rawValue }
 }
 
@@ -47,6 +48,7 @@ struct CompaniesView: View {
     @Environment(CatalogStore.self) private var store
 
     @State private var selected: CompanyBubble?
+    @State private var listing: BubbleCluster?
 
     /// How many bubbles each tier shows. Eight per cluster keeps every bubble big
     /// enough to carry a legible logo.
@@ -59,7 +61,7 @@ struct CompaniesView: View {
             return BubbleCluster(
                 tier: tier,
                 shown: Array(group.prefix(Self.perTier)),
-                hiddenCount: max(0, group.count - Self.perTier)
+                all: group
             )
         }
         .filter { !$0.shown.isEmpty }
@@ -108,7 +110,11 @@ struct CompaniesView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     ForEach(clusters) { cluster in
-                        ClusterBand(cluster: cluster) { selected = $0 }
+                        ClusterBand(
+                            cluster: cluster,
+                            onTap: { selected = $0 },
+                            onMore: { listing = $0 }
+                        )
                     }
                 }
                 .padding(.bottom, 24)
@@ -119,6 +125,12 @@ struct CompaniesView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarVisibility(.visible, for: .navigationBar)
         .sheet(item: $selected) { CompanyRolesSheet(company: $0) }
+        .sheet(item: $listing) { cluster in
+            TierListSheet(cluster: cluster) { bubble in
+                listing = nil
+                selected = bubble
+            }
+        }
     }
 }
 
@@ -126,6 +138,7 @@ struct CompaniesView: View {
 private struct ClusterBand: View {
     var cluster: BubbleCluster
     var onTap: (CompanyBubble) -> Void
+    var onMore: (BubbleCluster) -> Void
 
     /// Tall enough for eight bubbles to cluster without the spiral having to reach
     /// for the edges.
@@ -144,11 +157,23 @@ private struct ClusterBand: View {
                     .font(Font2.caption)
                     .foregroundStyle(Palette.ink400)
                 Spacer()
-                // Never silently truncate: say what is not on screen.
+                // What's not on screen is one tap away — never a dead label.
                 if cluster.hiddenCount > 0 {
-                    Text("+\(cluster.hiddenCount) more")
+                    Button {
+                        onMore(cluster)
+                    } label: {
+                        HStack(spacing: 3) {
+                            Text("+\(cluster.hiddenCount) more")
+                            Image(systemName: "chevron.right").font(.system(size: 8, weight: .bold))
+                        }
                         .font(Font2.micro)
-                        .foregroundStyle(Palette.ink400)
+                        .foregroundStyle(Palette.ink500)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(Palette.card, in: .capsule)
+                        .cardShadow()
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 22)
@@ -177,70 +202,16 @@ struct BubbleField: View {
     }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
-            let t = ShaderClock.seconds(timeline.date)
-
-            contents
-                .layerEffect(
-                    ShaderLibrary.bubbleField(
-                        .float2(size),
-                        .floatArray(packedFloats),
-                        .float(t),
-                        // Blend radius, in points. 12 with the overlapped packing:
-                        // touching rims bridge into one skin, but companies still
-                        // keep their own dome. (14 fused to foam; 9 read as beads.)
-                        .float(12),
-                        // Magnification 0.22 / fringe 0.035 — dialled DOWN from
-                        // 0.34/0.05: at those values the rim band visibly smeared
-                        // the contents into "a weird refracting portion" instead of
-                        // a gentle lens bulge.
-                        .float(0.16),
-                        .float(0.035)
-                    ),
-                    // Must cover the largest offset the loupe can produce, plus the
-                    // drift, or the refraction clips at the edges.
-                    maxSampleOffset: CGSize(width: 44, height: 44)
-                )
-                .overlay { taps }
-        }
-    }
-
-    /// What lives inside the glass. The shader refracts whatever this renders, so
-    /// each bubble needs real structure — a lit pole, a shadowed pole, a mark.
-    private var contents: some View {
+        // Independent orbs, painted LARGE→SMALL so small bubbles sit in front —
+        // the depth stacking the Wabi hero uses. Each carries its own glass
+        // shading and drop shadow, so every bubble reads as its own body floating
+        // over the canvas; nothing merges, nothing draws a shared skin.
         ZStack(alignment: .topLeading) {
-            // The shader reads this layer's alpha; a clear ground keeps everything
-            // outside the field transparent.
-            Color.clear
-
-            ForEach(placed) { item in
-                BubbleContents(bubble: item.bubble, diameter: item.radius * 2)
-                    .position(x: item.center.x, y: item.center.y)
+            ForEach(placed.sorted { $0.radius > $1.radius }) { item in
+                FloatingOrb(item: item) { onTap(item.bubble) }
             }
         }
         .frame(width: size.width, height: size.height)
-    }
-
-    /// Hit targets sit above the shader: the warp moves pixels, not geometry, so
-    /// tapping what you see means tapping the real circle underneath.
-    private var taps: some View {
-        ZStack(alignment: .topLeading) {
-            ForEach(placed) { item in
-                Circle()
-                    .fill(.clear)
-                    .contentShape(.circle)
-                    .frame(width: item.radius * 2, height: item.radius * 2)
-                    .position(x: item.center.x, y: item.center.y)
-                    .onTapGesture { onTap(item.bubble) }
-                    .accessibilityElement()
-                    .accessibilityLabel(
-                        "\(item.bubble.name), \(item.bubble.roleCount) role"
-                            + (item.bubble.roleCount == 1 ? "" : "s")
-                            + (item.bubble.status.map { ", \($0.label)" } ?? "")
-                    )
-                    .accessibilityAddTraits(.isButton)
-            }
-        }
     }
 
     // MARK: - Packing
@@ -299,12 +270,11 @@ struct BubbleField: View {
                     y: center.y + sin(angle) * step * 0.72
                 )
                 let fits = placed.allSatisfy { other in
-                    // Neighbours overlap by ~12% of the smaller radius: enough for
-                    // the SDF merge to bridge them into one cloud, shallow enough
-                    // that no bubble covers a neighbour's logo. (40% looked like
-                    // Wabi from afar but ate the marks — the logos ARE the data.)
+                    // A shallow overlap (~18% of the smaller radius) lets small
+                    // bubbles tuck in FRONT of big ones, Wabi-style — the paint
+                    // order (large first) keeps every logo readable.
                     hypot(candidate.x - other.center.x, candidate.y - other.center.y)
-                        > (radius + other.radius) - min(radius, other.radius) * 0.12
+                        > (radius + other.radius) - min(radius, other.radius) * 0.18
                 }
                 let inBounds = candidate.x - radius > 4 && candidate.x + radius < size.width - 4
                     && candidate.y - radius > 3 && candidate.y + radius < size.height - 3
@@ -320,6 +290,43 @@ struct BubbleField: View {
             placed.append(PlacedBubble(bubble: bubble, center: spot, radius: radius))
         }
         return placed
+    }
+}
+
+/// One placed bubble: contents → glass shader → drop shadow → slow bob. The bob
+/// phase is seeded from the company id so the field breathes out of step, which
+/// is what keeps a still layout from looking frozen.
+private struct FloatingOrb: View {
+    var item: PlacedBubble
+    var action: () -> Void
+
+    private var phase: Double {
+        Double(abs(item.bubble.id.hashValue) % 977) / 977.0 * 6.28318
+    }
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+            let t = ShaderClock.seconds(timeline.date)
+            let bob = sin(t * 0.5 + phase) * 2.5
+
+            Button(action: action) {
+                GlassOrb(bubble: item.bubble, diameter: item.radius * 2)
+                    // The float: a soft shadow well below the ball, scaled to it.
+                    .shadow(
+                        color: .black.opacity(0.16),
+                        radius: item.radius * 0.22,
+                        y: item.radius * 0.16
+                    )
+            }
+            .buttonStyle(.plain)
+            .offset(y: bob)
+        }
+        .position(x: item.center.x, y: item.center.y)
+        .accessibilityLabel(
+            "\(item.bubble.name), \(item.bubble.roleCount) role"
+                + (item.bubble.roleCount == 1 ? "" : "s")
+                + (item.bubble.status.map { ", \($0.label)" } ?? "")
+        )
     }
 }
 
@@ -464,6 +471,57 @@ private struct CompanyRolesSheet: View {
             .sheet(item: $route) { InternshipSheet(item: $0) }
         }
         .presentationDetents([.fraction(0.75), .large])
+        .presentationCornerRadius(Radius.sheet)
+    }
+}
+
+/// Every company in a tier, as a plain list — the bubbles show the leaders, this
+/// shows everyone. Tapping a row opens the same roles sheet the bubbles do.
+private struct TierListSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var cluster: BubbleCluster
+    var onSelect: (CompanyBubble) -> Void
+
+    var body: some View {
+        NavigationStack {
+            List(cluster.all) { bubble in
+                Button {
+                    dismiss()
+                    onSelect(bubble)
+                } label: {
+                    HStack(spacing: 12) {
+                        CompanyMark(company: bubble.name, candidates: bubble.logoCandidates, size: 38)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(bubble.name)
+                                .font(Font2.rowTitle)
+                                .foregroundStyle(Palette.ink)
+                                .lineLimit(1)
+                            Text(bubble.roleCount == 1 ? String(localized: "1 role") : String(localized: "\(bubble.roleCount) roles"))
+                                .font(Font2.caption)
+                                .foregroundStyle(Palette.ink500)
+                        }
+                        Spacer()
+                        if let status = bubble.status {
+                            StatusChip(status: status)
+                        }
+                        Chevron()
+                    }
+                }
+                .buttonStyle(.plain)
+                .listRowBackground(Palette.card)
+            }
+            .scrollContentBackground(.hidden)
+            .background(Palette.canvas)
+            .navigationTitle("\(cluster.tier.label) · \(cluster.all.count)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }.fontWeight(.semibold)
+                }
+            }
+        }
+        .presentationDetents([.large])
         .presentationCornerRadius(Radius.sheet)
     }
 }

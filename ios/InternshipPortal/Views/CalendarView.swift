@@ -215,19 +215,19 @@ private struct DayCell: View {
         Button(action: action) {
             VStack(spacing: 2) {
                 ZStack {
-                    // Today keeps the reference's red disc even when another day is
-                    // selected — losing "where am I" to show "what did I tap" is a
-                    // bad trade on a calendar.
-                    if isToday {
+                    // The web's calendar theme, verbatim: the SELECTED day wears
+                    // the red disc; today (unselected) keeps a soft red wash so
+                    // "where am I" survives without stealing the selection's voice.
+                    if isSelected {
                         Circle().fill(Palette.red)
-                    } else if isSelected {
-                        Circle().fill(Palette.ink)
+                    } else if isToday {
+                        Circle().fill(Palette.red.opacity(0.12))
                     } else if !events.isEmpty {
                         Circle().fill(Palette.tile)
                     }
                     Text(day)
                         .font(.system(size: 13, weight: isSelected || isToday ? .semibold : .medium))
-                        .foregroundStyle(isSelected || isToday ? .white : Palette.ink600)
+                        .foregroundStyle(isSelected ? .white : (isToday ? Palette.red : Palette.ink600))
                         .monospacedDigit()
                 }
                 .frame(width: 32, height: 32)

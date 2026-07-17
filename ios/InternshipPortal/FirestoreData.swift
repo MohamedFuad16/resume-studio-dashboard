@@ -77,6 +77,40 @@ struct FirestoreData {
         return personal.compactMapValues { $0 as? String }
     }
 
+    // MARK: - Per-user settings (users/{uid}/settings/app)
+    // Same document the web's SettingsPanel reads/writes: the OpenRouter key and
+    // the two model slugs. Owner-only rules apply; nothing here is server-visible
+    // except when the client sends the key with a research request.
+
+    struct AppSettings {
+        var hasKey: Bool
+        var searchModel: String
+        var auditModel: String
+    }
+
+    static func fetchSettings(uid: String) async throws -> AppSettings {
+        let snapshot = try await db.collection("users").document(uid)
+            .collection("settings").document("app").getDocument()
+        let data = snapshot.data() ?? [:]
+        return AppSettings(
+            hasKey: !(String(describing: data["openrouterKey"] ?? "").isEmpty
+                      || data["openrouterKey"] == nil),
+            searchModel: data["searchModel"] as? String ?? "",
+            auditModel: data["auditModel"] as? String ?? ""
+        )
+    }
+
+    /// Merge-writes only the provided fields, exactly like the web's saveSettings.
+    static func saveSettings(uid: String, key: String?, searchModel: String?, auditModel: String?) async throws {
+        var patch: [String: Any] = ["updatedAt": FieldValue.serverTimestamp()]
+        if let key, !key.isEmpty { patch["openrouterKey"] = key }
+        if let searchModel { patch["searchModel"] = searchModel }
+        if let auditModel { patch["auditModel"] = auditModel }
+        try await db.collection("users").document(uid)
+            .collection("settings").document("app")
+            .setData(patch, merge: true)
+    }
+
     /// Firestore hands back Timestamp/NSNull/NSNumber, none of which
     /// JSONSerialization will accept. Flatten to JSON-safe values.
     private static func sanitize(_ value: Any) -> Any {

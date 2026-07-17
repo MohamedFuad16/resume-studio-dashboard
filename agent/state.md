@@ -25,6 +25,20 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-17 (round 5) — Floating orbs, in-app Gmail/keys, red calendar, Gmail
+  mark (ADR-0044).** Merged origin/main (12 commits incl. isInternship + reapply
+  cooldown) + committed the parallel session's local work first. Bubbles: SDF
+  metaball field DELETED — independent `GlassOrb`s painted large→small with ~18%
+  depth overlap, per-orb shadows and out-of-step bob (the Wabi hero is overlapping
+  spheres, not merged skins); `glassOrb` = crescent highlights + hotspot + belly
+  shade + mild magnification, NO rim ring. "+N more" → TierListSheet (full tier
+  list). RecordSheet "Remove from tracker" for legacy non-internships (5CA/micro1 —
+  server only filters new mail). `GmailMark` (web SVG → Canvas) replaces the SF
+  envelope. Calendar: selected = web-red disc, today = red wash. JA greetings break
+  before the name. Settings: `AIKeysView` (same Firestore doc as web) +
+  `GmailSettingsView` (server OAuth status/connect/disconnect) — only the résumé
+  editor still links to the web. Build clean, zero warnings; visuals to be verified
+  by the user. Gmail→Firestore DRAIN not ported (web/Azure still ingests).
 - **2026-07-17 (round 8 — VERIFIED, UNCOMMITTED) — Logo quality + fit, profile edit
   page, language pill, Applications logos (ADR-0047).** Logos load via a candidate
   chain (Google s2 128px → DDG → logoUrl; HTTP-200 + placeholder-hash guarded;

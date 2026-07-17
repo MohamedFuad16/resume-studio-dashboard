@@ -142,9 +142,11 @@ struct InternshipSheet: View {
 struct RecordSheet: View {
     @Environment(CatalogStore.self) private var store
     @Environment(\.openURL) private var openURL
+    @Environment(\.dismiss) private var dismiss
 
     var record: TrackerRecord
     @State private var showInterviewPrompt = false
+    @State private var confirmRemove = false
 
     /// The catalog entry behind this record, when there is one.
     private var catalogItem: Internship? {
@@ -161,7 +163,7 @@ struct RecordSheet: View {
                     StatusChip(status: record.appStatus)
                     if record.fromGmail {
                         HStack(spacing: 5) {
-                            Image(systemName: "envelope.fill").font(.system(size: 9))
+                            GmailMark(size: 12)
                             Text("From Gmail")
                         }
                         .font(.system(size: 11, weight: .medium))
@@ -250,6 +252,35 @@ struct RecordSheet: View {
                         DetailLine(label: String(localized: "Deadline"), value: record.deadline ?? String(localized: "Not stated"))
                         DetailLine(label: String(localized: "Source"), value: record.fromGmail ? String(localized: "Gmail inbox") : String(localized: "Added in app"))
                     }
+                }
+
+                // The way out for rows that shouldn't be here — chiefly gig/freelance
+                // emails ingested before the isInternship rule existed (5CA, micro1).
+                // The server only filters NEW mail; legacy rows leave by hand.
+                Button(role: .destructive) {
+                    confirmRemove = true
+                } label: {
+                    Label(String(localized: "Remove from tracker"), systemImage: "trash")
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 13)
+                        .background(Palette.red.opacity(0.09), in: .rect(cornerRadius: Radius.row, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Palette.red)
+                .padding(.top, 26)
+                .confirmationDialog(
+                    String(localized: "Remove \(record.displayCompany)?"),
+                    isPresented: $confirmRemove, titleVisibility: .visible
+                ) {
+                    Button(String(localized: "Remove"), role: .destructive) {
+                        let id = record.id
+                        Task { await store.removeRecord(id) }
+                        dismiss()
+                    }
+                    Button(String(localized: "Cancel"), role: .cancel) {}
+                } message: {
+                    Text(String(localized: "Its calendar events go with it. The role stays in the catalog."))
                 }
             }
         }

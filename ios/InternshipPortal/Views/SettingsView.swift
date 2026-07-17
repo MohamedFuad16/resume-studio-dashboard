@@ -174,52 +174,44 @@ struct SettingsView: View {
 
                     Card(radius: Radius.card, padding: 6) {
                         VStack(spacing: 0) {
+                            NavigationLink { AIKeysView() } label: {
+                                SettingsRow(
+                                    symbol: "sparkles", tint: .purple,
+                                    title: String(localized: "AI & API keys"),
+                                    subtitle: String(localized: "OpenRouter key and models"),
+                                    action: nil
+                                ) { Chevron() }
+                            }
+                            .buttonStyle(.plain)
+
+                            NavigationLink { GmailSettingsView() } label: {
+                                SettingsRow(
+                                    symbol: "envelope", tint: .orange,
+                                    title: "Gmail",
+                                    subtitle: String(localized: "Auto-tracks replies and interviews"),
+                                    action: nil
+                                ) { Chevron() }
+                            }
+                            .buttonStyle(.plain)
+
+                            // The one remaining web handoff: the résumé editor is a
+                            // LaTeX pipeline with live PDF compile — a desktop tool.
                             SettingsRow(
                                 symbol: "doc.text", tint: .blue,
-                                title: String(localized: "Résumé & details"),
-                                subtitle: String(localized: "Edit on the web")
+                                title: String(localized: "Résumé editor"),
+                                subtitle: String(localized: "LaTeX editing stays on the desktop")
                             ) { openURL(webURL) }
-
-                            SettingsRow(
-                                symbol: "sparkles", tint: .purple,
-                                title: String(localized: "AI & API keys"),
-                                subtitle: String(localized: "OpenRouter · managed on the web")
-                            ) { openURL(webURL) }
-
-                            SettingsRow(
-                                symbol: "envelope", tint: .orange,
-                                title: "Gmail",
-                                subtitle: String(localized: "Auto-tracks replies and interviews"),
-                                action: nil
-                            ) {
-                                HStack(spacing: 6) {
-                                    Circle()
-                                        .fill(Palette.teal)
-                                        .frame(width: 7, height: 7)
-                                    Text("Connected")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundStyle(Palette.teal)
-                                }
-                                .padding(.trailing, 6)
-                            }
                         }
                     }
                     .padding(.bottom, 16)
 
                     Card(radius: Radius.card, padding: 6) {
-                        VStack(spacing: 0) {
-                            SettingsRow(
-                                symbol: "arrow.clockwise", tint: .teal,
-                                title: String(localized: "Refresh data"),
-                                subtitle: catalogSummary
-                            ) {
-                                Task { await store.load() }
-                            }
-                            SettingsRow(
-                                symbol: "safari", tint: .indigo,
-                                title: String(localized: "Open the web portal"),
-                                subtitle: "portal.mohamedfuad.com"
-                            ) { openURL(webURL) }
+                        SettingsRow(
+                            symbol: "arrow.clockwise", tint: .teal,
+                            title: String(localized: "Refresh data"),
+                            subtitle: catalogSummary
+                        ) {
+                            Task { await store.load() }
                         }
                     }
                     .padding(.bottom, 16)
@@ -456,3 +448,233 @@ struct EditProfileView: View {
         .environment(AuthService())
 }
 #endif
+
+// MARK: - AI & API keys (in-app; users/{uid}/settings/app, same doc as the web)
+
+struct AIKeysView: View {
+    @Environment(CatalogStore.self) private var store
+
+    @State private var newKey = ""
+    @State private var hasKey = false
+    @State private var searchModel = ""
+    @State private var auditModel = ""
+    @State private var phase: Phase = .loading
+    @State private var saving = false
+
+    private enum Phase: Equatable { case loading, ready, failed(String) }
+
+    var body: some View {
+        Form {
+            Section {
+                if hasKey && newKey.isEmpty {
+                    Label(String(localized: "A key is saved to your account"), systemImage: "checkmark.seal.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Palette.teal)
+                }
+                SecureField("sk-or-…", text: $newKey)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+            } header: {
+                Text("OpenRouter API key")
+            } footer: {
+                Text("Used for live company research and résumé drafting. Stored in your account (owner-only rules) and never shown again after saving — same behaviour as the web.")
+            }
+
+            Section {
+                TextField("perplexity/sonar", text: $searchModel)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+            } header: { Text("Search model") }
+
+            Section {
+                TextField("openai/gpt-5-nano", text: $auditModel)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+            } header: { Text("Audit model") }
+
+            Section {
+                Button {
+                    save()
+                } label: {
+                    HStack {
+                        if saving { ProgressView().controlSize(.small) }
+                        Text("Save")
+                    }
+                }
+                .disabled(saving || phase != .ready || !store.isCloudBacked)
+            } footer: {
+                if !store.isCloudBacked {
+                    Text("Sign in to store keys in your account.")
+                } else if case .failed(let message) = phase {
+                    Text(message)
+                }
+            }
+        }
+        .navigationTitle(String(localized: "AI & API keys"))
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await load() }
+    }
+
+    private func load() async {
+        guard let uid = store.uid else { phase = .ready; return }
+        do {
+            let settings = try await FirestoreData.fetchSettings(uid: uid)
+            hasKey = settings.hasKey
+            searchModel = settings.searchModel
+            auditModel = settings.auditModel
+            phase = .ready
+        } catch {
+            phase = .failed(error.localizedDescription)
+        }
+    }
+
+    private func save() {
+        guard let uid = store.uid else { return }
+        saving = true
+        let key = newKey.trimmingCharacters(in: .whitespaces)
+        let search = searchModel.trimmingCharacters(in: .whitespaces)
+        let audit = auditModel.trimmingCharacters(in: .whitespaces)
+        Task {
+            defer { saving = false }
+            do {
+                try await FirestoreData.saveSettings(
+                    uid: uid,
+                    key: key.isEmpty ? nil : key,
+                    searchModel: search.isEmpty ? nil : search,
+                    auditModel: audit.isEmpty ? nil : audit
+                )
+                if !key.isEmpty { hasKey = true; newKey = "" }
+                store.toast = String(localized: "Settings saved")
+            } catch {
+                phase = .failed(error.localizedDescription)
+            }
+        }
+    }
+}
+
+// MARK: - Gmail (in-app connect / status / disconnect via the portal server)
+
+struct GmailSettingsView: View {
+    @Environment(CatalogStore.self) private var store
+    @Environment(\.openURL) private var openURL
+
+    @State private var status: GmailStatus?
+    @State private var error: String?
+    @State private var busy = false
+    @State private var confirmDisconnect = false
+
+    /// Gmail connections are keyed by the SERVER profile id (the web passes its
+    /// active profile). Mirror that: the resolved Firestore profile id matches the
+    /// web's for the owner account, with the KV default as the fallback.
+    private var profile: String { store.profileID ?? PortalAPI.profile }
+
+    var body: some View {
+        Form {
+            Section {
+                HStack(spacing: 12) {
+                    GmailMark(size: 22)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(status?.connected == true
+                             ? (status?.email?.isEmpty == false ? status!.email! : String(localized: "Connected"))
+                             : String(localized: "Not connected"))
+                            .font(Font2.rowTitle)
+                            .foregroundStyle(Palette.ink)
+                        if let last = status?.lastSyncAt, !last.isEmpty {
+                            Text(String(localized: "Last sync \(last.prefix(16).replacingOccurrences(of: "T", with: " "))"))
+                                .font(Font2.caption)
+                                .foregroundStyle(Palette.ink500)
+                        }
+                    }
+                    Spacer()
+                    if status?.connected == true {
+                        Circle().fill(Palette.teal).frame(width: 9, height: 9)
+                    }
+                }
+            } footer: {
+                Text("Read-only access. New application emails, replies and interview invites flow into Applications and the Calendar automatically.")
+            }
+
+            if let lastError = status?.lastError, !lastError.isEmpty {
+                Section("Last error") {
+                    Text(lastError).font(Font2.caption).foregroundStyle(Palette.red)
+                }
+            }
+
+            Section {
+                if status?.connected == true {
+                    Button(String(localized: "Disconnect Gmail"), role: .destructive) {
+                        confirmDisconnect = true
+                    }
+                    .disabled(busy)
+                } else {
+                    Button {
+                        connect()
+                    } label: {
+                        HStack {
+                            if busy { ProgressView().controlSize(.small) }
+                            Text("Connect Gmail")
+                        }
+                    }
+                    .disabled(busy || status?.configured == false)
+                }
+            } footer: {
+                if status?.configured == false {
+                    Text("The server is missing its Google OAuth credentials — connection is unavailable until they are set.")
+                } else if let error {
+                    Text(error)
+                } else if status?.connected != true {
+                    Text("Sign-in happens in the browser; come back here afterwards and the status updates itself.")
+                }
+            }
+        }
+        .navigationTitle("Gmail")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await refresh() }
+        .refreshable { await refresh() }
+        .confirmationDialog(String(localized: "Disconnect Gmail?"), isPresented: $confirmDisconnect, titleVisibility: .visible) {
+            Button(String(localized: "Disconnect"), role: .destructive) { disconnect() }
+            Button(String(localized: "Cancel"), role: .cancel) {}
+        } message: {
+            Text(String(localized: "Already-tracked applications stay; new mail just stops flowing in."))
+        }
+    }
+
+    private func refresh() async {
+        do {
+            status = try await PortalAPI.gmailStatus(profile: profile)
+            error = nil
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func connect() {
+        busy = true
+        Task {
+            defer { busy = false }
+            do {
+                let url = try await PortalAPI.gmailAuthURL(profile: profile)
+                openURL(url)   // consent completes in the browser; server keeps the token
+                // Poll a few times so the status flips without a manual refresh.
+                for _ in 0..<6 {
+                    try? await Task.sleep(for: .seconds(5))
+                    await refresh()
+                    if status?.connected == true { break }
+                }
+            } catch {
+                self.error = error.localizedDescription
+            }
+        }
+    }
+
+    private func disconnect() {
+        busy = true
+        Task {
+            defer { busy = false }
+            do {
+                try await PortalAPI.gmailDisconnect(profile: profile)
+                await refresh()
+            } catch {
+                self.error = error.localizedDescription
+            }
+        }
+    }
+}

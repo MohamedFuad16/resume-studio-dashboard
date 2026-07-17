@@ -1227,3 +1227,46 @@ Applications list showed monograms where every other surface showed logos.
 **Status.** Sim-verified (sharp bubble logos incl. Rakuten's real R and KDDI,
 clean Settings card, one-line pill, HENNGE logo in Applications); Release build
 installed on the iPhone. Uncommitted.
+
+## ADR-0044 · 2026-07-17 · Floating orbs (metaballs out), in-app Gmail + AI keys, web red calendar, real Gmail mark
+**Context.** User review round 5 with two new references (the Wabi hero cluster and
+black lensball photography): bubbles still wrong — "each has to be its own bubble,
+completely floating"; logos still not fitting; JA greeting broke mid-line; legacy
+non-internship rows (5CA, micro1) showing; Gmail tag used a generic envelope; the
+calendar's selection should match the web's red; "+N more" was a dead label; and
+Settings still punted AI keys and Gmail to the web. Merged origin/main first (12
+commits: reapply-cooldown, isInternship filtering, editor overhaul) plus the local
+parallel session (logo candidate chains, insight-grid Home, ja.lproj).
+**The bubble verdict: metaballs OUT, floating orbs IN.** The SDF field was the
+technically interesting answer and the visually wrong one — merged skins read as
+smeared borders, never as bubbles. The Wabi hero is plainly independent spheres
+overlapping in DEPTH: large behind, small in front, each with its own shading and
+shadow. New rendering: per-bubble `GlassOrb` views painted large→small, ~18%
+shallow overlap so small ones tuck in front, per-orb drop shadow, out-of-step bob
+seeded from the company id. `glassOrb` rewritten to the lensball recipe: key
+CRESCENT hugging the upper rim + fainter warm counter-crescent below + one hard
+hotspot + belly shade for weight + gentle centre magnification — and deliberately
+NO uniform rim ring (a ring traced around the silhouette is precisely what kept
+reading as a border). `bubbleField`/`smin`/`fieldSDF` deleted; the splash now uses
+the same floating orbs, so it stays the same material as Companies.
+**Other decisions.**
+- "+N more" is a button → `TierListSheet`: every company in the tier as a list
+  (mark, name, role count, status) feeding the same roles sheet as the bubbles.
+- Legacy non-internships: the server filters only NEW mail (sync.js drops
+  `!verdict.isInternship` since the July audit), so 5CA/micro1 must leave by hand —
+  RecordSheet gained "Remove from tracker" (confirm dialog → `store.removeRecord`).
+- Real Gmail mark: `GmailMark` ports the web's GmailMark.jsx SVG paths to a Canvas
+  (five fills, 48×48 space) — used in ApplicationCard, RecordSheet, Gmail settings.
+- Calendar matches the web: SELECTED day = red disc/white text; today unselected =
+  soft red wash + red numeral. (Previously today owned the red and selection was ink.)
+- JA greeting: `\n` before the name in all three ja.lproj greetings — 「こんにちは、」
+  then 「Mohamedさん」 on its own line.
+- **In-app instead of web:** `AIKeysView` reads/writes the SAME Firestore doc as
+  the web (`users/{uid}/settings/app`: openrouterKey/searchModel/auditModel,
+  merge-write, key never echoed back); `GmailSettingsView` drives the server's
+  OAuth endpoints (status/auth-url/disconnect) with browser-based consent and a
+  short status poll after connect. The ONLY remaining web handoff is the résumé
+  editor (a LaTeX+PDF pipeline is a desktop tool); "Open the web portal" row is gone.
+**Verified.** Builds clean, zero project warnings. Visual sign-off left to the user
+by request. NOT yet ported: the Gmail→Firestore drain loop (web/Azure still does
+ingestion; iOS manages the connection only).

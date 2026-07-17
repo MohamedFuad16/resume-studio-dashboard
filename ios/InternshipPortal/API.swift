@@ -58,6 +58,54 @@ struct PortalAPI {
     }
 }
 
+// MARK: - Gmail integration (server-side OAuth; see editor/server/gmail)
+
+struct GmailStatus: Decodable {
+    var configured: Bool?
+    var connected: Bool
+    var email: String?
+    var lastSyncAt: String?
+    var lastError: String?
+}
+
+extension PortalAPI {
+    static func gmailStatus(profile: String) async throws -> GmailStatus {
+        var url = baseURL.appending(path: "api/integrations/gmail/status")
+        url.append(queryItems: [.init(name: "profile", value: profile)])
+        let (data, response) = try await URLSession.shared.data(from: url)
+        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+            throw APIError.badStatus(http.statusCode)
+        }
+        return try JSONDecoder().decode(GmailStatus.self, from: data)
+    }
+
+    /// The OAuth consent URL. Opened in the browser; the server stores the token
+    /// on callback, so the app only ever polls status afterwards.
+    static func gmailAuthURL(profile: String) async throws -> URL {
+        struct Payload: Decodable { let url: String }
+        var url = baseURL.appending(path: "api/integrations/gmail/auth-url")
+        url.append(queryItems: [.init(name: "profile", value: profile)])
+        let (data, response) = try await URLSession.shared.data(from: url)
+        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+            throw APIError.badStatus(http.statusCode)
+        }
+        let payload = try JSONDecoder().decode(Payload.self, from: data)
+        guard let authURL = URL(string: payload.url) else { throw APIError.badStatus(500) }
+        return authURL
+    }
+
+    static func gmailDisconnect(profile: String) async throws {
+        var url = baseURL.appending(path: "api/integrations/gmail/disconnect")
+        url.append(queryItems: [.init(name: "profile", value: profile)])
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        let (_, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+            throw APIError.badStatus(http.statusCode)
+        }
+    }
+}
+
 /// Catalog + tracker state, shared by every tab. One load feeds them all.
 ///
 /// The tracker has two possible homes, and which one is live depends on the
@@ -278,6 +326,17 @@ final class CatalogStore {
         record.status = status.rawValue
         record.updatedAt = ISO8601DateFormatter.flexible.string(from: .now)
         tracker[id] = record
+        await persist(rollingBackTo: previous)
+    }
+
+    /// Delete a tracked record outright. This is how legacy non-internship rows
+    /// (gig/freelance emails ingested before the isInternship rule existed —
+    /// 5CA, micro1) leave the tracker: the server only filters NEW mail, and the
+    /// web expects these to be removed by hand.
+    func removeRecord(_ id: String) async {
+        guard tracker[id] != nil else { return }
+        let previous = tracker
+        tracker[id] = nil
         await persist(rollingBackTo: previous)
     }
 

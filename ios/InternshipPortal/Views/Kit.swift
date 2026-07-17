@@ -184,7 +184,7 @@ struct ApplicationCard: View {
                         Text(record.appliedAgo)
                         if record.fromGmail {
                             Text("·").foregroundStyle(Palette.ink300)
-                            Image(systemName: "envelope.fill").font(.system(size: 9))
+                            GmailMark(size: 11)
                             Text("Gmail")
                         }
                     }
@@ -391,6 +391,69 @@ struct Chevron: View {
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(Palette.ink300)
             .padding(.trailing, 6)
+    }
+}
+
+
+/// The Gmail envelope, ported from the web's GmailMark.jsx (nominative use, to
+/// label the integration and tag inbox-sourced records). Drawn as paths so it
+/// stays crisp at badge sizes — an SF envelope glyph is not Gmail.
+struct GmailMark: View {
+    var size: CGFloat = 14
+
+    var body: some View {
+        Canvas { context, canvasSize in
+            let s = canvasSize.width / 48
+
+            func pt(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x * s, y: y * s) }
+
+            // Right flap (green)
+            var path = Path()
+            path.move(to: pt(45, 16.2)); path.addLine(to: pt(40, 18.95))
+            path.addLine(to: pt(35, 23.7)); path.addLine(to: pt(35, 40))
+            path.addLine(to: pt(42, 40))
+            path.addQuadCurve(to: pt(45, 37), control: pt(45, 40))
+            path.closeSubpath()
+            context.fill(path, with: .color(Color(hex: 0x4CAF50)))
+
+            // Left flap (blue)
+            path = Path()
+            path.move(to: pt(3, 16.2)); path.addLine(to: pt(6.614, 17.91))
+            path.addLine(to: pt(13, 23.7)); path.addLine(to: pt(13, 40))
+            path.addLine(to: pt(6, 40))
+            path.addQuadCurve(to: pt(3, 37), control: pt(3, 40))
+            path.closeSubpath()
+            context.fill(path, with: .color(Color(hex: 0x1E88E5)))
+
+            // Envelope M (red)
+            path = Path()
+            path.move(to: pt(35, 11.2)); path.addLine(to: pt(24, 19.45))
+            path.addLine(to: pt(13, 11.2)); path.addLine(to: pt(12, 17))
+            path.addLine(to: pt(13, 23.7)); path.addLine(to: pt(24, 31.95))
+            path.addLine(to: pt(35, 23.7)); path.addLine(to: pt(36, 17))
+            path.closeSubpath()
+            context.fill(path, with: .color(Color(hex: 0xE53935)))
+
+            // Left fold (dark red)
+            path = Path()
+            path.move(to: pt(3, 12.3)); path.addLine(to: pt(3, 16.2))
+            path.addLine(to: pt(13, 23.7)); path.addLine(to: pt(13, 11.2))
+            path.addLine(to: pt(9.876, 8.86))
+            path.addQuadCurve(to: pt(3, 12.3), control: pt(3.5, 8.5))
+            path.closeSubpath()
+            context.fill(path, with: .color(Color(hex: 0xC62828)))
+
+            // Right fold (yellow)
+            path = Path()
+            path.move(to: pt(45, 12.3)); path.addLine(to: pt(45, 16.2))
+            path.addLine(to: pt(35, 23.7)); path.addLine(to: pt(35, 11.2))
+            path.addLine(to: pt(38.124, 8.86))
+            path.addQuadCurve(to: pt(45, 12.3), control: pt(44.5, 8.5))
+            path.closeSubpath()
+            context.fill(path, with: .color(Color(hex: 0xFBC02D)))
+        }
+        .frame(width: size, height: size * 0.78)   // the mark is wider than tall
+        .accessibilityHidden(true)
     }
 }
 

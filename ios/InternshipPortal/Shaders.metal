@@ -85,161 +85,19 @@ static inline float fbm(float2 p) {
                  currentColor.a);
 }
 
-// ── bubbleField ──────────────────────────────────────────────────────────
-// The Companies view, built the way Wabi's splash is: not N separate circle views
-// but ONE signed-distance field over the whole canvas, warped by a loupe.
-//
-// Why it has to be a field rather than per-view shaders: separate views cannot know
-// about each other, so they can only ever overlap. Evaluating every bubble into one
-// SDF and combining them with a polynomial smooth-minimum makes neighbours grow a
-// meniscus and merge like real bubbles — that surface tension is the whole effect,
-// and it is unreachable any other way.
-//
-// Cost is bounded by the canvas, not the company count: the field is one screen,
-// and the loop is a handful of cheap flops per bubble per pixel.
-
-/// Polynomial smooth minimum (iq). `k` is the blend radius in points: where two
-/// bubbles come within k of each other, the surface bridges instead of creasing.
-static inline float smin(float a, float b, float k) {
-    float h = clamp(0.5 + 0.5 * (b - a) / max(k, 1e-4), 0.0, 1.0);
-    return mix(b, a, h) - k * h * (1.0 - h);
-}
-
-/// Signed distance to the merged field, AND the local sphere radius.
-///
-/// The radius has to travel with the distance. Reconstructing a dome needs to know
-/// how big the sphere under this pixel is: with a fixed shoulder instead, every
-/// bubble becomes a flat disc with a constant-width refracting ring around it —
-/// which is exactly what reads as "a weird border on the edges".
-///
-/// Returns (distance, radius). `bubbles` is packed (x, y, radius) triples.
-static inline float2 fieldSDF(float2 p, device const float *bubbles, int count,
-                              float blend, float time) {
-    float d = 1e9;
-    float rr = 30.0;
-    for (int i = 0; i + 2 < count; i += 3) {
-        // Each bubble drifts on its own phase, so the field breathes and the
-        // bridges between neighbours stretch and thin as they move.
-        float phase = float(i) * 0.37;
-        float2 c = float2(bubbles[i], bubbles[i + 1]);
-        c.x += sin(time * 0.31 + phase) * 2.5;
-        c.y += cos(time * 0.27 + phase * 1.3) * 3.0;
-        float r = bubbles[i + 2];
-        float di = length(p - c) - r;
-
-        // Smooth union, with the radius blended by the same weight so the dome
-        // stays continuous across a merge.
-        float h = clamp(0.5 + 0.5 * (di - d) / max(blend, 1e-4), 0.0, 1.0);
-        d = mix(di, d, h) - blend * h * (1.0 - h);
-        rr = mix(r, rr, h);
-    }
-    return float2(d, rr);
-}
-
-// Shared bubble shading, matched to the Wabi reference by eye and by the physics
-// it photographs (lensball + soap film):
-//   • contents get MILD centre magnification — the picture is laminated inside the
-//     sphere and stays legible, not crushed into the rim by hard Snell bending;
-//   • the rim is BRIGHT, in two lobes (key light + the caustic opposite it) —
-//     light wraps a bubble's silhouette; darkness there reads as a border;
-//   • a whisper of thin-film iridescence rides the rim;
-//   • one broad sheen (curved + glossy) and one tight hotspot (hard surface);
-//   • a breath of white haze, because glass sits between you and the contents.
-static inline half4 shadeBubble(half4 color, float3 normal, float height,
-                                float2 outward, float mask) {
-    // Haze.
-    color.rgb = mix(color.rgb, half3(1.0), half(0.06) * color.a);
-
-    // One key light, up and to the left — same light as the app's card shadows.
-    float3 lightDir = normalize(float3(-0.42, -0.74, 0.53));
-    float ndl = saturate(dot(normal, lightDir));
-    color.rgb += half3(pow(ndl, 5.0) * 0.20 + pow(ndl, 64.0) * 0.85) * color.a;
-
-    // Bright rim, two lobes: lit side, and the refocused caustic opposite.
-    float rim = pow(1.0 - height, 5.0);
-    float lobes = 0.40 + 0.60 * pow(ndl, 2.0)
-                + 0.70 * pow(saturate(dot(normal, -lightDir)), 2.0);
-
-    // Thin-film colour walking around the circumference, rim-only and subtle.
-    float angle = atan2(outward.y, outward.x);
-    float phase = angle * 0.3183 + height * 0.6;   // two hue cycles per revolution
-    half3 film = half3(0.5) + half3(0.5) * half3(
-        half(cos(6.28318 * (phase + 0.00))),
-        half(cos(6.28318 * (phase + 0.33))),
-        half(cos(6.28318 * (phase + 0.67))));
-    half3 rimColor = mix(half3(1.0), film, half(0.30));
-
-    half glow = half(rim * lobes);
-    color.rgb += rimColor * glow * 0.85h;
-    // The rim glows even where the contents thin out (meniscus bridges), which is
-    // what makes merged bubbles read as one skin of glass.
-    color.a = saturate(color.a + glow * 0.4h);
-
-    return color * half(mask);
-}
-
-[[stitchable]] half4 bubbleField(float2 position, SwiftUI::Layer layer, float2 size,
-                                 device const float *bubbles, int count,
-                                 float time, float blend, float mag, float chroma) {
-    float2 field = fieldSDF(position, bubbles, count, blend, time);
-    float d = field.x;
-    float radius = max(field.y, 1.0);
-
-    // Antialias the silhouette over ~1pt of the distance field — free, because the
-    // SDF already measures exactly that.
-    float mask = smoothstep(0.6, -0.6, d);
-    if (mask <= 0.001) return half4(0.0);
-
-    // Surface normal from the field's gradient. Central differences: 4 extra field
-    // evaluations, which is the honest price of not faking the lighting.
-    const float e = 1.25;
-    float dx = fieldSDF(position + float2(e, 0), bubbles, count, blend, time).x
-             - fieldSDF(position - float2(e, 0), bubbles, count, blend, time).x;
-    float dy = fieldSDF(position + float2(0, e), bubbles, count, blend, time).x
-             - fieldSDF(position - float2(0, e), bubbles, count, blend, time).x;
-    float2 grad = normalize(float2(dx, dy) + 1e-5);   // unit radial direction
-
-    // Lift the field into a TRUE hemisphere rather than a fixed shoulder. For a
-    // sphere of radius R, a point at distance (R + d) from the centre sits at
-    // height sqrt(-d(2R + d)) — exact, and it scales with each bubble, so a big
-    // bubble is a big dome instead of a disc with a ring.
-    float height = sqrt(max(-d * (2.0 * radius + d), 0.0)) / radius;   // 1 centre → 0 rim
-
-    // Radial component: 0 at the centre, 1 at the rim. Together with `height` this
-    // is the real sphere normal.
-    float lateral = saturate((radius + d) / radius);
-    float3 normal = normalize(float3(grad * lateral, max(height, 1e-3)));
-
-    // The bubble's loupe: mild magnification, not hard Snell bending. Sampling is
-    // pulled toward the local centre, strongest at the rim, so the contents bulge
-    // gently like a picture laminated inside a lens ball — and stay legible.
-    float2 offset = -grad * radius * mag * (1.0 - height);
-
-    // Chromatic fringe, rim-only, tiny.
-    float edge = pow(1.0 - height, 3.0);
-    float2 spread = grad * radius * chroma * edge;
-    half r = layer.sample(position + offset + spread).r;
-    half4 g = layer.sample(position + offset);
-    half b = layer.sample(position + offset - spread).b;
-    half4 color = half4(r, g.g, b, g.a);
-
-    return shadeBubble(color, normal, height, grad, mask);
-}
-
 // ── glassOrb ─────────────────────────────────────────────────────────────
-// A refractive glass marble: the Companies view's bubbles. The layer beneath is
-// the bubble's contents (tint + company logo); this bends it as if seen through a
-// solid glass sphere, then adds the things that actually sell glass — chromatic
-// fringing at the rim, a Fresnel edge, and a specular hotspot.
-//
-// This is a LAYER effect: it samples the composited layer at offset positions, so
-// `maxSampleOffset` on the Swift side must cover the largest offset produced here
-// or the refraction clips at the edges.
-//
-// Refraction is real rather than the usual parabolic fudge: reconstruct the sphere
-// normal from the pixel's position on the disc, then bend the view ray through it
-// with Snell's law (Metal's refract()). It costs nothing extra and behaves
-// correctly at the rim, where a fudge flattens out and reads like a fisheye photo.
+// One floating glass bubble, matched to the Wabi hero and to real lensball
+// photography. What actually sells those spheres, in order of importance:
+//   1. a broad CRESCENT of light hugging the upper rim (the studio softbox),
+//   2. a fainter counter-crescent along the lower rim (light refocused through
+//      the ball),
+//   3. one small hard specular dot,
+//   4. an inner shade at the bottom that gives the ball weight,
+//   5. contents gently magnified at the centre and compressed at the edge.
+// Deliberately absent: any uniform rim ring. A ring traced around the silhouette
+// is what kept reading as "a border" — real bubbles brighten in crescents, not
+// in circles. The float comes from a drop shadow OUTSIDE the shader (SwiftUI),
+// which also keeps every bubble its own body.
 [[stitchable]] half4 glassOrb(float2 position, SwiftUI::Layer layer,
                               float2 size, float mag, float chroma) {
     float2 center = size * 0.5;
@@ -257,7 +115,8 @@ static inline half4 shadeBubble(half4 color, float3 normal, float height,
     float3 normal = normalize(float3(toCenter / max(radius, 1.0), z));
     float2 outward = toCenter / max(dist, 1e-4);
 
-    // Same bubble loupe as bubbleField: gentle centre magnification.
+    // 5) The loupe: gentle centre magnification, strongest toward the edge, so the
+    // contents bulge like a picture laminated inside the ball and stay legible.
     float2 offset = -outward * dist * mag * (1.0 - z);
 
     float edge = pow(1.0 - z, 3.0);
@@ -267,9 +126,31 @@ static inline half4 shadeBubble(half4 color, float3 normal, float height,
     half b = layer.sample(position + offset - spread).b;
     half4 color = half4(r, g.g, b, g.a);
 
+    // A band hugging the inside of the silhouette — every crescent lives in it.
+    float rimBand = smoothstep(0.55, 0.10, z) * smoothstep(-0.02, 0.10, z);
+
+    // 1) Key crescent, upper rim. The light matches the app's card shadows.
+    float3 keyDir = normalize(float3(-0.30, -0.90, 0.28));
+    float keyFace = saturate(dot(normal, keyDir));
+    color.rgb += half3(rimBand * pow(keyFace, 2.5) * 0.85) * color.a;
+
+    // 2) Counter-crescent, lower rim — fainter, slightly warm like bounced light.
+    float3 counterDir = normalize(float3(0.20, 0.95, 0.20));
+    float counterFace = saturate(dot(normal, counterDir));
+    color.rgb += half3(0.38, 0.36, 0.34) * half(rimBand * pow(counterFace, 3.0)) * color.a;
+
+    // 3) The hotspot: small, hard, off the key direction.
+    float3 hotDir = normalize(float3(-0.42, -0.72, 0.55));
+    color.rgb += half3(pow(saturate(dot(normal, hotDir)), 110.0) * 0.9) * color.a;
+
+    // 4) Weight: shade the lower interior, just inside the counter-crescent.
+    float belly = smoothstep(0.75, 0.25, z) * saturate(normal.y);
+    color.rgb -= half3(belly * 0.12) * color.a;
+
+    // A breath of haze so the glass reads as BETWEEN you and the contents.
+    color.rgb = mix(color.rgb, half3(1.0), half(0.04) * color.a);
+
     // Antialias the silhouette across roughly one pixel.
     float aa = 1.5 / max(radius, 1.0);
-    float mask = smoothstep(1.0, 1.0 - aa, nd);
-
-    return shadeBubble(color, normal, z, outward, mask);
+    return color * half(smoothstep(1.0, 1.0 - aa, nd));
 }

@@ -94,39 +94,25 @@ struct SplashView: View {
         .accessibilityLabel("Internship Portal")
     }
 
-    /// The orbs' contents, warped by the shared bubbleField shader — so they merge,
-    /// breathe, and light exactly like the Companies view.
+    /// The cluster: the same floating GlassOrbs the Companies view draws — large
+    /// behind, small in front, each with its own shadow and out-of-step bob — so
+    /// the splash and the market view are visibly the same material.
     private func bubbleCluster(width: CGFloat, height: CGFloat) -> some View {
-        let packed: [Float] = Self.orbs.flatMap {
-            [Float($0.x * width), Float($0.y * width), Float($0.r * width)]
-        }
-
-        return TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: reduceMotion)) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { timeline in
             let t = ShaderClock.seconds(timeline.date)
 
             ZStack(alignment: .topLeading) {
-                Color.clear
+                ForEach(Self.orbs.sorted { $0.r > $1.r }) { orb in
+                    let d = orb.r * width * 2
+                    let bob = reduceMotion ? 0 : sin(t * 0.5 + Double(orb.id) * 0.9) * 2.5
 
-                ForEach(Self.orbs) { orb in
-                    // The exact contents the Companies bubbles draw — same chip,
-                    // same logo pipeline — so the splash and the market view are
-                    // visibly the same material.
-                    BubbleContents(bubble: orb.bubble, diameter: orb.r * width * 2)
+                    GlassOrb(bubble: orb.bubble, diameter: d)
+                        .shadow(color: .black.opacity(0.16), radius: d * 0.11, y: d * 0.08)
+                        .offset(y: bob)
                         .position(x: orb.x * width, y: orb.y * width)
                 }
             }
             .frame(width: width, height: height)
-            .layerEffect(
-                ShaderLibrary.bubbleField(
-                    .float2(CGSize(width: width, height: height)),
-                    .floatArray(packed),
-                    .float(t),
-                    .float(12),     // blend — the cluster kisses, like the reference
-                    .float(0.16),   // magnification — matches the Companies field
-                    .float(0.035)   // chromatic fringe
-                ),
-                maxSampleOffset: CGSize(width: 44, height: 44)
-            )
         }
     }
 }

@@ -26,9 +26,9 @@
 "Early-stage teams" = "アーリーステージのチーム";
 
 /* Home */
-"Good morning, Mohamed" = "おはようございます、Mohamedさん";
-"Good afternoon, Mohamed" = "こんにちは、Mohamedさん";
-"Good evening, Mohamed" = "こんばんは、Mohamedさん";
+"Good morning, Mohamed" = "おはようございます、\nMohamedさん";
+"Good afternoon, Mohamed" = "こんにちは、\nMohamedさん";
+"Good evening, Mohamed" = "こんばんは、\nMohamedさん";
 "1 interview in progress" = "面接進行中 1件";
 "%lld interviews in progress" = "面接進行中 %lld件";
 "Nothing tracked yet" = "まだ何もトラッキングしていません";
