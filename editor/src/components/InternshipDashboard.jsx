@@ -591,12 +591,16 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
     englishFirst: visibleCatalog.filter(item => item.languageType === 'English-first').length,
   }), [visibleCatalog, meta.target]);
   const latestVerifiedDate = useMemo(() => {
+    // "checked <date>" = the newest of any listing's verifiedDate and the
+    // catalog-wide liveness sweep (meta.lastCheckedDate from auto-refresh).
     const dates = catalog
       .map(item => item.verifiedDate)
       .filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date || ''))
       .sort();
-    return dates.at(-1) || meta.researchDate;
-  }, [catalog, meta.researchDate]);
+    const newestVerified = dates.at(-1) || meta.researchDate;
+    const lastChecked = meta.lastCheckedDate || '';
+    return lastChecked > newestVerified ? lastChecked : newestVerified;
+  }, [catalog, meta.researchDate, meta.lastCheckedDate]);
   const companyQuery = normalizeCompanyQuery(query);
   const hasCatalogTextMatch = useMemo(() => {
     const needle = query.trim().toLowerCase();

@@ -19,6 +19,7 @@ import {
 } from './seeds/internships.js';
 import { buildSeedCatalog } from './seeds/catalog.js';
 import { isRetiredInternshipId } from './seeds/catalog-audit-2026-07-02.js';
+import { autoRefreshData } from './seeds/auto-refresh.js';
 import * as gmailOAuth from './gmail/oauth.js';
 import * as gmailStore from './gmail/store.js';
 import { encAvailable } from './gmail/crypto.js';
@@ -121,9 +122,14 @@ async function writeInternshipCatalog(items) {
 
 function internshipCatalogMeta(items) {
   const verifiedDates = items.map(item => item.verifiedDate).filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date || '')).sort();
+  // The auto-refresh overlay liveness-checks the WHOLE catalog on each run, so
+  // its updatedAt is the honest "checked <date>" — usually newer than the last
+  // per-listing verifiedDate (which only moves when a listing is re-researched).
+  const lastChecked = String(autoRefreshData.updatedAt || '').slice(0, 10);
   return {
     target: Math.max(seedInternshipStats.target || 200, items.length),
     researchDate: verifiedDates.at(-1) || INTERNSHIP_RESEARCH_DATE,
+    lastCheckedDate: /^\d{4}-\d{2}-\d{2}$/.test(lastChecked) ? lastChecked : '',
     researchNote: INTERNSHIP_RESEARCH_NOTE,
     count: items.length,
   };

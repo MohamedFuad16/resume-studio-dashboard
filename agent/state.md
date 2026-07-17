@@ -25,6 +25,23 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-17 — editor polish round 2 + catalog freshness.** (1) Editor: ALL hairline
+  dividers removed (topbar/rail/pane-head/sec-hd/pg-block/item — whitespace only);
+  manual Update button removed (auto-compile was already on; hidden `compile-btn`
+  keeps the E2E hook, an "Updating" chip shows during compiles); Fit zoom → `view=FitH`
+  + `.pdf-frame` aspect 2/3 kills the viewer letterboxing; phone/email/LinkedIn/GitHub
+  each full-width rows; skills tag inputs 1-per-row. (2) Catalog: ran
+  `refresh-catalog.js` (171 checked, retired Harbinger Motors global-091, 1 conflict
+  left active); NEW `catalog-audit-2026-07-17.js` overlay — Mercari Class-of-2028 SWE
+  internship REINSTATED (07-02 audit retired it for its passed 6/30 deadline, but the
+  official Workable API shows it published/live today → deadline now "Not stated");
+  Mercari security/UI-UX 2028 verifiedDate bumped. `isRetiredInternshipId` subtracts
+  `reinstatedIds20260717`; buildSeedCatalog applies 07-17 patches after 07-02.
+  (3) Radar "checked <date>" now uses `meta.lastCheckedDate` (auto-refresh.json
+  updatedAt — the whole-catalog liveness sweep) when newer than any verifiedDate.
+  Research notes: Woven/PFN/Mercari-Build+ 2026 cohorts closed (spring deadlines);
+  Rapyuta/PayPay/SmartNews have zero intern postings on their ATS APIs; aggregators
+  (japan-dev, tokyodev) list only HENNGE — the catalog already covers the market.
 - **2026-07-16 (night) — post-overhaul bug sweep.** Two regressions from the editor
   redesign's late override layer, both caused by end-of-file rules outranking legacy
   media queries: (1) `.editor-view .sidebar{width:560px}` pinned the form column inside
