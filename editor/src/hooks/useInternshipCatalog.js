@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { internshipApi } from '../api/client.js';
 
 export const CATALOG_EVENT = 'resume-studio:internship-catalog-change';
-const EMPTY_META = { target: 200, researchDate: '', researchNote: '', count: 0 };
+const EMPTY_META = { target: 200, researchDate: '', lastCheckedDate: '', researchNote: '', count: 0 };
 // Module-level cache shared across all mounts. This is intentional and safe: the
 // internship catalog is GLOBAL (profile-independent) — matching/ranking is applied
 // per-profile downstream (utils/internshipRanking, the tracker), not baked into the

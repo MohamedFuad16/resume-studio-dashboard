@@ -1,5 +1,14 @@
 {
-  "updatedAt": null,
-  "retired": [],
+  "updatedAt": "2026-07-16",
+  "retired": [
+    {
+      "id": "global-091",
+      "company": "Harbinger Motors",
+      "role": "Production Data Analytics Intern",
+      "retiredAt": "2026-07-16",
+      "reason": "apply URL HTTP-dead · model: unknown",
+      "evidenceUrl": "https://job-boards.greenhouse.io/harbingermotors/jobs/5164341007"
+    }
+  ],
   "deadlinePatches": {}
 }

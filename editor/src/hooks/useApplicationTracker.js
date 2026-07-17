@@ -134,6 +134,12 @@ export function useApplicationTracker(profileId) {
         // A record keeps its origin once set; only a fresh Gmail action can stamp it.
         source: internship.source || current[internship.id]?.source || 'web',
         sourceMeta: internship.sourceMeta || current[internship.id]?.sourceMeta || null,
+        // Reapplication cooldown (set by a Gmail rejection that states a wait
+        // window). Carried forward unless a new value arrives, so re-tracking a
+        // role doesn't wipe the company's stated cooldown.
+        reapplyAfter: internship.reapplyAfter ?? current[internship.id]?.reapplyAfter ?? null,
+        reapplyNote: internship.reapplyNote ?? current[internship.id]?.reapplyNote ?? '',
+        reapplyMonths: internship.reapplyMonths ?? current[internship.id]?.reapplyMonths ?? null,
         updatedAt: new Date().toISOString(),
         createdAt: current[internship.id]?.createdAt || new Date().toISOString(),
         milestones: Array.isArray(current[internship.id]?.milestones) ? current[internship.id].milestones : [],

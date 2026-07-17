@@ -7,6 +7,7 @@ import GmailMark from './GmailMark.jsx';
 import { DetailPanel } from './InternshipDashboard.jsx';
 import InterviewDateModal from './InterviewDateModal.jsx';
 import { displayCompany, displayRole, displayValue, formatDisplayDeadline } from '../utils/internshipDisplay.js';
+import { companyCooldownMap, cooldownForCompany, cooldownLabel } from '../utils/reapplyCooldown.js';
 
 const STATUS_ICONS = {
   saved: Bookmark,
@@ -56,6 +57,7 @@ export default function ApplicationsView({ isJa, activeProfile, onOpenRadar, onO
   const [filter, setFilter] = useState('all');
   const [interviewPending, setInterviewPending] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
+  const cooldownMap = useMemo(() => companyCooldownMap(records), [records]);
 
   const visible = useMemo(
     () => (filter === 'all' ? records : records.filter(record => record.status === filter)),
@@ -122,9 +124,10 @@ export default function ApplicationsView({ isJa, activeProfile, onOpenRadar, onO
         {visible.length ? visible.map(record => {
           const item = catalog.find(entry => entry.id === record.internshipId)
             || { ...record, id: record.internshipId, url: record.applyUrl };
+          const cooldown = cooldownForCompany(cooldownMap, record.company);
           return (
             <article className="application-row" key={record.internshipId}>
-              <span className="application-company"><CompanyLogo item={item} /><button type="button" className="application-company-trigger" onClick={() => setSelectedItem(item)} aria-label={isJa ? `${displayCompany(item, isJa)}の詳細を開く` : `Open details for ${displayCompany(item, isJa)}`}><b>{displayCompany(item, isJa)}{record.source === 'gmail' && <span className="src-gmail" title={isJa ? 'Gmailから追加' : 'Added from Gmail'}><GmailMark size={12} /></span>}</b><small>{displayRole(item.role || record.role, isJa)}</small></button></span>
+              <span className="application-company"><CompanyLogo item={item} /><button type="button" className="application-company-trigger" onClick={() => setSelectedItem(item)} aria-label={isJa ? `${displayCompany(item, isJa)}の詳細を開く` : `Open details for ${displayCompany(item, isJa)}`}><b>{displayCompany(item, isJa)}{record.source === 'gmail' && <span className="src-gmail" title={isJa ? 'Gmailから追加' : 'Added from Gmail'}><GmailMark size={12} /></span>}</b><small>{displayRole(item.role || record.role, isJa)}{cooldown ? <span className="application-cooldown-tag"><CalendarClock size={11} />{cooldownLabel(cooldown, isJa)}</span> : null}</small></button></span>
               <span>{displayValue(record.location, isJa)}</span>
               <span className="application-deadline">{formatDisplayDeadline(record.deadline, isJa)}</span>
               <select value={record.status} onChange={event => onStatusChange(item, event.target.value)} aria-label={isJa ? `${record.company}の応募状況` : `Status for ${record.company}`}>
@@ -148,6 +151,7 @@ export default function ApplicationsView({ isJa, activeProfile, onOpenRadar, onO
             onApply={onApply}
             onClose={() => setSelectedItem(null)}
             onOpenEditor={onOpenEditor}
+            cooldown={cooldownForCompany(cooldownMap, selectedItem.company)}
             isJa={isJa}
           />
         </div>
