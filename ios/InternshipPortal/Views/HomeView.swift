@@ -145,7 +145,7 @@ private struct InsightGrid: View {
                     value: "\(store.count(of: .interview))",
                     action: { tab = .applications }
                 ) {
-                    IconTile(symbol: "calendar.badge.clock", tint: .orange, size: 36, glyph: 16)
+                    IconTile(symbol: "calendar.badge.clock", tint: .green, size: 36, glyph: 16)
                 }
 
                 InsightCard(
@@ -154,7 +154,7 @@ private struct InsightGrid: View {
                     value: "\(store.count(of: .rejected))",
                     action: { tab = .applications }
                 ) {
-                    IconTile(symbol: "circle.slash", tint: .gray, size: 36, glyph: 16)
+                    IconTile(symbol: "circle.slash", tint: .red, size: 36, glyph: 16)
                 }
 
                 InsightCard(

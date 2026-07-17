@@ -300,33 +300,72 @@ private struct FloatingOrb: View {
     var item: PlacedBubble
     var action: () -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var drag: CGSize = .zero
+    @State private var dragging = false
+
     private var phase: Double {
         Double(abs(item.bubble.id.hashValue) % 977) / 977.0 * 6.28318
     }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { timeline in
             let t = ShaderClock.seconds(timeline.date)
-            let bob = sin(t * 0.5 + phase) * 2.5
+            // The bob pauses while you hold the bubble — a thing you are touching
+            // should not also be drifting under your finger.
+            let bob = (reduceMotion || dragging) ? 0 : sin(t * 0.5 + phase) * 2.5
 
-            Button(action: action) {
-                GlassOrb(bubble: item.bubble, diameter: item.radius * 2)
-                    // The float: a soft shadow well below the ball, scaled to it.
-                    .shadow(
-                        color: .black.opacity(0.16),
-                        radius: item.radius * 0.22,
-                        y: item.radius * 0.16
-                    )
-            }
-            .buttonStyle(.plain)
-            .offset(y: bob)
+            GlassOrb(bubble: item.bubble, diameter: item.radius * 2)
+                // Lifted while held: bigger, with a longer shadow.
+                .shadow(
+                    color: .black.opacity(dragging ? 0.24 : 0.16),
+                    radius: item.radius * (dragging ? 0.4 : 0.22),
+                    y: item.radius * (dragging ? 0.3 : 0.16)
+                )
+                .scaleEffect(dragging ? 1.08 : 1)
+                .offset(x: drag.width, y: drag.height + bob)
+                .zIndex(dragging ? 1 : 0)
         }
         .position(x: item.center.x, y: item.center.y)
+        .gesture(
+            // Pull a bubble out of the cluster and it springs home — the cluster
+            // is where it belongs, and the snap is what says so. minimumDistance 0
+            // so the same gesture carries the tap.
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    if !dragging {
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+                            dragging = true
+                        }
+                    }
+                    // Rubber-banding: the further out you pull, the more the
+                    // cluster resists — it reads as elastic rather than free.
+                    let pull = hypot(value.translation.width, value.translation.height)
+                    let give = pull > 0 ? min(1, 90 / pull * 1.6) : 1
+                    drag = CGSize(
+                        width: value.translation.width * max(0.35, give),
+                        height: value.translation.height * max(0.35, give)
+                    )
+                }
+                .onEnded { value in
+                    let moved = hypot(value.translation.width, value.translation.height)
+                    // A bouncy spring, not a linear ease: the bubble should
+                    // overshoot slightly and settle, the way a tethered thing does.
+                    withAnimation(.spring(response: 0.55, dampingFraction: 0.55)) {
+                        drag = .zero
+                        dragging = false
+                    }
+                    if moved < 12 { action() }
+                }
+        )
+        .accessibilityElement()
+        .accessibilityAddTraits(.isButton)
         .accessibilityLabel(
             "\(item.bubble.name), \(item.bubble.roleCount) role"
                 + (item.bubble.roleCount == 1 ? "" : "s")
                 + (item.bubble.status.map { ", \($0.label)" } ?? "")
         )
+        .accessibilityAction { action() }
     }
 }
 
@@ -335,47 +374,55 @@ struct BubbleContents: View {
     var bubble: CompanyBubble
     var diameter: CGFloat
 
+    /// The logo's own background, once known. Cloudflare's orange, BMO's blue —
+    /// the brand's field becomes the bubble's field, so the sphere reads as that
+    /// company rather than as a white chip with a sticker on it.
+    @State private var brand: Color?
+    @State private var resolved = false
+
     private var monogram: String {
         bubble.name.trimmingCharacters(in: .whitespaces).first.map { String($0).uppercased() } ?? "?"
     }
 
+    /// Bare marks (transparent artwork) get white — the field a logo is designed
+    /// against — not the tier pastel, which tinted every mark the wrong colour.
+    private var field: Color { brand ?? .white }
+
     var body: some View {
         ZStack {
-            // Sky-to-depth gradient: light where the key light sits, saturated at
-            // the bottom, so the magnification has real structure to bulge. The
-            // white highlights come from the shader now, not painted here — the
-            // old painted white pole doubled with the shader's and looked plastic.
+            // ONE circle, filling the whole sphere. The old white chip inside a
+            // pastel ball left a visible ring and made the mark look pasted on;
+            // the brand field IS the bubble now, edge to edge.
             Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [bubble.tint.bg, bubble.tint.fg.opacity(0.72)],
-                        center: .init(x: 0.38, y: 0.28),
-                        startRadius: diameter * 0.06,
-                        endRadius: diameter * 0.85
+                .fill(field)
+                .overlay {
+                    // A touch of depth so the lens has something to bend: light at
+                    // the key-light pole, a shade at the far one.
+                    Circle().fill(
+                        LinearGradient(
+                            colors: [.white.opacity(0.28), .clear, .black.opacity(0.10)],
+                            startPoint: .topLeading, endPoint: .bottomTrailing
+                        )
                     )
-                )
+                }
 
-            // The mark rides on a white circular chip. Favicons are square; drawn
-            // bare they read as stretched stickers once the lens magnifies them —
-            // a circle inside a sphere stays a circle from every angle.
-            ZStack {
-                Circle()
-                    .fill(.white.opacity(0.92))
-                // Inscribed, not clipped: a square logo fits inside the circular
-                // chip when its side is diameter/√2 — padding ≈ 0.147 of the chip.
-                // The old tighter padding cut every square favicon's corners off,
-                // which is exactly "the logo doesn't fit the bubble".
-                LogoImage(candidates: bubble.logoCandidates) { monogramView }
-                    .padding(diameter * 0.19)
+            LogoImage(candidates: bubble.logoCandidates, onBackground: { colour in
+                withAnimation(.easeOut(duration: 0.25)) {
+                    brand = colour
+                    resolved = true
+                }
+            }) {
+                monogramView
             }
-            // The chip fills the sphere (~97%) — like the Wabi orbs, where the
-            // picture IS the bubble. The tint survives as a sliver at the rim and
-            // in the glass shading; a small chip on a flat ball read as a button.
-            .frame(width: diameter * 0.97, height: diameter * 0.97)
+            // Inscribed in the sphere: a square mark fits when its side is
+            // diameter/√2, so ~0.15 of padding. Marks that BRING their own field
+            // fill it completely — cropping Cloudflare's orange to a small square
+            // is exactly what looked wrong.
+            .padding(diameter * (brand == nil ? 0.24 : 0.0))
+            .clipShape(.circle)
 
-            // Tracked companies wear their status as a crisp presence badge. With
-            // the chip at 97% a ring would hug the refracting rim again (the smear
-            // this replaced); a dot at mid-radius stays legible under the lens.
+            // Tracked companies wear a presence badge at mid-radius, where the
+            // lens doesn't smear it.
             if let status = bubble.status {
                 let badge = max(12, diameter * 0.18)
                 Circle()
@@ -391,6 +438,7 @@ struct BubbleContents: View {
     }
 
     private var monogramView: some View {
+        // On white, the tier tint is the only colour the mark has.
         Text(monogram)
             .font(.system(size: diameter * 0.32, weight: .bold))
             .foregroundStyle(bubble.tint.fg)

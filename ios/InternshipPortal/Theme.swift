@@ -40,7 +40,10 @@ enum Palette {
     static let blue50 = Color(hex: 0xEFF6FF)
     static let blue600 = Color(hex: 0x2563EB)
     static let indigo = Color(hex: 0x6366F1)
-    static let red = Color(hex: 0xEF4444)       // today marker
+    static let red = Color(hex: 0xEF4444)       // red-500 — today marker, rejection
+    static let red50 = Color(hex: 0xFEF2F2)
+    static let green = Color(hex: 0x16A34A)     // green-600 — a live interview
+    static let green50 = Color(hex: 0xF0FDF4)
 }
 
 /// Corner radii, straight from the reference's rounded-[Npx] classes.
@@ -105,6 +108,8 @@ extension Color6 {
         case .blue: Palette.blue600
         case .indigo: Palette.indigo
         case .gray: Palette.ink500
+        case .red: Palette.red
+        case .green: Palette.green
         }
     }
 
@@ -116,6 +121,8 @@ extension Color6 {
         case .blue: Palette.blue50
         case .indigo: Color(hex: 0xEEF2FF)
         case .gray: Palette.hairline
+        case .red: Palette.red50
+        case .green: Palette.green50
         }
     }
 }

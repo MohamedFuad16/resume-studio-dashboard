@@ -137,15 +137,17 @@ enum ApplicationStatus: String, CaseIterable, Codable, Identifiable {
         }
     }
 
-    /// Rejected is a real outcome, not a failure to hide — it keeps a muted voice
-    /// rather than shouting in red.
+    /// The pipeline reads as RED / GREEN / BLUE at a glance: rejection is red,
+    /// a live interview is green, an application in flight is blue. The two
+    /// pre-send stages stay off that axis (slate, amber) so the three outcomes
+    /// that actually matter own the primaries and nothing competes with them.
     var tint: Color6 {
         switch self {
-        case .saved: .indigo
-        case .applying: .purple
+        case .saved: .gray
+        case .applying: .orange
         case .applied: .blue
-        case .interview: .orange
-        case .rejected: .gray
+        case .interview: .green
+        case .rejected: .red
         }
     }
 
@@ -163,7 +165,7 @@ enum ApplicationStatus: String, CaseIterable, Codable, Identifiable {
 
 /// Model-layer tint token; Theme.swift maps these to real colors so this file
 /// stays free of SwiftUI.
-enum Color6 { case teal, purple, orange, blue, indigo, gray }
+enum Color6 { case teal, purple, orange, blue, indigo, gray, red, green }
 
 /// The three bands the Companies view clusters by.
 enum CompanyTier: String, CaseIterable, Identifiable {

@@ -559,6 +559,7 @@ struct GmailSettingsView: View {
     @State private var status: GmailStatus?
     @State private var error: String?
     @State private var busy = false
+    @State private var syncing = false
     @State private var confirmDisconnect = false
 
     /// Gmail connections are keyed by the SERVER profile id (the web passes its
@@ -598,6 +599,34 @@ struct GmailSettingsView: View {
                 }
             }
 
+            if status?.connected == true {
+                Section {
+                    Button {
+                        resync(backfill: false)
+                    } label: {
+                        HStack {
+                            if syncing { ProgressView().controlSize(.small) }
+                            Text("Sync now")
+                        }
+                    }
+                    .disabled(syncing)
+
+                    Button {
+                        resync(backfill: true)
+                    } label: {
+                        HStack {
+                            if syncing { ProgressView().controlSize(.small) }
+                            Text("Rescan last 90 days")
+                        }
+                    }
+                    .disabled(syncing)
+                } header: {
+                    Text("Resync")
+                } footer: {
+                    Text("Sync now reads new mail. A rescan re-reads 90 days and can take a couple of minutes — useful after a rule change, or when something is missing.")
+                }
+            }
+
             Section {
                 if status?.connected == true {
                     Button(String(localized: "Disconnect Gmail"), role: .destructive) {
@@ -634,6 +663,15 @@ struct GmailSettingsView: View {
             Button(String(localized: "Cancel"), role: .cancel) {}
         } message: {
             Text(String(localized: "Already-tracked applications stay; new mail just stops flowing in."))
+        }
+    }
+
+    private func resync(backfill: Bool) {
+        syncing = true
+        Task {
+            defer { syncing = false }
+            await store.drainGmail(backfillDays: backfill ? 90 : nil)
+            await refresh()
         }
     }
 

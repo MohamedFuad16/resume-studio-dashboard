@@ -13,6 +13,20 @@
 import CryptoKit
 import SwiftUI
 
+/// A logo plus the colour it wants to sit on.
+///
+/// Favicons come in two shapes: a coloured tile with the mark knocked out
+/// (Cloudflare's orange, BMO's blue) or a dark mark on transparent/white. Painting
+/// both on a white chip is what made half the bubbles look like stickers — the
+/// brand's own field is the bubble's colour, so read it off the artwork instead of
+/// guessing a pastel.
+struct CompanyLogo {
+    let image: UIImage
+    /// The artwork's own background, sampled from its edges. nil when the edges
+    /// are transparent (a bare mark), in which case the caller supplies white.
+    let background: Color?
+}
+
 /// SHA-256 of DuckDuckGo's "unknown domain" placeholder (1478 bytes, constant —
 /// verified against multiple made-up domains).
 private let ddgPlaceholderSHA256 =
@@ -25,21 +39,75 @@ enum LogoLoader {
     /// In-memory results so a logo that appears in the radar, a bubble, and a
     /// sheet is fetched once. URLCache still handles the HTTP layer underneath.
     private static let cache = NSCache<NSString, UIImage>()
+    private static var backgrounds: [String: Color?] = [:]
     private static var missing: Set<String> = []
 
     /// Pixel width good enough to fill a bubble without visible softness.
     private static let crispWidth = 48
 
-    /// Walks the chain and returns the first crisp image; a small image only
-    /// wins when no candidate anywhere in the chain is crisp.
-    static func load(candidates: [String]) async -> UIImage? {
-        var small: UIImage?
+    /// Walks the chain and returns the first crisp logo; a small one only wins
+    /// when no candidate anywhere in the chain is crisp.
+    static func load(candidates: [String]) async -> CompanyLogo? {
+        var small: CompanyLogo?
         for urlString in candidates {
             guard let image = await load(urlString) else { continue }
-            if (image.cgImage?.width ?? 0) >= crispWidth { return image }
-            if small == nil { small = image }
+            let logo = CompanyLogo(image: image, background: background(of: image, key: urlString))
+            if (image.cgImage?.width ?? 0) >= crispWidth { return logo }
+            if small == nil { small = logo }
         }
         return small
+    }
+
+    /// The artwork's background, read from its outer ring.
+    ///
+    /// Sampling the EDGE, not the average: the average of a logo is the mark mixed
+    /// with its field (Cloudflare would come back muddy brown). The edge is the
+    /// field itself. A ring that is mostly transparent means a bare mark → nil, and
+    /// a ring that disagrees with itself (a photo, a gradient) is not a flat brand
+    /// colour → nil as well, rather than a confident wrong answer.
+    private static func background(of image: UIImage, key: String) -> Color? {
+        if let hit = backgrounds[key] { return hit }
+
+        guard let cg = image.cgImage else { return nil }
+        let side = 16
+        var pixels = [UInt8](repeating: 0, count: side * side * 4)
+        guard let ctx = CGContext(
+            data: &pixels, width: side, height: side, bitsPerComponent: 8,
+            bytesPerRow: side * 4, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: side, height: side))
+
+        var samples: [(Double, Double, Double)] = []
+        var transparent = 0
+        for y in 0..<side {
+            for x in 0..<side where x == 0 || y == 0 || x == side - 1 || y == side - 1 {
+                let i = (y * side + x) * 4
+                let a = Double(pixels[i + 3]) / 255
+                if a < 0.5 { transparent += 1; continue }
+                // Un-premultiply so a semi-transparent edge doesn't read as dark.
+                samples.append((Double(pixels[i]) / 255 / a,
+                                Double(pixels[i + 1]) / 255 / a,
+                                Double(pixels[i + 2]) / 255 / a))
+            }
+        }
+
+        let ring = (side - 1) * 4
+        var result: Color?
+        if transparent <= ring / 3, !samples.isEmpty {
+            let n = Double(samples.count)
+            let mean = (samples.reduce(0) { $0 + $1.0 } / n,
+                        samples.reduce(0) { $0 + $1.1 } / n,
+                        samples.reduce(0) { $0 + $1.2 } / n)
+            // Reject a busy edge: if any sample is far from the mean, this is not
+            // one flat brand colour.
+            let spread = samples.map { max(abs($0.0 - mean.0), abs($0.1 - mean.1), abs($0.2 - mean.2)) }.max() ?? 0
+            if spread < 0.18 {
+                result = Color(.sRGB, red: mean.0, green: mean.1, blue: mean.2)
+            }
+        }
+        backgrounds[key] = result
+        return result
     }
 
     static func load(_ urlString: String) async -> UIImage? {
@@ -70,13 +138,18 @@ enum LogoLoader {
 /// or the provided fallback when there is none worth showing.
 struct LogoImage<Fallback: View>: View {
     var candidates: [String]
+    /// Fires when the artwork's own background colour is known, so a bubble can
+    /// paint itself in the brand's field.
+    var onBackground: ((Color?) -> Void)?
     @ViewBuilder var fallback: () -> Fallback
 
-    @State private var image: UIImage?
+    @State private var logo: CompanyLogo?
     @State private var resolved = false
 
-    init(candidates: [String], @ViewBuilder fallback: @escaping () -> Fallback) {
+    init(candidates: [String], onBackground: ((Color?) -> Void)? = nil,
+         @ViewBuilder fallback: @escaping () -> Fallback) {
         self.candidates = candidates
+        self.onBackground = onBackground
         self.fallback = fallback
     }
 
@@ -87,8 +160,8 @@ struct LogoImage<Fallback: View>: View {
 
     var body: some View {
         Group {
-            if let image {
-                Image(uiImage: image)
+            if let logo {
+                Image(uiImage: logo.image)
                     .resizable()
                     .scaledToFit()
             } else {
@@ -99,8 +172,9 @@ struct LogoImage<Fallback: View>: View {
         }
         .task(id: candidates) {
             guard !candidates.isEmpty else { return }
-            image = await LogoLoader.load(candidates: candidates)
+            logo = await LogoLoader.load(candidates: candidates)
             resolved = true
+            onBackground?(logo?.background)
         }
     }
 }

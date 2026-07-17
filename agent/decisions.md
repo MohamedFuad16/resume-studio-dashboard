@@ -1270,3 +1270,47 @@ the same floating orbs, so it stays the same material as Companies.
 **Verified.** Builds clean, zero project warnings. Visual sign-off left to the user
 by request. NOT yet ported: the Gmail→Firestore drain loop (web/Azure still does
 ingestion; iOS manages the connection only).
+
+## ADR-0045 · 2026-07-17 · The drain moves into the app; a deterministic gig guard; brand-field bubbles
+**Context.** Device testing found: rejected showed 1 when the inbox has 9; micro1
+(a gig platform) was tracked despite the isInternship rule; logos looked low-quality
+and "pasted on"; bubbles wanted drag-with-snap-back; the status donut wanted an RGB
+palette; splash should play every launch while under review.
+**Two data bugs, one root each — found by reading prod, not by guessing.**
+1. **The 41-action queue.** `pending` held 41 classified actions (9 rejected, 13
+   applied, 19 interview) that nothing had applied. The server only QUEUES; the web's
+   `useGmailInbox` was the ONLY drain, so a phone-only user's tracker froze at
+   whatever the web last ingested. Fixed by porting the drain: `GmailDrain.swift`
+   mirrors useGmailInbox.js rule-for-rule (one record per company, monotonic status,
+   `gmail-<msgId>` milestone ids, ack-even-when-skipped so the queue can't wedge),
+   runs detached after every `load()`, and is exposed in Settings as "Sync now" /
+   "Rescan last 90 days". One tracker write per drain, not one per action.
+   NOTE: prod backfill exceeds Azure ingress's 240s cap and returns 504 while the
+   server keeps working — so sync-now is fire-and-forget and the drain reads the
+   queue afterwards rather than trusting the response.
+2. **micro1/5CA/Turing.** Not a code bug: the prompt states the rule correctly and
+   gpt-5-nano answers `isInternship: true` anyway. A rule we can state exactly should
+   not be delegated to a cheap model's judgement, so `looksLikeGig()` (classify.js)
+   and `GigFilter` (iOS) now override the model — role regex (language expert, LLM
+   trainer, annotation, customer support, quality analyst…) + gig-platform names
+   (micro1, 5CA, remotasks, appen, outlier). Every entry corresponds to a wrong
+   record observed in the real inbox. Unit-checked against the live queue: blocks
+   micro1/5CA/Turing, keeps HENNGE/Rakuten/ABEJA/ispace. The model proposes, the
+   guard disposes. Both sides carry it because both write the same records; iOS's
+   copy is what's live today (the server's ships on the next Azure deploy).
+**Design.**
+- **RGB pipeline**: rejected=red-500, interview=green-600, applied=blue-600; the
+  pre-send stages (saved=slate, applying=amber) stay OFF the primary axis so the
+  three outcomes that matter own it. Home's insight tiles speak the same language.
+- **Brand-field bubbles**: `LogoLoader` samples each logo's own background from its
+  EDGE ring (the average of a logo is the mark mixed with its field — Cloudflare
+  came back muddy brown; the edge IS the field) and rejects a busy/transparent ring
+  rather than guessing. That colour fills the sphere edge-to-edge; marks that bring
+  a field are no longer inset. The white-chip-inside-a-pastel-ball look is gone.
+- **Drag + snap**: rubber-banded pull (resistance grows with distance), lift (scale
+  + longer shadow), bob pauses while held, bouncy spring home — the cluster is where
+  the bubble belongs and the snap says so.
+- **Splash**: 2.6s on EVERY launch during the debugging phase; comment marks the
+  line to revert before shipping.
+**Verified.** Builds clean; signed with the personal team and INSTALLED on the
+paired iPhone 15 Pro. Runtime behaviour is the user's to check.

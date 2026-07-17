@@ -253,6 +253,11 @@ final class CatalogStore {
             internships = try await catalog
             tracker = await tracked
             phase = .loaded
+
+            // Pull anything Gmail queued since last time. Detached from the load
+            // so a slow inbox never delays the catalog appearing; it updates the
+            // tracker in place when it lands.
+            Task { await self.drainGmail() }
         } catch {
             phase = .failed(error.localizedDescription)
         }

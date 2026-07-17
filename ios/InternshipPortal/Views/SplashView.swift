@@ -87,7 +87,10 @@ struct SplashView: View {
             // `simctl launch … -holdSplash YES` keeps the splash up for screenshots.
             if UserDefaults.standard.bool(forKey: "holdSplash") { return }
             #endif
-            try? await Task.sleep(for: .seconds(reduceMotion ? 0.6 : 1.8))
+            // DEBUGGING PHASE: the splash plays on EVERY launch, at a length you
+            // can actually look at, because it is under active review. Drop this
+            // back to ~1.8s (and consider once-per-session) before shipping.
+            try? await Task.sleep(for: .seconds(reduceMotion ? 1.2 : 2.6))
             onFinished()
         }
         .accessibilityElement()

@@ -29,6 +29,25 @@ function parseJson(text) {
 
 const VALID_KINDS = new Set(['applied', 'rejected', 'interview', 'offer', 'other']);
 
+// Roles and platforms that are never internships, whatever the triage model says.
+//
+// The prompt below already spells this rule out, and gpt-5-nano keeps answering
+// isInternship=true anyway — a real 90-day backfill queued micro1's "Japanese
+// Language Expert", 5CA's support mail and Turing's "LLM Trainer" as interviews.
+// A rule we can state exactly should not be left to a cheap model's judgement, so
+// the model proposes and this disposes. Every entry here corresponds to a wrong
+// record observed in the real inbox.
+const NON_INTERNSHIP_ROLE =
+  /(language expert|ai (trainer|interview)|llm trainer|data annotat|annotator|labell?ing|crowdwork|freelanc|\bgig\b|tutor|customer (support|service|experience)|support (agent|specialist|engineer)|email analyst|content moderat|transcrib|survey taker|voice (actor|record)|quality analyst)/i;
+
+// Platforms whose entire business is gig / outsourced work.
+const NON_INTERNSHIP_COMPANY = /^(micro1|5ca|remotasks|appen|outlier)\b/i;
+
+export function looksLikeGig(company, role) {
+  return NON_INTERNSHIP_COMPANY.test(String(company || '').trim())
+    || NON_INTERNSHIP_ROLE.test(String(role || ''));
+}
+
 // Returns null on any failure (never throws the sync). Shape:
 // { isApplicationRelated, kind, company, role, interview:{date,time}|null, confidence }
 export async function classifyMessage(message) {
@@ -86,12 +105,15 @@ export async function classifyMessage(message) {
       const max = toMonths(parsed.reapplyMonths.max) ?? min;
       if (min) reapplyMonths = { min, max: Math.max(min, max || min) };
     }
+    const company = String(parsed.company || '').slice(0, 120).trim();
+    const role = String(parsed.role || '').slice(0, 160).trim();
     return {
       isApplicationRelated: Boolean(parsed.isApplicationRelated),
-      isInternship: Boolean(parsed.isInternship),
+      // The deterministic guard overrides the model, never the reverse.
+      isInternship: Boolean(parsed.isInternship) && !looksLikeGig(company, role),
       kind,
-      company: String(parsed.company || '').slice(0, 120).trim(),
-      role: String(parsed.role || '').slice(0, 160).trim(),
+      company,
+      role,
       interview,
       reapplyMonths,
       confidence: typeof parsed.confidence === 'number' ? Math.max(0, Math.min(1, parsed.confidence)) : 0.5,
