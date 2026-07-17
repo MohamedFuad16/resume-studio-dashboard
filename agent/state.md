@@ -25,6 +25,20 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-18 — Web UI polish batch (dashboard/radar/calendar/editor/mobile).** Branch
+  rebased onto latest main (which already had `a371e34` lazy-compile/tracker-cache/phone-
+  radar-grid). (1) Dashboard trend chart → smooth **line/area** chart (Catmull-Rom + GSAP
+  draw-in), not bars; Recent apps drop freelance/gig records via new `utils/roleFilter.js`
+  (`isGigRole`). (2) `CompanyLogo`: hi-res favicons (Google s2 sz=128 ≈114px) for curated
+  domains, DDG fallback kept — fixes blurry Rakuten/etc. (3) Calendar date badges → **black
+  chips** (today red); mobile month view compact. (4) Radar: tech-stack tags under each
+  listing's role (where `techStack` exists; `resolveTechIcon`). "checked <date>" already
+  correct locally (17 Jul); prod "Jul 2" was stale redeploy. (5) Editor: **section rail
+  collapses** to an icon strip (persisted `railOpen`); compile **content-hash cache**
+  (template+resume JSON) → identical recompile 2.05s→0.003s; debounce 700→400ms; education
+  end-date/Expected pill aligned; bullet delete = clean full-height button. (6) Mobile: top
+  nav fits ≤560px, editor stacks (rail-collapse neutralised ≤980 via `.editor-view`
+  specificity), calendar compact. Verified in-browser at 390px; build green.
 - **2026-07-17 (night) — Native TabView, Wabi bubble shading, splash + icon
   (ADR-0042).** Nav round 3: hand-rolled glass bars can only be worse copies — the
   fluid droplet/minimize behaviour lives in the system bar — so the app now uses
