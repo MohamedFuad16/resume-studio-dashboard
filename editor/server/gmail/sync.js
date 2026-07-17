@@ -146,5 +146,13 @@ export async function syncProfile(store, profile, opts = {}) {
     processedMessageIds: [...processed].slice(-PROCESSED_CAP),
   });
 
+  // A backfill outlives the request that starts it (the gateway gives up at 240s),
+  // so its outcome can't be read from the HTTP response — only from here. Counts
+  // only, never mail content: this is someone's inbox.
+  console.log(
+    `gmail-sync[${profile}] listed=${messageIds.length} fresh=${fresh.length} ` +
+    `queued=${actions.length} dropped=${JSON.stringify(dropped)}`
+  );
+
   return { scanned: fresh.length, actions: actions.length, dropped };
 }
