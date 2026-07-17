@@ -1,63 +1,38 @@
 /**
- * Non-internship gig detection. Gmail records ingested before the classifier's
- * `isInternship` gate (or mis-classified) can leave freelance/crowdwork/"AI
- * trainer"-type gigs in the tracker. The dashboard's Recent applications should
- * show only real internships, so these are filtered from that view.
+ * Internship-only detection. The app tracks internship applications, so records
+ * that aren't internships (freelance/gig/crowdwork mis-ingested from Gmail, e.g.
+ * "AI Data Reviewer", "Language Expert") should not surface as applications.
  *
- * Deliberately CONSERVATIVE — matches only unmistakable gig signals so a real
- * internship (e.g. a "Data Analyst Internship") is never hidden. "analyst" and
- * "part-time" alone are NOT gig signals; "email analyst" (a named gig) is.
+ * This is an INCLUSIVE filter — it decides what IS an internship rather than
+ * blocklisting specific companies/roles (no hard-coded company names):
+ *
+ *   • A record linked to a catalog listing (or added in-app via the radar) is
+ *     an internship by construction — its id is the real catalog id, not a
+ *     `gmail-<slug>` synthetic minted for a company that isn't in the catalog.
+ *   • A Gmail-only record (company not in the catalog) counts only when its
+ *     role/company text positively says internship / co-op / new-grad, in EN
+ *     or JA. Anything that doesn't identify as an internship is left out.
+ *
+ * Data only — no JSX, no React.
  */
 
-// Whole-phrase gig markers (EN + JA). Each is specific enough not to collide
-// with a legitimate internship title.
-const GIG_PATTERNS = [
-  /language\s+(expert|specialist)/i,
-  /言語\s*(エキスパート|スペシャリスト)/,
-  /email\s+analyst/i,
-  /\b(ai|llm|data|search|content|speech|voice)\s*trainer\b/i,
-  /\btrainer\b.*\b(gig|freelance|remote task)\b/i,
-  /annotat(or|ion)/i,
-  /アノテーション/,
-  /crowd[\s-]?work/i,
-  /クラウドワーク/,
-  /transcrib(er|ing)|transcription/i,
-  /\brater\b|\bevaluator\b/i,
-  // Data/content reviewer gigs (e.g. micro1 "AI Data Reviewer").
-  /\b(ai|data|content|search|image|speech|voice)\s+reviewer\b/i,
-  /\bfreelance\b/i,
-  /フリーランス/,
-  /\bgig\b/i,
-  /data\s+entry/i,
-  /micro[\s-]?task/i,
-  /\btutor(ing)?\b/i,
-  /survey\s+(taker|panel|participant)/i,
-];
+// Universal internship markers (EN + JA) — the concept, not any company.
+const INTERNSHIP_MARKERS =
+  /\b(intern|internship|co-?op|trainee|new[\s-]?grad(uate)?|graduate\s+(program|scheme|trainee))\b|インターン(シップ)?|新卒|就業体験/i;
 
-// Crowdwork / AI-gig PLATFORMS — every record from these is a gig, whatever the
-// role text says (their confirmation emails often carry a generic "Application"
-// role the classifier couldn't refine). Matched on the normalized company.
-const GIG_COMPANY_PATTERNS = [
-  /^micro1(ai)?$/,      // micro1 / micro1.ai — AI-interview + data-gig platform
-  /^remotasks?$/,
-  /^appen$/,
-  /^outlier(ai)?$/,     // Scale's crowdwork brand (not Scale AI itself, which hires engineers)
-  /^clickworker$/,
-];
+// Gmail records for a company NOT in the catalog are keyed `gmail-<slug>`;
+// catalog/radar records keep the real catalog id (e.g. `hennge-…`, `global-091`,
+// `live-…`). So a non-`gmail-` id means "a known catalog internship".
+const isGmailSyntheticId = id => /^gmail-/.test(String(id || ''));
 
-const companyKey = value =>
-  String(value || '').replace(/株式会社|合同会社|有限会社|\(株\)|（株）/g, '')
-    .toLowerCase().replace(/[^a-z0-9]+/g, '');
-
-/** True when the role/company reads as a freelance/gig task, not an internship. */
-export function isGigRole(record) {
-  const key = companyKey(record?.company);
-  if (key && GIG_COMPANY_PATTERNS.some(pattern => pattern.test(key))) return true;
-  const haystack = `${record?.role || ''} ${record?.company || ''}`;
-  return GIG_PATTERNS.some(pattern => pattern.test(haystack));
+/** True when this tracker record is an internship application (should be shown). */
+export function isInternshipApplication(record) {
+  if (!record) return false;
+  if (!isGmailSyntheticId(record.internshipId || record.id)) return true;
+  return INTERNSHIP_MARKERS.test(`${record.role || ''} ${record.company || ''}`);
 }
 
-/** Keep only real internships (drops gigs). Pass tracker records. */
+/** Keep only internship applications (drops gigs / non-internships). */
 export function internshipRecordsOnly(records) {
-  return (records || []).filter(record => !isGigRole(record));
+  return (records || []).filter(isInternshipApplication);
 }

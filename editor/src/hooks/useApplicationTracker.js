@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { trackerApi } from '../api/client.js';
-import { isGigRole } from '../utils/roleFilter.js';
+import { isInternshipApplication } from '../utils/roleFilter.js';
 
 export const TRACKER_EVENT = 'resume-studio:application-tracker-change';
 
@@ -210,7 +210,7 @@ export function useApplicationTracker(profileId) {
   // internship.
   const records = useMemo(
     () => Object.values(tracker)
-      .filter(record => !isGigRole(record))
+      .filter(isInternshipApplication)
       .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')),
     [tracker],
   );
