@@ -1,15 +1,16 @@
 // Company logo loading, shared by the cards and the bubbles.
 //
 // Logos come from a CANDIDATE CHAIN (see logoCandidateURLs in Models.swift):
-// Google s2 at 128px for real resolution, DuckDuckGo favicons for coverage, the
-// catalog's own logoUrl last. Neither favicon service behaves like a plain image
-// host, so the loader carries two defenses:
+// gstatic faviconV2 at 256px, the site's own apple-touch-icon, DuckDuckGo for
+// coverage, the catalog's logoUrl last. No favicon service behaves like a plain
+// image host, so the loader carries two defenses:
 //   • DDG never 404s — unknown domains get a constant grey placeholder at HTTP
 //     200. It is byte-identical every time, so it is detected by hash.
-//   • s2 404s for unknown domains (checked), and small sources are served as-is:
-//     a 16px icon stretched over a 90pt bubble is what "low quality" looked
-//     like, so the chain prefers the first candidate ≥48px and only settles for
-//     a smaller one when nothing better exists anywhere in the chain.
+//   • The chain takes the LARGEST candidate, not the first acceptable one. Taking
+//     the first ≥48px meant a 48px DDG icon beat a 256px gstatic one purely by
+//     ordering, then got stretched over a 90pt bubble — that is what "low quality"
+//     looked like across the app. Only a genuinely big result (≥120px) short-
+//     circuits the walk; anything less keeps looking for better.
 import CryptoKit
 import SwiftUI
 
@@ -42,34 +43,79 @@ enum LogoLoader {
     private static var backgrounds: [String: Color?] = [:]
     private static var missing: Set<String> = []
 
-    /// Pixel width good enough to fill a bubble without visible softness.
-    private static let crispWidth = 48
+    /// Big enough that nothing later in the chain could look meaningfully better
+    /// on a 90pt bubble at 3x — stop walking once something this good arrives.
+    private static let goodEnough = 120
 
-    /// Walks the chain and returns the first crisp logo; a small one only wins
-    /// when no candidate anywhere in the chain is crisp.
+    /// Walks the chain and returns the BIGGEST logo it finds.
+    ///
+    /// Not the first acceptable one: the chain is ordered by expected quality, but
+    /// expectation is not measurement — a domain with no gstatic entry falls
+    /// through to a 32px DDG favicon, and "first ≥48px" would have shipped that
+    /// while a large apple-touch-icon sat unread later in the list. Measuring every
+    /// candidate costs a few requests the URLCache mostly absorbs, and it is the
+    /// difference between a crisp mark and a blurred one.
     static func load(candidates: [String]) async -> CompanyLogo? {
-        var small: CompanyLogo?
+        var best: CompanyLogo?
+        var bestWidth = 0
         for urlString in candidates {
             guard let image = await load(urlString) else { continue }
-            let logo = CompanyLogo(image: image, background: background(of: image, key: urlString))
-            if (image.cgImage?.width ?? 0) >= crispWidth { return logo }
-            if small == nil { small = logo }
+            let width = image.cgImage?.width ?? 0
+            guard width > bestWidth else { continue }
+            best = CompanyLogo(image: image, background: background(of: image, key: urlString))
+            bestWidth = width
+            if width >= goodEnough { break }
         }
-        return small
+        return best
+    }
+
+    /// One candidate URL → artwork, or nil if this source has nothing real.
+    ///
+    /// "Nothing real" is not the same as an HTTP error. Both favicon services
+    /// answer 200 for domains they have never heard of — DDG with a constant grey
+    /// placeholder (caught by hash) and gstatic with an HTML redirect page (caught
+    /// by UIImage simply failing to decode it). A status check alone would let both
+    /// through and they would render as a grey smudge on the bubble.
+    private static func load(_ urlString: String) async -> UIImage? {
+        let key = urlString as NSString
+        if let hit = cache.object(forKey: key) { return hit }
+        if missing.contains(urlString) { return nil }
+
+        guard let url = URL(string: urlString) else { return nil }
+        guard let (data, response) = try? await URLSession.shared.data(from: url),
+              let http = response as? HTTPURLResponse,
+              (200..<300).contains(http.statusCode)
+        else {
+            missing.insert(urlString)
+            return nil
+        }
+
+        let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        guard digest != ddgPlaceholderSHA256, let image = UIImage(data: data) else {
+            missing.insert(urlString)
+            return nil
+        }
+
+        cache.setObject(image, forKey: key)
+        return image
     }
 
     /// The artwork's background, read from its outer ring.
     ///
-    /// Sampling the EDGE, not the average: the average of a logo is the mark mixed
-    /// with its field (Cloudflare would come back muddy brown). The edge is the
-    /// field itself. A ring that is mostly transparent means a bare mark → nil, and
-    /// a ring that disagrees with itself (a photo, a gradient) is not a flat brand
-    /// colour → nil as well, rather than a confident wrong answer.
+    /// Sampling the EDGE, not the average: a logo's average is the mark mixed with
+    /// its field (Cloudflare came back muddy brown); the edge IS the field.
+    ///
+    /// Transparent samples are IGNORED rather than counted against the logo. Most
+    /// brand tiles are ROUNDED squares, so their corners are transparent by
+    /// design — the old rule ("more than a third transparent → no field") threw
+    /// away Cloudflare's orange for exactly that reason and left an orange square
+    /// sitting on a white bubble. What matters is whether the OPAQUE part of the
+    /// ring agrees with itself.
     private static func background(of image: UIImage, key: String) -> Color? {
         if let hit = backgrounds[key] { return hit }
 
         guard let cg = image.cgImage else { return nil }
-        let side = 16
+        let side = 24
         var pixels = [UInt8](repeating: 0, count: side * side * 4)
         guard let ctx = CGContext(
             data: &pixels, width: side, height: side, bitsPerComponent: 8,
@@ -78,59 +124,43 @@ enum LogoLoader {
         ) else { return nil }
         ctx.draw(cg, in: CGRect(x: 0, y: 0, width: side, height: side))
 
+        // One pixel in from the very edge: favicons often carry a stray
+        // semi-transparent outline on the outermost row.
         var samples: [(Double, Double, Double)] = []
-        var transparent = 0
-        for y in 0..<side {
-            for x in 0..<side where x == 0 || y == 0 || x == side - 1 || y == side - 1 {
+        var ringCount = 0
+        let inset = 1
+        for y in inset..<(side - inset) {
+            for x in inset..<(side - inset)
+            where x == inset || y == inset || x == side - inset - 1 || y == side - inset - 1 {
+                ringCount += 1
                 let i = (y * side + x) * 4
                 let a = Double(pixels[i + 3]) / 255
-                if a < 0.5 { transparent += 1; continue }
-                // Un-premultiply so a semi-transparent edge doesn't read as dark.
+                if a < 0.9 { continue }   // skip transparent + antialiased corners
                 samples.append((Double(pixels[i]) / 255 / a,
                                 Double(pixels[i + 1]) / 255 / a,
                                 Double(pixels[i + 2]) / 255 / a))
             }
         }
 
-        let ring = (side - 1) * 4
         var result: Color?
-        if transparent <= ring / 3, !samples.isEmpty {
+        // A rounded tile still shows its field along most of each side; a bare mark
+        // shows almost nothing. 45% opaque separates the two cleanly.
+        if samples.count >= Int(Double(ringCount) * 0.45), !samples.isEmpty {
             let n = Double(samples.count)
             let mean = (samples.reduce(0) { $0 + $1.0 } / n,
                         samples.reduce(0) { $0 + $1.1 } / n,
                         samples.reduce(0) { $0 + $1.2 } / n)
-            // Reject a busy edge: if any sample is far from the mean, this is not
-            // one flat brand colour.
-            let spread = samples.map { max(abs($0.0 - mean.0), abs($0.1 - mean.1), abs($0.2 - mean.2)) }.max() ?? 0
-            if spread < 0.18 {
+            // Reject a busy edge (a photo, a gradient): not one flat field, and a
+            // confident wrong colour is worse than falling back to white.
+            let spread = samples
+                .map { max(abs($0.0 - mean.0), abs($0.1 - mean.1), abs($0.2 - mean.2)) }
+                .max() ?? 0
+            if spread < 0.20 {
                 result = Color(.sRGB, red: mean.0, green: mean.1, blue: mean.2)
             }
         }
         backgrounds[key] = result
         return result
-    }
-
-    static func load(_ urlString: String) async -> UIImage? {
-        if let hit = cache.object(forKey: urlString as NSString) { return hit }
-        if missing.contains(urlString) { return nil }
-
-        guard let url = URL(string: urlString) else { return nil }
-        guard let (data, response) = try? await URLSession.shared.data(from: url) else { return nil }
-
-        // s2 (and any well-behaved host) says "unknown" with a status code; DDG
-        // says it with a placeholder body, caught by the hash below.
-        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-            missing.insert(urlString)
-            return nil
-        }
-
-        let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-        guard hash != ddgPlaceholderSHA256, let image = UIImage(data: data) else {
-            missing.insert(urlString)
-            return nil
-        }
-        cache.setObject(image, forKey: urlString as NSString)
-        return image
     }
 }
 

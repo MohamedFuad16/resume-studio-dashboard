@@ -378,7 +378,6 @@ struct BubbleContents: View {
     /// the brand's field becomes the bubble's field, so the sphere reads as that
     /// company rather than as a white chip with a sticker on it.
     @State private var brand: Color?
-    @State private var resolved = false
 
     private var monogram: String {
         bubble.name.trimmingCharacters(in: .whitespaces).first.map { String($0).uppercased() } ?? "?"
@@ -407,18 +406,17 @@ struct BubbleContents: View {
                 }
 
             LogoImage(candidates: bubble.logoCandidates, onBackground: { colour in
-                withAnimation(.easeOut(duration: 0.25)) {
-                    brand = colour
-                    resolved = true
-                }
+                withAnimation(.easeOut(duration: 0.25)) { brand = colour }
             }) {
                 monogramView
             }
-            // Inscribed in the sphere: a square mark fits when its side is
-            // diameter/√2, so ~0.15 of padding. Marks that BRING their own field
-            // fill it completely — cropping Cloudflare's orange to a small square
-            // is exactly what looked wrong.
-            .padding(diameter * (brand == nil ? 0.24 : 0.0))
+            // ALWAYS inset, even when the mark brings its own field. Brand tiles
+            // are squares whose artwork runs to the corners (Nokia's slash goes
+            // corner to corner) — filling a CIRCLE with one crops the mark, which
+            // is what read as "oversized". Insetting keeps the mark whole, and the
+            // tile's own background disappears into the sphere behind it because
+            // that sphere is painted the very same colour.
+            .padding(diameter * 0.17)
             .clipShape(.circle)
 
             // Tracked companies wear a presence badge at mid-radius, where the

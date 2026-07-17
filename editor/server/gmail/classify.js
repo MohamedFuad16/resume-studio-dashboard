@@ -29,23 +29,31 @@ function parseJson(text) {
 
 const VALID_KINDS = new Set(['applied', 'rejected', 'interview', 'offer', 'other']);
 
-// Roles and platforms that are never internships, whatever the triage model says.
+// Internship detection is POSITIVE and GROUNDED, never a list of companies.
 //
-// The prompt below already spells this rule out, and gpt-5-nano keeps answering
-// isInternship=true anyway — a real 90-day backfill queued micro1's "Japanese
-// Language Expert", 5CA's support mail and Turing's "LLM Trainer" as interviews.
-// A rule we can state exactly should not be left to a cheap model's judgement, so
-// the model proposes and this disposes. Every entry here corresponds to a wrong
-// record observed in the real inbox.
-const NON_INTERNSHIP_ROLE =
-  /(language expert|ai (trainer|interview)|llm trainer|data annotat|annotator|labell?ing|crowdwork|freelanc|\bgig\b|tutor|customer (support|service|experience)|support (agent|specialist|engineer)|email analyst|content moderat|transcrib|survey taker|voice (actor|record)|quality analyst)/i;
+// The prompt already states the rule and gpt-5-nano answers isInternship=true
+// anyway (a real 90-day backfill queued micro1's "Japanese Language Expert",
+// 5CA's support mail and Turing's "LLM Trainer" as interviews). Naming those
+// companies would be a denylist that ages badly and punishes a firm for its name
+// rather than for what it wrote. So instead the model must QUOTE the words that
+// make an email an internship, and we check the quote is really there:
+//
+//   1. the quote must appear in the email (no invention), and
+//   2. the quote must actually contain an internship term.
+//
+// No quote → not an internship. A real internship email always says so somewhere;
+// a gig email never does, whatever the model believes.
+const INTERNSHIP_TERM =
+  /(intern(ship)?s?\b|co-?op\b|new.?grad|graduate (programme|program|scheme)|placement year|サマーインターン|インターン(シップ)?|新卒|就業体験)/i;
 
-// Platforms whose entire business is gig / outsourced work.
-const NON_INTERNSHIP_COMPANY = /^(micro1|5ca|remotasks|appen|outlier)\b/i;
+const normalize = text => String(text || '').toLowerCase().replace(/\s+/g, ' ').trim();
 
-export function looksLikeGig(company, role) {
-  return NON_INTERNSHIP_COMPANY.test(String(company || '').trim())
-    || NON_INTERNSHIP_ROLE.test(String(role || ''));
+/// True when `evidence` is a real quote from `haystack` AND names an internship.
+export function internshipEvidenceHolds(evidence, haystack) {
+  const quote = normalize(evidence);
+  if (quote.length < 4) return false;
+  if (!INTERNSHIP_TERM.test(quote)) return false;
+  return normalize(haystack).includes(quote);
 }
 
 // Returns null on any failure (never throws the sync). Shape:
@@ -57,7 +65,7 @@ export async function classifyMessage(message) {
     `Classify this email about a job/internship application. Today is ${new Date().toISOString().slice(0, 10)}.\n\n` +
     `From: ${message.from}\nSubject: ${message.subject}\nBody:\n"""${(message.text || message.snippet || '').slice(0, 3500)}"""\n\n` +
     `Answer ONLY minified JSON:\n` +
-    `{"isApplicationRelated":bool,"isInternship":bool,"kind":"applied|rejected|interview|offer|other","company":str,"role":str,` +
+    `{"isApplicationRelated":bool,"isInternship":bool,"internshipEvidence":str,"kind":"applied|rejected|interview|offer|other","company":str,"role":str,` +
     `"interview":{"date":"YYYY-MM-DD","time":"HH:mm"|null}|null,"reapplyMonths":{"min":int,"max":int}|null,"confidence":0..1}\n` +
     `Rules: isApplicationRelated=true only for emails about the user's OWN application to a company — ` +
     `including applications made on the company's own site or a job board (the confirmation still lands here). ` +
@@ -65,6 +73,10 @@ export async function classifyMessage(message) {
     `isInternship=true ONLY for an internship / co-op / new-grad program (インターン・インターンシップ・新卒採用). ` +
     `Freelance or gig work, crowdwork, LLM/data-annotation or "AI trainer" gigs, tutoring, part-time jobs, ` +
     `customer-support roles, and regular full-time positions are isInternship=false even when application-related.\n` +
+    `internshipEvidence: when isInternship=true, quote the EXACT words from the email above (copy them ` +
+    `character for character, max ~12 words) that show this is an internship — e.g. "Summer Internship 2026", ` +
+    `"インターンシップ選考", "new grad program". The quote is verified against the email and a claim without ` +
+    `one is discarded, so never paraphrase or invent it. Empty string when isInternship=false.\n` +
     `kind:\n` +
     `- "applied": application confirmation / registration / pre-entry / "thank you for applying" / エントリー・応募完了.\n` +
     `- "interview": ANY selection step past "applied" — an interview invite/schedule, OR a coding test / online / ` +
@@ -107,10 +119,14 @@ export async function classifyMessage(message) {
     }
     const company = String(parsed.company || '').slice(0, 120).trim();
     const role = String(parsed.role || '').slice(0, 160).trim();
+    // Ground the claim in the email's own words. The model proposes; the quote
+    // check disposes — see internshipEvidenceHolds.
+    const haystack = `${message.subject || ''} ${message.text || message.snippet || ''}`;
+    const proven = internshipEvidenceHolds(parsed.internshipEvidence, haystack);
     return {
       isApplicationRelated: Boolean(parsed.isApplicationRelated),
-      // The deterministic guard overrides the model, never the reverse.
-      isInternship: Boolean(parsed.isInternship) && !looksLikeGig(company, role),
+      isInternship: Boolean(parsed.isInternship) && proven,
+      internshipEvidence: proven ? String(parsed.internshipEvidence).slice(0, 120) : '',
       kind,
       company,
       role,

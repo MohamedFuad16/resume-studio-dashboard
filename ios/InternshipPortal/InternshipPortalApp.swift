@@ -22,6 +22,7 @@ struct InternshipPortalApp: App {
     }
 
     @State private var showSplash = true
+    @Environment(\.scenePhase) private var scenePhase
     /// First launch only: the onboarding screens between the splash and the gate.
     @AppStorage("hasOnboarded") private var hasOnboarded = false
 
@@ -60,6 +61,29 @@ struct InternshipPortalApp: App {
             .onOpenURL { url in
                 // Google Sign-In's callback into com.googleusercontent.apps.*
                 GIDSignIn.sharedInstance.handle(url)
+            }
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
+
+                // Coming forward is the app's cue to check the inbox. This is what
+                // makes a new application "just appear": you apply, the reply lands
+                // in Gmail, and the next time you open the app it is already there
+                // with a banner — no pull-to-refresh, no Settings trip.
+                Task { await store.drainGmail() }
+
+                // DEBUGGING PHASE: replay the splash on every foreground.
+                // Reopening from the home screen RESUMES a suspended process —
+                // App.init never runs again — so a cold-launch-only splash is one
+                // you can never actually see. Remove this (and shorten SplashView's
+                // timer) once the design is settled.
+                #if DEBUG
+                if !showSplash { showSplash = true }
+                #endif
+            }
+            .task {
+                // Ask once the UI is up, not during init: a permission sheet over a
+                // launch screen is the classic way to get told no.
+                await Notifier.requestAuthorization()
             }
         }
     }

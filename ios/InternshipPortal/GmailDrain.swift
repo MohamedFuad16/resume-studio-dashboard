@@ -5,6 +5,13 @@
 // the phone showed one rejection while nine waited. Now the app drains its own
 // inbox, and the two clients converge on the same Firestore documents.
 //
+// WHAT IS AND ISN'T AN INTERNSHIP IS THE SERVER'S CALL, not this file's. The
+// classifier only emits an action when the email itself QUOTES words that make it
+// an internship, and the quote is verified against the email (see classify.js).
+// An earlier version of this file carried a hardcoded list of gig companies; that
+// was a denylist that would age badly and judged a firm by its name rather than by
+// what it wrote. Anything reaching this drain has already earned its place.
+//
 // The rules here mirror useGmailInbox.js exactly, because both write the same
 // records and a disagreement would show up as data that changes when you switch
 // device:
@@ -78,40 +85,6 @@ extension PortalAPI {
     }
 }
 
-// MARK: - The gig filter
-
-/// Roles that are never internships, whatever the triage model says.
-///
-/// The prompt already tells gpt-5-nano to set isInternship=false for gig work,
-/// and it keeps saying true anyway — micro1's "Japanese Language Expert", 5CA's
-/// support roles and Turing's "LLM Trainer" all arrived as interviews. A rule we
-/// can state exactly should not be delegated to a cheap model's judgement, so it
-/// is enforced here as well: the model proposes, this disposes.
-enum GigFilter {
-    private static let roleDeny = try! NSRegularExpression(
-        pattern: #"(language expert|ai (trainer|interview)|llm trainer|data annotat|annotator|labell?ing|crowdwork|freelanc|\bgig\b|tutor|customer (support|service|experience)|support (agent|specialist|engineer)|email analyst|content moderat|transcrib|survey taker|voice (actor|record)|quality analyst)"#,
-        options: .caseInsensitive
-    )
-
-    /// Platforms whose entire business is gig/outsourced work, so nothing they
-    /// send is an internship application. Named explicitly rather than guessed —
-    /// each one is here because it produced a wrong record in the real inbox.
-    private static let denyCompanies: Set<String> = ["micro1", "5ca", "remotasks", "appen", "outlier"]
-
-    static func isGig(company: String?, role: String?) -> Bool {
-        let name = (company ?? "")
-            .lowercased()
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        if denyCompanies.contains(where: { name == $0 || name.hasPrefix($0 + " ") || name.hasPrefix($0 + ",") }) {
-            return true
-        }
-        let text = role ?? ""
-        guard !text.isEmpty else { return false }
-        let range = NSRange(text.startIndex..., in: text)
-        return roleDeny.firstMatch(in: text, range: range) != nil
-    }
-}
-
 // MARK: - The drain
 
 @MainActor
@@ -157,7 +130,8 @@ extension CatalogStore {
         var next = tracker
         var touched = 0
         var acked: [String] = []
-        var skippedGigs = 0
+        var discovered: [(key: String, company: String, role: String,
+                          status: ApplicationStatus, candidates: [String])] = []
 
         for action in ordered {
             // ACK regardless: a skipped action must still leave the queue, or it
@@ -165,11 +139,6 @@ extension CatalogStore {
             acked.append(action.id)
 
             guard let status = Self.status(forKind: action.kind) else { continue }
-
-            if GigFilter.isGig(company: action.company, role: action.role) {
-                skippedGigs += 1
-                continue
-            }
 
             let key = Self.companyKey(action.company)
             guard !key.isEmpty else { continue }
@@ -230,6 +199,22 @@ extension CatalogStore {
             session[key] = (base, shouldSet ? incoming : rank)
 
             if shouldSet {
+                // Announce only what the tracker did not already say. A record
+                // that merely gets richer (a role backfilled from a second email)
+                // is not news; a company arriving, or moving to a new status, is.
+                let previousStatus = tracker[base.id]?.appStatus
+                if previousStatus != status {
+                    discovered.append(
+                        (key: "gmail-\(key)-\(status.rawValue)",
+                         company: base.displayCompany,
+                         role: base.displayRole,
+                         status: status,
+                         candidates: logoCandidateURLs(
+                            logoUrl: base.logoUrl, domain: base.companyDomain
+                         ))
+                    )
+                }
+
                 var record = next[base.id] ?? TrackerRecord()
                 record.internshipId = base.id
                 record.company = base.company
@@ -242,8 +227,15 @@ extension CatalogStore {
                 record.logoUrl = base.logoUrl
                 record.status = status.rawValue
                 record.source = "gmail"
-                record.updatedAt = ISO8601DateFormatter.flexible.string(from: .now)
-                record.createdAt = record.createdAt ?? action.receivedAt ?? record.updatedAt
+                // The EMAIL's date, never `now`. Stamping the clock made every
+                // ingested record read "applied 6 minutes ago" and dropped each
+                // one on today's calendar — for mail that arrived days earlier.
+                // Actions are applied oldest-first, so createdAt sticks at the
+                // first email (the application) while updatedAt tracks the latest
+                // (the rejection) — which is also what "Recent" should sort on.
+                let emailDate = action.receivedAt ?? ISO8601DateFormatter.flexible.string(from: .now)
+                record.updatedAt = emailDate
+                record.createdAt = record.createdAt ?? emailDate
                 record.milestones = record.milestones ?? []
                 next[base.id] = record
                 touched += 1
@@ -287,9 +279,22 @@ extension CatalogStore {
             return 0
         }
 
-        if skippedGigs > 0 {
-            toast = String(localized: "Synced \(touched) from Gmail · skipped \(skippedGigs) non-internship")
-        } else if touched > 0 {
+        // Only after the save: a banner for a record that failed to persist would
+        // be a notification about something that does not exist.
+        if Notifier.hasBaseline {
+            for item in discovered {
+                await Notifier.announce(
+                    key: item.key, company: item.company, role: item.role,
+                    status: item.status, logoCandidates: item.candidates
+                )
+            }
+        } else {
+            // First ever drain: the whole backlog is "new" but none of it is news.
+            Notifier.seed(discovered.map(\.key))
+            Notifier.markBaselineSeeded()
+        }
+
+        if touched > 0 {
             toast = String(localized: "Synced \(touched) applications from Gmail")
         }
         return touched

@@ -8,16 +8,20 @@ import Foundation
 
 // MARK: - Catalog
 
-/// Logo sources for a company, best first. Google's s2 service leads because it
-/// serves REAL resolutions (up to 128px) — DuckDuckGo's favicons are often 16–32px,
-/// which is why bubble logos looked soft when magnified. DDG stays as the fallback
-/// (better coverage of small Japanese companies), then any explicit `logoUrl` from
-/// the catalog (last: several are white wordmarks that vanish on white chips).
-/// LogoLoader walks this list and prefers the first image that is ≥48px.
+/// Logo sources for a company.
+///
+/// NOT google.com/s2/favicons: it answers with an HTML redirect page, never an
+/// image, so every logo silently fell through to DuckDuckGo's 32px favicon —
+/// that was the "low quality" across the whole app. Verified per-source against
+/// the real domains: gstatic's faviconV2 is the reliable one (Nokia/Mercari 128px
+/// where DDG gives 32), DDG occasionally wins big (HENNGE 256), and a site's own
+/// apple-touch-icon is best when it exists (Rakuten 192) but is usually an HTML
+/// 404 page. So: ask all of them and let LogoLoader keep the LARGEST.
 func logoCandidateURLs(logoUrl: String?, domain: String?) -> [String] {
     var list: [String] = []
     if let domain, !domain.isEmpty {
-        list.append("https://www.google.com/s2/favicons?domain=\(domain)&sz=128")
+        list.append("https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://\(domain)&size=256")
+        list.append("https://\(domain)/apple-touch-icon.png")
         list.append("https://icons.duckduckgo.com/ip3/\(domain).ico")
     }
     if let logoUrl, !logoUrl.isEmpty { list.append(logoUrl) }
@@ -137,17 +141,18 @@ enum ApplicationStatus: String, CaseIterable, Codable, Identifiable {
         }
     }
 
-    /// The pipeline reads as RED / GREEN / BLUE at a glance: rejection is red,
-    /// a live interview is green, an application in flight is blue. The two
-    /// pre-send stages stay off that axis (slate, amber) so the three outcomes
-    /// that actually matter own the primaries and nothing competes with them.
+    /// A ramp, not a traffic light. Pure red/green/blue side by side fought each
+    /// other — three saturated primaries with nothing to relate them. These walk
+    /// the wheel in pipeline order (slate → amber → sky → violet → rose), so the
+    /// donut reads as one family and progress reads as movement along it. Rose
+    /// still lands unmistakably on "rejected" without shouting.
     var tint: Color6 {
         switch self {
         case .saved: .gray
-        case .applying: .orange
-        case .applied: .blue
-        case .interview: .green
-        case .rejected: .red
+        case .applying: .amber
+        case .applied: .sky
+        case .interview: .violet
+        case .rejected: .rose
         }
     }
 
@@ -165,7 +170,7 @@ enum ApplicationStatus: String, CaseIterable, Codable, Identifiable {
 
 /// Model-layer tint token; Theme.swift maps these to real colors so this file
 /// stays free of SwiftUI.
-enum Color6 { case teal, purple, orange, blue, indigo, gray, red, green }
+enum Color6 { case teal, purple, orange, blue, indigo, gray, amber, sky, violet, rose }
 
 /// The three bands the Companies view clusters by.
 enum CompanyTier: String, CaseIterable, Identifiable {

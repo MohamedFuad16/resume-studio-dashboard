@@ -40,10 +40,18 @@ enum Palette {
     static let blue50 = Color(hex: 0xEFF6FF)
     static let blue600 = Color(hex: 0x2563EB)
     static let indigo = Color(hex: 0x6366F1)
-    static let red = Color(hex: 0xEF4444)       // red-500 — today marker, rejection
-    static let red50 = Color(hex: 0xFEF2F2)
-    static let green = Color(hex: 0x16A34A)     // green-600 — a live interview
-    static let green50 = Color(hex: 0xF0FDF4)
+    static let red = Color(hex: 0xEF4444)       // red-500 — the calendar's today
+
+    // The pipeline ramp: slate → amber → sky → violet → rose, walked in stage
+    // order so the status donut reads as one family instead of a traffic light.
+    static let amber = Color(hex: 0xD97706)
+    static let amber50 = Color(hex: 0xFFFBEB)
+    static let sky = Color(hex: 0x0284C7)
+    static let sky50 = Color(hex: 0xF0F9FF)
+    static let violet = Color(hex: 0x7C3AED)
+    static let violet50 = Color(hex: 0xF5F3FF)
+    static let rose = Color(hex: 0xE11D48)
+    static let rose50 = Color(hex: 0xFFF1F2)
 }
 
 /// Corner radii, straight from the reference's rounded-[Npx] classes.
@@ -108,8 +116,10 @@ extension Color6 {
         case .blue: Palette.blue600
         case .indigo: Palette.indigo
         case .gray: Palette.ink500
-        case .red: Palette.red
-        case .green: Palette.green
+        case .amber: Palette.amber
+        case .sky: Palette.sky
+        case .violet: Palette.violet
+        case .rose: Palette.rose
         }
     }
 
@@ -121,8 +131,10 @@ extension Color6 {
         case .blue: Palette.blue50
         case .indigo: Color(hex: 0xEEF2FF)
         case .gray: Palette.hairline
-        case .red: Palette.red50
-        case .green: Palette.green50
+        case .amber: Palette.amber50
+        case .sky: Palette.sky50
+        case .violet: Palette.violet50
+        case .rose: Palette.rose50
         }
     }
 }

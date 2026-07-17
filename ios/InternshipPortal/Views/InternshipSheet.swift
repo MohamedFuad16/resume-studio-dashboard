@@ -264,10 +264,10 @@ struct RecordSheet: View {
                         .font(.system(size: 14, weight: .semibold))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 13)
-                        .background(Palette.red.opacity(0.09), in: .rect(cornerRadius: Radius.row, style: .continuous))
+                        .background(Palette.rose50, in: .rect(cornerRadius: Radius.row, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(Palette.red)
+                .foregroundStyle(Palette.rose)
                 .padding(.top, 26)
                 .confirmationDialog(
                     String(localized: "Remove \(record.displayCompany)?"),
