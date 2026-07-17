@@ -799,3 +799,22 @@ build and 5 E2E tests green.
   now tees the liveness report, writes it to the run Summary, and on failure
   files/updates a single `catalog-liveness` issue listing the broken entries — dead
   listings are visible without opening run logs. See ADR-0026.
+
+- **2026-07-18 — iOS round: verified Gmail internship detection, logo.dev, calendar
+  dates, splash/onboarding.** Positive quote-grounded internship detection is LIVE on
+  portal-compile-jp (Azure). Verified against the real inbox: an 80-message backfill
+  drops 37 as not-application and 23 as not-internship (micro1, 5CA, a never-applied
+  Revolut Java SE role, Turing's gig), queueing 20 REAL internships (Money Forward,
+  enechain, LAPRAS, Rakuten, HENNGE, Atom11, Sky, Atilika, ABEJA, AICE, ispace). The
+  quote check folds punctuation on both sides (classify.js `fold`) after a first version
+  over-rejected everything a model's trailing full stop or 「」 broke a literal substring
+  test. Email dates normalised to ISO at the source (`toISO`); iOS parses RFC2822 as a
+  fallback for legacy rows. Client: logos via logo.dev (account token) by domain AND by
+  name (Gmail companies without a domain); edge sampler takes the dominant corner-free
+  colour so rounded tiles (Nokia) fill instead of sitting as a square. Calendar emits
+  Applied (createdAt) + Rejected (updatedAt) on their real days with the company logo.
+  Rebuild-from-Gmail reworked: an isRebuilding flag holds off the routine auto-drain
+  (which was emptying the queue first), then it polls the fast re-scan and purges +
+  replaces every Gmail row. Splash no longer replays on foreground (screenshot flashed
+  it). Onboarding shows a colourful floating company cluster, not one pastel orb.
+  logo.dev token in Models.swift is the account's own publishable key. All committed.
