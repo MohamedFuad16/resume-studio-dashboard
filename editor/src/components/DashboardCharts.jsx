@@ -11,10 +11,12 @@ const STATUS_COLORS = { applying: '#1baf7a', applied: '#2a78d6', interview: '#ed
 const DONUT_ORDER = ['applying', 'applied', 'interview', 'rejected'];
 const APPLICATION_STATUSES_SET = new Set(DONUT_ORDER);
 
-// The month an application belongs to. Gmail-imported records carry the email's
-// real receipt date in sourceMeta — createdAt is only when the drain ran.
+// "Applications sent per month" buckets by WHEN THE APPLICATION WAS MADE, so
+// prefer the per-status `appliedAt` (the application email's date) over the
+// last-touched email (`sourceMeta.receivedAt` could be a later rejection) and
+// over `createdAt` (the drain time).
 const recordInstant = record => {
-  const raw = record.sourceMeta?.receivedAt || record.appliedAt || record.createdAt || record.updatedAt;
+  const raw = record.appliedAt || record.createdAt || record.sourceMeta?.receivedAt || record.updatedAt;
   const date = raw ? new Date(raw) : null;
   return date && !Number.isNaN(date.getTime()) ? date : null;
 };

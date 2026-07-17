@@ -48,7 +48,7 @@ export function useGmailInbox(profile) {
           : { id: `gmail-${slug(action.company)}`, company: action.company, role: action.role || 'Application', location: action.enrichment?.location || '', deadline: action.enrichment?.deadline || 'Not stated', deadlineDate: action.enrichment?.deadlineDate || null, url: action.enrichment?.url || '' };
       // Statuses are monotonic across drains too: a record already at
       // "interview" can't be pulled back to "applied" by a re-classified email.
-      if (existing) base._rank = STATUS_RANK[existing.status] ?? 0;
+      if (existing) { base._rank = STATUS_RANK[existing.status] ?? 0; base._status = existing.status; }
       session.set(companyNeedle, base);
     }
     // Backfill better details from whichever email has them (the application email
@@ -64,9 +64,19 @@ export function useGmailInbox(profile) {
     // wins over a later-processed application). Interview milestones still land.
     const rank = STATUS_RANK[status] ?? 0;
     const shouldSetStatus = base._rank == null || rank >= base._rank;
-    if (shouldSetStatus) base._rank = rank;
-    const { _rank, ...cleanBase } = base;
+    if (shouldSetStatus) { base._rank = rank; base._status = status; }
+    const persistStatus = base._status || status;
+    const { _rank, _status, ...cleanBase } = base;
+    // The real email date for this event → per-status timestamp, so "when
+    // applied / rejected / interviewed" reflects the email, not the drain time.
+    // eventAt drives the record's updatedAt/createdAt in updateStatus.
+    const eventAt = (() => { const d = new Date(action.receivedAt); return Number.isNaN(d.getTime()) ? null : d.toISOString(); })();
+    const stampKey = { applied: 'appliedAt', rejected: 'rejectedAt', interview: 'interviewAt', offer: 'offerAt' }[action.kind];
     const internship = { ...cleanBase, source: 'gmail', sourceMeta: { gmailMessageId: action.gmailMessageId, receivedAt: action.receivedAt, subject: action.subject } };
+    if (eventAt) {
+      internship.eventAt = eventAt;
+      if (stampKey) internship[stampKey] = eventAt;
+    }
     // Rejection with a stated wait window → stamp a company-wide reapply cooldown.
     // reapplyAfter = the rejection's receipt date + the minimum stated months
     // (the earliest the company says you may reapply).
@@ -81,20 +91,26 @@ export function useGmailInbox(profile) {
           : `${action.company} asks applicants to wait ${min} months before reapplying.`;
       }
     }
-    if (shouldSetStatus) updateStatus(internship, status);
+    // Always persist — even when this email doesn't advance the status, its
+    // timestamp (e.g. an application email arriving after the record is already
+    // rejected, during a backfill) must still be recorded on the record.
+    if (persistStatus) updateStatus(internship, persistStatus);
     if (action.interview?.date) {
       addMilestone(internship.id, { id: `gmail-${action.gmailMessageId}`, kind: 'interview', date: action.interview.date, time: action.interview.time || null, title: `Interview — ${action.company}` });
     }
     return { id: internship.id, company: action.company, kind: shouldSetStatus ? action.kind : null };
   }, [updateStatus, addMilestone]);
 
-  const drain = useCallback(async () => {
+  const drain = useCallback(async ({ backfillDays = 0 } = {}) => {
     if (busy.current) return;
     busy.current = true;
     try {
       const status = await requestJson(`/api/integrations/gmail/status?profile=${encodeURIComponent(profile)}`).catch(() => null);
       if (!status?.connected) return;
-      await requestJson(`/api/integrations/gmail/sync-now?profile=${encodeURIComponent(profile)}`, { method: 'POST' }).catch(() => null);
+      // A backfill re-scans older mail (ignoring the processed list) so existing
+      // records get re-stamped with accurate applied/rejected dates.
+      const syncUrl = `/api/integrations/gmail/sync-now?profile=${encodeURIComponent(profile)}${backfillDays > 0 ? `&backfill=${backfillDays}` : ''}`;
+      await requestJson(syncUrl, { method: 'POST' }).catch(() => null);
       const { actions } = await requestJson(`/api/integrations/gmail/pending?profile=${encodeURIComponent(profile)}`).catch(() => ({ actions: [] }));
       if (!actions?.length) return;
 
@@ -120,8 +136,19 @@ export function useGmailInbox(profile) {
 
   useEffect(() => {
     if (!profile) return undefined;
-    const t = setTimeout(drain, 1500);
-    const iv = setInterval(drain, POLL_MS);
+    // One-time backfill (per browser) so existing records are re-stamped with
+    // accurate applied/rejected dates from their emails; normal polling after.
+    const BACKFILL_FLAG = 'resume-studio:ts-backfill-v1';
+    let needsBackfill = false;
+    try { needsBackfill = !localStorage.getItem(BACKFILL_FLAG); } catch { /* ignore */ }
+    const t = setTimeout(() => {
+      if (needsBackfill) {
+        drain({ backfillDays: 180 }).finally(() => { try { localStorage.setItem(BACKFILL_FLAG, '1'); } catch { /* ignore */ } });
+      } else {
+        drain();
+      }
+    }, 1500);
+    const iv = setInterval(() => drain(), POLL_MS);
     return () => { clearTimeout(t); clearInterval(iv); };
   }, [profile, drain]);
 
