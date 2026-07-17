@@ -4160,9 +4160,9 @@ body,
 .trend-chart { width: 100%; max-width: 980px; height: auto; margin: 6px auto 0; display: block; }
 .trend-tick { fill: #97a1b1; font-size: 10px; }
 .trend-month { fill: #6f7b8e; font-size: 10.5px; font-weight: 650; }
-.trend-chip { opacity: 0; transition: opacity .12s ease; }
-.trend-bar.peak .trend-chip, .trend-bar:hover .trend-chip { opacity: 1; }
-.trend-bar:hover .trend-bar-mark { fill: var(--halo-bg, #1a56f0); stroke: none; }
+.trend-line { filter: drop-shadow(0 4px 8px rgba(26, 86, 240, .18)); }
+.trend-dot { transition: r .12s ease; }
+.trend-point.peak .trend-dot { filter: drop-shadow(0 2px 5px rgba(26, 86, 240, .35)); }
 .trend-chip-bg { fill: #fff; stroke: #e2e7f0; filter: drop-shadow(0 2px 4px rgba(15, 23, 42, .1)); }
 .trend-chip-text { fill: #172033; font-size: 10.5px; font-weight: 780; }
 .donut-wrap { display: grid; grid-template-columns: 112px minmax(0, 1fr); align-items: center; gap: 16px; }
@@ -7399,7 +7399,7 @@ body,
 /* Date badges — the layered "raised pin" treatment from the reference now
    applies to EVERY date: a radial gradient lit from the top edge, an inset
    highlight for the raised lip, a tinted drop shadow, and a fine grain
-   overlay. All days are blue; today alone is red. */
+   overlay. Every day is a black chip with white text; today alone is red. */
 .calendar-view .calendar-day.today {
   border-color: var(--b0);
   box-shadow: none;
@@ -7412,14 +7412,14 @@ body,
   margin: 2px 0 4px;
   padding: 0;
   border-radius: 50%;
-  background: radial-gradient(115% 115% at 50% 0%, #6b96ff 0%, #2f66f2 55%, #1547c7 100%);
-  color: #d9e4ff;
+  background: radial-gradient(115% 115% at 50% 0%, #4a4f57 0%, #22262d 55%, #0b0d10 100%);
+  color: #ffffff;
   box-shadow:
-    0 2px 7px rgba(21, 71, 199, 0.4),
-    0 1px 2px rgba(21, 71, 199, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.45),
-    inset 0 -1px 0 rgba(7, 26, 88, 0.35);
-  text-shadow: 0 1px 1px rgba(7, 26, 88, 0.4);
+    0 2px 7px rgba(9, 11, 15, 0.34),
+    0 1px 2px rgba(9, 11, 15, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
   overflow: hidden;
 }
 .calendar-view .calendar-day.today .calendar-day-number {
