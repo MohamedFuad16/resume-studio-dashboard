@@ -7817,10 +7817,14 @@ body,
 }
 
 /* Section rail — quiet nav list, no boxes, no divider lines */
-.section-rail { border-right: 0; background: #fbfcfe; }
+.section-rail { border-right: 0; background: #fbfcfe; transition: none; }
 .rail-head {
   height: 46px;
-  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 10px 0 16px;
   border-bottom: 0;
   color: #8b95a6;
   font-size: 10px;
@@ -7829,6 +7833,36 @@ body,
   text-transform: uppercase;
 }
 .rail-head strong { min-width: 24px; height: 22px; border-radius: 999px; background: #eef1f6; color: #58657a; font-size: 11px; }
+/* Collapse toggle — white rounded square, chevron flips when collapsed. */
+.rail-toggle {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e3e7ee;
+  border-radius: 9px;
+  background: #fff;
+  color: #58657a;
+  cursor: pointer;
+  transition: background var(--ease), color var(--ease), border-color var(--ease);
+}
+.rail-toggle:hover { border-color: #cfd6e2; color: #18243a; }
+.rail-collapsed .rail-toggle svg { transform: rotate(180deg); }
+
+/* Collapsed rail — icon-only, narrow column; the form gets the width. */
+.editor-workspace.rail-collapsed { grid-template-columns: 56px minmax(0, 1fr); }
+.rail-collapsed .rail-head { padding: 0; justify-content: center; }
+.rail-collapsed .rail-head > span { display: none; }
+.rail-collapsed .section-list { padding: 8px 6px; }
+.rail-collapsed .section-row {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  padding: 8px 0;
+}
+.rail-collapsed .section-copy,
+.rail-collapsed .section-count { display: none; }
 .section-list { padding: 8px; }
 .section-row {
   grid-template-columns: 30px minmax(0, 1fr) auto;
@@ -7982,13 +8016,20 @@ body,
 }
 .editor-view .btn-add-item:hover,
 .editor-view .btn-add-bullet:hover { border-color: #18243a; border-style: solid; background: #fff; color: #18243a; }
+/* Bullet delete — a clean full-height button aligned with the textarea, not a
+   stray vertical capsule (conflicting width/height/min-height rules). */
+.editor-view .bullet-row { align-items: stretch; gap: 8px; }
 .editor-view .bullet-del {
-  width: 28px;
-  height: 28px;
+  width: 40px;
+  min-width: 40px;
+  height: auto;
+  min-height: 0;
+  align-self: stretch;
+  flex: 0 0 40px;
   border: 1px solid #e3e7ee;
-  border-radius: 999px;
-  background: #fff;
-  color: #8b95a6;
+  border-radius: 10px;
+  background: #fbfcfe;
+  color: #94a3b8;
 }
 .editor-view .bullet-del:hover { border-color: #f3c1c3; color: #d54b50; background: #fff7f7; }
 
@@ -8006,9 +8047,18 @@ body,
   border-radius: 12px;
   box-shadow: 0 12px 32px rgba(15, 29, 51, .12);
 }
+/* Education/experience end-date: the month input and the Expected/Present pill
+   sit on one line at equal height and aligned; the pill wraps below only when
+   the column is genuinely too narrow. */
+.editor-view .month-field-row { flex-wrap: wrap; align-items: stretch; gap: 8px; }
+.editor-view .month-input { min-height: 38px; }
 .editor-view .month-ongoing-toggle {
-  border-radius: 999px;
+  min-height: 38px;
+  border-radius: 10px;
+  border-color: #e3e7ee;
+  color: #58657a;
 }
+.editor-view .month-ongoing-toggle.on { background: #18243a; border-color: #18243a; color: #fff; }
 .editor-view .photo-preview { border-radius: 14px; background: #eef1f6; border: 0; }
 .editor-view .photo-upload,
 .editor-view .photo-remove { border-radius: 999px; }

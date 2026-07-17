@@ -2,7 +2,7 @@ import './load-env.js';
 import express from 'express';
 import cors from 'cors';
 import { execFile } from 'child_process';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
@@ -277,10 +277,11 @@ async function materializeResumePhoto(resume, tmpDir) {
   }
 }
 
-async function persistCompiledPdf(template, pdfData, { mirrorLocal = !process.env.VERCEL } = {}) {
+async function persistCompiledPdf(template, pdfData, { mirrorLocal = !process.env.VERCEL, hash = '' } = {}) {
   await store.setJson(compiledKey(template), {
     contentType: 'application/pdf',
     base64: pdfData.toString('base64'),
+    hash,
     updatedAt: new Date().toISOString(),
   });
 
@@ -289,6 +290,18 @@ async function persistCompiledPdf(template, pdfData, { mirrorLocal = !process.en
     await fs.writeFile(publicPdfPath, pdfData);
   }
 }
+
+// The hash of the last successfully compiled document per template (template +
+// generated LaTeX, which folds in the résumé and the photo). A repeat compile of
+// identical content returns the stored PDF and skips Tectonic entirely.
+async function compiledPdfHash(template) {
+  const stored = await store.getJson(compiledKey(template), null);
+  return stored?.hash || '';
+}
+// Hash the INPUT (template + résumé JSON, which includes the photo data URL) —
+// stable across compiles, unlike the generated LaTeX whose photo path is a fresh
+// tmp dir each run (which would defeat the cache for photo templates).
+const documentHash = (template, resume) => createHash('sha1').update(`${template}\n${JSON.stringify(resume)}`).digest('hex');
 
 async function readCompiledPdf(template) {
   const stored = await store.getJson(compiledKey(template), null);
@@ -820,6 +833,14 @@ app.post('/api/compile', async (req, res) => {
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'resume-'));
 
   try {
+    // Content-hash short-circuit (before the slow steps): if this exact document
+    // was already compiled, serve the stored PDF instantly instead of re-running
+    // Tectonic. Covers template toggles, re-opening the editor, cross-session.
+    const hash = documentHash(template, resume);
+    if (hash === await compiledPdfHash(template) && await readCompiledPdf(template)) {
+      return res.json({ success: true, pdfUrl: `/api/compiled/resume_${template}.pdf`, cached: true });
+    }
+
     const photoFile = await materializeResumePhoto(resume, tmpDir);
     const latex = generateLatex(template, resume, { photoFile });
     const texFile = path.join(tmpDir, 'resume.tex');
@@ -829,7 +850,7 @@ app.post('/api/compile', async (req, res) => {
 
     const pdfFile = path.join(tmpDir, 'resume.pdf');
     const pdfData = await fs.readFile(pdfFile);
-    await persistCompiledPdf(template, pdfData);
+    await persistCompiledPdf(template, pdfData, { hash });
 
     res.json({ success: true, pdfUrl: `/api/compiled/resume_${template}.pdf` });
   } catch (e) {

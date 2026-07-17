@@ -506,6 +506,16 @@ export default function App() {
 
   // AI Application Assistant states
   const [sidebarTab, setSidebarTab] = useState('editor'); // editor | chat
+  // Editor section-rail collapse — lets the user hide the section list and
+  // focus on the form fields. Persisted so it survives reloads.
+  const [railOpen, setRailOpen] = useState(() => {
+    try { return localStorage.getItem('resume-studio-rail') !== 'closed'; } catch { return true; }
+  });
+  const toggleRail = useCallback(() => setRailOpen(open => {
+    const next = !open;
+    try { localStorage.setItem('resume-studio-rail', next ? 'open' : 'closed'); } catch { /* ignore */ }
+    return next;
+  }), []);
   const [applications, setApplications] = useState([]);
   const [activeApp, setActiveApp] = useState(null);
   const [asstCompany, setAsstCompany] = useState('');
@@ -846,7 +856,9 @@ export default function App() {
     saveData(normalized, activeProfile);
     if (cmpTimer.current) clearTimeout(cmpTimer.current);
     if (autoCompile) {
-      cmpTimer.current = setTimeout(() => compile(normalized, template), 700);
+      // Snappier autocompile (was 700ms). The server content-hash cache makes a
+      // no-op recompile instant, so a shorter debounce doesn't waste Tectonic runs.
+      cmpTimer.current = setTimeout(() => compile(normalized, template), 400);
     }
   }, [template, saveData, saveProfileImmediately, compile, activeProfile, autoCompile, toast, isJa]);
 
@@ -1266,11 +1278,20 @@ export default function App() {
             }
           }}
         >
-          <div className="editor-workspace">
+          <div className={`editor-workspace ${railOpen ? '' : 'rail-collapsed'}`}>
             <nav className="section-rail" aria-label="Resume sections">
               <div className="rail-head">
                 <span>{isJa ? '入力項目' : 'Sections'}</span>
-                <strong>{sectionEntries.reduce((sum, entry) => sum + Number(entry.count || 0), 0)}</strong>
+                <button
+                  type="button"
+                  className="rail-toggle"
+                  onClick={toggleRail}
+                  aria-expanded={railOpen}
+                  aria-label={railOpen ? (isJa ? 'セクションを折りたたむ' : 'Collapse sections') : (isJa ? 'セクションを展開' : 'Expand sections')}
+                  title={railOpen ? (isJa ? 'セクションを折りたたむ' : 'Collapse sections') : (isJa ? 'セクションを展開' : 'Expand sections')}
+                >
+                  <I n="collapse" s={15} />
+                </button>
               </div>
               <div className="section-list">
                 {sectionEntries.map(entry => (
@@ -1279,6 +1300,7 @@ export default function App() {
                     key={entry.key}
                     className={`section-row ${entry.key === activeEntry.key ? 'active' : ''}`}
                     onClick={() => setActiveSection(entry.key)}
+                    title={entry.label}
                   >
                     <span className={`section-status s-${entry.key}`}><I n={entry.icon} s={13} /></span>
                     <span className="section-copy">
