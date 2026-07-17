@@ -882,6 +882,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
                 const languageParts = splitLanguageRequirement(item.language, isJa);
                 const durationParts = splitDuration(item.duration, isJa);
                 const locationParts = splitLocation(item.location, isJa);
+                const techTags = (internshipDetails(item).techStack || []).slice(0, 5);
                 return <React.Fragment key={item.id}>
                   <article
                     className={`intern-row ${item.priority ? 'priority' : ''}`}
@@ -901,7 +902,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
                     }}
                   >
                     <span className="intern-rank">{(page - 1) * pageSize + index + 1}</span>
-                    <span className="intern-company-cell"><CompanyLogo item={item} /><button type="button" className="intern-company-trigger" onClick={() => setSelectedId(item.id)} aria-label={`${displayCompany(item, isJa)}: ${isJa ? '詳細を開く' : 'Open internship details'}`}><strong>{displayCompany(item, isJa)}</strong><small className="intern-role-stack"><span>{roleLead}</span>{roleDetails.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</small></button></span>
+                    <span className="intern-company-cell"><CompanyLogo item={item} /><button type="button" className="intern-company-trigger" onClick={() => setSelectedId(item.id)} aria-label={`${displayCompany(item, isJa)}: ${isJa ? '詳細を開く' : 'Open internship details'}`}><strong>{displayCompany(item, isJa)}</strong><small className="intern-role-stack"><span>{roleLead}</span>{roleDetails.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</small>{techTags.length ? <span className="intern-tech-tags" aria-label={isJa ? '使用技術' : 'Tech stack'}>{techTags.map((tech, i) => { const icon = resolveTechIcon(tech); return <span className="intern-tech-tag" key={`${tech}-${i}`}><img src={icon.src} alt="" loading="lazy" onError={e => { e.currentTarget.src = icon.fallbackSrc; }} />{displayValue(tech, isJa)}</span>; })}</span> : null}</button></span>
                     <span className="intern-match"><strong>{item.score}%</strong><small>{item.priority ? t.priority : t.matchLabel(item.score)}</small></span>
                     <span className="intern-location" data-label={t.location}><MapPin size={13} /><span className="intern-location-stack">{locationParts.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</span></span>
                     <span className="intern-language" data-label={t.language}><Globe2 size={13} /><span className="intern-language-stack">{languageParts.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</span></span>

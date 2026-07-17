@@ -4984,6 +4984,31 @@ body,
   white-space: normal;
 }
 
+/* Tech-stack tags under the role — the programming languages / tools for a
+   listing, shown where the catalog carries them. Compact chips with a brand
+   icon; wrap within the company column. */
+.intern-tech-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.intern-tech-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px 1px 5px;
+  border: 1px solid #e3e8f0;
+  border-radius: 999px;
+  background: #f6f8fc;
+  color: #4b5870;
+  font-size: 9.5px;
+  font-weight: 650;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.intern-tech-tag img { width: 11px; height: 11px; object-fit: contain; }
+
 .intern-company-cell small.intern-role-stack > span:last-child { color: #536174; }
 .intern-company-cell small.intern-role-stack > span {
   overflow: visible;
