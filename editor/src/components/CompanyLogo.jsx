@@ -90,22 +90,31 @@ function knownDomain(company) {
   return KNOWN_DOMAINS[company] || KNOWN_DOMAINS_LC[String(company || '').trim().toLowerCase()] || '';
 }
 
+// High-resolution favicon (Google s2 at 128px → ~114px PNG, crisp on the chip)
+// vs DuckDuckGo's /ip3/ which is a blurry 32px. Google serves a generic GLOBE at
+// HTTP 200 for domains with no favicon (so onError never advances) — so it is
+// only trusted FIRST for CURATED known domains, which all have a real favicon.
+const hiResFavicon = domain => `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+const ddgFavicon = domain => `https://icons.duckduckgo.com/ip3/${domain}.ico`;
+
 function companyLogoUrls(item) {
   const filled = FILLED_BRAND_LOGOS[item.company];
   if (filled) return [filled.src];
   // Curated domain first: live-researched items carry a companyDomain derived from the
   // posting URL, which can be a job board — never let it shadow a known-correct domain.
   const safeCompanyDomain = item.companyDomain && !JOB_BOARD_DOMAINS.test(item.companyDomain) ? item.companyDomain : '';
-  const domain = knownDomain(item.company) || safeCompanyDomain || domainFromUrl(item.url);
-  // Prefer the DuckDuckGo FAVICON over the seed `logoUrl`: favicons are square icons
-  // designed to read at small sizes, whereas company `logoUrl` wordmarks vary wildly
-  // (e.g. HENNGE ships a WHITE svg that is invisible on the light logo chip). DDG also
-  // returns a clean 404 when it has no icon (→ onError → next source → text initials),
-  // unlike Google's s2/favicons which serves a generic GLOBE at HTTP 200 (never errors,
-  // so the wrong image sticks — the bug this fixes). Order: favicon → logoUrl → initials.
+  const curated = knownDomain(item.company);
+  const domain = curated || safeCompanyDomain || domainFromUrl(item.url);
+  // For a curated domain we KNOW there's a real favicon → high-res Google first
+  // (no globe risk), then DDG as a fallback. For uncertain (live-research) domains,
+  // DDG first (clean 404 → next source) so a Google globe can never stick, then
+  // high-res as a second try. Order ends: logoUrl → initials.
+  const faviconChain = domain
+    ? (curated ? [hiResFavicon(domain), ddgFavicon(domain)] : [ddgFavicon(domain), hiResFavicon(domain)])
+    : [];
   return [
     knownLogo(item.company),
-    domain ? `https://icons.duckduckgo.com/ip3/${domain}.ico` : '',
+    ...faviconChain,
     item.logoUrl,
   ].filter((source, index, sources) => source && sources.indexOf(source) === index);
 }

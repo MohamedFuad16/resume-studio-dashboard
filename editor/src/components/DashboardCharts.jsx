@@ -19,21 +19,23 @@ const recordInstant = record => {
   return date && !Number.isNaN(date.getTime()) ? date : null;
 };
 
-// A bar that sits flush on the axis: square bottom corners, rounded top only.
-// (A plain <rect rx> rounds all four corners, so bars looked detached from
-// the baseline.)
-const barPath = (x, top, width, height) => {
-  const r = Math.min(9, width / 2, height);
-  const bottom = top + height;
-  return [
-    `M${x} ${bottom}`,
-    `V${top + r}`,
-    `Q${x} ${top} ${x + r} ${top}`,
-    `H${x + width - r}`,
-    `Q${x + width} ${top} ${x + width} ${top + r}`,
-    `V${bottom}`,
-    'Z',
-  ].join(' ');
+// Smooth path through the points (Catmull-Rom → cubic Bézier), so the trend
+// reads as one flowing line rather than a jagged polyline.
+const smoothPath = points => {
+  if (points.length < 2) return points.length ? `M${points[0].x} ${points[0].y}` : '';
+  let d = `M${points[0].x} ${points[0].y}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] || points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] || p2;
+    const c1x = p1.x + (p2.x - p0.x) / 6;
+    const c1y = p1.y + (p2.y - p0.y) / 6;
+    const c2x = p2.x - (p3.x - p1.x) / 6;
+    const c2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C${c1x} ${c1y} ${c2x} ${c2y} ${p2.x} ${p2.y}`;
+  }
+  return d;
 };
 
 export function ApplicationTrendChart({ records, isJa }) {
@@ -64,37 +66,45 @@ export function ApplicationTrendChart({ records, isJa }) {
   const yMax = Math.max(2, Math.ceil(max / 2) * 2);
   const ticks = [0, yMax / 2, yMax];
 
-  const W = 640; const H = 224; const PAD_L = 30; const PAD_B = 28; const PAD_T = 38;
-  const plotW = W - PAD_L - 10; const plotH = H - PAD_T - PAD_B;
-  const band = plotW / months.length;
-  const barW = Math.min(34, band * 0.42);
+  const W = 640; const H = 224; const PAD_L = 30; const PAD_B = 28; const PAD_T = 34;
+  const plotW = W - PAD_L - 14; const plotH = H - PAD_T - PAD_B;
+  const step = plotW / (months.length - 1);
+  const x = i => PAD_L + step * i;
   const y = v => PAD_T + plotH - (v / yMax) * plotH;
+  const points = months.map((m, i) => ({ x: x(i), y: y(m.count), count: m.count }));
+  const linePath = smoothPath(points);
+  const areaPath = points.length
+    ? `${linePath} L${points[points.length - 1].x} ${y(0)} L${points[0].x} ${y(0)} Z`
+    : '';
 
-  // GSAP entrance: bars grow up from the baseline with a stagger while month
-  // labels fade in. Cleanup clears the inline props so an interrupted run
-  // (re-render mid-tween) can never leave the chart half-drawn or invisible.
-  // NOTE: don't tween .trend-chip — GSAP would overwrite its SVG
-  // `transform="translate(...)"` positioning; CSS handles its fade.
+  // GSAP entrance: the area fades up, the line draws left→right via
+  // stroke-dashoffset, then the dots pop and month labels fade in. Cleanup
+  // clears inline props so an interrupted re-render can't freeze it invisible.
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return undefined;
-    const bars = svg.querySelectorAll('.trend-bar-mark');
+    const line = svg.querySelector('.trend-line');
+    const area = svg.querySelector('.trend-area');
+    const dots = svg.querySelectorAll('.trend-dot');
     const labels = svg.querySelectorAll('.trend-month');
-    const tweens = [
-      gsap.fromTo(bars,
-        { scaleY: 0, transformOrigin: '50% 100%' },
-        { scaleY: 1, duration: 0.85, ease: 'power3.out', stagger: 0.07, overwrite: 'auto' }),
-      gsap.fromTo(labels,
-        { opacity: 0 },
-        { opacity: 1, duration: 0.45, ease: 'power2.out', stagger: 0.07, delay: 0.15, overwrite: 'auto' }),
-    ];
-    // rAF can be throttled/paused in background or embedded tabs, freezing the
-    // tweens at their (invisible) start state — force-finish after the runtime.
-    const settle = window.setTimeout(() => tweens.forEach(tween => tween.progress(1)), 1800);
+    const len = line ? line.getTotalLength() : 0;
+    const tweens = [];
+    if (line) {
+      gsap.set(line, { strokeDasharray: len, strokeDashoffset: len });
+      tweens.push(gsap.to(line, { strokeDashoffset: 0, duration: 1, ease: 'power2.out', overwrite: 'auto' }));
+    }
+    if (area) tweens.push(gsap.fromTo(area, { opacity: 0 }, { opacity: 1, duration: 0.9, ease: 'power2.out', overwrite: 'auto' }));
+    tweens.push(gsap.fromTo(dots, { scale: 0, transformOrigin: '50% 50%' }, { scale: 1, duration: 0.4, ease: 'back.out(2)', stagger: 0.08, delay: 0.5, overwrite: 'auto' }));
+    tweens.push(gsap.fromTo(labels, { opacity: 0 }, { opacity: 1, duration: 0.45, ease: 'power2.out', stagger: 0.06, delay: 0.2, overwrite: 'auto' }));
+    // rAF can be throttled/paused in a background/embedded tab, freezing tweens
+    // at their invisible start — force-finish after the runtime.
+    const settle = window.setTimeout(() => tweens.forEach(t => t.progress(1)), 1800);
     return () => {
       window.clearTimeout(settle);
-      tweens.forEach(tween => tween.kill());
-      gsap.set(bars, { clearProps: 'all' });
+      tweens.forEach(t => t.kill());
+      if (line) gsap.set(line, { clearProps: 'all' });
+      if (area) gsap.set(area, { clearProps: 'all' });
+      gsap.set(dots, { clearProps: 'all' });
       gsap.set(labels, { clearProps: 'all' });
     };
   }, [months]);
@@ -102,36 +112,31 @@ export function ApplicationTrendChart({ records, isJa }) {
   return (
     <svg ref={svgRef} className="trend-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={isJa ? '月別の応募数' : 'Applications per month'}>
       <defs>
-        <pattern id="trend-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <rect width="6" height="6" fill="#eef1f6" />
-          <line x1="0" y1="0" x2="0" y2="6" stroke="#d7dde8" strokeWidth="1.6" />
-        </pattern>
+        <linearGradient id="trend-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--halo-bg, #1a56f0)" stopOpacity="0.18" />
+          <stop offset="100%" stopColor="var(--halo-bg, #1a56f0)" stopOpacity="0" />
+        </linearGradient>
       </defs>
       {ticks.map(tick => (
         <g key={tick}>
-          <line x1={PAD_L} x2={W - 10} y1={y(tick)} y2={y(tick)} stroke={tick === 0 ? '#cdd5e1' : '#eceff5'} strokeWidth="1" />
+          <line x1={PAD_L} x2={W - 14} y1={y(tick)} y2={y(tick)} stroke={tick === 0 ? '#cdd5e1' : '#eceff5'} strokeWidth="1" />
           <text x={PAD_L - 8} y={y(tick) + 3} textAnchor="end" className="trend-tick">{tick}</text>
         </g>
       ))}
-      {months.map((month, index) => {
-        const x = PAD_L + band * index + (band - barW) / 2;
-        const h = month.count === 0 ? 3 : (month.count / yMax) * plotH;
-        const top = PAD_T + plotH - h;
-        const highlighted = index === peakIndex && month.count > 0;
+      {areaPath ? <path className="trend-area" d={areaPath} fill="url(#trend-fill)" /> : null}
+      {linePath ? <path className="trend-line" d={linePath} fill="none" stroke="var(--halo-bg, #1a56f0)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /> : null}
+      {points.map((p, index) => {
+        const highlighted = index === peakIndex && p.count > 0;
         return (
-          <g key={month.key} className={`trend-bar ${highlighted ? 'peak' : ''}`}>
-            <rect className="trend-bar-hit" x={PAD_L + band * index} y={PAD_T - 16} width={band} height={plotH + 16} fill="transparent" />
-            <path
-              className="trend-bar-mark"
-              d={barPath(x, top, barW, h)}
-              fill={highlighted ? 'var(--halo-bg, #1a56f0)' : 'url(#trend-hatch)'}
-              stroke={highlighted ? 'none' : '#dde3ee'} strokeWidth={highlighted ? 0 : 1}
-            />
-            <g className="trend-chip" transform={`translate(${x + barW / 2}, ${top - 11})`}>
-              <rect x="-19" y="-12" width="38" height="19" rx="9.5" className="trend-chip-bg" />
-              <text y="2" textAnchor="middle" className="trend-chip-text">{month.count}</text>
-            </g>
-            <text x={x + barW / 2} y={H - 8} textAnchor="middle" className="trend-month">{month.label}</text>
+          <g key={months[index].key} className={`trend-point ${highlighted ? 'peak' : ''}`}>
+            <circle className="trend-dot" cx={p.x} cy={p.y} r={highlighted ? 5 : 3.5} fill="#fff" stroke="var(--halo-bg, #1a56f0)" strokeWidth="2.5" />
+            {highlighted ? (
+              <g className="trend-chip" transform={`translate(${p.x}, ${p.y - 14})`}>
+                <rect x="-15" y="-13" width="30" height="19" rx="9.5" className="trend-chip-bg" />
+                <text y="1" textAnchor="middle" className="trend-chip-text">{p.count}</text>
+              </g>
+            ) : null}
+            <text x={p.x} y={H - 8} textAnchor="middle" className="trend-month">{months[index].label}</text>
           </g>
         );
       })}
