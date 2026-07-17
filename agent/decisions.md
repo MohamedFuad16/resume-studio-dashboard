@@ -742,23 +742,79 @@ least the Gmail routes) to Azure. 7-day testing-mode token expiry is avoided by 
 OAuth app to production; the reconnect banner is event-driven (fires only on a real invalid_grant),
 not a timer. Gmail brand mark is nominative use to label the integration + tag ingested rows.
 
-## ADR-0036 · 2026-07-17 · Company-wide reapplication cooldown from rejection emails
-**Context:** After a rejection, many companies ask you to wait before reapplying (HENNGE:
-"apply again after 9–12 months"). The user should not be offered "Apply" for that company
-while the cooldown is active — and the block is company-wide, not per-posting (HENNGE has
-Front-End and Full-Stack pathways; a rejection from one gates both).
-**Decision:** (1) The Gmail triage model extracts `reapplyMonths{min,max}` from `kind:rejected`
-emails (clamped 1–36, max≥min); null when no window is stated. (2) The client drain stamps
-`reapplyAfter = rejection receivedAt + min months` plus `reapplyNote`/`reapplyMonths` on the
-tracker record; `useApplicationTracker.updateStatus` carries these fields forward. (3) A shared
-`utils/reapplyCooldown.js` derives a company→cooldown map from all records (latest reapplyAfter
-wins; CJK-safe company normalization) and every apply surface consults it: radar (amber clock
-chip in the Apply cell, `onApply` blocked, drawer banner + disabled Apply-now), Applications
-view + dashboard Recent (a "Reapply from <date>" pill). Cooldown is active only while
-status==='rejected' AND reapplyAfter is in the future, so moving the record off 'rejected'
-(a deliberate reapply) lifts the block automatically.
-**Consequences:** No false blocks — a plain rejection with no stated window never gates apply.
-The block is data-driven from the email, matching the company's own policy. Manual cooldown
-entry is not offered yet (a rejection marked by hand in-app carries no window); if needed, add a
-date field to the detail drawer's status control. The min-months bound is the earliest the
-company said you may reapply (conservative = shows the soonest unblock date).
+---
+
+## ADR-0036 · 2026-07-16 · Native iOS app (ios/), planner-pastel design language
+**Status:** Accepted
+**Context:** User asked for an iOS version of the Internship Portal in Xcode on the
+"iOS 27 liquid glass" design. The machine has Xcode 27.0 beta (27A5209h) with the
+iOS 27.0 SDK — but xcode-select points at CommandLineTools and sudo is unavailable,
+so every build exports DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer.
+Mid-build, the user supplied a reference set (task-planner / wellness pastel UI) and
+asked for a complete redesign to match it, starting from the Dashboard.
+**Decisions:**
+1. **Project layout** — `ios/project.yml` (XcodeGen) is the source of truth; the
+   .xcodeproj is generated and gitignored (`cd ios && xcodegen generate`). SwiftUI,
+   Swift 6, deployment target iOS 27.0, CODE_SIGNING_ALLOWED=NO (simulator only).
+2. **Design language** (Theme.swift) — the planner reference: near-white canvas
+   #F5F6F7, white cards (radius 22), near-black ink #16191C, pastel circular icon
+   tiles (green/lavender/peach/sky, hash-stable per company), thin outlined chips,
+   ONE saturated green accent #2FB56B (actions + match scores), ember orange for
+   urgency. Rows are the reference's anatomy one to one: 56pt pastel circle with a
+   TRACK glyph (frontend→macwindow, AI→brain, cloud→cloud, …; never a logo or
+   lettermark), bold title + gray value chip, muted subtitle, no chevron. System
+   Liquid Glass supplies the shell: native TabView (floating glass bar,
+   .tabBarMinimizeBehavior) with selection tinted INK like the reference. The
+   LOGIN screen alone keeps the web's warm-paper + serif + black pills (ADR-0028).
+   This supersedes the first draft's web-token port (ink/blue #1A56F0) — the web
+   and iOS apps now deliberately diverge.
+3. **IA + data** — four content tabs (Home / Roles / Timeline / Settings) and NO
+   search tab or nav-bar search: per user direction, search is a small pill INSIDE
+   the Roles list (browsing is the primary mode). No Firebase yet. LoginView is the
+   real design with sign-in stubbed; "Browse without an account" uses the PUBLIC
+   catalog: PortalAPI fetches /api/internships from portal-compile-jp (Azure).
+   Home = greeting header + stat chips + glowing top-match card +
+   Tokyo-first/Beyond-Tokyo sections; Roles = sectioned catalog
+   (Priority/Tokyo/Worldwide) with the inline search pill; Timeline = upcoming
+   deadlineDate roles grouped by day (JST, per BUG-009); Settings = status + web
+   links + back-to-sign-in. Editor deliberately deferred (no mobile LaTeX design).
+4. **Headless verification hooks** — simulators can't be tapped from simctl, so the
+   app accepts `--browse` (skip auth gate) and `--tab <dashboard|timeline|settings|radar>`
+   launch arguments; screenshots via `xcrun simctl io <udid> screenshot`. Verified on
+   an iPhone 17 Pro simulator (runtime downloaded via `xcodebuild -downloadPlatform iOS`).
+**Consequences:** Login/Radar/Timeline/Settings/Detail still carry the first-draft
+styling in places (Radar uses a plain List; detail uses glass chips) — the planner
+restyle has landed on Dashboard + shared row components only. Firebase auth, the
+per-user pipeline (saved/applied/rejected), and real UI tests (XCUITest instead of
+launch-arg screenshots) are the known next steps. NavModel (tab selection in the
+environment) exists so in-content controls can switch tabs.
+
+## ADR-0037 · 2026-07-16 · Performance + UI bug pass: lazy compile, shared tracker cache, catalog memo, vendor chunks
+**Context.** A full audit (browser walk + network trace + JA sweep) found: (1) a LaTeX
+compile (`POST /api/compile`) fired on every page load even though the app lands on the
+Dashboard; (2) `useApplicationTracker` was mounted 5× with no shared cache → 6
+`GET /api/tracker` on one load; (3) `readInternshipCatalog()` rebuilt + re-validated the
+seed catalog and double-`JSON.stringify`ed a ~1 MB drift check on every request; (4) the
+client shipped as one 1.18 MB JS chunk; (5) `.intern-deadline` was coral for every row
+(urgent had no color of its own); (6) JA mode leaked English ("Occasional hiring…",
+"Remote in USA/Canada", SpaceX location); (7) at ≤560px the radar rows used the tablet
+grid (a 4th `.intern-row` grid later in the file overrode the phone one), crushing the
+company column to ~80px and leaving an empty cell where the hidden status select sat.
+**Decision.**
+- App.jsx compiles lazily: one effect gated on `appView === 'editor'` (deps: resume,
+  template, appView) replaced the on-mount + on-template effects; `compile` still
+  dedupes via `lastCompiled`. Profile switch just clears the cache key.
+- `useApplicationTracker` got the same module-level per-profile snapshot + in-flight
+  dedupe as `useInternshipCatalog`; `commit()` refreshes the cache; TRACKER_EVENT still
+  syncs mounts; `refresh({force:false})` on mount.
+- `readInternshipCatalog` memoizes the resolved catalog in-process for 60 s
+  (`rememberCatalog`); all writers refresh the memo. TTL bounds staleness on
+  multi-instance hosts (Vercel); Azure is single-replica.
+- Vite `manualChunks`: vendor-react / vendor-firebase / vendor-ui (lucide+gsap).
+  Firebase stays static (auth gate needs it at startup; `auth`/`db` are sync exports).
+- CSS: urgent-only coral; JA mappings added; a phone `.intern-row` grid now lives AFTER
+  the final ≤860px block (source order is the winner at equal specificity) — company
+  spans the row, match/deadline stack full-width, status+apply share the bottom row.
+**Verified.** Build green, E2E 5/5, one tracker GET and zero compiles on a dashboard
+load, single compile on first Editor entry, JA + mobile verified in-browser at
+375/1366px.

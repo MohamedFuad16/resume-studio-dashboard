@@ -84,7 +84,23 @@ function mergeInternships(...groups) {
   return [...byId.values()];
 }
 
+// In-process memo for the resolved catalog. Without it, every /api/internships
+// request rebuilt + re-validated the full seed catalog and double-JSON.stringified
+// it against the stored copy (a ~1 MB drift check). All writes go through
+// writeInternshipCatalog / the setJson calls below, which refresh the memo; the
+// short TTL bounds staleness across instances on multi-instance hosts (Vercel).
+const CATALOG_MEMO_MS = 60_000;
+let catalogMemo = null;
+let catalogMemoAt = 0;
+
+function rememberCatalog(catalog) {
+  catalogMemo = catalog;
+  catalogMemoAt = Date.now();
+  return catalog;
+}
+
 async function readInternshipCatalog() {
+  if (catalogMemo && Date.now() - catalogMemoAt < CATALOG_MEMO_MS) return catalogMemo;
   const stored = await store.getJson(INTERNSHIP_CATALOG_KEY, null);
   const seedCatalog = buildSeedCatalog().map(validateInternship);
   if (Array.isArray(stored) && stored.length) {
@@ -99,7 +115,7 @@ async function readInternshipCatalog() {
     if (catalog.length !== stored.length || JSON.stringify(catalog) !== JSON.stringify(stored)) {
       await store.setJson(INTERNSHIP_CATALOG_KEY, catalog);
     }
-    return catalog;
+    return rememberCatalog(catalog);
   }
   const legacyCustom = await store.getJson('customInternships', []);
   const catalog = mergeInternships(
@@ -109,7 +125,7 @@ async function readInternshipCatalog() {
     seedCatalog,
   );
   await store.setJson(INTERNSHIP_CATALOG_KEY, catalog);
-  return catalog;
+  return rememberCatalog(catalog);
 }
 
 async function writeInternshipCatalog(items) {
@@ -117,7 +133,7 @@ async function writeInternshipCatalog(items) {
     items.filter(item => !isRetiredInternshipId(item?.id)).map(validateInternship),
   );
   await store.setJson(INTERNSHIP_CATALOG_KEY, catalog);
-  return catalog;
+  return rememberCatalog(catalog);
 }
 
 function internshipCatalogMeta(items) {

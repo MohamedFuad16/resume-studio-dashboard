@@ -3662,8 +3662,7 @@ body,
   font-weight: 580;
   line-height: 1.3;
 }
-.intern-deadline { color: var(--intern-coral); }
-.intern-deadline.urgent { font-weight: 760; }
+.intern-deadline.urgent { color: var(--intern-coral); font-weight: 760; }
 .intern-deadline.soon { color: #d86a22; }
 
 .intern-apply {
@@ -4390,20 +4389,9 @@ body,
   .intern-sort select { min-height: 36px; }
   .intern-summary > div span { max-width: 84px; line-height: 1.25; }
   .intern-table-head { display: none; }
-  .intern-row {
-    grid-template-columns: 30px minmax(0, 1fr) 34px;
-    grid-template-areas:
-      'rank company save'
-      '. company apply'
-      '. match apply'
-      '. location location'
-      '. language language'
-      '. deadline deadline';
-    min-height: 0;
-    gap: 7px 10px;
-    padding: 14px 12px 14px 10px;
-  }
-  .intern-row-status { display: none; }
+  /* NOTE: no .intern-row grid here — the phone grid lives in the final
+     max-width:560px block AFTER the 860px card layout (source order decides
+     the winner at equal specificity; a grid defined here can never apply). */
   .intern-rank { padding-top: 8px; text-align: center; }
   .intern-company-cell { align-items: flex-start; gap: 9px; }
   .intern-company-cell .company-logo { width: 32px; height: 32px; flex-basis: 32px; border-radius: 8px; }
@@ -5269,6 +5257,7 @@ body,
   .photo-field { grid-template-columns: 70px minmax(0, 1fr); gap: 14px; }
   .photo-preview { width: 70px; }
 }
+
 
 /* ── Internship radar calendar/search polish, final overrides ───── */
 .intern-toolbar { overflow: visible; }
@@ -6205,6 +6194,27 @@ body,
   .intern-detail.drawer { width: min(560px, 100vw); padding: 20px 18px 28px; }
   .intern-detail-head { grid-template-columns: 52px minmax(0, 1fr) auto auto 34px; gap: 10px; }
   .intern-detail-head > .company-logo { width: 52px; height: 52px; }
+}
+
+/* Phone layout for radar rows — must come AFTER every ≤860px .intern-row grid
+   (the winner at equal specificity is source order). The tablet card grid pinned
+   match to a 92px column and put deadline/status/apply on one row; below ~560px
+   that left the company text ~80px wide (JA names wrapped one character per
+   line) and the deadline chip wrapped vertically. Stack those pieces instead. */
+@media (max-width: 560px) {
+  .intern-row {
+    grid-template-columns: 22px minmax(0, 1fr) 72px 34px;
+    grid-template-areas:
+      'rank company company save'
+      '. match match match'
+      '. location location location'
+      '. language language language'
+      '. duration duration duration'
+      '. deadline deadline deadline'
+      '. status apply apply';
+  }
+  .intern-match { text-align: left; padding-top: 0; }
+  .intern-row .intern-apply { justify-self: stretch; }
 }
 
 @media (max-width: 560px) {

@@ -25,64 +25,24 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
-- **2026-07-17 — reapplication cooldown + automation audit.** Verified GitHub Actions
-  (validate-catalog.yml: push/PR structural validate + daily 06:00 UTC self-healing
-  refresh → auto-PR) and the Gmail pipeline (server `setInterval` poll every 5 min gated
-  by `isDirectRun` → gpt-5-nano classify → sonar enrich → per-profile queue → client
-  drain) — both correct/API-driven, no manual step. NEW feature — **company-wide reapply
-  cooldown**: a rejection email that states a wait window ("apply again after 9–12
-  months") now blocks reapplying to that company until the date passes. Pipeline:
-  classify.js extracts `reapplyMonths{min,max}` (clamped 1–36) from `kind:rejected`
-  emails → sync.js threads it → useGmailInbox stamps `reapplyAfter = receivedAt + min
-  months` + `reapplyNote` on the record → useApplicationTracker preserves the fields.
-  New `utils/reapplyCooldown.js` (companyCooldownMap/cooldownForCompany/cooldownLabel,
-  CJK-safe company match). UI: radar shows an amber clock chip in the Apply cell +
-  blocks onApply for ALL roles at the company (sibling roles too, e.g. both HENNGE
-  pathways), drawer shows a banner + disabled "Apply now"; Applications view + dashboard
-  Recent show a "Reapply from <date>" pill. Verified end-to-end in browser (injected a
-  HENNGE Front-End rejection → Full-Stack sibling blocked). Cooldown only when the email
-  states a window — no false blocks on plain rejections. Build + e2e (5/5) green.
-- **2026-07-17 — editor polish round 2 + catalog freshness.** (1) Editor: ALL hairline
-  dividers removed (topbar/rail/pane-head/sec-hd/pg-block/item — whitespace only);
-  manual Update button removed (auto-compile was already on; hidden `compile-btn`
-  keeps the E2E hook, an "Updating" chip shows during compiles); Fit zoom → `view=FitH`
-  + `.pdf-frame` aspect 2/3 kills the viewer letterboxing; phone/email/LinkedIn/GitHub
-  each full-width rows; skills tag inputs 1-per-row. (2) Catalog: ran
-  `refresh-catalog.js` (171 checked, retired Harbinger Motors global-091, 1 conflict
-  left active); NEW `catalog-audit-2026-07-17.js` overlay — Mercari Class-of-2028 SWE
-  internship REINSTATED (07-02 audit retired it for its passed 6/30 deadline, but the
-  official Workable API shows it published/live today → deadline now "Not stated");
-  Mercari security/UI-UX 2028 verifiedDate bumped. `isRetiredInternshipId` subtracts
-  `reinstatedIds20260717`; buildSeedCatalog applies 07-17 patches after 07-02.
-  (3) Radar "checked <date>" now uses `meta.lastCheckedDate` (auto-refresh.json
-  updatedAt — the whole-catalog liveness sweep) when newer than any verifiedDate.
-  Research notes: Woven/PFN/Mercari-Build+ 2026 cohorts closed (spring deadlines);
-  Rapyuta/PayPay/SmartNews have zero intern postings on their ATS APIs; aggregators
-  (japan-dev, tokyodev) list only HENNGE — the catalog already covers the market.
-- **2026-07-16 (night) — post-overhaul bug sweep.** Two regressions from the editor
-  redesign's late override layer, both caused by end-of-file rules outranking legacy
-  media queries: (1) `.editor-view .sidebar{width:560px}` pinned the form column inside
-  the ≤980 stacked layout → adaptive `min(820px,52vw)` + ≤980 full-width & 1-col
-  workspace restored (`a5a9ac9`); (2) preview toolbar zoom pills clipped at narrow
-  preview widths → toolbar wraps (`7f47fce`). Verified clean: e2e smoke ×2, EN+JA all
-  views, 390/500/900/1440 widths, editor add/move/delete + export menu + skills inputs,
-  drawer head wrap ≤560. NOTE: the embedded preview pane freezes rAF AND CSS animations
-  — a mid-animation drawer measures 42px off-screen there; not a real bug.
-- **2026-07-16 (eve) — editor overhaul + app-shell gradient + profile editing.**
-  (1) EDITOR redesigned to the app language (final override layer at the end of
-  index.css): one `.editor-topbar` (title + template pills + Save/Export — the old `.tb`
-  toolbar and `.editor-commandbar` rows are gone from the JSX), CHAT TAB REMOVED (chat
-  state/functions remain in App.jsx, unused), section rail restyled (no R-xx ids),
-  borderless sections/items with dividers, soft #f8fafc inputs w/ blue focus ring, pill
-  buttons everywhere, dashed add-pills, pill zoom segment; `ItemHeader` in sections.jsx
-  replaces the inline-styled ▲▼/Remove buttons (same data-testids).
-  (2) APP SHELL: `.app-body` carries the login `.auth-art` palette as a MUTED pastel
-  composite (user rejected the vivid sky gradient AND frosted cards — went through 4
-  iterations; final = flat-ish pastel wash backdrop, transparent sidebar, white cards
-  with border, no divider lines). (3) Calendar: every date gets the raised-badge
-  treatment — blue for all days, red for today; week view uses pills. (4) Settings'
-  Profile card removed; Profile view now edits personal details inline
-  (`onSavePersonal` prop from App → saveProfileImmediately). (5) Sidebar nav font 13px.
+- **2026-07-16 (eve) — Performance + UI bug pass (ADR-0037, BUG-016/017/018).** Pulled
+  origin/main into `ios-local` (merge commit; only `agent/state.md` conflicted). Fixes:
+  LaTeX compile now lazy (only in the Editor view — a dashboard load no longer POSTs
+  /api/compile); `useApplicationTracker` got a module-level per-profile cache +
+  in-flight dedupe (6 → 1 tracker GET per load); `readInternshipCatalog` 60 s in-process
+  memo (was rebuilding + double-stringifying the catalog per request); Vite manualChunks
+  split the 1.18 MB bundle into react/firebase/ui vendor chunks; deadline coral now
+  urgent-only; JA leaks mapped (Occasional hiring, Remote in USA/Canada, SpaceX site);
+  phone-width radar rows re-gridded (company was ~80px wide; the ≤560px grid was dead —
+  overridden by a later ≤860px grid). Build green, E2E 5/5, verified in-browser at
+  375/1366px in EN+JA.
+- **2026-07-16 — Native iOS app scaffold (`ios/`, ADR-0036).** SwiftUI app on the iOS 27.0
+  SDK (Xcode 27 beta via DEVELOPER_DIR; xcodegen; .xcodeproj gitignored). Planner-pastel
+  design language (near-white canvas, pastel track-glyph circles, one green accent, ink
+  tab selection) over the system Liquid Glass shell; login keeps the web identity. Four
+  content tabs (Home/Roles/Timeline/Settings) — NO search tab; search is an inline pill in
+  Roles. Live against the public Azure catalog (Home/Roles verified on an iPhone 17 Pro sim
+  via --browse/--tab hooks). No Firebase yet; Editor deferred.
 - **2026-07-16 (pm, round 3 — user feedback).** Drawer head is
   `logo | title | status select | score | close` — status sits beside the match %
   (`.intern-status-head`; the round-2 `.intern-status-top` row was removed; wraps to its
