@@ -1,5 +1,9 @@
-// Home — the reference's HomeTab, wired to real catalog + tracker data.
-// Greeting, streak, 2×2 launcher, Tokyo opportunities, recent applications.
+// Home — greeting, insight cards, recent applications, then Tokyo picks.
+//
+// Laid out like the Solace reference: a big greeting with the streak flame on the
+// right, then a 2×2 grid of soft cards. Here the cards carry the STATE of the
+// search — a pipeline donut and the figures that change week to week — because
+// Applications and Calendar have their own tabs and don't need launcher doors.
 import SwiftUI
 
 struct HomeView: View {
@@ -10,9 +14,9 @@ struct HomeView: View {
     private var greeting: String {
         let hour = CatalogStore.tokyoCalendar.component(.hour, from: .now)
         switch hour {
-        case 5..<12: return "Good morning, Mohamed"
-        case 12..<17: return "Good afternoon, Mohamed"
-        default: return "Good evening, Mohamed"
+        case 5..<12: return String(localized: "Good morning, Mohamed")
+        case 12..<17: return String(localized: "Good afternoon, Mohamed")
+        default: return String(localized: "Good evening, Mohamed")
         }
     }
 
@@ -20,11 +24,22 @@ struct HomeView: View {
     /// rather than a generic hello.
     private var statusLine: String {
         let interviews = store.count(of: .interview)
-        if interviews > 0 {
-            return "\(interviews) interview\(interviews == 1 ? "" : "s") in progress"
-        }
-        if store.tracker.isEmpty { return "Nothing tracked yet" }
-        return "\(store.tracker.count) applications tracked"
+        if interviews == 1 { return String(localized: "1 interview in progress") }
+        if interviews > 1 { return String(localized: "\(interviews) interviews in progress") }
+        if store.tracker.isEmpty { return String(localized: "Nothing tracked yet") }
+        return String(localized: "\(store.tracker.count) applications tracked")
+    }
+
+    /// The flame's number: applications that moved past "saved" in the last
+    /// seven days — this week's actual output, not an all-time total.
+    private var appliedThisWeek: Int {
+        let cutoff = Date.now.addingTimeInterval(-7 * 24 * 3600)
+        return store.records.filter { record in
+            guard record.appStatus != .saved,
+                  let date = ISO8601DateFormatter.parse(record.createdAt ?? record.updatedAt)
+            else { return false }
+            return date > cutoff
+        }.count
     }
 
     private var tokyoPicks: [Internship] {
@@ -33,105 +48,304 @@ struct HomeView: View {
 
     var body: some View {
         TabScroll {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .top, spacing: 12) {
                     Text(greeting)
-                        .font(.system(size: 22, weight: .semibold))
+                        .font(Font2.title(26))
                         .tracking(-0.4)
                         .foregroundStyle(Palette.ink)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text(statusLine)
-                        .font(Font2.body)
-                        .foregroundStyle(Palette.ink500)
+                    Spacer(minLength: 8)
+                    StreakPill(count: appliedThisWeek)
                 }
-                Spacer(minLength: 12)
-                StreakPill(count: store.count(of: .applied) + store.count(of: .interview))
+                Text(statusLine)
+                    .font(Font2.body)
+                    .foregroundStyle(Palette.ink500)
             }
-            .padding(.bottom, 24)
+            .padding(.bottom, 22)
 
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                ActionCard(
-                    symbol: "location.north.circle", tint: .teal,
-                    title: "Radar",
-                    subtitle: store.internships.isEmpty ? "Loading…" : "\(store.internships.count) matches"
-                ) { tab = .radar }
+            InsightGrid(tab: $tab)
+                .padding(.bottom, 26)
 
-                ActionCard(
-                    symbol: "briefcase", tint: .purple,
-                    title: "Applications",
-                    subtitle: "\(store.tracker.count) tracked"
-                ) { tab = .applications }
-
-                ActionCard(
-                    symbol: "calendar", tint: .blue,
-                    title: "Calendar",
-                    subtitle: nextEventLabel
-                ) { tab = .calendar }
-
-                ActionCard(
-                    symbol: "person.crop.circle", tint: .orange,
-                    title: "Profile",
-                    subtitle: "Résumé & keys"
-                ) { route = .profile }
-            }
-            .padding(.bottom, 28)
-
-            SectionHeader(title: "Tokyo opportunities", actionLabel: "See all") { tab = .radar }
-                .padding(.bottom, 12)
-
-            if store.phase == .loading && store.internships.isEmpty {
-                VStack(spacing: 10) {
-                    ForEach(0..<3, id: \.self) { _ in ShimmerBox(height: 76) }
-                }
-                .padding(.bottom, 24)
-            } else if tokyoPicks.isEmpty {
-                EmptyNote(
-                    symbol: "location.slash",
-                    title: "No new Tokyo roles",
-                    message: "Every Tokyo listing is already in your applications."
-                )
-                .padding(.bottom, 24)
-            } else {
-                VStack(spacing: 10) {
-                    ForEach(tokyoPicks) { item in
-                        MatchCard(item: item) { route = .internship(item) }
-                    }
-                }
-                .padding(.bottom, 28)
-            }
-
-            SectionHeader(title: "Recent applications")
+            SectionHeader(title: String(localized: "Recent applications"), actionLabel: String(localized: "See all")) { tab = .applications }
                 .padding(.bottom, 12)
 
             if store.records.isEmpty {
                 EmptyNote(
                     symbol: "tray",
-                    title: "No applications tracked yet",
-                    message: "Save or start a role in Radar and it will appear here."
+                    title: String(localized: "No applications tracked yet"),
+                    message: String(localized: "Save or start a role in Radar and it will appear here.")
                 )
+                .padding(.bottom, 26)
             } else {
                 VStack(spacing: 10) {
                     ForEach(store.records.prefix(3)) { record in
                         ApplicationCard(record: record) { route = .record(record) }
                     }
                 }
+                .padding(.bottom, 26)
+            }
+
+            SectionHeader(title: String(localized: "Tokyo opportunities"), actionLabel: String(localized: "See all")) { tab = .radar }
+                .padding(.bottom, 12)
+
+            if store.phase == .loading && store.internships.isEmpty {
+                VStack(spacing: 10) {
+                    ForEach(0..<3, id: \.self) { _ in ShimmerBox(height: 76) }
+                }
+            } else if tokyoPicks.isEmpty {
+                EmptyNote(
+                    symbol: "location.slash",
+                    title: String(localized: "No new Tokyo roles"),
+                    message: String(localized: "Every Tokyo listing is already in your applications.")
+                )
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(tokyoPicks) { item in
+                        MatchCard(item: item) { route = .internship(item) }
+                    }
+                }
             }
         }
     }
+}
 
-    private var nextEventLabel: String {
-        let today = CatalogStore.dayKey(.now)
-        let upcoming = store.events.filter { $0.date >= today }.sorted { $0.date < $1.date }
-        guard let next = upcoming.first else { return "No events" }
-        let parts = next.date.split(separator: "-")
-        guard parts.count == 3, let month = Int(parts[1]), let day = Int(parts[2]) else { return "Deadlines" }
-        let names = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-        return "Next \(names[month]) \(day)"
+/// The insight block: the web dashboard's Status-breakdown donut (centre total,
+/// legend with counts) as a full-width card, then the reference's 2×2 grid with
+/// the figures worth checking daily.
+private struct InsightGrid: View {
+    @Environment(CatalogStore.self) private var store
+    @Binding var tab: AppTab
+
+    /// Share of sent applications that got ANY answer (interview or rejection).
+    private var heardBack: String {
+        let sent = store.count(of: .applied) + store.count(of: .interview) + store.count(of: .rejected)
+        guard sent > 0 else { return "—" }
+        let answered = store.count(of: .interview) + store.count(of: .rejected)
+        return "\(Int((Double(answered) / Double(sent) * 100).rounded()))%"
+    }
+
+    var body: some View {
+        VStack(spacing: 12) {
+            StatusBreakdownCard { tab = .applications }
+
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+                InsightCard(
+                    title: String(localized: "Applied"),
+                    subtitle: String(localized: "sent so far"),
+                    value: "\(store.count(of: .applied))",
+                    action: { tab = .applications }
+                ) {
+                    IconTile(symbol: "paperplane", tint: .blue, size: 36, glyph: 16)
+                }
+
+                InsightCard(
+                    title: String(localized: "Interviews"),
+                    subtitle: String(localized: "in progress"),
+                    value: "\(store.count(of: .interview))",
+                    action: { tab = .applications }
+                ) {
+                    IconTile(symbol: "calendar.badge.clock", tint: .orange, size: 36, glyph: 16)
+                }
+
+                InsightCard(
+                    title: String(localized: "Rejected"),
+                    subtitle: String(localized: "closed doors"),
+                    value: "\(store.count(of: .rejected))",
+                    action: { tab = .applications }
+                ) {
+                    IconTile(symbol: "circle.slash", tint: .gray, size: 36, glyph: 16)
+                }
+
+                InsightCard(
+                    title: String(localized: "Heard back"),
+                    subtitle: String(localized: "of sent applications"),
+                    value: heardBack,
+                    action: { tab = .applications }
+                ) {
+                    IconTile(symbol: "arrow.uturn.left", tint: .teal, size: 36, glyph: 16)
+                }
+            }
+        }
     }
 }
 
-/// The reference's streak chip. Here it counts live applications rather than a
-/// habit streak — a number that means something in this app.
+/// The web dashboard's Status-breakdown panel, verbatim in spirit: a thick donut
+/// with the total in the hole, and a legend that names every stage with its
+/// count — colour is never the only signal.
+private struct StatusBreakdownCard: View {
+    @Environment(CatalogStore.self) private var store
+    var action: () -> Void
+
+    private var present: [ApplicationStatus] {
+        ApplicationStatus.allCases.filter { store.count(of: $0) > 0 }
+    }
+
+    var body: some View {
+        PressableCard(action: action) {
+            Card(padding: 18) {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack {
+                        Text("Status breakdown")
+                            .font(Font2.sectionTitle)
+                            .foregroundStyle(Palette.ink)
+                        Spacer()
+                        Text(store.tracker.isEmpty ? String(localized: "Nothing yet") : String(localized: "\(store.tracker.count) tracked"))
+                            .font(Font2.caption)
+                            .foregroundStyle(Palette.ink400)
+                            .monospacedDigit()
+                    }
+
+                    HStack(spacing: 20) {
+                        PipelineDonut(size: 96, line: 15)
+
+                        if present.isEmpty {
+                            Text("Track a role in Radar and the breakdown starts here.")
+                                .font(Font2.caption)
+                                .foregroundStyle(Palette.ink500)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        } else {
+                            VStack(alignment: .leading, spacing: 8) {
+                                ForEach(present) { status in
+                                    HStack(spacing: 7) {
+                                        Circle()
+                                            .fill(status.tint.fg)
+                                            .frame(width: 7, height: 7)
+                                        Text(status.label)
+                                            .font(Font2.caption)
+                                            .foregroundStyle(Palette.ink600)
+                                        Spacer(minLength: 10)
+                                        Text("\(store.count(of: status))")
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundStyle(Palette.ink)
+                                            .monospacedDigit()
+                                    }
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                    }
+                }
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "Status breakdown. "
+                + (present.isEmpty
+                    ? "Nothing tracked yet."
+                    : present.map { "\($0.label) \(store.count(of: $0))" }.joined(separator: ", "))
+        )
+    }
+}
+
+/// One soft card in the grid — top visual, then (optionally) a big figure, then
+/// title + quiet subtitle, all left-aligned like the reference boxes.
+private struct InsightCard<Top: View>: View {
+    var title: String
+    var subtitle: String
+    var value: String?
+    var action: () -> Void
+    @ViewBuilder var top: () -> Top
+
+    init(
+        title: String, subtitle: String, value: String? = nil,
+        action: @escaping () -> Void, @ViewBuilder top: @escaping () -> Top
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.value = value
+        self.action = action
+        self.top = top
+    }
+
+    var body: some View {
+        PressableCard(action: action) {
+            Card(padding: 16) {
+                VStack(alignment: .leading, spacing: 0) {
+                    top()
+                    Spacer(minLength: 12)
+                    if let value {
+                        Text(value)
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundStyle(Palette.ink)
+                            .monospacedDigit()
+                            .padding(.bottom, 1)
+                    }
+                    Text(title)
+                        .font(Font2.cardTitle)
+                        .foregroundStyle(Palette.ink)
+                    Text(subtitle)
+                        .font(Font2.caption)
+                        .foregroundStyle(Palette.ink500)
+                        .lineLimit(1)
+                        .padding(.top, 2)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .aspectRatio(1.06, contentMode: .fit)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title). \(value.map { "\($0), " } ?? "")\(subtitle)")
+    }
+}
+
+/// The pipeline as a donut: one arc per status with a count in the middle.
+/// Legend lives in the statuses' own colours plus the Applications tab — on a
+/// 44pt chart, labels would be noise.
+private struct PipelineDonut: View {
+    @Environment(CatalogStore.self) private var store
+    var size: CGFloat
+    var line: CGFloat
+
+    private var slices: [(status: ApplicationStatus, from: Double, to: Double)] {
+        let total = store.tracker.count
+        guard total > 0 else { return [] }
+        var start = 0.0
+        return ApplicationStatus.allCases.compactMap { status in
+            let count = store.count(of: status)
+            guard count > 0 else { return nil }
+            let end = start + Double(count) / Double(total)
+            defer { start = end }
+            return (status, start, end)
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Palette.hairline, lineWidth: line)
+
+            ForEach(slices, id: \.status) { slice in
+                Circle()
+                    .trim(from: slice.from, to: slice.to)
+                    .stroke(
+                        slice.status.tint.fg,
+                        style: StrokeStyle(lineWidth: line, lineCap: slices.count == 1 ? .butt : .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+            }
+
+            // The web donut's centre: the total, named.
+            VStack(spacing: 0) {
+                Text("\(store.tracker.count)")
+                    .font(.system(size: size * 0.24, weight: .bold))
+                    .foregroundStyle(Palette.ink)
+                    .monospacedDigit()
+                if size >= 80 {
+                    Text("tracked")
+                        .font(Font2.nano)
+                        .foregroundStyle(Palette.ink400)
+                }
+            }
+        }
+        .frame(width: size, height: size)
+        .padding(line / 2)
+        .accessibilityHidden(true)   // the card's combined label carries the numbers
+    }
+}
+
+/// The reference's streak chip. Here it counts this week's applications rather
+/// than a habit streak — a number that means something in this app.
 struct StreakPill: View {
     var count: Int
 
@@ -149,12 +363,13 @@ struct StreakPill: View {
         .padding(.vertical, 7)
         .background(Palette.card, in: .capsule)
         .cardShadow()
-        .accessibilityLabel("\(count) active applications")
+        .accessibilityLabel("\(count) applications this week")
     }
 }
 
 // MARK: - Previews
 
+#if DEBUG
 #Preview("Home — with data") {
     @Previewable @State var tab: AppTab = .home
     @Previewable @State var route: Route?
@@ -175,3 +390,4 @@ struct StreakPill: View {
     AmbientCanvas { HomeView(tab: $tab, route: $route) }
         .environment(CatalogStore.previewLoading)
 }
+#endif

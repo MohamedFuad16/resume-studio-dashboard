@@ -13,16 +13,17 @@ import SwiftUI
 /// Named AppTab, not Tab: the iOS 18+ TabView syntax has its own `SwiftUI.Tab`
 /// type, and shadowing it turns every `Tab("…")` line into our enum.
 enum AppTab: String, CaseIterable, Identifiable {
-    case home, radar, applications, calendar
+    case home, radar, applications, calendar, settings
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
-        case .home: "Home"
-        case .radar: "Radar"
-        case .applications: "Applications"
-        case .calendar: "Calendar"
+        case .home: String(localized: "Home")
+        case .radar: String(localized: "Radar")
+        case .applications: String(localized: "Applications")
+        case .calendar: String(localized: "Calendar")
+        case .settings: String(localized: "Settings")
         }
     }
 
@@ -32,6 +33,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .radar: "location.north.circle"
         case .applications: "briefcase"
         case .calendar: "calendar"
+        case .settings: "gearshape"
         }
     }
 }
@@ -43,7 +45,6 @@ enum Route: Identifiable, Hashable {
     case record(TrackerRecord)
     case addEvent
     case interviewDate(recordId: String, company: String)
-    case profile
 
     var id: String {
         switch self {
@@ -51,7 +52,6 @@ enum Route: Identifiable, Hashable {
         case .record(let record): "record-\(record.id)"
         case .addEvent: "add-event"
         case .interviewDate(let id, _): "interview-\(id)"
-        case .profile: "profile"
         }
     }
 }
@@ -79,10 +79,17 @@ struct RootView: View {
                 AmbientCanvas(active: route == nil) { RadarView(route: $route) }
             }
             SwiftUI.Tab(AppTab.applications.label, systemImage: AppTab.applications.symbol, value: AppTab.applications) {
-                AmbientCanvas(active: route == nil) { ApplicationsView(route: $route) }
+                // No AmbientCanvas HERE: Applications owns a NavigationStack (for
+                // the Companies push), and a stack paints its own opaque ground
+                // over anything behind it — the canvas must live inside the stack
+                // or cards sit on flat white and stop reading as cards.
+                ApplicationsView(route: $route)
             }
             SwiftUI.Tab(AppTab.calendar.label, systemImage: AppTab.calendar.symbol, value: AppTab.calendar) {
                 AmbientCanvas(active: route == nil) { CalendarView(route: $route) }
+            }
+            SwiftUI.Tab(AppTab.settings.label, systemImage: AppTab.settings.symbol, value: AppTab.settings) {
+                SettingsView()
             }
         }
         // The bar shrinks to a droplet while you scroll a long list — the system
@@ -105,8 +112,6 @@ struct RootView: View {
                 AddEventSheet()
             case .interviewDate(let recordId, let company):
                 InterviewDateSheet(recordId: recordId, company: company)
-            case .profile:
-                ProfileSheet()
             }
         }
     }
@@ -155,8 +160,10 @@ struct TabScroll<Content: View>: View {
 
 // MARK: - Previews
 
+#if DEBUG
 #Preview("Whole app") {
     RootView()
         .environment(CatalogStore.preview)
         .environment(AuthService())
 }
+#endif

@@ -25,10 +25,7 @@ final class AuthService {
     /// are not, so the common ones are translated below.
     var error: String?
 
-    /// `nonisolated(unsafe)` so `deinit` (which is never actor-isolated) can detach
-    /// the listener. Safe by construction: written once in init, read once in deinit,
-    /// never touched concurrently.
-    private nonisolated(unsafe) var handle: AuthStateDidChangeListenerHandle?
+    private var handle: AuthStateDidChangeListenerHandle?
 
     var uid: String? {
         if case .signedIn(let uid, _, _) = phase { return uid }
@@ -66,7 +63,9 @@ final class AuthService {
         }
     }
 
-    deinit {
+    /// `isolated deinit` (SE-0371): runs on the main actor, so it can read the
+    /// stored handle directly — no `nonisolated(unsafe)` escape hatch needed.
+    isolated deinit {
         if let handle { Auth.auth().removeStateDidChangeListener(handle) }
     }
 
@@ -98,6 +97,22 @@ final class AuthService {
             self.error = Self.message(for: error)
         }
         busy = false
+    }
+
+    /// Renames the account — the greeting and Settings read displayName, so the
+    /// change is committed to Firebase, the user reloaded, and the phase
+    /// re-applied so every view updates at once.
+    func updateDisplayName(_ name: String) async {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        await run {
+            guard let user = Auth.auth().currentUser else { return }
+            let change = user.createProfileChangeRequest()
+            change.displayName = trimmed
+            try await change.commitChanges()
+            try await user.reload()
+        }
+        apply(Auth.auth().currentUser)
     }
 
     // MARK: - Google

@@ -7,46 +7,159 @@ struct RadarView: View {
     @Binding var route: Route?
 
     @State private var query = ""
-    @State private var filter: RadarFilter = .all
+    @State private var location: LocationFilter = .all
+    @State private var language: LanguageFilter = .all
+    @State private var sort: RadarSort = .match
 
-    enum RadarFilter: String, CaseIterable, Identifiable {
-        case all, tokyo, english, saved
+    enum LocationFilter: String, CaseIterable, Identifiable {
+        case all, tokyo, remote, elsewhere
         var id: String { rawValue }
         var label: String {
             switch self {
-            case .all: "All tracks"
-            case .tokyo: "Tokyo"
-            case .english: "English"
-            case .saved: "Saved"
+            case .all: String(localized: "All locations")
+            case .tokyo: String(localized: "Tokyo")
+            case .remote: String(localized: "Remote")
+            case .elsewhere: String(localized: "Elsewhere")
             }
         }
+        var symbol: String {
+            switch self {
+            case .all: "globe.asia.australia"
+            case .tokyo: "mappin.and.ellipse"
+            case .remote: "laptopcomputer.and.iphone"
+            case .elsewhere: "map"
+            }
+        }
+    }
+
+    enum LanguageFilter: String, CaseIterable, Identifiable {
+        case all, english, japanese
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .all: String(localized: "All languages")
+            case .english: String(localized: "English-first")
+            case .japanese: String(localized: "Japanese")
+            }
+        }
+        var symbol: String {
+            switch self {
+            case .all: "globe"
+            case .english: "textformat.abc"
+            case .japanese: "character.bubble"
+            }
+        }
+    }
+
+    enum RadarSort: String, CaseIterable, Identifiable {
+        case match, deadline, company
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .match: String(localized: "Best match")
+            case .deadline: String(localized: "Deadline")
+            case .company: String(localized: "Company A–Z")
+            }
+        }
+        var symbol: String {
+            switch self {
+            case .match: "sparkles"
+            case .deadline: "clock"
+            case .company: "textformat"
+            }
+        }
+    }
+
+    private static func isRemote(_ item: Internship) -> Bool {
+        (item.workMode ?? "").localizedCaseInsensitiveContains("remote")
+            || item.displayLocation.localizedCaseInsensitiveContains("remote")
     }
 
     private var results: [Internship] {
         var items = store.internships
 
-        switch filter {
+        switch location {
         case .all: break
         case .tokyo: items = items.filter(\.isTokyo)
+        case .remote: items = items.filter(Self.isRemote)
+        case .elsewhere: items = items.filter { !$0.isTokyo && !Self.isRemote($0) }
+        }
+
+        switch language {
+        case .all: break
         case .english: items = items.filter(\.isEnglishFirst)
-        case .saved: items = items.filter { store.status(for: $0.id) == .saved }
+        case .japanese: items = items.filter { !$0.isEnglishFirst }
         }
 
         let trimmed = query.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return items }
-        return items.filter {
-            $0.displayCompany.localizedCaseInsensitiveContains(trimmed)
-                || $0.displayRole.localizedCaseInsensitiveContains(trimmed)
-                || $0.displayLocation.localizedCaseInsensitiveContains(trimmed)
-                || ($0.track ?? "").localizedCaseInsensitiveContains(trimmed)
+        if !trimmed.isEmpty {
+            items = items.filter {
+                $0.displayCompany.localizedCaseInsensitiveContains(trimmed)
+                    || $0.displayRole.localizedCaseInsensitiveContains(trimmed)
+                    || $0.displayLocation.localizedCaseInsensitiveContains(trimmed)
+                    || ($0.track ?? "").localizedCaseInsensitiveContains(trimmed)
+            }
         }
+
+        switch sort {
+        case .match:
+            // The catalog arrives ranked; keep that order (score with tie-breaks).
+            return items
+        case .deadline:
+            // deadlineDate is YYYY-MM-DD, so string order IS date order; roles
+            // without one sink to the bottom rather than fake urgency.
+            return items.sorted {
+                let a = $0.deadlineDate ?? "9999", b = $1.deadlineDate ?? "9999"
+                return a == b ? ($0.score ?? 0) > ($1.score ?? 0) : a < b
+            }
+        case .company:
+            return items.sorted {
+                $0.displayCompany.localizedCaseInsensitiveCompare($1.displayCompany) == .orderedAscending
+            }
+        }
+    }
+
+    /// The control row: three menus — sort, location, language. Menus, not chip
+    /// toggles: each has 3–4 options and the current choice must stay readable.
+    /// An active filter wears the ink fill, same as the old selected chip.
+    private var sortMenu: some View {
+        FilterMenuPill(icon: "arrow.up.arrow.down", label: sort.label, isActive: false) {
+            Picker("Sort by", selection: $sort) {
+                ForEach(RadarSort.allCases) { option in
+                    Label(option.label, systemImage: option.symbol).tag(option)
+                }
+            }
+        }
+        .accessibilityLabel("Sort by \(sort.label)")
+    }
+
+    private var locationMenu: some View {
+        FilterMenuPill(icon: "mappin.and.ellipse", label: location.label, isActive: location != .all) {
+            Picker("Location", selection: $location) {
+                ForEach(LocationFilter.allCases) { option in
+                    Label(option.label, systemImage: option.symbol).tag(option)
+                }
+            }
+        }
+        .accessibilityLabel("Location: \(location.label)")
+    }
+
+    private var languageMenu: some View {
+        FilterMenuPill(icon: "globe", label: language.label, isActive: language != .all) {
+            Picker("Language", selection: $language) {
+                ForEach(LanguageFilter.allCases) { option in
+                    Label(option.label, systemImage: option.symbol).tag(option)
+                }
+            }
+        }
+        .accessibilityLabel("Language: \(language.label)")
     }
 
     var body: some View {
         TabScroll {
             ScreenHeader(
-                title: "Japan matches",
-                subtitle: store.internships.isEmpty ? "Loading catalog…" : "\(store.internships.count) verified live roles"
+                title: String(localized: "Japan matches"),
+                subtitle: store.internships.isEmpty ? String(localized: "Loading catalog…") : String(localized: "\(store.internships.count) verified live roles")
             )
             .padding(.bottom, 18)
 
@@ -55,15 +168,9 @@ struct RadarView: View {
 
             ScrollView(.horizontal) {
                 HStack(spacing: 8) {
-                    ForEach(RadarFilter.allCases) { option in
-                        FilterChip(
-                            label: option.label,
-                            count: option == .saved ? store.count(of: .saved) : nil,
-                            isOn: filter == option
-                        ) {
-                            withAnimation(.easeOut(duration: 0.18)) { filter = option }
-                        }
-                    }
+                    sortMenu
+                    locationMenu
+                    languageMenu
                 }
                 .padding(.horizontal, 20)
             }
@@ -73,9 +180,9 @@ struct RadarView: View {
 
             ScrollView(.horizontal) {
                 HStack(spacing: 12) {
-                    StatCard(symbol: "mappin.and.ellipse", tint: .blue, value: "\(store.tokyoCount)", label: "Tokyo")
-                    StatCard(symbol: "star", tint: .indigo, value: "\(store.japanCount)", label: "Japan total")
-                    StatCard(symbol: "globe", tint: .teal, value: "\(store.englishFirstCount)", label: "English")
+                    StatCard(symbol: "mappin.and.ellipse", tint: .blue, value: "\(store.tokyoCount)", label: String(localized: "Tokyo"))
+                    StatCard(symbol: "star", tint: .indigo, value: "\(store.japanCount)", label: String(localized: "Japan total"))
+                    StatCard(symbol: "globe", tint: .teal, value: "\(store.englishFirstCount)", label: String(localized: "English"))
                 }
                 .padding(.horizontal, 20)
             }
@@ -94,8 +201,8 @@ struct RadarView: View {
                 if results.isEmpty {
                     EmptyNote(
                         symbol: "magnifyingglass",
-                        title: "No roles match",
-                        message: "Try a different search or clear the filters."
+                        title: String(localized: "No roles match"),
+                        message: String(localized: "Try a different search or clear the filters.")
                     )
                 } else {
                     LazyVStack(spacing: 10) {
@@ -103,6 +210,40 @@ struct RadarView: View {
                             MatchCard(item: item) { route = .internship(item) }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+/// A menu wearing the FilterChip's clothes: pill, icon, current value, and the
+/// ink fill when its filter is narrowing the list.
+private struct FilterMenuPill<Content: View>: View {
+    var icon: String
+    var label: String
+    var isActive: Bool
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        Menu(content: content) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .semibold))
+                Text(label)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(isActive ? .white.opacity(0.65) : Palette.ink400)
+            }
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(isActive ? .white : Palette.ink600)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background {
+                if isActive {
+                    Capsule().fill(Palette.ink)
+                } else {
+                    Capsule().fill(Palette.card).cardShadow()
+                    Capsule().strokeBorder(Palette.hairline, lineWidth: 1)
                 }
             }
         }
@@ -178,6 +319,7 @@ struct FailureNote: View {
 
 // MARK: - Previews
 
+#if DEBUG
 #Preview("Radar — ranked list") {
     @Previewable @State var route: Route?
     AmbientCanvas { RadarView(route: $route) }
@@ -195,3 +337,4 @@ struct FailureNote: View {
     AmbientCanvas { RadarView(route: $route) }
         .environment(CatalogStore.previewFailed)
 }
+#endif

@@ -1,0 +1,171 @@
+/* Internship Portal — Japanese strings.
+   Keys are the English source strings (SwiftUI Text literals and
+   String(localized:) call sites). English needs no file: the keys themselves
+   are the development-language fallback. */
+
+/* Tabs */
+"Home" = "ホーム";
+"Radar" = "レーダー";
+"Applications" = "応募";
+"Calendar" = "カレンダー";
+"Settings" = "設定";
+
+/* Statuses */
+"Saved" = "保存済み";
+"Applying" = "応募準備中";
+"Applied" = "応募済み";
+"Interview" = "面接";
+"Rejected" = "不採用";
+
+/* Company tiers */
+"Flagships" = "大手企業";
+"Scale-ups" = "成長企業";
+"Startups" = "スタートアップ";
+"Tier-1 and global names" = "一流・グローバル企業";
+"Established and growing" = "安定成長中の企業";
+"Early-stage teams" = "アーリーステージのチーム";
+
+/* Home */
+"Good morning, Mohamed" = "おはようございます、Mohamedさん";
+"Good afternoon, Mohamed" = "こんにちは、Mohamedさん";
+"Good evening, Mohamed" = "こんばんは、Mohamedさん";
+"1 interview in progress" = "面接進行中 1件";
+"%lld interviews in progress" = "面接進行中 %lld件";
+"Nothing tracked yet" = "まだ何もトラッキングしていません";
+"%lld applications tracked" = "%lld件の応募をトラッキング中";
+"Status breakdown" = "ステータス内訳";
+"%lld tracked" = "%lld件";
+"Nothing yet" = "まだありません";
+"tracked" = "追跡中";
+"Track a role in Radar and the breakdown starts here." = "レーダーで求人をトラッキングすると、ここに内訳が表示されます。";
+"sent so far" = "これまでの応募";
+"Interviews" = "面接";
+"in progress" = "進行中";
+"closed doors" = "見送りになった応募";
+"Heard back" = "返信率";
+"of sent applications" = "応募のうち返信あり";
+"Recent applications" = "最近の応募";
+"See all" = "すべて見る";
+"Tokyo opportunities" = "東京の求人";
+"No applications tracked yet" = "まだ応募をトラッキングしていません";
+"Save or start a role in Radar and it will appear here." = "レーダーで求人を保存または応募すると、ここに表示されます。";
+"No new Tokyo roles" = "新しい東京の求人はありません";
+"Every Tokyo listing is already in your applications." = "東京の求人はすべて応募リストに入っています。";
+
+/* Radar */
+"Japan matches" = "日本のマッチ求人";
+"Loading catalog…" = "カタログを読み込み中…";
+"%lld verified live roles" = "検証済みの募集中求人 %lld件";
+"Search company or role…" = "会社名・職種で検索…";
+"Best match" = "マッチ度順";
+"Deadline" = "締切";
+"Company A–Z" = "会社名順";
+"Sort by" = "並び替え";
+"Location" = "勤務地";
+"Language" = "言語";
+"All locations" = "すべての勤務地";
+"Tokyo" = "東京";
+"Remote" = "リモート";
+"Elsewhere" = "その他の地域";
+"All languages" = "すべての言語";
+"English-first" = "英語メイン";
+"Japanese" = "日本語";
+"Japan total" = "日本全体";
+"English" = "英語";
+"No roles match" = "一致する求人がありません";
+"Try a different search or clear the filters." = "検索条件を変えるか、フィルタを解除してください。";
+"Couldn't reach the portal" = "ポータルに接続できません";
+"Try again" = "再試行";
+"Clear search" = "検索をクリア";
+"MATCH" = "適合度";
+
+/* Applications */
+"%lld companies · synced from Gmail" = "%lld社 · Gmailと同期済み";
+"All" = "すべて";
+"Companies" = "企業";
+"%lld hiring · sized by role count" = "%lld社が募集中 · 求人数でサイズ表示";
+"No applications yet" = "まだ応募がありません";
+"Nothing in %@" = "「%@」の応募はありません";
+"Track a role from Radar and it will show up here." = "レーダーから求人をトラッキングすると、ここに表示されます。";
+"No company is at this stage right now." = "現在この段階の企業はありません。";
+"+%lld more" = "他%lld社";
+"Done" = "完了";
+
+/* Sheets */
+"Status" = "ステータス";
+"Where this application stands" = "この応募の現在の段階";
+"Set status" = "ステータスを設定";
+"Not tracked" = "未トラッキング";
+"About the role" = "職務内容";
+"Why this fits" = "マッチする理由";
+"Tech stack" = "技術スタック";
+"Eligibility" = "応募資格";
+"Selection process" = "選考プロセス";
+"Details" = "詳細";
+"Compensation" = "報酬";
+"Verified" = "確認日";
+"Apply now" = "今すぐ応募";
+"Open posting" = "募集ページを開く";
+"Timeline" = "タイムライン";
+"From Gmail" = "Gmailから";
+"Source" = "ソース";
+"Gmail inbox" = "Gmailの受信トレイ";
+"Added in app" = "アプリで追加";
+"Not stated" = "記載なし";
+"Close" = "閉じる";
+
+/* Calendar */
+"Today" = "今日";
+"Event" = "予定";
+"No events this month" = "今月の予定はありません";
+"1 event this month" = "今月の予定 1件";
+"%lld events this month" = "今月の予定 %lld件";
+"Nothing on this day" = "この日の予定はありません";
+"Track a role first — its deadline lands here." = "まず求人をトラッキングすると、締切がここに表示されます。";
+"Deadlines and interviews will appear here." = "締切や面接がここに表示されます。";
+"Previous month" = "前の月";
+"Next month" = "次の月";
+
+/* Settings */
+"App language" = "アプリの言語";
+"Applies after relaunch" = "再起動後に反映されます";
+"System" = "システム";
+"Edit profile" = "プロフィールを編集";
+"Change photo" = "写真を変更";
+"Remove photo" = "写真を削除";
+"Résumé & details" = "履歴書・プロフィール";
+"Edit on the web" = "ウェブで編集";
+"AI & API keys" = "AI・APIキー";
+"OpenRouter · managed on the web" = "OpenRouter · ウェブで管理";
+"Auto-tracks replies and interviews" = "返信や面接を自動トラッキング";
+"Connected" = "接続済み";
+"Refresh data" = "データを更新";
+"Refreshing…" = "更新中…";
+"Last attempt failed" = "前回の更新に失敗しました";
+"%lld roles · %lld tracked" = "求人%lld件 · トラッキング%lld件";
+"Open the web portal" = "ウェブポータルを開く";
+"Sign out" = "サインアウト";
+"Sign out?" = "サインアウトしますか？";
+"Cancel" = "キャンセル";
+"Your applications stay in your account — nothing is deleted." = "応募データはアカウントに保存されたままです。何も削除されません。";
+"Synced with the web app" = "ウェブアプリと同期中";
+"Local data only" = "ローカルデータのみ";
+"Your name" = "名前";
+"Save" = "保存";
+"Shown in the greeting and on this card." = "ホームの挨拶とこのカードに表示されます。";
+"Change profile photo" = "プロフィール写真を変更";
+"Edit name" = "名前を編集";
+
+/* Splash + onboarding */
+"Every application, one calm place." = "すべての応募を、ひとつの落ち着いた場所に。";
+"Skip" = "スキップ";
+"Continue" = "続ける";
+"Get started" = "はじめる";
+"Every application,\none calm place" = "すべての応募を\nひとつの場所に";
+"Find your match" = "自分に合う求人を見つける";
+"Track without typing" = "入力いらずのトラッキング";
+"Never miss a deadline" = "締切を逃さない";
+"Internship Portal keeps your whole search — roles, applications, interviews — in one quiet, glassy home." = "求人・応募・面接まで、就活のすべてをひとつの静かな場所にまとめます。";
+"Radar ranks verified Tokyo and Japan internships against your résumé, so the best-fit roles surface first." = "レーダーが検証済みの東京・日本のインターンをあなたの履歴書と照合し、最適な求人を上位に表示します。";
+"Gmail sync reads replies for you — applications move from applied to interview on their own, rejections file themselves." = "Gmail同期が返信を自動で読み取り、応募から面接への進捗も不採用の記録もすべて自動で更新します。";
+"Deadlines and interview dates land on the calendar the moment a role is tracked." = "求人をトラッキングした瞬間、締切や面接日がカレンダーに登録されます。";

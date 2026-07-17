@@ -48,7 +48,7 @@ struct CalendarView: View {
 
     var body: some View {
         TabScroll {
-            ScreenHeader(title: "Calendar", subtitle: agendaSubtitle) {
+            ScreenHeader(title: String(localized: "Calendar"), subtitle: agendaSubtitle) {
                 HStack(spacing: 8) {
                     Button("Today") {
                         withAnimation(.easeOut(duration: 0.2)) {
@@ -136,10 +136,10 @@ struct CalendarView: View {
             if dayEvents.isEmpty {
                 EmptyNote(
                     symbol: "calendar",
-                    title: "Nothing on this day",
+                    title: String(localized: "Nothing on this day"),
                     message: store.tracker.isEmpty
-                        ? "Track a role first — its deadline lands here."
-                        : "Deadlines and interviews will appear here."
+                        ? String(localized: "Track a role first — its deadline lands here.")
+                        : String(localized: "Deadlines and interviews will appear here.")
                 )
             } else {
                 VStack(spacing: 10) {
@@ -156,8 +156,9 @@ struct CalendarView: View {
     }
 
     private var agendaSubtitle: String {
-        monthEventCount == 0 ? "No events this month"
-            : "\(monthEventCount) event\(monthEventCount == 1 ? "" : "s") this month"
+        if monthEventCount == 0 { return String(localized: "No events this month") }
+        if monthEventCount == 1 { return String(localized: "1 event this month") }
+        return String(localized: "\(monthEventCount) events this month")
     }
 
     private func step(_ months: Int) {
@@ -230,12 +231,10 @@ private struct DayCell: View {
                         .monospacedDigit()
                 }
                 .frame(width: 32, height: 32)
-                // A selected day that isn't today still reads as selected.
-                .overlay {
-                    if isSelected && isToday {
-                        Circle().strokeBorder(Palette.ink.opacity(0.9), lineWidth: 2).padding(-3)
-                    }
-                }
+                // No extra ring when today is also selected: the old negative-
+                // padding stroke spilled outside the cell, colliding with the
+                // event dots below and reading as a glitch. The red disc already
+                // says "you are here"; selection elsewhere gets the ink disc.
 
                 // Up to three dots; identity also carries in the agenda below, so
                 // colour is never the only signal.
@@ -303,6 +302,7 @@ private struct EventRow: View {
 
 // MARK: - Previews
 
+#if DEBUG
 #Preview("Calendar — with events") {
     @Previewable @State var route: Route?
     AmbientCanvas { CalendarView(route: $route) }
@@ -314,3 +314,4 @@ private struct EventRow: View {
     AmbientCanvas { CalendarView(route: $route) }
         .environment(CatalogStore.previewEmpty)
 }
+#endif

@@ -2,20 +2,20 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
   Firebase Auth stores the signed-in session in the keychain. Keychain access
-  requires an application-identifier entitlement, and ad-hoc signing does not
-  inject one on its own — without this file SecItemCopyMatching fails with -34018,
-  the auth state listener never fires, and the app hangs on its launch spinner.
+  requires the app to be signed with an application-identifier, and the access
+  group must carry the team prefix — codesign expands $(AppIdentifierPrefix) to
+  "<TEAMID>." from the signing settings (team 74G5KQR6DG), on device and
+  simulator alike now that signing is automatic with the personal team.
 
-  On a real device Xcode rewrites application-identifier to <TEAMID>.<bundle id>
-  from the provisioning profile; the value here is what the simulator needs.
+  application-identifier itself is NOT declared here: with profile-based signing
+  Xcode injects it, and a hardcoded value (the old un-prefixed one) mismatches
+  the profile and fails the device install.
 -->
 <plist version="1.0">
 <dict>
-	<key>application-identifier</key>
-	<string>com.mohamedfuad.internshipportal</string>
 	<key>keychain-access-groups</key>
 	<array>
-		<string>com.mohamedfuad.internshipportal</string>
+		<string>$(AppIdentifierPrefix)com.mohamedfuad.internshipportal</string>
 	</array>
 </dict>
 </plist>

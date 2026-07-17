@@ -15,7 +15,7 @@ struct InternshipSheet: View {
 
     var body: some View {
         SheetShell(
-            mark: AnyView(CompanyMark(company: item.displayCompany, logoURL: item.logoUrl, size: 48)),
+            mark: AnyView(CompanyMark(company: item.displayCompany, candidates: item.logoCandidates, size: 48)),
             action: { applyButton }
         ) {
             VStack(alignment: .leading, spacing: 0) {
@@ -54,7 +54,7 @@ struct InternshipSheet: View {
                 .padding(.top, 20)
 
                 if let about = item.about, !about.isEmpty {
-                    SheetSection(title: "About the role") {
+                    SheetSection(title: String(localized: "About the role")) {
                         Text(about)
                             .font(Font2.body)
                             .foregroundStyle(Palette.ink600)
@@ -63,7 +63,7 @@ struct InternshipSheet: View {
                 }
 
                 if let reasons = item.reasons, !reasons.isEmpty {
-                    SheetSection(title: "Why this fits") {
+                    SheetSection(title: String(localized: "Why this fits")) {
                         VStack(alignment: .leading, spacing: 10) {
                             ForEach(reasons, id: \.self) { reason in
                                 HStack(alignment: .top, spacing: 10) {
@@ -80,31 +80,31 @@ struct InternshipSheet: View {
                 }
 
                 if let stack = item.techStack, !stack.isEmpty {
-                    SheetSection(title: "Tech stack") {
+                    SheetSection(title: String(localized: "Tech stack")) {
                         FlowChips(items: stack)
                     }
                 }
 
                 if let eligibility = item.eligibility, !eligibility.isEmpty {
-                    SheetSection(title: "Eligibility") {
+                    SheetSection(title: String(localized: "Eligibility")) {
                         BulletList(items: eligibility)
                     }
                 }
 
                 if let process = item.process, !process.isEmpty {
-                    SheetSection(title: "Selection process") {
+                    SheetSection(title: String(localized: "Selection process")) {
                         BulletList(items: process, numbered: true)
                     }
                 }
 
-                SheetSection(title: "Details") {
+                SheetSection(title: String(localized: "Details")) {
                     VStack(spacing: 0) {
-                        DetailLine(label: "Deadline", value: item.shortDeadline)
+                        DetailLine(label: String(localized: "Deadline"), value: item.shortDeadline)
                         if let compensation = item.compensation, !compensation.isEmpty {
-                            DetailLine(label: "Compensation", value: compensation)
+                            DetailLine(label: String(localized: "Compensation"), value: compensation)
                         }
                         if let verified = item.verifiedDate {
-                            DetailLine(label: "Verified", value: verified)
+                            DetailLine(label: String(localized: "Verified"), value: verified)
                         }
                     }
                 }
@@ -153,7 +153,7 @@ struct RecordSheet: View {
 
     var body: some View {
         SheetShell(
-            mark: AnyView(CompanyMark(company: record.displayCompany, logoURL: record.logoUrl, size: 48)),
+            mark: AnyView(CompanyMark(company: record.displayCompany, candidates: store.logoCandidates(for: record), size: 48)),
             action: { applyButton }
         ) {
             VStack(alignment: .leading, spacing: 0) {
@@ -191,7 +191,7 @@ struct RecordSheet: View {
                 .foregroundStyle(Palette.ink500)
                 .padding(.top, 16)
 
-                StatusPicker(current: record.appStatus) { next in
+                StatusPicker(current: record.appStatus, allowsClear: false) { next in
                     Task {
                         guard let next else { return }
                         await store.setStatus(next, forRecord: record.id)
@@ -202,7 +202,7 @@ struct RecordSheet: View {
 
                 let milestones = record.milestones ?? []
                 if !milestones.isEmpty {
-                    SheetSection(title: "Timeline") {
+                    SheetSection(title: String(localized: "Timeline")) {
                         VStack(spacing: 10) {
                             ForEach(milestones) { milestone in
                                 HStack(spacing: 12) {
@@ -233,7 +233,7 @@ struct RecordSheet: View {
 
                 if let item = catalogItem {
                     if let about = item.about, !about.isEmpty {
-                        SheetSection(title: "About the role") {
+                        SheetSection(title: String(localized: "About the role")) {
                             Text(about)
                                 .font(Font2.body)
                                 .foregroundStyle(Palette.ink600)
@@ -241,14 +241,14 @@ struct RecordSheet: View {
                         }
                     }
                     if let stack = item.techStack, !stack.isEmpty {
-                        SheetSection(title: "Tech stack") { FlowChips(items: stack) }
+                        SheetSection(title: String(localized: "Tech stack")) { FlowChips(items: stack) }
                     }
                 }
 
-                SheetSection(title: "Details") {
+                SheetSection(title: String(localized: "Details")) {
                     VStack(spacing: 0) {
-                        DetailLine(label: "Deadline", value: record.deadline ?? "Not stated")
-                        DetailLine(label: "Source", value: record.fromGmail ? "Gmail inbox" : "Added in app")
+                        DetailLine(label: String(localized: "Deadline"), value: record.deadline ?? String(localized: "Not stated"))
+                        DetailLine(label: String(localized: "Source"), value: record.fromGmail ? String(localized: "Gmail inbox") : String(localized: "Added in app"))
                     }
                 }
             }
@@ -469,50 +469,74 @@ struct DetailLine: View {
     }
 }
 
-/// Status control — the drawer's `<select>`, as a segmented row of chips.
+/// Status control — the drawer's `<select>`, as an actual selector. The previous
+/// horizontal chip row hid "Rejected" off the right edge; a menu shows all five
+/// stages at once and states the current one in its own colour.
 struct StatusPicker: View {
     var current: ApplicationStatus?
+    /// Whether "Not tracked" is offered. Tracked records can move stages but not
+    /// silently vanish from the tracker, so sheets over records pass false.
+    var allowsClear = true
     var onChange: (ApplicationStatus?) -> Void
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Status")
-                .font(.system(size: 11, weight: .semibold))
-                .tracking(0.4)
-                .foregroundStyle(Palette.ink400)
+    private var selection: Binding<ApplicationStatus?> {
+        Binding(get: { current }, set: { next in
+            guard next != current else { return }
+            onChange(next)
+        })
+    }
 
-            // Bleeds to the sheet edge so the last chip reads as scrollable
-            // rather than as a chip that got cut off.
-            ScrollView(.horizontal) {
-                HStack(spacing: 7) {
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Status")
+                    .font(Font2.cardTitle)
+                    .foregroundStyle(Palette.ink)
+                Text("Where this application stands")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Palette.ink400)
+            }
+
+            Spacer(minLength: 8)
+
+            Menu {
+                Picker("Status", selection: selection) {
+                    if allowsClear {
+                        Label("Not tracked", systemImage: "minus.circle")
+                            .tag(ApplicationStatus?.none)
+                    }
                     ForEach(ApplicationStatus.allCases) { status in
-                        Button {
-                            onChange(current == status ? nil : status)
-                        } label: {
-                            HStack(spacing: 5) {
-                                Image(systemName: status.icon).font(.system(size: 11))
-                                Text(status.label)
-                            }
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(current == status ? .white : status.tint.fg)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background {
-                                if current == status {
-                                    Capsule().fill(status.tint.fg)
-                                } else {
-                                    Capsule().fill(status.tint.bg)
-                                }
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityAddTraits(current == status ? [.isButton, .isSelected] : .isButton)
+                        Label(status.label, systemImage: status.icon)
+                            .tag(ApplicationStatus?.some(status))
                     }
                 }
-                .padding(.horizontal, 20)
+            } label: {
+                HStack(spacing: 6) {
+                    if let current {
+                        Circle()
+                            .fill(current.tint.fg)
+                            .frame(width: 6, height: 6)
+                        Text(current.label)
+                    } else {
+                        Text("Set status")
+                    }
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(current == nil ? Palette.ink400 : current!.tint.fg.opacity(0.7))
+                }
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(current?.tint.fg ?? Palette.ink600)
+                .padding(.horizontal, 13)
+                .padding(.vertical, 9)
+                .background(current?.tint.bg ?? Palette.hairline, in: .capsule)
             }
-            .scrollIndicators(.hidden)
-            .padding(.horizontal, -20)
+            .accessibilityLabel("Status: \(current?.label ?? "not tracked")")
+        }
+        .padding(12)
+        .background(Palette.tile, in: .rect(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Palette.hairline, lineWidth: 1)
         }
     }
 }
@@ -551,6 +575,7 @@ struct FlowLayout: Layout {
 
 // MARK: - Previews
 
+#if DEBUG
 #Preview("Detail sheet — full listing") {
     InternshipSheet(item: .sampleHennge)
         .environment(CatalogStore.previewEmpty)
@@ -567,3 +592,4 @@ struct FlowLayout: Layout {
     RecordSheet(record: .sampleInterview)
         .environment(CatalogStore.preview)
 }
+#endif

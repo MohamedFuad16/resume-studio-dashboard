@@ -25,6 +25,72 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-17 (round 8 — VERIFIED, UNCOMMITTED) — Logo quality + fit, profile edit
+  page, language pill, Applications logos (ADR-0047).** Logos load via a candidate
+  chain (Google s2 128px → DDG → logoUrl; HTTP-200 + placeholder-hash guarded;
+  prefers ≥48px) — the blur was DDG 16–32px favicons stretched over bubbles. Logo
+  0.59·d in the chip, lens mag 0.22→0.16. Applications list resolves logos via
+  CatalogStore.logoCandidates(for:) (record → catalog by id → by name-prefix).
+  Settings card → NavigationLink to EditProfileView (avatar picker + name + Save);
+  pencil/camera icons removed; language pill "System", never wraps. Release build
+  reinstalled on the iPhone.
+- **2026-07-17 (round 7 — VERIFIED, UNCOMMITTED) — Splash company logos, scroll-lag
+  fix, profile editing, Japanese localization (ADR-0046).** Splash orbs are real
+  flagship logos via `BubbleContents` (one material with Companies). Applications
+  tab ground fixed (AmbientCanvas moved INSIDE its NavigationStack). Bubble logos
+  inscribed (padding 0.145·d, no corner clipping), overlap 12%, coverage 0.46.
+  PERF: PressableCard's 0-distance DragGesture (fought every scroll) → real
+  Button+ButtonStyle; `CADisableMinimumFrameDurationOnPhone` for 120Hz; the
+  perceived lag was mostly the DEBUG build — a **Release build is now installed
+  on the iPhone**. Settings: PhotosPicker avatar (device-local `AvatarStore`),
+  name edit via `AuthService.updateDisplayName`, "App language" row
+  (System/English/日本語 → AppleLanguages, applies on relaunch) +
+  `ja.lproj/Localizable.strings` (~150 keys) and `String(localized:)` across enum
+  labels/computed strings. Gotcha: #Preview bodies compile in Release —
+  ALL preview sections are now `#if DEBUG`-gated (new files must follow).
+- **2026-07-17 (round 6 — VERIFIED on sim, UNCOMMITTED) — Web donut Home card,
+  full-logo bubbles, Radar Location/Language menus, iPhone signing (ADR-0045).**
+  Home: full-width `StatusBreakdownCard` (web-style donut, centre total+"tracked",
+  legend counts) + Rejected card in the grid. Bubbles: logo chip 0.54→0.97 of the
+  sphere (favicon softness accepted), status = presence badge (ring would smear at
+  the rim). Radar: FilterChips → three `FilterMenuPill`s (Sort / Location:
+  All-Tokyo-Remote-Elsewhere / Language: All-English-Japanese); Saved dropped.
+  Device: ad-hoc identity was the iPhone "signing issue" → automatic signing,
+  team **74G5KQR6DG** (cert CN's "(R38YYZHMHK)" is a user id, NOT the team);
+  entitlements use $(AppIdentifierPrefix), no hardcoded application-identifier.
+  Installed on iPhone 15 Pro (iOS 27) via devicectl using the existing team
+  profile (Xcode-beta has no Apple-ID account, so -allowProvisioningUpdates
+  fails; the on-disk profile suffices, expires ~Jul 23). **User must trust the
+  developer profile on-device, then sign in.** Live checks: Azure API 200/31ms,
+  DDG favicons 200, Firebase resume-841f9 bundled.
+- **2026-07-17 (round 5 — VERIFIED on sim, UNCOMMITTED) — Solace Home, Companies
+  page + Wabi packing, status menu, Radar sort, onboarding (ADR-0044).** Home:
+  sans greeting (serif dropped), avatar removed, flame = this week's applications,
+  `InsightGrid` 2×2 (pipeline donut + Applied/Interviews/Heard-back) replaces
+  PipelineCard. StatusPicker is now a Menu row (all 5 stages visible; RecordSheet
+  can't clear). Radar gained a sort pill (Best match / Deadline / Company A–Z).
+  Companies: PUSHED page off Applications (roles sheet stays a sheet); packing
+  goes Wabi (coverage 0.52, ≤40%-of-smaller-radius overlap, blend 12); refraction
+  softened app-wide (mag 0.22 / chroma 0.035); tracked-status ring moved from the
+  smeared rim onto the logo chip. Calendar's spilling selected-today ring removed.
+  NEW `Views/OnboardingView.swift`: 4 first-launch pages after the splash
+  (`hasOnboarded`). Screenshot-verified: Home, onboarding p1, Companies clusters,
+  Radar, status menu. Launch hooks: `-hasOnboarded YES` skips onboarding.
+- **2026-07-17 (night, round 4 — UNVERIFIED/UNCOMMITTED) — Settings tab, pipeline
+  Home, serif voice, real logos (ADR-0043).** Logos: DuckDuckGo favicon fallback
+  from `companyDomain` (`resolvedLogoURL`), white circular chips inside bubbles,
+  and `LogoLoader`/`LogoImage` that hash-rejects DDG's constant grey placeholder
+  (1478 B, never a 404) so unknown domains show monograms, not grey arrows. Five
+  tabs (Settings = former ProfileSheet, profile card inside; `Route.profile`
+  removed; Home avatar top-left → Settings). Home: `PipelineCard` (stacked status
+  bar + Applied/Interviews/Rejected/Heard-back %) replaces the 2×2 launcher;
+  Recent applications now ABOVE Tokyo opportunities. Serif (.design(.serif)) on
+  Home greeting, login title, splash wordmark — matches the web's serif "Welcome
+  back". Warning sweep: `isolated deinit` in AuthService, value-captured shimmer
+  closure — zero project warnings. **State: last edit (Set.insert fix in
+  LogoImage.swift) applied but not rebuilt; user is verifying and has the changes
+  uncommitted.** Gotcha recorded: new Swift files need `xcodegen generate` before
+  they exist to the build.
 - **2026-07-17 (night) — Native TabView, Wabi bubble shading, splash + icon
   (ADR-0042).** Nav round 3: hand-rolled glass bars can only be worse copies — the
   fluid droplet/minimize behaviour lives in the system bar — so the app now uses

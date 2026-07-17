@@ -26,9 +26,10 @@ struct LoginView: View {
                     IconTile(symbol: "location.north.circle", tint: .teal, size: 52, glyph: 24)
                         .padding(.bottom, 20)
 
+                    // Serif matches the web's "Welcome back" wall — the brand's
+                    // display voice.
                     Text(mode == .signIn ? "Welcome back" : "Create your account")
-                        .font(.system(size: 28, weight: .bold))
-                        .tracking(-0.5)
+                        .font(.system(size: 30, weight: .semibold, design: .serif))
                         .foregroundStyle(Palette.ink)
                         .contentTransition(.opacity)
 
@@ -208,6 +209,8 @@ private struct GoogleMark: View {
     }
 }
 
+#if DEBUG
 #Preview("Sign in") {
     LoginView().environment(AuthService())
 }
+#endif

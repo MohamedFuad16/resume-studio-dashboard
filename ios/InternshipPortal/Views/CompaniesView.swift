@@ -17,7 +17,7 @@ import SwiftUI
 struct CompanyBubble: Identifiable, Equatable {
     let id: String            // normalised company name
     let name: String
-    let logoURL: String?
+    let logoCandidates: [String]
     let roleCount: Int        // listings in the catalog — the size signal
     let bestScore: Int
     let status: ApplicationStatus?
@@ -45,7 +45,6 @@ struct BubbleCluster: Identifiable {
 
 struct CompaniesView: View {
     @Environment(CatalogStore.self) private var store
-    @Environment(\.dismiss) private var dismiss
 
     @State private var selected: CompanyBubble?
 
@@ -88,7 +87,7 @@ struct CompaniesView: View {
             return CompanyBubble(
                 id: key,
                 name: first.displayCompany,
-                logoURL: items.compactMap(\.logoUrl).first,
+                logoCandidates: items.map(\.logoCandidates).first(where: { !$0.isEmpty }) ?? [],
                 roleCount: items.count,
                 bestScore: items.compactMap(\.score).max() ?? 0,
                 status: status,
@@ -99,30 +98,27 @@ struct CompaniesView: View {
         .sorted { ($0.roleCount, $0.bestScore) > ($1.roleCount, $1.bestScore) }
     }
 
+    // A PAGE, not a sheet: it is pushed from Applications and gets the system
+    // back button. Only the company detail below is a sheet — a market overview
+    // is a place you go, a single company is a card you lift.
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Palette.canvas.ignoresSafeArea()
+        ZStack {
+            Palette.canvas.ignoresSafeArea()
 
-                ScrollView {
-                    VStack(spacing: 0) {
-                        ForEach(clusters) { cluster in
-                            ClusterBand(cluster: cluster) { selected = $0 }
-                        }
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(clusters) { cluster in
+                        ClusterBand(cluster: cluster) { selected = $0 }
                     }
-                    .padding(.bottom, 24)
                 }
-                .scrollIndicators(.hidden)
+                .padding(.bottom, 24)
             }
-            .navigationTitle("Companies")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }.fontWeight(.semibold)
-                }
-            }
-            .sheet(item: $selected) { CompanyRolesSheet(company: $0) }
+            .scrollIndicators(.hidden)
         }
+        .navigationTitle("Companies")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarVisibility(.visible, for: .navigationBar)
+        .sheet(item: $selected) { CompanyRolesSheet(company: $0) }
     }
 }
 
@@ -190,16 +186,19 @@ struct BubbleField: View {
                         .float2(size),
                         .floatArray(packedFloats),
                         .float(t),
-                        // Blend radius, in points. Tuned down from 14: at that value
-                        // the field fused into foam and individual companies stopped
-                        // being readable. ~9 lets a cluster read as one body while
-                        // each company keeps its own dome.
-                        .float(9),
-                        .float(0.34),   // magnification — the gentle lens-ball bulge
-                        .float(0.05)    // chromatic fringe at the rim, barely-there
+                        // Blend radius, in points. 12 with the overlapped packing:
+                        // touching rims bridge into one skin, but companies still
+                        // keep their own dome. (14 fused to foam; 9 read as beads.)
+                        .float(12),
+                        // Magnification 0.22 / fringe 0.035 — dialled DOWN from
+                        // 0.34/0.05: at those values the rim band visibly smeared
+                        // the contents into "a weird refracting portion" instead of
+                        // a gentle lens bulge.
+                        .float(0.16),
+                        .float(0.035)
                     ),
-                    // Must cover the largest offset the loupe can produce (34pt),
-                    // plus the drift, or the refraction clips at the edges.
+                    // Must cover the largest offset the loupe can produce, plus the
+                    // drift, or the refraction clips at the edges.
                     maxSampleOffset: CGSize(width: 44, height: 44)
                 )
                 .overlay { taps }
@@ -254,9 +253,10 @@ struct BubbleField: View {
 
         let weights = bubbles.map { sqrt(CGFloat($0.roleCount)) }
         let totalWeightArea = weights.reduce(0) { $0 + $1 * $1 }
-        // ~34% coverage: tight enough for a cluster to fuse into one body, open
-        // enough that each company still reads as its own dome.
-        let usable = size.width * size.height * 0.34
+        // ~46% coverage: a dense cloud (34% read as scattered dots), but with the
+        // shallow-overlap rule the spiral needs a little slack or the shrink-retry
+        // loop erodes every radius to fit.
+        let usable = size.width * size.height * 0.46
         var unit = sqrt(usable / (.pi * max(totalWeightArea, 1)))
 
         // Shrink and retry until everything fits. The coverage figure above is a
@@ -299,13 +299,15 @@ struct BubbleField: View {
                     y: center.y + sin(angle) * step * 0.72
                 )
                 let fits = placed.allSatisfy { other in
-                    // Rims sit ~4pt apart so the shader's blend bridges neighbours
-                    // into one cluster body without swallowing them.
+                    // Neighbours overlap by ~12% of the smaller radius: enough for
+                    // the SDF merge to bridge them into one cloud, shallow enough
+                    // that no bubble covers a neighbour's logo. (40% looked like
+                    // Wabi from afar but ate the marks — the logos ARE the data.)
                     hypot(candidate.x - other.center.x, candidate.y - other.center.y)
-                        > (radius + other.radius) - 4
+                        > (radius + other.radius) - min(radius, other.radius) * 0.12
                 }
-                let inBounds = candidate.x - radius > 10 && candidate.x + radius < size.width - 10
-                    && candidate.y - radius > 6 && candidate.y + radius < size.height - 6
+                let inBounds = candidate.x - radius > 4 && candidate.x + radius < size.width - 4
+                    && candidate.y - radius > 3 && candidate.y + radius < size.height - 3
                 if fits && inBounds {
                     spot = candidate
                     break
@@ -346,28 +348,36 @@ struct BubbleContents: View {
                     )
                 )
 
-            Group {
-                if let logoURL = bubble.logoURL, let url = URL(string: logoURL) {
-                    AsyncImage(url: url) { phase in
-                        if case .success(let image) = phase {
-                            image.resizable().scaledToFit()
-                        } else {
-                            monogramView
-                        }
-                    }
-                } else {
-                    monogramView
-                }
-            }
-            // Bigger mark: the Wabi orbs read because their contents FILL the
-            // sphere. A small logo on a flat ball reads as a button, not a world.
-            .frame(width: diameter * 0.56, height: diameter * 0.56)
-
-            // Tracked companies wear a ring, so status survives the glass.
-            if let status = bubble.status {
+            // The mark rides on a white circular chip. Favicons are square; drawn
+            // bare they read as stretched stickers once the lens magnifies them —
+            // a circle inside a sphere stays a circle from every angle.
+            ZStack {
                 Circle()
-                    .strokeBorder(status.tint.fg.opacity(0.95), lineWidth: max(2, diameter * 0.035))
-                    .padding(1.5)
+                    .fill(.white.opacity(0.92))
+                // Inscribed, not clipped: a square logo fits inside the circular
+                // chip when its side is diameter/√2 — padding ≈ 0.147 of the chip.
+                // The old tighter padding cut every square favicon's corners off,
+                // which is exactly "the logo doesn't fit the bubble".
+                LogoImage(candidates: bubble.logoCandidates) { monogramView }
+                    .padding(diameter * 0.19)
+            }
+            // The chip fills the sphere (~97%) — like the Wabi orbs, where the
+            // picture IS the bubble. The tint survives as a sliver at the rim and
+            // in the glass shading; a small chip on a flat ball read as a button.
+            .frame(width: diameter * 0.97, height: diameter * 0.97)
+
+            // Tracked companies wear their status as a crisp presence badge. With
+            // the chip at 97% a ring would hug the refracting rim again (the smear
+            // this replaced); a dot at mid-radius stays legible under the lens.
+            if let status = bubble.status {
+                let badge = max(12, diameter * 0.18)
+                Circle()
+                    .fill(status.tint.fg)
+                    .frame(width: badge, height: badge)
+                    .overlay {
+                        Circle().strokeBorder(.white, lineWidth: max(1.5, badge * 0.14))
+                    }
+                    .offset(x: diameter * 0.27, y: diameter * 0.27)
             }
         }
         .frame(width: diameter, height: diameter)
@@ -375,8 +385,8 @@ struct BubbleContents: View {
 
     private var monogramView: some View {
         Text(monogram)
-            .font(.system(size: diameter * 0.3, weight: .bold))
-            .foregroundStyle(Palette.ink.opacity(0.7))
+            .font(.system(size: diameter * 0.32, weight: .bold))
+            .foregroundStyle(bubble.tint.fg)
             .minimumScaleFactor(0.4)
             .lineLimit(1)
     }
@@ -393,8 +403,8 @@ struct GlassOrb: View {
             .layerEffect(
                 ShaderLibrary.glassOrb(
                     .float2(CGSize(width: diameter, height: diameter)),
-                    .float(0.34),
-                    .float(0.05)
+                    .float(0.16),   // matches the field, so orbs and clusters are one material
+                    .float(0.035)
                 ),
                 maxSampleOffset: CGSize(width: diameter, height: diameter)
             )
@@ -460,8 +470,10 @@ private struct CompanyRolesSheet: View {
 
 // MARK: - Previews
 
+#if DEBUG
 #Preview("Companies — clusters") {
-    CompaniesView().environment(CatalogStore.preview)
+    NavigationStack { CompaniesView() }
+        .environment(CatalogStore.preview)
 }
 
 #Preview("One orb") {
@@ -469,7 +481,7 @@ private struct CompanyRolesSheet: View {
         Palette.canvas
         GlassOrb(
             bubble: CompanyBubble(
-                id: "hennge", name: "HENNGE", logoURL: nil, roleCount: 4,
+                id: "hennge", name: "HENNGE", logoCandidates: [], roleCount: 4,
                 bestScore: 99, status: .interview, tier: .flagship, tint: .indigo
             ),
             diameter: 180
@@ -477,3 +489,4 @@ private struct CompanyRolesSheet: View {
     }
     .ignoresSafeArea()
 }
+#endif

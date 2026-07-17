@@ -13,26 +13,37 @@ struct SplashView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var appeared = false
 
-    /// One orb per thing the app actually does. Positions are fractions of the
-    /// screen width, clustered like the reference's opening — dense at the middle,
-    /// strays at the edges.
+    /// One orb per flagship company from the live catalog — the splash shows the
+    /// THING the app is about (applying to these companies), not abstract feature
+    /// glyphs whose pastel fills never matched each other. Logos load through the
+    /// same LogoLoader the bubbles use (cached after first launch); until a logo
+    /// arrives the company's monogram holds the chip, so the cluster is never blank.
     private struct Orb: Identifiable {
         let id: Int
-        let symbol: String
+        let company: String
+        let domain: String
         let tint: Color6
         let x: CGFloat      // × width
         let y: CGFloat      // × width (the cluster lives in a square-ish band)
         let r: CGFloat      // × width
+
+        var bubble: CompanyBubble {
+            CompanyBubble(
+                id: domain, name: company,
+                logoCandidates: logoCandidateURLs(logoUrl: nil, domain: domain),
+                roleCount: 1, bestScore: 0, status: nil, tier: .flagship, tint: tint
+            )
+        }
     }
 
     private static let orbs: [Orb] = [
-        Orb(id: 0, symbol: "location.north.circle", tint: .teal, x: 0.50, y: 0.34, r: 0.155),
-        Orb(id: 1, symbol: "briefcase", tint: .purple, x: 0.28, y: 0.22, r: 0.105),
-        Orb(id: 2, symbol: "calendar", tint: .blue, x: 0.72, y: 0.23, r: 0.095),
-        Orb(id: 3, symbol: "doc.text", tint: .indigo, x: 0.15, y: 0.40, r: 0.070),
-        Orb(id: 4, symbol: "sparkles", tint: .orange, x: 0.70, y: 0.45, r: 0.080),
-        Orb(id: 5, symbol: "graduationcap", tint: .teal, x: 0.87, y: 0.35, r: 0.055),
-        Orb(id: 6, symbol: "flame.fill", tint: .orange, x: 0.35, y: 0.50, r: 0.050),
+        Orb(id: 0, company: "Rakuten", domain: "rakuten.com", tint: .indigo, x: 0.50, y: 0.34, r: 0.155),
+        Orb(id: 1, company: "NVIDIA", domain: "nvidia.com", tint: .teal, x: 0.28, y: 0.22, r: 0.105),
+        Orb(id: 2, company: "Mercari", domain: "mercari.com", tint: .blue, x: 0.72, y: 0.23, r: 0.095),
+        Orb(id: 3, company: "Cloudflare", domain: "cloudflare.com", tint: .orange, x: 0.15, y: 0.40, r: 0.070),
+        Orb(id: 4, company: "HENNGE", domain: "hennge.com", tint: .purple, x: 0.70, y: 0.45, r: 0.080),
+        Orb(id: 5, company: "1Password", domain: "1password.com", tint: .indigo, x: 0.87, y: 0.35, r: 0.055),
+        Orb(id: 6, company: "Sakana AI", domain: "sakana.ai", tint: .orange, x: 0.35, y: 0.50, r: 0.050),
     ]
 
     var body: some View {
@@ -53,8 +64,7 @@ struct SplashView: View {
 
                     VStack(spacing: 10) {
                         Text("Internship Portal")
-                            .font(.system(size: 30, weight: .bold))
-                            .tracking(-0.6)
+                            .font(.system(size: 30, weight: .semibold, design: .serif))
                             .foregroundStyle(Palette.ink)
                         Text("Every application, one calm place.")
                             .font(.system(size: 15))
@@ -98,23 +108,11 @@ struct SplashView: View {
                 Color.clear
 
                 ForEach(Self.orbs) { orb in
-                    let d = orb.r * width * 2
-                    ZStack {
-                        Circle()
-                            .fill(
-                                RadialGradient(
-                                    colors: [orb.tint.bg, orb.tint.fg.opacity(0.72)],
-                                    center: .init(x: 0.38, y: 0.28),
-                                    startRadius: d * 0.06,
-                                    endRadius: d * 0.85
-                                )
-                            )
-                        Image(systemName: orb.symbol)
-                            .font(.system(size: d * 0.34, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.92))
-                    }
-                    .frame(width: d, height: d)
-                    .position(x: orb.x * width, y: orb.y * width)
+                    // The exact contents the Companies bubbles draw — same chip,
+                    // same logo pipeline — so the splash and the market view are
+                    // visibly the same material.
+                    BubbleContents(bubble: orb.bubble, diameter: orb.r * width * 2)
+                        .position(x: orb.x * width, y: orb.y * width)
                 }
             }
             .frame(width: width, height: height)
@@ -123,9 +121,9 @@ struct SplashView: View {
                     .float2(CGSize(width: width, height: height)),
                     .floatArray(packed),
                     .float(t),
-                    .float(10),     // blend — the cluster kisses, like the reference
-                    .float(0.34),   // magnification
-                    .float(0.05)    // chromatic fringe
+                    .float(12),     // blend — the cluster kisses, like the reference
+                    .float(0.16),   // magnification — matches the Companies field
+                    .float(0.035)   // chromatic fringe
                 ),
                 maxSampleOffset: CGSize(width: 44, height: 44)
             )
@@ -135,6 +133,8 @@ struct SplashView: View {
 
 // MARK: - Previews
 
+#if DEBUG
 #Preview("Splash") {
     SplashView(onFinished: {})
 }
+#endif

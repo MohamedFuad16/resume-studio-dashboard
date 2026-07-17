@@ -19,18 +19,30 @@ struct ApplicationsView: View {
     }
 
     var body: some View {
+        // The stack exists so Companies can be PUSHED as a full page — it is a
+        // destination, not a card. The AmbientCanvas sits INSIDE the stack (the
+        // stack's own ground is opaque and would cover it), and the tab's screen
+        // keeps its custom header, so the bar stays hidden until a push.
+        NavigationStack {
+            AmbientCanvas(active: route == nil) { content }
+                .navigationDestination(isPresented: $showCompanies) { CompaniesView() }
+                .toolbar(.hidden, for: .navigationBar)
+        }
+    }
+
+    private var content: some View {
         TabScroll {
             ScreenHeader(
-                title: "Applications",
+                title: String(localized: "Applications"),
                 subtitle: store.tracker.isEmpty
-                    ? "Nothing tracked yet"
-                    : "\(store.tracker.count) companies · synced from Gmail"
+                    ? String(localized: "Nothing tracked yet")
+                    : String(localized: "\(store.tracker.count) companies · synced from Gmail")
             )
             .padding(.bottom, 18)
 
             ScrollView(.horizontal) {
                 HStack(spacing: 8) {
-                    FilterChip(label: "All", count: store.records.count, isOn: filter == nil) {
+                    FilterChip(label: String(localized: "All"), count: store.records.count, isOn: filter == nil) {
                         withAnimation(.easeOut(duration: 0.18)) { filter = nil }
                     }
                     ForEach(ApplicationStatus.allCases) { status in
@@ -59,10 +71,10 @@ struct ApplicationsView: View {
             } else if results.isEmpty {
                 EmptyNote(
                     symbol: "tray",
-                    title: filter == nil ? "No applications yet" : "Nothing in \(filter!.label)",
+                    title: filter == nil ? String(localized: "No applications yet") : String(localized: "Nothing in \(filter!.label)"),
                     message: filter == nil
-                        ? "Track a role from Radar and it will show up here."
-                        : "No company is at this stage right now."
+                        ? String(localized: "Track a role from Radar and it will show up here.")
+                        : String(localized: "No company is at this stage right now.")
                 )
             } else {
                 LazyVStack(spacing: 10) {
@@ -72,7 +84,6 @@ struct ApplicationsView: View {
                 }
             }
         }
-        .sheet(isPresented: $showCompanies) { CompaniesView() }
         .task {
             // Screenshot hook: `simctl launch … -sheet companies`.
             if UserDefaults.standard.string(forKey: "sheet") == "companies" {
@@ -89,11 +100,11 @@ private struct CompaniesButton: View {
     var action: () -> Void
 
     private static let preview: [CompanyBubble] = [
-        .init(id: "a", name: "HENNGE", logoURL: nil, roleCount: 4, bestScore: 99,
+        .init(id: "a", name: "HENNGE", logoCandidates: [], roleCount: 4, bestScore: 99,
               status: .interview, tier: .flagship, tint: .indigo),
-        .init(id: "b", name: "Rakuten", logoURL: nil, roleCount: 3, bestScore: 98,
+        .init(id: "b", name: "Rakuten", logoCandidates: [], roleCount: 3, bestScore: 98,
               status: .applied, tier: .scaleUp, tint: .teal),
-        .init(id: "c", name: "Sakana", logoURL: nil, roleCount: 2, bestScore: 92,
+        .init(id: "c", name: "Sakana", logoCandidates: [], roleCount: 2, bestScore: 92,
               status: nil, tier: .startup, tint: .orange),
     ]
 
@@ -127,14 +138,16 @@ private struct CompaniesButton: View {
 
 // MARK: - Previews
 
+#if DEBUG
 #Preview("Applications — tracked") {
     @Previewable @State var route: Route?
-    AmbientCanvas { ApplicationsView(route: $route) }
+    ApplicationsView(route: $route)
         .environment(CatalogStore.preview)
 }
 
 #Preview("Applications — empty") {
     @Previewable @State var route: Route?
-    AmbientCanvas { ApplicationsView(route: $route) }
+    ApplicationsView(route: $route)
         .environment(CatalogStore.previewEmpty)
 }
+#endif

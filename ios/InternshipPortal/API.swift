@@ -115,6 +115,29 @@ final class CatalogStore {
         internships.filter { tracker[$0.id] == nil }
     }
 
+    /// Logo sources for a tracked record. Gmail-synthesised rows usually carry no
+    /// logoUrl/companyDomain of their own, which is why the Applications list
+    /// showed monograms for companies whose logos render fine everywhere else —
+    /// so fall through to the catalog: by the record's internship id first, then
+    /// by company name.
+    func logoCandidates(for record: TrackerRecord) -> [String] {
+        let own = record.logoCandidates
+        if !own.isEmpty { return own }
+        if let item = internships.first(where: { $0.id == record.internshipId }) {
+            return item.logoCandidates
+        }
+        let key = record.displayCompany.lowercased().trimmingCharacters(in: .whitespaces)
+        // Prefix match too: Gmail names arrive as "micro1.ai" / "Rakuten Group"
+        // while the catalog says "micro1" / "Rakuten".
+        if let item = internships.first(where: {
+            let name = $0.displayCompany.lowercased().trimmingCharacters(in: .whitespaces)
+            return name == key || key.hasPrefix(name) || name.hasPrefix(key)
+        }) {
+            return item.logoCandidates
+        }
+        return []
+    }
+
     /// Every tracked record's deadline + milestones, flattened into calendar
     /// events. Mirrors ApplicationCalendar.jsx: a record with a real deadlineDate
     /// emits a deadline event; applied-type records without one emit an "applied"

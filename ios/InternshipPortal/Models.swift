@@ -8,6 +8,22 @@ import Foundation
 
 // MARK: - Catalog
 
+/// Logo sources for a company, best first. Google's s2 service leads because it
+/// serves REAL resolutions (up to 128px) — DuckDuckGo's favicons are often 16–32px,
+/// which is why bubble logos looked soft when magnified. DDG stays as the fallback
+/// (better coverage of small Japanese companies), then any explicit `logoUrl` from
+/// the catalog (last: several are white wordmarks that vanish on white chips).
+/// LogoLoader walks this list and prefers the first image that is ≥48px.
+func logoCandidateURLs(logoUrl: String?, domain: String?) -> [String] {
+    var list: [String] = []
+    if let domain, !domain.isEmpty {
+        list.append("https://www.google.com/s2/favicons?domain=\(domain)&sz=128")
+        list.append("https://icons.duckduckgo.com/ip3/\(domain).ico")
+    }
+    if let logoUrl, !logoUrl.isEmpty { list.append(logoUrl) }
+    return list
+}
+
 struct Internship: Decodable, Identifiable, Hashable {
     let id: String
     var company: String?
@@ -43,6 +59,11 @@ struct Internship: Decodable, Identifiable, Hashable {
     var isTokyo: Bool { displayLocation.localizedCaseInsensitiveContains("tokyo") }
     var isEnglishFirst: Bool { (languageType ?? "").localizedCaseInsensitiveContains("english") }
     var matchText: String { score.map { "\($0)%" } ?? "—" }
+
+    /// The logos to try, best first — see `logoCandidateURLs`.
+    var logoCandidates: [String] {
+        logoCandidateURLs(logoUrl: logoUrl, domain: companyDomain)
+    }
 
     /// Which band of the market this listing's company sits in.
     ///
@@ -98,11 +119,11 @@ enum ApplicationStatus: String, CaseIterable, Codable, Identifiable {
 
     var label: String {
         switch self {
-        case .saved: "Saved"
-        case .applying: "Applying"
-        case .applied: "Applied"
-        case .interview: "Interview"
-        case .rejected: "Rejected"
+        case .saved: String(localized: "Saved")
+        case .applying: String(localized: "Applying")
+        case .applied: String(localized: "Applied")
+        case .interview: String(localized: "Interview")
+        case .rejected: String(localized: "Rejected")
         }
     }
 
@@ -152,17 +173,17 @@ enum CompanyTier: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .flagship: "Flagships"
-        case .scaleUp: "Scale-ups"
-        case .startup: "Startups"
+        case .flagship: String(localized: "Flagships")
+        case .scaleUp: String(localized: "Scale-ups")
+        case .startup: String(localized: "Startups")
         }
     }
 
     var blurb: String {
         switch self {
-        case .flagship: "Tier-1 and global names"
-        case .scaleUp: "Established and growing"
-        case .startup: "Early-stage teams"
+        case .flagship: String(localized: "Tier-1 and global names")
+        case .scaleUp: String(localized: "Established and growing")
+        case .startup: String(localized: "Early-stage teams")
         }
     }
 
@@ -227,6 +248,11 @@ struct TrackerRecord: Codable, Identifiable, Hashable {
     var appStatus: ApplicationStatus { ApplicationStatus(rawValue: status ?? "saved") ?? .saved }
     /// Ingested from Gmail rather than added in-app (server stamps `source`).
     var fromGmail: Bool { source == "gmail" }
+
+    /// Same candidate chain as Internship.logoCandidates.
+    var logoCandidates: [String] {
+        logoCandidateURLs(logoUrl: logoUrl, domain: companyDomain)
+    }
 
     /// Relative "Applied 2 days ago" line the reference's ApplicationCard shows.
     var appliedAgo: String {

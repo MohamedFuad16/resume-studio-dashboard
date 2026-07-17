@@ -22,11 +22,23 @@ struct InternshipPortalApp: App {
     }
 
     @State private var showSplash = true
+    /// First launch only: the onboarding screens between the splash and the gate.
+    @AppStorage("hasOnboarded") private var hasOnboarded = false
 
     var body: some Scene {
         WindowGroup {
             ZStack {
                 AuthGate()
+
+                // First launch: the splash fades into onboarding, which fades into
+                // the gate. Every launch after that goes splash → gate directly.
+                if !hasOnboarded {
+                    OnboardingView {
+                        withAnimation(.easeOut(duration: 0.4)) { hasOnboarded = true }
+                    }
+                    .zIndex(1)
+                    .transition(.opacity)
+                }
 
                 // The intro splash sits over the gate and fades; it also covers the
                 // beat where Firebase restores the session, so a returning user
@@ -35,7 +47,7 @@ struct InternshipPortalApp: App {
                     SplashView {
                         withAnimation(.easeOut(duration: 0.45)) { showSplash = false }
                     }
-                    .zIndex(1)
+                    .zIndex(2)
                     .transition(.opacity)
                 }
             }

@@ -66,7 +66,9 @@ struct ShimmerBox: View {
         RoundedRectangle(cornerRadius: radius, style: .continuous)
             .fill(Palette.card)
             .frame(height: height)
-            .visualEffect { view, proxy in
+            // Capture `progress` by value: the visualEffect closure is Sendable and
+            // must not reach back into main-actor state.
+            .visualEffect { [progress] view, proxy in
                 view.colorEffect(
                     ShaderLibrary.shimmer(
                         .float2(proxy.size),
@@ -86,28 +88,26 @@ struct ShimmerBox: View {
 /// `active:scale-[0.98]` and nothing more — a distortion shader was tried here and
 /// removed: warping the thing you are touching fights the tap rather than
 /// confirming it.
+///
+/// A real Button, not a DragGesture(minimumDistance: 0): the zero-distance drag
+/// claimed every touch-down, so each scroll that started on a card ran the press
+/// spring on it and wrestled the ScrollView's pan for ownership — measurable as
+/// scroll hitching on device. Buttons get the system's scroll-aware touch-down
+/// delay and cancel semantics for free.
 struct PressableCard<Content: View>: View {
     var action: () -> Void
     @ViewBuilder var content: () -> Content
 
-    @State private var isPressed = false
-
     var body: some View {
-        content()
-            .scaleEffect(isPressed ? 0.98 : 1.0)
-            .animation(.spring(response: 0.28, dampingFraction: 0.7), value: isPressed)
-            .contentShape(.rect)
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in if !isPressed { isPressed = true } }
-                    .onEnded { value in
-                        isPressed = false
-                        // Only fire if the finger stayed on the card — matches the
-                        // cancel behaviour of a real button.
-                        let moved = hypot(value.translation.width, value.translation.height)
-                        if moved < 12 { action() }
-                    }
-            )
-            .accessibilityAddTraits(.isButton)
+        Button(action: action) { content() }
+            .buttonStyle(PressScaleStyle())
+    }
+}
+
+private struct PressScaleStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .animation(.spring(response: 0.28, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }

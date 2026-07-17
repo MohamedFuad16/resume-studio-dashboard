@@ -1026,3 +1026,204 @@ claims 1024, "did not have any applicable content"; `sips -z 1024 1024` fixes it
 (content lensing under it), bubble clusters with bright rims and merged glow, and
 the splash. On-device feel (droplet slide between tabs, minimize-on-scroll) left to
 the user.
+
+## ADR-0043 · 2026-07-17 · Settings tab, Home as pipeline, serif display voice, real logos
+**Context.** User review round 3: company logos missing or "elongated" in the
+bubbles; wants a Settings tab (profile inside it), an avatar top-left on Home, the
+greeting in the serif from the web's "Welcome back" wall, the 2×2 launcher replaced
+with application stats (accepted/rejected/graph-ish), Recent applications above
+Tokyo opportunities, and an iOS 27 deprecation sweep.
+**Decisions.**
+- **Logos, two layers of fix.** (1) Most catalog rows carry `companyDomain` but no
+  `logoUrl` — the web falls back to the DuckDuckGo favicon service; iOS now does
+  the same (`Internship.resolvedLogoURL` / `TrackerRecord.resolvedLogoURL`).
+  (2) Square favicons drawn bare inside the lens read as stretched stickers →
+  every bubble mark now rides a white circular chip (54% of diameter, clipped to a
+  circle). (3) DDG **never 404s**: unknown domains get a constant grey placeholder
+  icon with HTTP 200, which AsyncImage happily shows (the grey "›" bubbles). It is
+  byte-identical every time (1478 B, sha256 e5db88ea2322863c…), so `LogoLoader`
+  fetches Data, rejects that hash, and falls back to the tint monogram. Shared
+  `LogoImage` view replaced AsyncImage in CompanyMark and BubbleContents; NSCache +
+  missing-set memoise per-URL (main-actor confined — Swift 6 rejects bare mutable
+  statics).
+- **Five tabs**: Home / Radar / Applications / Calendar / **Settings** (gearshape).
+  `SettingsView` is the former ProfileSheet promoted to a tab (identity card on
+  top, then Gmail/keys/refresh/sign-out); `Route.profile` deleted. Home's avatar
+  (top-LEFT of the greeting, per request) jumps to the Settings tab.
+- **Home is the pipeline now.** The 2×2 launcher duplicated tabs, so it's gone.
+  `PipelineCard`: one stacked status bar (width = count, legend carries numbers so
+  colour is never the only signal) + Applied / Interviews / Rejected / **Heard
+  back %** ((interview+rejected)/sent — there is no "offer" status; an interview is
+  the strongest positive signal the data has). Section order: pipeline → Recent
+  applications → Tokyo opportunities (swapped per request).
+- **Serif display voice.** The web's "Welcome back" wall is serif; the iOS
+  greeting, login title, and splash wordmark now use `.design(.serif)` (New York) —
+  the platform serif, no bundled font.
+- **Warning sweep to zero**: `isolated deinit` (SE-0371) on AuthService replaces
+  `nonisolated(unsafe)`; ShimmerBox captures `progress` by value in its Sendable
+  visualEffect closure.
+**Gotcha:** a NEW Swift file does nothing until `xcodegen generate` — the target's
+file list is baked into the .xcodeproj, so "cannot find X in scope" after adding a
+file means regenerate, not a code problem.
+**Status.** Builds clean through the LogoImage work except the final `.insert` fix,
+which is applied but NOT rebuilt/verified — the user chose to verify themselves.
+Uncommitted at time of writing.
+
+## ADR-0044 · 2026-07-17 · Home to the Solace grid; Companies is a page; the market cloud packs like Wabi
+**Context.** User review of round 4: the serif greeting read as "weird" against the
+rest of the app; the top-left avatar promised a profile photo the app can't set;
+the PipelineCard bar was not what they wanted (they pointed at the Solace
+reference: greeting + streak flame + a 2×2 grid of soft cards, one carrying a
+small pie); the sheet StatusPicker hid "Rejected" off the right edge; Radar had
+filters but no sort; the Companies field floated as sparse dots with dead space
+(they pointed at the Wabi cloud: bubbles kiss and overlap) and its rim ring on
+tracked companies smeared into a colour arc; Companies opened as a sheet.
+**Decisions.**
+1. **Greeting is the app sans, not serif** (`Font2.title(26)`), and the avatar
+   button is gone — a control that shows an identity you cannot set is a lie;
+   Settings is already a tab. The flame counts THIS WEEK's applications
+   (records past `saved` with `createdAt` in the last 7 days), not an all-time sum.
+2. **InsightGrid replaces PipelineCard**: 2×2 cards — a pipeline donut
+   (trimmed-circle strokes per status, count centred) plus Applied / Interviews /
+   Heard-back% figures. Solace's shape, this app's numbers.
+3. **StatusPicker is a Menu** (Picker inside), a labelled row with the current
+   status as a tinted pill. All five stages visible at once; `allowsClear: false`
+   for RecordSheet (tracked records move stages, they don't vanish).
+4. **Radar sorts**: menu pill first in the chip row — Best match (catalog order),
+   Deadline (YYYY-MM-DD string order, absent sinks), Company A–Z.
+5. **Companies is PUSHED** from Applications (NavigationStack + navigationDestination,
+   root keeps its custom header via toolbar(.hidden)); a company's roles stay a sheet.
+   A market overview is a place; one company is a card you lift.
+6. **Wabi packing**: coverage 0.34→0.52, neighbours may overlap up to 40% of the
+   smaller radius (SDF smooth-min turns the intersection into a shared meniscus),
+   band insets 10/6→4/3, blend 9→12. Refraction dialled down (mag 0.34→0.22,
+   chroma 0.05→0.035) everywhere (field, orb, splash) — the old values smeared the
+   rim into "a weird refracting portion".
+7. **Status ring moved off the rim onto the logo chip** — at the rim the loupe +
+   rim glow dragged it into a detached arc that read as a glitch.
+8. **Calendar**: the negative-padding ink ring on selected-today removed; it
+   spilled outside the cell into the event dots below.
+9. **Onboarding** (`Views/OnboardingView.swift`): four pages after the splash on
+   first launch only (`@AppStorage("hasOnboarded")`, launch-arg overridable for
+   screenshots), paged TabView with custom dots (system page control is
+   white-on-white here), each feature introduced by a glassOrb-shaded orb.
+**Status.** Built clean; Home, onboarding p1, Companies page (both clusters),
+Radar sort pill, and the sheet status menu screenshot-verified on the sim
+(previewMode against live prod). Calendar + onboarding p2–4 verified by code
+only. Uncommitted.
+
+## ADR-0045 · 2026-07-17 · Web donut on Home; bubbles are their logos; Radar menus; device signing unblocked
+**Context.** Round-6 feedback on ADR-0044: the pipeline card should be the WEB's
+status-breakdown donut (centre total + legend counts), not a mini donut in a
+square; bubbles still had "a lot of gap inside" (logo chip 54%); Radar's chips
+should become Location and Language selectors (Saved dropped); building to the
+user's iPhone failed with "signing issue"; and confirm the app really talks to
+the production APIs.
+**Decisions.**
+1. **StatusBreakdownCard** (full-width, above the 2×2 grid): 96pt donut, total +
+   "tracked" in the hole, legend rows `● label … count` — the web panel's shape.
+   The grid gains a Rejected card; pipeline mini-donut card removed.
+2. **BubbleContents chip 0.54 → 0.97** of the sphere — the picture IS the bubble
+   (Wabi). Tradeoff accepted: DuckDuckGo favicons are low-res, so big bubbles
+   magnify softness. Status became a presence BADGE (max(12, 0.18d), white rim,
+   offset 0.27d): with a 97% chip a status ring would hug the refracting rim —
+   the exact smear ADR-0044 removed.
+3. **Radar controls are three menu pills** (FilterMenuPill: chip skin + chevron,
+   ink fill when narrowing): Sort (unchanged), Location (All/Tokyo/Remote/
+   Elsewhere — remote = workMode/location contains "remote"), Language
+   (All/English-first/Japanese = !isEnglishFirst). FilterChip row + Saved filter
+   dropped from Radar (Saved lives in Applications).
+4. **Device signing**: the ad-hoc `CODE_SIGN_IDENTITY: "-"` was simulator-only —
+   THAT was the iPhone build failure. Now `CODE_SIGN_STYLE: Automatic` +
+   `DEVELOPMENT_TEAM: 74G5KQR6DG` (the personal team — NB: the "(R38YYZHMHK)" in
+   the cert CN is a user id, not the team; the team is the OU). Entitlements no
+   longer hardcode application-identifier (profile injects it) and the keychain
+   group carries `$(AppIdentifierPrefix)`. Xcode-beta has NO Apple-ID account, so
+   `-allowProvisioningUpdates` fails ("No Account for Team") — but a valid team
+   profile from the user's own Xcode attempt (expires +7 days, embeds the
+   keychain cert, includes device 00008130-001210600A01001C) resolves WITHOUT the
+   flag. Installed via `devicectl device install app`. **Launch blocked on the
+   one-time manual trust** (Settings → General → VPN & Device Management).
+   Profile lives in `~/Library/Developer/Xcode/UserData/Provisioning Profiles/`;
+   when it expires, re-run a device build from Xcode once (account signed in) to
+   mint a fresh one.
+5. **Connectivity audited live**: Azure catalog API 200/31ms (`/api/status`,
+   `/api/internships` serving HENNGE first), DuckDuckGo favicons 200, Firebase
+   `resume-841f9` config in the bundle; Firestore path `users/{uid}/trackers/…`
+   reads the same docs the web writes. End-to-end sign-in still needs the user's
+   own password — everything up to the wall is verified.
+**Status.** Sim-verified by screenshot (Home donut card, Companies 97% chips +
+badge, Radar menus). Device build signed+installed; awaiting user trust + login.
+Uncommitted.
+
+## ADR-0046 · 2026-07-17 · Splash logos, scroll-lag root cause, profile editing, JA localization
+**Context.** Round-7 feedback (app now runs on the user's iPhone): splash icons
+"don't match" — wanted real top-tier company logos; Applications tab's cards
+blended into the background; bubble logos didn't fit; the phone felt laggy and
+scrolling stuttered ("make sure it runs at 120fps"); wanted an editable profile
+(photo upload) and an app-language option (default = locale, Japanese optional).
+**Decisions.**
+1. **Splash orbs = real companies** (Rakuten/NVIDIA/Mercari/Cloudflare/HENNGE/
+   1Password/Sakana via DDG favicons), rendered by the same `BubbleContents` as
+   the Companies field — one material everywhere; monogram until the favicon
+   lands, cached after first launch.
+2. **Applications ground fixed**: the round-6 NavigationStack painted its opaque
+   ground OVER the tab's AmbientCanvas. The canvas now lives INSIDE the stack
+   (RootView no longer wraps that tab).
+3. **Logos inscribed, not clipped**: chip padding 0.145·d (side ≈ d/√2) so a
+   square favicon's corners never cut; overlap capped at 12% of the smaller
+   radius (40% ate neighbours' logos), coverage 0.52→0.46.
+4. **Scroll lag root cause**: PressableCard's `DragGesture(minimumDistance: 0)`
+   claimed every touch-down and fought the ScrollView pan — replaced with a real
+   Button + ButtonStyle (`configuration.isPressed` scale). Also
+   `CADisableMinimumFrameDurationOnPhone: true` (custom/TimelineView animation
+   was 60Hz-capped on iPhone without it), and the phone now runs a **Release**
+   build — the debug build (unoptimized Swift + Firebase debug) was the bulk of
+   the perceived lag.
+5. **Profile editing in Settings**: avatar = PhotosPicker with camera badge,
+   stored device-local via `AvatarStore` (Application Support, downscaled to
+   256px — Firebase Storage isn't wired and the web keeps photos in the résumé
+   doc); name = pencil → alert TextField → `AuthService.updateDisplayName`
+   (Firebase profile change + reload).
+6. **Japanese localization**: `ja.lproj/Localizable.strings` (~150 keys),
+   `CFBundleLocalizations [en, ja]`; enum labels + computed strings converted to
+   `String(localized:)`, literal Texts localize by key. Settings "App language"
+   row (System default / English / 日本語) writes the `AppleLanguages` override
+   (+`appLanguageOverride` marker) — applies on relaunch; default follows the
+   device locale, per the user.
+7. **Release-build gotcha**: `#Preview` bodies compile in Release but
+   PreviewData's fixtures are `#if DEBUG` — every preview section is now
+   DEBUG-gated (script pass across Views/).
+**Status.** Debug sim + Release device builds green; splash logos, Applications
+ground, bubble fit, Settings (avatar/name/language) screenshot-verified on sim;
+Release build installed on the iPhone. Uncommitted.
+
+## ADR-0047 · 2026-07-17 · Logo candidate chains, profile edit page, non-wrapping language pill
+**Context.** Round-8 feedback: bubble logos "too enlarged / low quality"; the
+Settings pencil+camera icons looked bad — wanted the profile card to OPEN an
+edit page instead; "System default" wrapped in the language pill; the
+Applications list showed monograms where every other surface showed logos.
+**Decisions.**
+1. **Logo candidate chain** (`logoCandidateURLs` in Models.swift): Google s2
+   `?sz=128` first (REAL resolutions, 96–128px — DDG favicons are 16–32px, which
+   was the blur), DDG second (coverage), catalog `logoUrl` last (white
+   wordmarks). `LogoLoader.load(candidates:)` walks the chain, requires HTTP 200
+   (s2 404s for unknown domains now — the old "globe at 200" behaviour is gone;
+   DDG's constant-hash placeholder check stays) and prefers the first image
+   ≥48px, settling for smaller only if nothing crisp exists. `resolvedLogoURL`
+   is gone; `CompanyBubble.logoURL` → `logoCandidates`.
+2. **"Too enlarged"**: logo inside the chip 0.71·d → 0.59·d (padding 0.19), and
+   lens magnification 0.22 → 0.16 everywhere — the bulge was reading as
+   distortion on square marks.
+3. **Applications logos**: `CatalogStore.logoCandidates(for record:)` falls
+   through record → catalog-by-id → catalog-by-company-name (prefix-tolerant:
+   Gmail says "micro1.ai"/"Rakuten Group", the catalog says "micro1"/"Rakuten").
+   ApplicationCard/RecordSheet use it.
+4. **Settings**: identity card is a NavigationLink (chevron only — no pencil, no
+   camera badge) to a new `EditProfileView` page: tappable 112pt avatar +
+   Change/Remove photo + name field + Save (Firebase displayName). Language
+   pill: label "System", subtitle "Applies after relaunch", `.fixedSize()` +
+   `lineLimit(1)` so it never wraps.
+**Status.** Sim-verified (sharp bubble logos incl. Rakuten's real R and KDDI,
+clean Settings card, one-line pill, HENNGE logo in Applications); Release build
+installed on the iPhone. Uncommitted.

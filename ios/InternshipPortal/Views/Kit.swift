@@ -43,7 +43,7 @@ struct IconTile: View {
 /// monogram — never an empty box (the web's DuckDuckGo favicons often 404).
 struct CompanyMark: View {
     var company: String
-    var logoURL: String?
+    var candidates: [String] = []
     var size: CGFloat = 44
 
     private var monogram: String {
@@ -56,22 +56,12 @@ struct CompanyMark: View {
             .fill(Palette.tile)
             .frame(width: size, height: size)
             .overlay {
-                if let logoURL, let url = URL(string: logoURL) {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image.resizable().scaledToFit().padding(size * 0.22)
-                        default:
-                            Text(monogram)
-                                .font(.system(size: size * 0.38, weight: .bold))
-                                .foregroundStyle(Palette.ink600)
-                        }
-                    }
-                } else {
+                LogoImage(candidates: candidates) {
                     Text(monogram)
                         .font(.system(size: size * 0.38, weight: .bold))
                         .foregroundStyle(Palette.ink600)
                 }
+                .padding(size * 0.22)
             }
             .overlay {
                 RoundedRectangle(cornerRadius: Radius.logo, style: .continuous)
@@ -122,7 +112,7 @@ struct MatchCard: View {
         PressableCard(action: action) {
             Card(radius: Radius.row, padding: 14) {
                 HStack(spacing: 12) {
-                    CompanyMark(company: item.displayCompany, logoURL: item.logoUrl)
+                    CompanyMark(company: item.displayCompany, candidates: item.logoCandidates)
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.displayCompany)
@@ -163,6 +153,7 @@ struct MatchCard: View {
 
 /// A tracked application — reference: ApplicationCard.
 struct ApplicationCard: View {
+    @Environment(CatalogStore.self) private var store
     var record: TrackerRecord
     var action: () -> Void
 
@@ -171,7 +162,7 @@ struct ApplicationCard: View {
             Card(radius: Radius.row, padding: 14) {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(alignment: .top, spacing: 12) {
-                        CompanyMark(company: record.displayCompany, logoURL: record.logoUrl, size: 40)
+                        CompanyMark(company: record.displayCompany, candidates: store.logoCandidates(for: record), size: 40)
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text(record.displayCompany)
@@ -436,6 +427,7 @@ struct EmptyNote: View {
 
 /// The component gallery: every piece of the vocabulary on one canvas, so a token
 /// change can be judged everywhere at once instead of screen by screen.
+#if DEBUG
 #Preview("Component gallery") {
     ScrollView {
         VStack(alignment: .leading, spacing: 20) {
@@ -476,3 +468,4 @@ struct EmptyNote: View {
     }
     .background(Palette.canvas)
 }
+#endif

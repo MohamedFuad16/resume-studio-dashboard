@@ -46,6 +46,14 @@ targets:
           UIColorName: LaunchBackground
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         ITSAppUsesNonExemptEncryption: false
+        # ProMotion: without this key, custom (non-UIKit) animation like the
+        # TimelineView-driven shaders is capped at 60 Hz on iPhone. With it, the
+        # display drives at up to 120 Hz on supported devices.
+        CADisableMinimumFrameDurationOnPhone: true
+        # The app ships English + Japanese strings; iOS uses the device (or
+        # per-app) locale to pick, and Settings offers an in-app override.
+        CFBundleDevelopmentRegion: en
+        CFBundleLocalizations: [en, ja]
         CFBundleURLTypes:
           # REVERSED_CLIENT_ID from GoogleService-Info.plist — the callback scheme
           # Google Sign-In returns to. Must stay in step with that file.
@@ -62,9 +70,14 @@ targets:
         # application-identifier entitlement — which only exists if the app is
         # signed. With CODE_SIGNING_ALLOWED=NO, SecItemCopyMatching fails with
         # -34018 and the auth state listener never fires its first callback, so the
-        # app hangs on the launch spinner forever. Ad-hoc ("-") is enough here; a
-        # real device needs a DEVELOPMENT_TEAM.
-        CODE_SIGN_IDENTITY: "-"
-        CODE_SIGNING_REQUIRED: "NO"
+        # app hangs on the launch spinner forever.
+        #
+        # Signing is AUTOMATIC with the personal team (Apple Development:
+        # flashxjapan@gmail.com) so builds install on the paired iPhone as well as
+        # the simulator. The earlier ad-hoc ("-") identity was simulator-only —
+        # that was the device "signing issue". Device builds want
+        # -allowProvisioningUpdates so Xcode can mint/renew the profile.
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: 74G5KQR6DG
         CODE_SIGNING_ALLOWED: "YES"
         CODE_SIGN_ENTITLEMENTS: InternshipPortal/InternshipPortal.entitlements
