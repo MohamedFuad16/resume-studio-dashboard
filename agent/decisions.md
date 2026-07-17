@@ -741,3 +741,24 @@ container, NOT Vercel serverless (ephemeral). Prod deploy therefore must route t
 least the Gmail routes) to Azure. 7-day testing-mode token expiry is avoided by publishing the
 OAuth app to production; the reconnect banner is event-driven (fires only on a real invalid_grant),
 not a timer. Gmail brand mark is nominative use to label the integration + tag ingested rows.
+
+## ADR-0036 · 2026-07-17 · Company-wide reapplication cooldown from rejection emails
+**Context:** After a rejection, many companies ask you to wait before reapplying (HENNGE:
+"apply again after 9–12 months"). The user should not be offered "Apply" for that company
+while the cooldown is active — and the block is company-wide, not per-posting (HENNGE has
+Front-End and Full-Stack pathways; a rejection from one gates both).
+**Decision:** (1) The Gmail triage model extracts `reapplyMonths{min,max}` from `kind:rejected`
+emails (clamped 1–36, max≥min); null when no window is stated. (2) The client drain stamps
+`reapplyAfter = rejection receivedAt + min months` plus `reapplyNote`/`reapplyMonths` on the
+tracker record; `useApplicationTracker.updateStatus` carries these fields forward. (3) A shared
+`utils/reapplyCooldown.js` derives a company→cooldown map from all records (latest reapplyAfter
+wins; CJK-safe company normalization) and every apply surface consults it: radar (amber clock
+chip in the Apply cell, `onApply` blocked, drawer banner + disabled Apply-now), Applications
+view + dashboard Recent (a "Reapply from <date>" pill). Cooldown is active only while
+status==='rejected' AND reapplyAfter is in the future, so moving the record off 'rejected'
+(a deliberate reapply) lifts the block automatically.
+**Consequences:** No false blocks — a plain rejection with no stated window never gates apply.
+The block is data-driven from the email, matching the company's own policy. Manual cooldown
+entry is not offered yet (a rejection marked by hand in-app carries no window); if needed, add a
+date field to the detail drawer's status control. The min-months bound is the earliest the
+company said you may reapply (conservative = shows the soonest unblock date).

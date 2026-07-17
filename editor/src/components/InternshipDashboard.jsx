@@ -26,6 +26,7 @@ import InterviewDateModal from './InterviewDateModal.jsx';
 import { displayCompany, displayRole, displayValue, internshipDetails, splitLanguageRequirement } from '../utils/internshipDisplay.js';
 import { appliedCompaniesForProfile, appliedCompanyRank, compareCompanyAwareMatch } from '../utils/internshipRanking.js';
 import { resolveTechIcon } from '../utils/techIcons.js';
+import { companyCooldownMap, cooldownForCompany, cooldownLabel } from '../utils/reapplyCooldown.js';
 
 const DESKTOP_PAGE_SIZE = 14;
 const MOBILE_PAGE_SIZE = 6;
@@ -107,6 +108,8 @@ const copy = {
     status: 'Status',
     apply: 'Apply',
     applyNow: 'Apply now',
+    cooldown: 'Cooldown',
+    cooldownWhy: company => `${company} recently declined an application and asks you to wait before reapplying.`,
     about: 'What the internship is about',
     fitHeading: 'Why this is a strong fit',
     techStack: 'Tech stack / likely tools',
@@ -187,6 +190,8 @@ const copy = {
     status: '状況',
     apply: '応募',
     applyNow: '応募ページへ',
+    cooldown: '再応募待機中',
+    cooldownWhy: company => `${company}は選考見送り後、一定期間は再応募を控えるよう案内しています。`,
     about: 'インターン内容',
     fitHeading: 'マッチする理由',
     techStack: '使用技術・想定スタック',
@@ -371,7 +376,7 @@ const isJapanBased = item => item.region === 'Japan'
 const isRemoteRole = item => /remote|リモート/i.test(`${item.location || ''} ${item.workMode || ''}`);
 // Exported so the Applications view and the dashboard's Recent applications can
 // open the same detail drawer when a company row is clicked.
-export const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEditor, isJa = false }) => {
+export const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEditor, cooldown = null, isJa = false }) => {
   const t = copy[isJa ? 'ja' : 'en'];
   const details = internshipDetails(item);
   const companyName = displayCompany(item, isJa);
@@ -409,6 +414,16 @@ export const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEd
       {languageParts.map((part, index) => <span className="intern-meta-token language" key={`${part}-${index}`}><b>{index === 0 ? 'EN' : 'JA'}</b>{part}</span>)}
       {durationParts.map((part, index) => <span className="intern-meta-token" key={`${part}-${index}`}>{index === 0 ? <CalendarClock size={13} /> : null}{part}</span>)}
     </div>
+
+    {cooldown && (
+      <div className="intern-cooldown-banner" role="note">
+        <CalendarClock size={16} />
+        <div>
+          <strong>{cooldownLabel(cooldown, isJa)}</strong>
+          <span>{cooldown.reapplyNote || t.cooldownWhy(companyName)}</span>
+        </div>
+      </div>
+    )}
 
     {(details.about || details.aboutJa) && (
       <section className="intern-detail-section">
@@ -470,7 +485,11 @@ export const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEd
     )}
 
     <div className="intern-detail-actions">
-      {item.url ? (
+      {cooldown ? (
+        <span className="intern-apply intern-apply-large intern-apply-disabled" aria-disabled="true">
+          <CalendarClock size={15} /> {cooldownLabel(cooldown, isJa)}
+        </span>
+      ) : item.url ? (
         <a className="intern-apply intern-apply-large" href={item.url} target="_blank" rel="noreferrer" onClick={() => onApply(item)}>
           {copy[isJa ? 'ja' : 'en'].applyNow} <ExternalLink size={15} />
         </a>
@@ -574,6 +593,9 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
     () => appliedCompaniesForProfile(activeProfile, records),
     [activeProfile, records],
   );
+  // Company-wide reapply cooldowns from rejection emails that stated a wait
+  // window — blocks every role at that company until the date passes.
+  const cooldownMap = useMemo(() => companyCooldownMap(records), [records]);
   const regions = ['All', 'Japan', 'Remote', 'Global'];
   const tracks = useMemo(() => ['All', ...new Set(visibleCatalog.map(item => item.track).filter(Boolean))], [visibleCatalog]);
   // Derive from the VISIBLE set (not raw tracker records) so the Saved button count
@@ -772,6 +794,8 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
   };
 
   const onApply = item => {
+    // A company-wide cooldown (recent rejection with a stated wait) blocks apply.
+    if (cooldownForCompany(cooldownMap, item.company)) return;
     const current = statusFor(item.id);
     if (!current || current === 'saved') updateStatus(item, 'applying');
   };
@@ -853,6 +877,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
             <div className="intern-rows" role="list">
               {pageItems.map((item, index) => {
                 const status = statusFor(item.id);
+                const cooldown = cooldownForCompany(cooldownMap, item.company);
                 const [roleLead, ...roleDetails] = splitRole(displayRole(item.role, isJa));
                 const languageParts = splitLanguageRequirement(item.language, isJa);
                 const durationParts = splitDuration(item.duration, isJa);
@@ -883,7 +908,9 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
                     <span className="intern-duration" data-label={t.duration}><span className="intern-duration-stack">{durationParts.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</span></span>
                     <span className={`intern-deadline ${deadlineClass(item)}`} data-label={t.deadline}>{formatDeadline(item.deadline, isJa)}</span>
                     <select className={`intern-row-status ${status || 'untracked'}`} value={status} onClick={event => event.stopPropagation()} onChange={event => handleStatusSelect(item, event.target.value)} aria-label={`${t.status}: ${displayCompany(item, isJa)}`}><option value="">{t.track}</option>{APPLICATION_STATUSES.map(option => <option key={option.value} value={option.value}>{statusLabel(option.value, isJa)}</option>)}</select>
-                    <a className="intern-apply" href={item.url} target="_blank" rel="noreferrer" onClick={event => { event.stopPropagation(); onApply(item); }}>{t.apply} <ExternalLink size={13} /></a>
+                    {cooldown
+                      ? <span className="intern-cooldown" title={`${t.cooldown} · ${t.cooldownWhy(displayCompany(item, isJa))} ${cooldownLabel(cooldown, isJa)}.`} aria-label={`${t.cooldown} — ${cooldownLabel(cooldown, isJa)}`} onClick={event => event.stopPropagation()}><CalendarClock size={15} /></span>
+                      : <a className="intern-apply" href={item.url} target="_blank" rel="noreferrer" onClick={event => { event.stopPropagation(); onApply(item); }}>{t.apply} <ExternalLink size={13} /></a>}
                     <button type="button" className={`intern-bookmark ${status === 'saved' ? 'active' : ''}`} onClick={event => { event.stopPropagation(); toggleSaved(item); }} aria-label={t.saveLabel(displayCompany(item, isJa), status === 'saved')}>{status === 'saved' ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}</button>
                   </article>
                 </React.Fragment>;
@@ -895,7 +922,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
         </div>
         {selected ? (
           <div className="intern-detail-backdrop" role="presentation" onClick={event => { if (event.target === event.currentTarget) setSelectedId(''); }}>
-            <DetailPanel item={selected} status={statusFor(selected.id)} onStatus={handleStatusSelect} onApply={onApply} onClose={() => setSelectedId('')} onOpenEditor={onOpenEditor} isJa={isJa} />
+            <DetailPanel item={selected} status={statusFor(selected.id)} onStatus={handleStatusSelect} onApply={onApply} onClose={() => setSelectedId('')} onOpenEditor={onOpenEditor} cooldown={cooldownForCompany(cooldownMap, selected.company)} isJa={isJa} />
           </div>
         ) : null}
       </section>

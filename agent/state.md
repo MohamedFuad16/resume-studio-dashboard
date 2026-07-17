@@ -25,6 +25,23 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-17 — reapplication cooldown + automation audit.** Verified GitHub Actions
+  (validate-catalog.yml: push/PR structural validate + daily 06:00 UTC self-healing
+  refresh → auto-PR) and the Gmail pipeline (server `setInterval` poll every 5 min gated
+  by `isDirectRun` → gpt-5-nano classify → sonar enrich → per-profile queue → client
+  drain) — both correct/API-driven, no manual step. NEW feature — **company-wide reapply
+  cooldown**: a rejection email that states a wait window ("apply again after 9–12
+  months") now blocks reapplying to that company until the date passes. Pipeline:
+  classify.js extracts `reapplyMonths{min,max}` (clamped 1–36) from `kind:rejected`
+  emails → sync.js threads it → useGmailInbox stamps `reapplyAfter = receivedAt + min
+  months` + `reapplyNote` on the record → useApplicationTracker preserves the fields.
+  New `utils/reapplyCooldown.js` (companyCooldownMap/cooldownForCompany/cooldownLabel,
+  CJK-safe company match). UI: radar shows an amber clock chip in the Apply cell +
+  blocks onApply for ALL roles at the company (sibling roles too, e.g. both HENNGE
+  pathways), drawer shows a banner + disabled "Apply now"; Applications view + dashboard
+  Recent show a "Reapply from <date>" pill. Verified end-to-end in browser (injected a
+  HENNGE Front-End rejection → Full-Stack sibling blocked). Cooldown only when the email
+  states a window — no false blocks on plain rejections. Build + e2e (5/5) green.
 - **2026-07-17 — editor polish round 2 + catalog freshness.** (1) Editor: ALL hairline
   dividers removed (topbar/rail/pane-head/sec-hd/pg-block/item — whitespace only);
   manual Update button removed (auto-compile was already on; hidden `compile-btn`

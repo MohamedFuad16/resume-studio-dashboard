@@ -58,6 +58,11 @@ Entry: `main.jsx` → `App.jsx`. See `agent/graph/graph.md` for the import graph
 - **`internshipRanking.js`** — profile-aware applied-company normalization and shared
   comparators. Mohamed's explicit HENNGE/Rakuten history is combined with tracker
   statuses; scores of 98+ remain eligible for their natural rank.
+- **`reapplyCooldown.js`** — company-wide reapplication cooldown (ADR-0036). Builds a
+  company→cooldown map from tracker records (`reapplyAfter`/`reapplyMonths`/`reapplyNote`,
+  set by a Gmail rejection that stated a wait window) and exposes `cooldownForCompany`,
+  `cooldownLabel`, `addMonths`. Consumed by `InternshipDashboard`, `ApplicationsView`,
+  `ProfileDashboard` to block Apply + show a "Reapply from <date>" affordance.
 
 ## Dependency hot-spots (change impact)
 - `CompanyLogo`, `internshipDisplay`, `internshipRanking`, `useApplicationTracker`, `useInternshipCatalog`

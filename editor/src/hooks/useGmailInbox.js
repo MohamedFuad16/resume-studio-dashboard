@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { requestJson } from '../api/client.js';
 import { useApplicationTracker } from './useApplicationTracker.js';
 import { useInternshipCatalog } from './useInternshipCatalog.js';
+import { addMonths } from '../utils/reapplyCooldown.js';
 
 const POLL_MS = 90000;
 const KIND_TO_STATUS = { applied: 'applied', rejected: 'rejected', interview: 'interview', offer: 'applied' };
@@ -66,6 +67,20 @@ export function useGmailInbox(profile) {
     if (shouldSetStatus) base._rank = rank;
     const { _rank, ...cleanBase } = base;
     const internship = { ...cleanBase, source: 'gmail', sourceMeta: { gmailMessageId: action.gmailMessageId, receivedAt: action.receivedAt, subject: action.subject } };
+    // Rejection with a stated wait window → stamp a company-wide reapply cooldown.
+    // reapplyAfter = the rejection's receipt date + the minimum stated months
+    // (the earliest the company says you may reapply).
+    if (action.kind === 'rejected' && action.reapplyMonths?.min) {
+      const { min, max } = action.reapplyMonths;
+      const after = addMonths(action.receivedAt || Date.now(), min);
+      if (after) {
+        internship.reapplyAfter = after;
+        internship.reapplyMonths = { min, max: max || min };
+        internship.reapplyNote = max && max !== min
+          ? `${action.company} asks applicants to wait ${min}–${max} months before reapplying.`
+          : `${action.company} asks applicants to wait ${min} months before reapplying.`;
+      }
+    }
     if (shouldSetStatus) updateStatus(internship, status);
     if (action.interview?.date) {
       addMilestone(internship.id, { id: `gmail-${action.gmailMessageId}`, kind: 'interview', date: action.interview.date, time: action.interview.time || null, title: `Interview — ${action.company}` });

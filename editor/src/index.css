@@ -8078,3 +8078,62 @@ body,
   .editor-topbar { flex-wrap: wrap; }
   .editor-template-pills { order: 3; flex-basis: 100%; justify-content: flex-start; }
 }
+
+/* ── Reapplication cooldown (rejection stated a wait window) ──────────
+   Company-wide block surfaced as an amber "Reapply from <date>" affordance:
+   a chip in the radar apply-cell, a banner in the detail drawer, and a small
+   pill under the role in the Applications/dashboard lists. */
+.intern-cooldown {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #b45309;
+  cursor: help;
+}
+.intern-cooldown svg { flex: none; }
+
+.intern-cooldown-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 14px 0 2px;
+  padding: 12px 14px;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  background: #fff7ed;
+  color: #b45309;
+}
+.intern-cooldown-banner svg { flex: none; margin-top: 1px; }
+.intern-cooldown-banner strong { display: block; font-size: 12px; font-weight: 780; }
+.intern-cooldown-banner span { display: block; margin-top: 3px; color: #9a6a2c; font-size: 10.5px; font-weight: 560; line-height: 1.5; }
+
+.intern-apply.intern-apply-disabled {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #b45309;
+  cursor: not-allowed;
+  pointer-events: none;
+  gap: 7px;
+}
+
+.application-cooldown-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #b45309;
+  font-size: 9.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.application-cooldown-tag svg { flex: none; }
