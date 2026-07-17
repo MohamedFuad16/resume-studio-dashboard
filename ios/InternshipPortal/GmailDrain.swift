@@ -126,29 +126,56 @@ extension CatalogStore {
     /// Safe because Gmail rows are DERIVED data: the emails are the source of
     /// truth and are still sitting in the inbox. Anything you added by hand has a
     /// different `source` and is not touched.
-    func rebuildFromGmail(days: Int = 180) async {
-        let doomed = tracker.filter { $0.value.source == "gmail" }.count
-        // Deliberately NOT "delete, then re-fetch". Deleting first opens a window
-        // where the rows are gone and their replacements exist only in a request
-        // that might fail — a dropped connection would leave the tracker empty
-        // until some later sync happened to succeed. The drain does the swap in a
-        // single write instead: it only drops the old rows once it is holding the
-        // new ones, and it rolls back as one unit if the save fails.
-        let added = await drainGmail(backfillDays: days, replacingGmailRows: true)
-        if added > 0 {
-            toast = String(localized: "Rebuilt from Gmail — \(added) applications, \(doomed) old rows replaced")
+    func rebuildFromGmail(days: Int = 90) async {
+        guard !isRebuilding else { return }
+        isRebuilding = true
+        defer { isRebuilding = false }
+
+        let profile = profileID ?? PortalAPI.profile
+        guard (try? await PortalAPI.gmailStatus(profile: profile))?.connected == true else {
+            toast = String(localized: "Connect Gmail first to rebuild.")
+            return
         }
+        let doomed = tracker.filter { $0.value.source == "gmail" }.count
+
+        // Kick a fresh scan, then WAIT for the queue to fill. A rebuild can't use
+        // the atomic single-drain path the routine sync uses: the auto-drain (now
+        // held off by isRebuilding) would otherwise race it for the same queue, and
+        // a rebuild must reconstruct from the WHOLE backfill, not whatever happened
+        // to be queued at one instant. The re-scan is fast — companies are already
+        // known, so it skips the per-company web enrichment that made the first
+        // scan slow — but still a minute, so poll rather than guess a fixed wait.
+        toast = String(localized: "Rebuilding from Gmail — re-reading your inbox…")
+        await PortalAPI.gmailSyncNow(profile: profile, backfillDays: days)
+
+        var actions = (try? await PortalAPI.gmailPending(profile: profile)) ?? []
+        var waited = 0
+        while actions.isEmpty && waited < 90 {
+            try? await Task.sleep(for: .seconds(6))
+            waited += 6
+            actions = (try? await PortalAPI.gmailPending(profile: profile)) ?? []
+        }
+
+        guard !actions.isEmpty else {
+            toast = String(localized: "No internships found in Gmail to rebuild from.")
+            return
+        }
+
+        let added = await applyGmailActions(actions, profile: profile, replacingGmailRows: true)
+        toast = String(localized: "Rebuilt \(added) from Gmail — \(doomed) old rows cleared.")
     }
 
-    /// Pull everything waiting, apply it, ack it. Safe to call repeatedly.
+    /// The routine drain: pull whatever Gmail has queued, apply it additively, ack
+    /// it. Safe to call repeatedly — on load and on every foreground.
     /// - Parameter backfillDays: rescan older mail (ignores the processed list).
     /// - Returns: how many records the drain touched.
-    /// - Parameter replacingGmailRows: rebuild mode. Every existing Gmail-sourced
-    ///   record is dropped and re-derived from this drain's actions, in the same
-    ///   write. Used to repair rows an older classifier got wrong — including the
-    ///   dates it stamped from its own clock rather than the email's.
     @discardableResult
-    func drainGmail(backfillDays: Int? = nil, replacingGmailRows: Bool = false) async -> Int {
+    func drainGmail(backfillDays: Int? = nil) async -> Int {
+        // A rebuild owns the queue while it runs; an additive drain here would
+        // apply the backfill's actions on top of the old rows the rebuild is about
+        // to purge, and ack them out from under it.
+        guard !isRebuilding else { return 0 }
+
         let profile = profileID ?? PortalAPI.profile
         guard (try? await PortalAPI.gmailStatus(profile: profile))?.connected == true else { return 0 }
 
@@ -157,12 +184,20 @@ extension CatalogStore {
         guard let actions = try? await PortalAPI.gmailPending(profile: profile), !actions.isEmpty else {
             return 0
         }
+        return await applyGmailActions(actions, profile: profile, replacingGmailRows: false)
+    }
 
-        // Only now, holding real replacements, is it safe to drop the old rows.
-        if replacingGmailRows {
-            // Everything about to be re-added is old news, not new arrivals.
-            Notifier.resetBaseline()
-        }
+    /// Apply a batch of Gmail actions to the tracker and ack them. Shared by the
+    /// routine drain (additive) and the rebuild (replacing every Gmail row).
+    /// - Parameter replacingGmailRows: start from a tracker with all Gmail-sourced
+    ///   rows removed, so the batch fully reconstructs them — used by the rebuild
+    ///   to drop rows an older classifier got wrong.
+    @discardableResult
+    func applyGmailActions(
+        _ actions: [GmailAction], profile: String, replacingGmailRows: Bool
+    ) async -> Int {
+        // Everything a rebuild re-adds is old news, not new arrivals.
+        if replacingGmailRows { Notifier.resetBaseline() }
 
         // Oldest first, so the newest email's status wins (applied → then
         // rejected = rejected), sharing one session map for company convergence.

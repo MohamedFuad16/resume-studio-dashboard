@@ -127,6 +127,12 @@ final class CatalogStore {
     /// Surfaced as a toast; mirrors the reference's toast pattern.
     var toast: String?
 
+    /// True while a Gmail rebuild is reconstructing the tracker. The routine
+    /// auto-drains (on load and on foreground) must stand aside while it runs, or
+    /// they would consume the backfill's queued actions additively before the
+    /// rebuild can purge-and-replace with them.
+    var isRebuilding = false
+
     /// Set by RootView from AuthService. nil = signed out → KV path.
     var uid: String?
     /// Which Firestore profile document the tracker lives in. Resolved on load.
