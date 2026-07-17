@@ -27,6 +27,13 @@ const APPLICATION_QUERY = [
 const norm = s => String(s || '').replace(/株式会社|合同会社|有限会社|\(株\)|（株）/g, '')
   .toLowerCase().replace(/[^a-z0-9぀-ヿ一-鿿]+/gu, '-').replace(/^-|-$/g, '');
 
+// RFC 2822 (or anything Date can read) → ISO 8601, or null if unparseable.
+const toISO = value => {
+  if (!value) return null;
+  const t = Date.parse(value);
+  return Number.isNaN(t) ? null : new Date(t).toISOString();
+};
+
 // Companies we already know — the internship catalog (stored, else seeds) and the
 // server-side tracker — never need a web search: the client resolves their
 // details from its own records/catalog when it drains the queue.
@@ -64,15 +71,6 @@ export async function syncProfile(store, profile, opts = {}) {
   const backfillDays = Number(opts.backfillDays || 0);
   if (backfillDays > 0) {
     messageIds = await listRecentMessageIds(token, `newer_than:${backfillDays}d -in:sent -in:draft (${APPLICATION_QUERY})`, 100);
-    // TEMP PROBE: is the mailbox itself readable, or is the FILTER the thing
-    // returning nothing? Count a bare recent query and a total. Counts only.
-    try {
-      const bare = await listRecentMessageIds(token, `newer_than:${backfillDays}d`, 100);
-      const any = await listRecentMessageIds(token, `in:anywhere`, 5);
-      console.log(`gmail-probe[${profile}] filtered=${messageIds.length} bareRecent=${bare.length} anyMail=${any.length}`);
-    } catch (e) {
-      console.log(`gmail-probe[${profile}] error=${e.status || e.message}`);
-    }
   } else if (conn.historyId) {
     const res = await listNewMessageIds(token, conn.historyId);
     if (res.stale) {
@@ -132,7 +130,11 @@ export async function syncProfile(store, profile, opts = {}) {
       dedupeKey: `${message.id}:${verdict.kind}`,
       gmailMessageId: message.id,
       threadId: message.threadId,
-      receivedAt: message.date || new Date().toISOString(),
+      // Normalise to ISO 8601. The email's Date header is RFC 2822
+      // ("Fri, 03 Jul 2026 12:00:00 +0900"), which the iOS client's
+      // ISO8601DateFormatter cannot parse — leaving every ingested record without
+      // a usable applied/rejected date. new Date() reads RFC 2822 fine.
+      receivedAt: toISO(message.date) || new Date().toISOString(),
       kind: verdict.kind,
       company: verdict.company,
       role: verdict.role,
