@@ -14,10 +14,15 @@ FROM node:22-trixie-slim
 
 # LaTeX runtime libs, fontconfig, and Japanese fonts (Noto Serif/Sans CJK JP) that the
 # JA templates use on Linux (RESUME_FONT_PROFILE=linux swaps Hiragino → Noto).
+# python3/make/g++ are for better-sqlite3: it ships prebuilt binaries for
+# linux-x64 and normally uses them, but if a prebuild is ever unavailable for the
+# runtime's ABI, node-gyp compiles from source — and without a toolchain present
+# that turns into a FAILED image build rather than a slow one.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl fontconfig \
       fonts-noto-cjk fonts-noto-core \
       libssl3 libfontconfig1 libgraphite2-3 libharfbuzz0b libicu76 \
+      python3 make g++ \
   && fc-cache -f \
   && rm -rf /var/lib/apt/lists/*
 
