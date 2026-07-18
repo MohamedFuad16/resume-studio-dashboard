@@ -231,12 +231,69 @@ enum CompanyTier: String, CaseIterable, Identifiable {
     }
 }
 
-struct Milestone: Codable, Identifiable, Hashable {
+// MARK: - Unknown-field passthrough
+
+/// A JSON tree this client can carry without understanding.
+///
+/// TrackerRecord is a SHARED document: the web client writes fields iOS does not
+/// model (reapplyAfter, sourceMeta, per-status stamps, …) and both clients save
+/// whole records. Decoding only the fields we know and encoding them back was
+/// silently ERASING everything the web wrote, on every phone sync. So unknown
+/// keys are captured into `extra` on decode and re-emitted on encode — the
+/// round-trip rule in contracts/tracker-record.md.
+enum JSONValue: Codable, Hashable, Sendable {
+    case string(String)
+    case number(Double)
+    case bool(Bool)
+    case null
+    case array([JSONValue])
+    case object([String: JSONValue])
+
+    init(from decoder: Decoder) throws {
+        let single = try decoder.singleValueContainer()
+        if single.decodeNil() { self = .null }
+        // Bool before number: a JSON true decodes as 1 otherwise.
+        else if let b = try? single.decode(Bool.self) { self = .bool(b) }
+        else if let n = try? single.decode(Double.self) { self = .number(n) }
+        else if let s = try? single.decode(String.self) { self = .string(s) }
+        else if let a = try? single.decode([JSONValue].self) { self = .array(a) }
+        else if let o = try? single.decode([String: JSONValue].self) { self = .object(o) }
+        else {
+            throw DecodingError.dataCorruptedError(in: single, debugDescription: "Unsupported JSON value")
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var single = encoder.singleValueContainer()
+        switch self {
+        case .string(let s): try single.encode(s)
+        case .number(let n): try single.encode(n)
+        case .bool(let b): try single.encode(b)
+        case .null: try single.encodeNil()
+        case .array(let a): try single.encode(a)
+        case .object(let o): try single.encode(o)
+        }
+    }
+}
+
+/// String-keyed access to a keyed container, for walking keys we don't predeclare.
+struct AnyCodingKey: CodingKey {
+    var stringValue: String
+    var intValue: Int? { nil }
+    init(_ string: String) { self.stringValue = string }
+    init?(stringValue: String) { self.stringValue = stringValue }
+    init?(intValue: Int) { nil }
+}
+
+struct Milestone: Identifiable, Hashable, Sendable {
     var id: String
     var kind: String?
     var date: String?
     var time: String?
     var title: String?
+    /// Web-written fields this client doesn't model (timeZone, createdAt) —
+    /// preserved through the round trip. See JSONValue above.
+    var extra: [String: JSONValue] = [:]
 
     var kindLabel: String {
         switch kind {
@@ -260,7 +317,7 @@ struct Milestone: Codable, Identifiable, Hashable {
     }
 }
 
-struct TrackerRecord: Codable, Identifiable, Hashable {
+struct TrackerRecord: Identifiable, Hashable, Sendable {
     var internshipId: String?
     var company: String?
     var role: String?
@@ -275,6 +332,10 @@ struct TrackerRecord: Codable, Identifiable, Hashable {
     var updatedAt: String?
     var createdAt: String?
     var milestones: [Milestone]?
+    /// Everything else in the stored record — web-owned fields (reapplyAfter,
+    /// sourceMeta, appliedAt/rejectedAt/…) that MUST survive an iOS save.
+    /// The drain also WRITES parity stamps here (contracts/normalization.md §4–5).
+    var extra: [String: JSONValue] = [:]
 
     var id: String { internshipId ?? UUID().uuidString }
     var displayCompany: String { company ?? "Unknown company" }
@@ -297,6 +358,87 @@ struct TrackerRecord: Codable, Identifiable, Hashable {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full
         return "Applied \(formatter.localizedString(for: date, relativeTo: .now))"
+    }
+}
+
+// Codable lives in extensions so the memberwise initializers survive — a custom
+// init(from:) in the main declaration would delete them, and call sites build
+// these with `TrackerRecord()` / `Milestone(id:kind:date:time:title:)`.
+extension Milestone: Codable {
+    private static let known: Set<String> = ["id", "kind", "date", "time", "title"]
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: AnyCodingKey.self)
+        id = try c.decodeIfPresent(String.self, forKey: .init("id")) ?? UUID().uuidString
+        kind = try c.decodeIfPresent(String.self, forKey: .init("kind"))
+        date = try c.decodeIfPresent(String.self, forKey: .init("date"))
+        time = try c.decodeIfPresent(String.self, forKey: .init("time"))
+        title = try c.decodeIfPresent(String.self, forKey: .init("title"))
+        var extras: [String: JSONValue] = [:]
+        for key in c.allKeys where !Self.known.contains(key.stringValue) {
+            extras[key.stringValue] = try c.decode(JSONValue.self, forKey: key)
+        }
+        extra = extras
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: AnyCodingKey.self)
+        try c.encode(id, forKey: .init("id"))
+        try c.encodeIfPresent(kind, forKey: .init("kind"))
+        try c.encodeIfPresent(date, forKey: .init("date"))
+        try c.encodeIfPresent(time, forKey: .init("time"))
+        try c.encodeIfPresent(title, forKey: .init("title"))
+        for (key, value) in extra { try c.encode(value, forKey: .init(key)) }
+    }
+}
+
+extension TrackerRecord: Codable {
+    private static let known: Set<String> = [
+        "internshipId", "company", "role", "location", "deadline", "deadlineDate",
+        "applyUrl", "companyDomain", "logoUrl", "status", "source",
+        "updatedAt", "createdAt", "milestones",
+    ]
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: AnyCodingKey.self)
+        internshipId = try c.decodeIfPresent(String.self, forKey: .init("internshipId"))
+        company = try c.decodeIfPresent(String.self, forKey: .init("company"))
+        role = try c.decodeIfPresent(String.self, forKey: .init("role"))
+        location = try c.decodeIfPresent(String.self, forKey: .init("location"))
+        deadline = try c.decodeIfPresent(String.self, forKey: .init("deadline"))
+        deadlineDate = try c.decodeIfPresent(String.self, forKey: .init("deadlineDate"))
+        applyUrl = try c.decodeIfPresent(String.self, forKey: .init("applyUrl"))
+        companyDomain = try c.decodeIfPresent(String.self, forKey: .init("companyDomain"))
+        logoUrl = try c.decodeIfPresent(String.self, forKey: .init("logoUrl"))
+        status = try c.decodeIfPresent(String.self, forKey: .init("status"))
+        source = try c.decodeIfPresent(String.self, forKey: .init("source"))
+        updatedAt = try c.decodeIfPresent(String.self, forKey: .init("updatedAt"))
+        createdAt = try c.decodeIfPresent(String.self, forKey: .init("createdAt"))
+        milestones = try c.decodeIfPresent([Milestone].self, forKey: .init("milestones"))
+        var extras: [String: JSONValue] = [:]
+        for key in c.allKeys where !Self.known.contains(key.stringValue) {
+            extras[key.stringValue] = try c.decode(JSONValue.self, forKey: key)
+        }
+        extra = extras
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: AnyCodingKey.self)
+        try c.encodeIfPresent(internshipId, forKey: .init("internshipId"))
+        try c.encodeIfPresent(company, forKey: .init("company"))
+        try c.encodeIfPresent(role, forKey: .init("role"))
+        try c.encodeIfPresent(location, forKey: .init("location"))
+        try c.encodeIfPresent(deadline, forKey: .init("deadline"))
+        try c.encodeIfPresent(deadlineDate, forKey: .init("deadlineDate"))
+        try c.encodeIfPresent(applyUrl, forKey: .init("applyUrl"))
+        try c.encodeIfPresent(companyDomain, forKey: .init("companyDomain"))
+        try c.encodeIfPresent(logoUrl, forKey: .init("logoUrl"))
+        try c.encodeIfPresent(status, forKey: .init("status"))
+        try c.encodeIfPresent(source, forKey: .init("source"))
+        try c.encodeIfPresent(updatedAt, forKey: .init("updatedAt"))
+        try c.encodeIfPresent(createdAt, forKey: .init("createdAt"))
+        try c.encodeIfPresent(milestones, forKey: .init("milestones"))
+        for (key, value) in extra { try c.encode(value, forKey: .init(key)) }
     }
 }
 

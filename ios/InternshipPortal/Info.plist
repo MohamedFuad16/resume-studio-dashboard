@@ -40,6 +40,8 @@
 	<string>1</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>PortalAPIBaseURL</key>
+	<string>https://portal-compile-jp.redgrass-10389803.japaneast.azurecontainerapps.io</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

@@ -26,6 +26,7 @@ import Foundation
 
 struct GmailAction: Decodable {
     struct Interview: Decodable { let date: String?; let time: String? }
+    struct Reapply: Decodable { let min: Int?; let max: Int? }
     struct Enrichment: Decodable {
         let url: String?
         let location: String?
@@ -41,6 +42,8 @@ struct GmailAction: Decodable {
     let receivedAt: String?
     let subject: String?
     let interview: Interview?
+    /// A rejection's stated wait window ("apply again after 9–12 months").
+    let reapplyMonths: Reapply?
     let enrichment: Enrichment?
 }
 
@@ -338,6 +341,50 @@ extension CatalogStore {
                 record.milestones = record.milestones ?? []
                 next[base.id] = record
                 touched += 1
+            }
+
+            // WEB-PARITY STAMPS (contracts/normalization.md §4–5): the web client
+            // writes per-status timestamps, source metadata, and reapply cooldowns
+            // at drain time. Both clients drain the SAME queue and whoever acks
+            // first wins — so a record drained by the phone must not be poorer
+            // than one drained by the browser. Stamped even when the status was
+            // rank-limited (the web does too: processing an older application
+            // email after a rejection still records appliedAt). They live in
+            // `extra` because iOS doesn't render them yet — but must write and
+            // round-trip them.
+            if var record = next[base.id], let receivedAt = action.receivedAt {
+                record.extra["eventAt"] = .string(receivedAt)
+                let stampKey: String? = switch action.kind {
+                case "applied": "appliedAt"
+                case "rejected": "rejectedAt"
+                case "interview": "interviewAt"
+                case "offer": "offerAt"
+                default: nil
+                }
+                if let stampKey { record.extra[stampKey] = .string(receivedAt) }
+                record.extra["sourceMeta"] = .object([
+                    "gmailMessageId": .string(action.gmailMessageId ?? action.id),
+                    "receivedAt": .string(receivedAt),
+                    "subject": .string(action.subject ?? ""),
+                ])
+
+                // A rejection stating a wait window → company-wide cooldown.
+                // reapplyAfter = receipt date + the MINIMUM stated months (the
+                // earliest the company says you may reapply), Tokyo calendar.
+                if action.kind == "rejected", let months = action.reapplyMonths?.min, months > 0,
+                   let received = ISO8601DateFormatter.parse(receivedAt),
+                   let after = Self.tokyoCalendar.date(byAdding: .month, value: months, to: received) {
+                    let maxMonths = action.reapplyMonths?.max ?? months
+                    record.extra["reapplyAfter"] = .string(Self.dayKey(after))
+                    record.extra["reapplyMonths"] = .object([
+                        "min": .number(Double(months)), "max": .number(Double(maxMonths)),
+                    ])
+                    let window = maxMonths != months ? "\(months)–\(maxMonths)" : "\(months)"
+                    record.extra["reapplyNote"] = .string(
+                        "\(base.displayCompany) asks applicants to wait \(window) months before reapplying."
+                    )
+                }
+                next[base.id] = record
             }
 
             // Interview date → calendar, deduped by message id.

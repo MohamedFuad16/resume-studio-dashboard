@@ -40,6 +40,10 @@ targets:
       path: InternshipPortal/Info.plist
       properties:
         CFBundleDisplayName: Internship Portal
+        # The Azure server origin BOTH clients call. Web-team infrastructure —
+        # if the container app is recreated, update here (and the web's
+        # VITE_API_BASE_URL). See contracts/api.md.
+        PortalAPIBaseURL: https://portal-compile-jp.redgrass-10389803.japaneast.azurecontainerapps.io
         # Canvas-coloured static launch screen, so a cold start goes
         # canvas → splash → app with no white flash in between.
         UILaunchScreen:

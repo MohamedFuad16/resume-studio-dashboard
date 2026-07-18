@@ -20,7 +20,18 @@ enum APIError: LocalizedError {
 }
 
 struct PortalAPI {
-    static let baseURL = URL(string: "https://portal-compile-jp.redgrass-10389803.japaneast.azurecontainerapps.io")!
+    /// From Info.plist (`PortalAPIBaseURL`, set in project.yml), because the Azure
+    /// hostname is web-team infrastructure: if they recreate the container app the
+    /// random suffix changes, and a URL baked into code would brick every shipped
+    /// build. Config makes that a one-line bump. Contract: contracts/api.md.
+    static let baseURL: URL = {
+        if let raw = Bundle.main.object(forInfoDictionaryKey: "PortalAPIBaseURL") as? String,
+           let url = URL(string: raw), url.scheme != nil {
+            return url
+        }
+        return URL(string: "https://portal-compile-jp.redgrass-10389803.japaneast.azurecontainerapps.io")!
+    }()
+
     static let profile = "mohamed_fuad"
 
     private static func get<T: Decodable>(_ path: String, query: [URLQueryItem] = []) async throws -> T {
