@@ -1,14 +1,31 @@
 # CLAUDE.md
 
-This project uses an **agent knowledge base** in [`agent/`](agent/agent.md).
+One repo, two products, two teams, one contract layer:
 
-ALWAYS read [`agent/agent.md`](agent/agent.md) first and follow its routing table to
-the file relevant to your task (architecture, setup, api, components, data,
-conventions, tests, errors, secrets).
+- **iOS app** — `ios/` · branch `ios` · knowledge base [`agent/ios/agent.md`](agent/ios/agent.md)
+- **Web app + server** — `editor/`, `Dockerfile`, `docs/`, `en/`, `ja/` · branch `web` · knowledge base [`agent/web/agent.md`](agent/web/agent.md)
+- **Shared contracts** — [`contracts/`](contracts/README.md): the API routes, data
+  shapes, Firestore paths, and normalization algorithms BOTH clients depend on.
 
-Before changing a module, consult [`agent/graph/`](agent/graph/graph.md) for
-dependency/impact analysis.
+ALWAYS read your surface's `agent.md` first and follow its routing table.
 
-After making changes, keep [`agent/state.md`](agent/state.md) updated and append an ADR
-to [`agent/decisions.md`](agent/decisions.md) for notable decisions. Never commit
-secrets — see [`agent/secrets.md`](agent/secrets.md).
+## Rules
+
+1. **Stay on your surface.** Never edit the other team's tree or agent folder.
+   If a task needs a change there, write it as a request in
+   `contracts/CHANGELOG.md` and stop.
+2. **Contracts are load-bearing.** Before changing server routes
+   (`/api/tracker`, `/api/internships`, `/api/integrations/gmail/*`),
+   TrackerRecord or Gmail-action fields, Firestore paths/rules, or the
+   company-key / status-rank algorithms — read the matching `contracts/` file
+   and add a `contracts/CHANGELOG.md` entry in the same commit.
+3. **Branches.** Web works on `web`, iOS on `ios`; integrate through `main`.
+   Merge `main` into your branch regularly and read `contracts/CHANGELOG.md`
+   on every merge.
+4. **User data is central.** Firestore `users/{uid}/**` is the only user-data
+   store; the server holds only the shared catalog + Gmail queue. Every client
+   must round-trip record fields it does not model.
+5. **After changes:** update YOUR `state.md`; append ADRs to YOUR
+   `decisions.md` (iOS: `ADR-I-###` · web: `ADR-####` · shared:
+   `contracts/decisions.md` `ADR-S-###`). Never commit secrets
+   (`agent/web/secrets.md` is pointers-only).

@@ -58,19 +58,7 @@ Configuration (not secret, but environment-specific):
 - **Committed Firebase config** (no secrets): `editor/firebase.json`, `editor/.firebaserc`,
   `editor/firestore.rules`, `editor/firestore.indexes.json`. CLI artifacts (`.firebase/`,
   `firebase-debug.log`, …) are git-ignored.
-- **iOS app — added 2026-07-17.** App id `1:501333131661:ios:e3d159530820c85377fdc4`, bundle
-  `com.mohamedfuad.internshipportal`, registered via `firebase apps:create ios`.
-  `ios/InternshipPortal/GoogleService-Info.plist` is **committed and is not a secret**, for the
-  same reason as the web config: it identifies the project, and access is gated by the
-  owner-only Firestore rules. It carries the iOS API key, the OAuth `CLIENT_ID`, and the
-  `REVERSED_CLIENT_ID` — the last is duplicated into `project.yml` as the Google Sign-In
-  callback URL scheme, so **the two must be changed together**. Regenerate with
-  `firebase apps:sdkconfig IOS 1:501333131661:ios:e3d159530820c85377fdc4 --project resume-841f9`.
-  NOTE: the web app id will NOT work for the iOS SDK — FirebaseApp validates the `:ios:`
-  platform segment, so an iOS app has to be registered separately.
-- Firestore security rules: a signed-in user may read/write ONLY `users/{uid}` and its
-  subcollections; everything else denied. Deploy with
-  `firebase deploy --only firestore:rules` from `editor/`.
+- **iOS app** — see `agent/ios/setup.md` (Firebase iOS app id + plist rules live there).
 - **Before deploying to Vercel:** add the production domain (e.g. the `*.vercel.app`
   alias) to Firebase Auth **authorized domains** (Console → Authentication → Settings),
   else Google sign-in fails with `auth/unauthorized-domain`. `localhost` is already listed.

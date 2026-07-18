@@ -1,33 +1,20 @@
-# Agent Knowledge Base — Resume (Resume Studio + LaTeX résumés)
+# Agent knowledge base — router
 
-Bilingual (EN/JA) résumé project: a React + Node "Resume Studio" web app (`editor/`)
-plus a LaTeX résumé build pipeline (`en/`, `ja/` → `output/` PDFs via `build_all.sh`).
+This repo has TWO products built by TWO teams, plus a shared contract layer.
+Route by what you're working on:
 
-**Stack:** React 18 + Vite, Node/Express (ESM), sql.js (SQLite) + Vercel Blob,
-Tectonic/XeLaTeX, Playwright, Tailwind. Deployed to Vercel (`editor/api/[...path].js`).
+| Working on | Tree | Go to |
+|---|---|---|
+| **iOS app** | `ios/` | [`agent/ios/agent.md`](ios/agent.md) |
+| **Web app / server / LaTeX pipeline** | `editor/`, `Dockerfile`, `docs/`, `en/`, `ja/` | [`agent/web/agent.md`](web/agent.md) |
+| **Anything both clients depend on** (API routes, tracker/Gmail shapes, Firestore, normalization) | `contracts/` | [`contracts/README.md`](../contracts/README.md) |
 
-## Read this first, then route
+Hard rules (both teams):
+1. Never edit the other surface's tree or agent folder.
+2. Contract changes require a `contracts/CHANGELOG.md` entry in the same commit.
+3. Branches: web on `web`, iOS on `ios`, integrate through `main`.
+4. Firestore `users/{uid}/**` is the only user-data store; clients must
+   round-trip fields they don't model.
 
-| If the task concerns…                         | Read                         |
-|-----------------------------------------------|------------------------------|
-| Big picture, both tracks, data flow           | `agent/architecture.md`      |
-| Install / run / build (THE build-system file) | `agent/setup.md`             |
-| Express routes, seeds, connectors             | `agent/api.md`               |
-| React components, hooks, utils                | `agent/components.md`        |
-| Data models (internships, resume, tracker)    | `agent/data.md`              |
-| Coding style + file/folder placement          | `agent/conventions.md`       |
-| Test strategy + how to run                    | `agent/tests.md`             |
-| Known bugs, gotchas, fixes                    | `agent/errors.md`            |
-| Where keys/URLs/config live (pointers only)   | `agent/secrets.md`           |
-| Architectural decisions (ADRs)                | `agent/decisions.md`         |
-| Current state + recent changes                | `agent/state.md`             |
-| Dependency / impact analysis                  | `agent/graph/graph.md`       |
-
-## Before & after changes
-- Before touching a module, check `agent/graph/` (graph.md + dependencies.json/.dot
-  + architecture.svg) for who-imports-whom impact analysis.
-- After changes, update `agent/state.md` (summary + dated entry) and append an ADR
-  to `agent/decisions.md` for notable decisions. Record bugs in `agent/errors.md`.
-
-Legacy/auxiliary (do NOT delete): `.agents/`, `.workflow/`, `graphify-out/`,
-`graphify_root` (older coordination + code-structure artifacts).
+History note: before 2026-07-18 this folder was a single shared knowledge base;
+the split (and why) is ADR-S-001 in `contracts/decisions.md`.
