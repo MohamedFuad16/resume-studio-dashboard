@@ -130,7 +130,15 @@ private struct InsightGrid: View {
         return "\(Int((Double(answered) / Double(sent) * 100).rounded()))%"
     }
 
+    /// Figures start at zero and count up once the view settles. Without this the
+    /// roll only happens when data ARRIVES — invisible on a warm launch where the
+    /// tracker is already cached, which is most launches.
+    @State private var revealed = false
+
     private var today: String { CatalogStore.dayKey(.now) }
+
+    /// A count, or "0" until the reveal — so the transition has something to roll.
+    private func figure(_ value: Int) -> String { revealed ? "\(value)" : "0" }
 
     /// The soonest interview still ahead of you — the one thing on this screen
     /// that is a commitment rather than a statistic.
@@ -178,7 +186,7 @@ private struct InsightGrid: View {
                 InsightCard(
                     title: String(localized: "Heard back"),
                     subtitle: String(localized: "of sent applications"),
-                    value: heardBack,
+                    value: revealed ? heardBack : "0%",
                     action: { tab = .applications }
                 ) {
                     IconTile(symbol: "arrow.uturn.left", tint: .teal, size: 36, glyph: 16)
@@ -196,7 +204,7 @@ private struct InsightGrid: View {
                 InsightCard(
                     title: String(localized: "Closing soon"),
                     subtitle: String(localized: "deadlines in 14 days"),
-                    value: "\(closingSoon)",
+                    value: figure(closingSoon),
                     action: { tab = .calendar }
                 ) {
                     IconTile(symbol: "clock.badge.exclamationmark", tint: .orange, size: 36, glyph: 16)
@@ -205,12 +213,18 @@ private struct InsightGrid: View {
                 InsightCard(
                     title: String(localized: "This month"),
                     subtitle: String(localized: "new applications"),
-                    value: "\(sentThisMonth)",
+                    value: figure(sentThisMonth),
                     action: { tab = .applications }
                 ) {
                     IconTile(symbol: "chart.line.uptrend.xyaxis", tint: .blue, size: 36, glyph: 16)
                 }
             }
+        }
+        .task {
+            // One beat after the screen settles, so the roll reads as the numbers
+            // arriving rather than as a glitch during layout.
+            try? await Task.sleep(for: .seconds(0.2))
+            withAnimation(.snappy(duration: 0.55)) { revealed = true }
         }
     }
 }
@@ -221,6 +235,8 @@ private struct InsightGrid: View {
 private struct StatusBreakdownCard: View {
     @Environment(CatalogStore.self) private var store
     var action: () -> Void
+
+    @State private var revealed = false
 
     private var present: [ApplicationStatus] {
         ApplicationStatus.allCases.filter { store.count(of: $0) > 0 }
@@ -235,9 +251,13 @@ private struct StatusBreakdownCard: View {
                             .font(Font2.sectionTitle)
                             .foregroundStyle(Palette.ink)
                         Spacer()
-                        Text(store.tracker.isEmpty ? String(localized: "Nothing yet") : String(localized: "\(store.tracker.count) tracked"))
+                        Text(store.tracker.isEmpty
+                             ? String(localized: "Nothing yet")
+                             : String(localized: "\(revealed ? store.tracker.count : 0) tracked"))
                             .font(Font2.caption)
                             .foregroundStyle(Palette.ink400)
+                            .contentTransition(.numericText())
+                            .animation(.snappy(duration: 0.55), value: revealed)
                             .monospacedDigit()
                     }
 
@@ -260,10 +280,12 @@ private struct StatusBreakdownCard: View {
                                             .font(Font2.caption)
                                             .foregroundStyle(Palette.ink600)
                                         Spacer(minLength: 10)
-                                        Text("\(store.count(of: status))")
+                                        Text("\(revealed ? store.count(of: status) : 0)")
                                             .font(.system(size: 13, weight: .semibold))
                                             .foregroundStyle(Palette.ink)
                                             .monospacedDigit()
+                                            .contentTransition(.numericText())
+                                            .animation(.snappy(duration: 0.55), value: revealed)
                                     }
                                 }
                             }
@@ -272,6 +294,10 @@ private struct StatusBreakdownCard: View {
                     }
                 }
             }
+        }
+        .task {
+            try? await Task.sleep(for: .seconds(0.2))
+            withAnimation(.snappy(duration: 0.55)) { revealed = true }
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
@@ -310,10 +336,16 @@ private struct InsightCard<Top: View>: View {
                     top()
                     Spacer(minLength: 12)
                     if let value {
+                        // The month label's transition (CalendarView), reused: the
+                        // digits roll rather than snap. It fires whenever the text
+                        // changes — on launch as the figures count up from zero,
+                        // and later whenever a sync moves one.
                         Text(value)
                             .font(.system(size: 22, weight: .bold))
                             .foregroundStyle(Palette.ink)
                             .monospacedDigit()
+                            .contentTransition(.numericText())
+                            .animation(.snappy(duration: 0.55), value: value)
                             .padding(.bottom, 1)
                     }
                     Text(title)

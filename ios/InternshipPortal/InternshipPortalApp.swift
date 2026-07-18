@@ -102,6 +102,21 @@ struct InternshipPortalApp: App {
                     hasOnboarded = false
                     UserDefaults.standard.set(tag, forKey: "onboardingReviewTag")
                 }
+
+                // One-shot: post the sample banner on this build so it can be seen
+                // without hunting for the Settings button. Same tag pattern —
+                // bump it to send another. (Settings → "Send a test notification"
+                // stays, for repeat testing.)
+                let testTag = "test-notif-2026-07-19a"
+                if UserDefaults.standard.string(forKey: "testNotifTag") != testTag {
+                    UserDefaults.standard.set(testTag, forKey: "testNotifTag")
+                    Task {
+                        // After the splash has had its moment, so the banner isn't
+                        // competing with the intro.
+                        try? await Task.sleep(for: .seconds(5))
+                        await Notifier.sendTest()
+                    }
+                }
                 #endif
             }
         }
