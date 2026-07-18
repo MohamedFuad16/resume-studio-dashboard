@@ -2,6 +2,15 @@
 
 Every entry: date · who · what changed · what the OTHER side must do.
 
+- **2026-07-18 · iOS · companyKey aligned to the canonical normalizer
+  (normalization.md §1).** `GmailDrain.companyKey` previously stripped EN
+  suffixes as unanchored substrings (so `"Acme Co"` keyed `acme co` ≠ web's
+  `acme`, and `"ABC Inc. Japan"` over-stripped to `abc japan`), and its
+  `CharacterSet.alphanumerics` kept accented/fullwidth characters the web folds.
+  It now mirrors web `normalizeCompany` exactly: JA markers removed anywhere,
+  trailing-anchored `[,\s]+(inc|ltd|k.k|co).?$` peeled repeatedly, kept set
+  exactly `a-z 0-9 U+3040–30FF U+4E00–9FFF`. Verified by a 20k-case mirror test
+  against the web implementation (0 mismatches). Web: nothing to do.
 - **2026-07-18 · web · Web-side action items 1–4 done (ADR-0038).** (1) merged
   `ios`→`main` per HANDOFF-WEB.md. (2) **Canonical company key adopted**: the
   JA+EN-suffix-stripping normalizer now lives once in `reapplyCooldown.js`
