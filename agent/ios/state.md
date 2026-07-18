@@ -21,6 +21,15 @@ inbox (80 scanned → 20 real internships queued, 23 non-internships dropped).
 
 ## Recent changes
 
+- **2026-07-18 — Repo split executed (ADR-S-001) + loss-proof tracker writes (ADR-I-014).**
+  agent/ split into ios/ + web/ with disjoint ADR spaces; contracts/ created and
+  populated from both teams' audits; CLAUDE.md rewritten as the two-surface router;
+  HANDOFF-WEB.md written for the web session. Branch renamed ios-local → ios and
+  pushed (origin/ios-local left for web-side cleanup). Code: TrackerRecord/Milestone
+  unknown-field passthrough (`extra`), drain-time web-parity stamps (eventAt,
+  per-kind stamps, sourceMeta, reapply cooldown), base URL from Info.plist.
+  Build verified (generic/platform=iOS).
+
 - **2026-07-17 (round 5) — Floating orbs, in-app Gmail/keys, red calendar, Gmail
   mark (ADR-0044).** Merged origin/main (12 commits incl. isInternship + reapply
   cooldown) + committed the parallel session's local work first. Bubbles: SDF
