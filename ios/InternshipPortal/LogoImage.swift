@@ -69,6 +69,30 @@ enum LogoLoader {
         return best
     }
 
+    /// Warm the cache for several candidate chains at once.
+    ///
+    /// An animated cluster must not start moving until its artwork is in hand: the
+    /// glass ball would fly in and its mark would pop in a beat later, so the parts
+    /// read as arriving separately instead of as one finished bubble. Returns when
+    /// every logo has resolved OR `timeout` elapses — a slow network delays the
+    /// intro by at most that, it never blocks it.
+    static func preload(_ chains: [[String]], timeout: Double) async {
+        // Plain Tasks rather than a task group: every group formulation of this
+        // trips Swift 6's region-based isolation checker on the @MainActor loader.
+        // Creating the tasks starts them all at once, which is the concurrency we
+        // actually wanted.
+        let running = chains.filter { !$0.isEmpty }.map { chain in
+            Task { @MainActor in _ = await LogoLoader.load(candidates: chain) }
+        }
+        let deadline = ContinuousClock.now.advanced(by: .seconds(timeout))
+        for task in running {
+            if ContinuousClock.now >= deadline { break }
+            _ = await task.value
+        }
+        // Stragglers are deliberately NOT cancelled — they keep warming the cache
+        // in the background so the logo is there the moment its bubble needs it.
+    }
+
     /// One candidate URL → artwork, or nil if this source has nothing real.
     ///
     /// "Nothing real" is not the same as an HTTP error. Both favicon services
@@ -82,7 +106,11 @@ enum LogoLoader {
         if missing.contains(urlString) { return nil }
 
         guard let url = URL(string: urlString) else { return nil }
-        guard let (data, response) = try? await URLSession.shared.data(from: url),
+        // A short per-request timeout: the default 60s would let one unreachable
+        // favicon host hold the splash's preload open far past its own deadline.
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 6
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
               let http = response as? HTTPURLResponse,
               (200..<300).contains(http.statusCode)
         else {

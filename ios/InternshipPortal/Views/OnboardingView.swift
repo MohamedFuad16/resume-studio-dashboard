@@ -126,6 +126,9 @@ struct OnboardingView: View {
                 }
             }
         }
+        // Same reason as the splash: resolve the cluster's logos before any page
+        // animates, so the bubbles fly in finished rather than filling in mid-flight.
+        .task { await OnboardingCluster.preloadLogos() }
     }
 }
 
@@ -211,6 +214,15 @@ private struct OnboardingCluster: View {
         Sat(id: 4, company: "Mercari", domain: "mercari.com", tint: .blue, x: 0.84, y: 0.72, r: 0.095),
         Sat(id: 5, company: "1Password", domain: "1password.com", tint: .indigo, x: 0.5, y: 0.9, r: 0.07),
     ]
+
+    /// Warm every satellite's logo so the cluster assembles with finished bubbles.
+    @MainActor
+    static func preloadLogos() async {
+        await LogoLoader.preload(
+            sats.map { logoCandidateURLs(logoUrl: nil, domain: $0.domain, name: $0.company) },
+            timeout: 2.0
+        )
+    }
 
     /// Per-bubble stagger, so the cluster assembles rather than snapping in.
     private func delay(_ id: Int) -> Double { reduceMotion ? 0 : Double(id) * 0.14 }

@@ -41,6 +41,10 @@ enum Palette {
     static let blue600 = Color(hex: 0x2563EB)
     static let indigo = Color(hex: 0x6366F1)
     static let red = Color(hex: 0xEF4444)       // red-500 — the calendar's today
+    static let red50 = Color(hex: 0xFEF2F2)
+    // yellow-600 rather than yellow-500: the lighter one fails contrast on white.
+    static let yellow = Color(hex: 0xCA8A04)
+    static let yellow50 = Color(hex: 0xFEFCE8)
 
     // The pipeline ramp: slate → amber → sky → violet → rose, walked in stage
     // order so the status donut reads as one family instead of a traffic light.
@@ -120,6 +124,8 @@ extension Color6 {
         case .sky: Palette.sky
         case .violet: Palette.violet
         case .rose: Palette.rose
+        case .red: Palette.red
+        case .yellow: Palette.yellow
         }
     }
 
@@ -135,6 +141,8 @@ extension Color6 {
         case .sky: Palette.sky50
         case .violet: Palette.violet50
         case .rose: Palette.rose50
+        case .red: Palette.red50
+        case .yellow: Palette.yellow50
         }
     }
 }

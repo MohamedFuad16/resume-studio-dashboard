@@ -170,13 +170,17 @@ enum ApplicationStatus: String, CaseIterable, Codable, Identifiable {
     /// the wheel in pipeline order (slate → amber → sky → violet → rose), so the
     /// donut reads as one family and progress reads as movement along it. Rose
     /// still lands unmistakably on "rejected" without shouting.
+    /// Status colours read as a traffic signal on the dashboard breakdown, because
+    /// that is what these three actually mean: blue = sent and waiting, yellow =
+    /// in progress, red = closed. Saved and applying stay neutral/violet so they
+    /// don't compete with the three that carry news.
     var tint: Color6 {
         switch self {
         case .saved: .gray
-        case .applying: .amber
-        case .applied: .sky
-        case .interview: .violet
-        case .rejected: .rose
+        case .applying: .violet
+        case .applied: .blue
+        case .interview: .yellow
+        case .rejected: .red
         }
     }
 
@@ -194,7 +198,7 @@ enum ApplicationStatus: String, CaseIterable, Codable, Identifiable {
 
 /// Model-layer tint token; Theme.swift maps these to real colors so this file
 /// stays free of SwiftUI.
-enum Color6 { case teal, purple, orange, blue, indigo, gray, amber, sky, violet, rose }
+enum Color6 { case teal, purple, orange, blue, indigo, gray, amber, sky, violet, rose, red, yellow }
 
 /// The three bands the Companies view clusters by.
 enum CompanyTier: String, CaseIterable, Identifiable {
@@ -314,10 +318,10 @@ struct CalendarEvent: Identifiable, Hashable {
     var tint: Color6 {
         switch kind {
         case "deadline": .gray
-        case "interview", "coding-test": .orange
-        case "applied", "application-submitted": .teal
-        case "rejected": .rose
-        default: .blue
+        case "interview", "coding-test": .yellow
+        case "applied", "application-submitted": .blue
+        case "rejected": .red
+        default: .teal
         }
     }
 }

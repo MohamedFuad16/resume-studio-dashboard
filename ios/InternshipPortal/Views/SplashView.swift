@@ -79,20 +79,26 @@ struct SplashView: View {
                 }
             }
         }
-        .onAppear {
+        .task {
+            // Resolve the logos BEFORE anything moves. Without this the glass balls
+            // fly in empty and each mark pops in whenever its download lands, so the
+            // intro reads as loose parts appearing one at a time instead of finished
+            // bubbles gathering. Capped, so a slow network delays the intro briefly
+            // rather than holding it.
+            await LogoLoader.preload(Self.orbs.map(\.bubble.logoCandidates), timeout: 2.0)
+
             withAnimation(reduceMotion ? .none : .spring(response: 0.8, dampingFraction: 0.74)) {
                 appeared = true
             }
-        }
-        .task {
+
             #if DEBUG
             // `simctl launch … -holdSplash YES` keeps the splash up for screenshots.
             if UserDefaults.standard.bool(forKey: "holdSplash") { return }
             #endif
-            // DEBUGGING PHASE: the splash plays on EVERY launch, at a length you
-            // can actually look at, because it is under active review. Drop this
-            // back to ~2.0s (and consider once-per-session) before shipping.
-            try? await Task.sleep(for: .seconds(reduceMotion ? 1.2 : 2.8))
+            // Held long enough to watch the cluster gather and read the wordmark.
+            // Shorter than before because the logo preload above now runs first,
+            // so this sits on top of that rather than replacing it.
+            try? await Task.sleep(for: .seconds(reduceMotion ? 1.0 : 2.2))
             onFinished()
         }
         .accessibilityElement()
