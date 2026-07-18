@@ -1,14 +1,15 @@
 <div align="center">
 
-# Resume Studio
+# Internship Portal
 
-**A bilingual (EN / 日本語) résumé editor, internship tracker, and LaTeX → PDF compiler.**
+**A bilingual (EN / 日本語) internship tracker, résumé editor, and LaTeX → PDF compiler — on the web and on iOS.**
 
 [![React](https://img.shields.io/badge/React_18-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=FFD62E)](https://vitejs.dev/)
+[![Swift](https://img.shields.io/badge/SwiftUI_iOS_27-F05138?style=for-the-badge&logo=swift&logoColor=white)](https://developer.apple.com/swiftui/)
 [![Node](https://img.shields.io/badge/Node_Express-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://expressjs.com/)
-[![LaTeX](https://img.shields.io/badge/LaTeX_(Tectonic)-008080?style=for-the-badge&logo=latex&logoColor=white)](https://tectonic-typesetting.github.io/)
-[![Vercel](https://img.shields.io/badge/Deployed_on-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com/)
+[![Azure](https://img.shields.io/badge/Server_on_Azure-0078D4?style=for-the-badge&logo=microsoftazure&logoColor=white)](https://azure.microsoft.com/en-us/products/container-apps)
+[![Firebase](https://img.shields.io/badge/Auth_+_Firestore-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com/)
 
 </div>
 
@@ -16,77 +17,105 @@
 
 ## Overview
 
-Resume Studio is a bilingual internship portal (インターンポータル) that combines
-three things a job-hunting student actually needs:
+One repository, **two products** that share one backend and one user-data store:
 
-1. **A live résumé editor** — edit structured résumé content in the browser and
-   see a compiled PDF preview update as you type.
-2. **An internship tracker + radar** — browse a catalog of internships and track
-   your applications through each stage.
-3. **A LaTeX résumé pipeline** — professional, print-ready LaTeX templates
-   (English + Japanese) compiled to PDF.
+| Surface | Tree | Branch | What it is |
+|---|---|---|---|
+| **Web app** | `editor/` | `web` | React SPA — résumé editor, internship radar, tracker, calendar, LaTeX PDF preview |
+| **iOS app** | `ios/` | `ios` | SwiftUI (iOS 27) — the tracker away from a desk: radar, applications, calendar, Gmail sync, notifications |
+| **Shared contracts** | `contracts/` | both | The API routes, data shapes, and algorithms **both** clients depend on |
+| **LaTeX pipeline** | `en/`, `ja/`, `build_all.sh` | `web` | Standalone print-ready résumé sources → `output/*.pdf` |
 
-The repository has **two independent tracks** that share the same résumé content.
-
-## Features
-
-### Track A — Resume Studio web app (`editor/`)
-
-- **Live résumé editing** — a React SPA where form edits auto-save (debounced) and,
-  with auto-compile on, trigger a debounced LaTeX compile that renders a live PDF preview.
-- **Multiple templates** — the app's `templates.js` reuses the design language of
-  the LaTeX templates and shells out to the same `tectonic` binary, so an
-  in-app résumé produces a PDF consistent with the static sources.
-- **Internship radar & tracker** — a browsable internship catalog (seed dataset,
-  enriched at read time and merged with live-research / custom entries) plus an
-  application tracker that keeps multiple views in sync via in-tab events.
-- **AI application assistant** — a résumé chat helper (local heuristics or Codex CLI)
-  and live company internship research jobs.
-- **Export** — PDF, `.tex`, or `.json` for any résumé.
-- **Bilingual** — full English / 日本語 support.
-- **Durable persistence** — a single key→JSON KV store backed by `sql.js` (WASM
-  SQLite) locally and versioned **Vercel Blob** snapshots in production. Every
-  write is validated (size/shape/URL checks, prototype-pollution guards).
-
-### Track B — LaTeX résumé pipeline (root)
-
-- **English templates** (`en/`) — Jake's Clean, Awesome-CV, Alta Classic, Slate Modern, plus a cover letter.
-- **Japanese templates** (`ja/`) — 履歴書 (rirekisho) grid and 職務経歴書 (shokumu) modern layouts.
-- **One-command build** — `build_all.sh` compiles every template with `tectonic`
-  (XeLaTeX) into `output/*.pdf` and prints a pass/fail tally.
-- **PDF test suite** — a Python (PyMuPDF) end-to-end suite validating page counts,
-  fonts (Mincho vs Gothic), no-italic-CJK, and content accuracy.
+Branches integrate through `main`. The rules both teams follow are in
+[`CLAUDE.md`](CLAUDE.md); the knowledge bases are [`agent/web/`](agent/web/agent.md)
+and [`agent/ios/`](agent/ios/agent.md).
 
 ## Architecture
 
-```
-Track A — Resume Studio web app
-  Browser (React 18 + Vite SPA, editor/src)
-    │  fetch /api/*  (vite dev proxy → :5005, or Vercel function in prod)
-    ▼
-  Express app (editor/server/index.js, ESM)
-    ├─ storage.js     → sql.js (SQLite) KV, mirrored to Vercel Blob in prod
-    ├─ templates.js   → generateLatex(template, resume) → tectonic → PDF bytes
-    ├─ seeds/*        → internship catalog (static, enriched at read)
-    ├─ resume-chat.js → AI application assistant
-    └─ internship-research.js → live company internship lookup (async jobs)
+The single most important thing to understand: **user data never touches the
+server.** Clients talk to Firestore directly under owner-only rules; the server
+owns only shared data (the internship catalog and the Gmail action queue).
 
-Track B — LaTeX pipeline
-  en/*.tex, ja/*.tex ── build_all.sh → tectonic → output/*.pdf
-                                          │
-                                     tests/ (PyMuPDF E2E)
 ```
+┌──────────────────────┐          ┌──────────────────────┐
+│  Web (React SPA)     │          │  iOS (SwiftUI)       │
+│  static on Vercel    │          │  on device           │
+└──────────┬───────────┘          └──────────┬───────────┘
+           │                                 │
+           │  ── user data (client-direct) ──┤
+           ▼                                 ▼
+     ┌───────────────────────────────────────────────┐
+     │  Firebase Auth  +  Firestore                  │
+     │  users/{uid}/{profiles,trackers,applications} │
+     │  owner-only rules — the server cannot read it │
+     └───────────────────────────────────────────────┘
+           │                                 │
+           │  ── shared data + compute ──────┤
+           ▼                                 ▼
+     ┌───────────────────────────────────────────────┐
+     │  Express server — Azure Container Apps        │
+     │  portal-compile-jp (japaneast, always-on)     │
+     │    ├─ /api/internships   shared catalog       │
+     │    ├─ /api/compile       Tectonic → PDF       │
+     │    ├─ /api/integrations/gmail/*  ingest queue │
+     │    └─ storage.js  SQLite (working copy)       │
+     │             └─ snapshot → /data (Azure Files) │
+     └───────────────────────────────────────────────┘
+```
+
+**Vercel hosts static files only.** The SPA calls the Azure origin directly via
+`VITE_API_BASE_URL`; there is no serverless copy of the server. Azure runs
+always-on (`min = max = 1` replica) because live-research jobs hold in-memory
+state and the Gmail poller needs a long-lived process.
+
+### Storage: why it looks unusual
+
+`/data` is an **Azure Files (SMB)** mount, and SQLite cannot lock a file over
+SMB — opening the database directly there makes every write fail `SQLITE_BUSY`.
+So SQLite runs on a **local working copy** (where locking works) and the mount
+only ever receives a whole-file `copyFile` of the finished database after each
+write. Durability is unchanged; the mount never sees a lock. See ADR-0040 and
+`agent/web/errors.md`.
+
+### Gmail ingest
+
+The server reads the inbox, classifies each message, and **queues** actions; the
+clients drain that queue into their own Firestore tracker (the server can't).
+Internship detection is **evidence-based, never a company list**: the model must
+quote the email's own words, and the quote is verified against the message.
+Contract: [`contracts/gmail-action.md`](contracts/gmail-action.md).
+
+## Features
+
+**Both clients** — internship radar with match scoring, application tracker
+(saved → applying → applied → interview → rejected), calendar of deadlines and
+interviews, automatic Gmail ingest, company logos, EN/JA localization.
+
+**Web only** — live résumé editor with a compiled PDF preview, multiple EN/JA
+LaTeX templates, AI application assistant, live company research, export to
+PDF / `.tex` / `.json`.
+
+**iOS only** — Metal-shaded glass UI (Liquid Glass), the Companies bubble field,
+and background app refresh that syncs Gmail and posts a notification with the
+company's logo when a new application is detected.
+
+**LaTeX pipeline** — `en/` (Jake's Clean, Awesome-CV, Alta Classic, Slate Modern,
+cover letter) and `ja/` (履歴書 grid, 職務経歴書 modern), built by `build_all.sh`
+with Tectonic and validated by a PyMuPDF suite.
 
 ## Tech Stack
 
 | Layer | Technology |
 | ----- | ---------- |
-| Frontend | React 18, Vite, Tailwind CSS |
-| Backend | Node.js / Express (ESM) |
-| Persistence | `sql.js` (WASM SQLite) KV, Vercel Blob (versioned snapshots) |
+| Web client | React 18, Vite, hand-written CSS (Tailwind available, migration in progress) |
+| iOS client | SwiftUI (iOS 27), Swift 6, Metal, XcodeGen |
+| Server | Node.js / Express (ESM) on Azure Container Apps |
+| Auth + user data | Firebase Auth, Firestore (client-direct, owner-only rules) |
+| Shared data | SQLite (`better-sqlite3`) — local working copy, snapshotted to Azure Files |
 | PDF engine | Tectonic (XeLaTeX) |
-| Testing | Playwright (web app), Python + PyMuPDF (LaTeX PDFs) |
-| Deploy | Vercel (`editor/api/[...path].js`) |
+| LLM | OpenRouter — `gpt-5-nano` (mail triage), `perplexity/sonar` (company research) |
+| Testing | Playwright (web), PyMuPDF (PDFs), `validate:catalog` (data + storage) |
+| Hosting | Vercel (static SPA) · Azure Container Apps (server) |
 
 ## Getting Started
 
@@ -95,48 +124,71 @@ Track B — LaTeX pipeline
 ```bash
 cd editor
 npm install
-npm run dev
+npm run dev          # http://127.0.0.1:5173
 ```
 
-Open <http://127.0.0.1:5173/?profile=mohamed_fuad>.
+Runs the SPA and the Express server together (Vite proxies `/api` → `:5005`).
+
+### iOS app
+
+```bash
+cd ios
+xcodegen generate    # regenerate after adding/removing any file
+open InternshipPortal.xcodeproj
+```
+
+Requires Xcode 27 (iOS 27 SDK). Signing must stay **on** even for the simulator —
+Firebase Auth needs a keychain entitlement. See [`agent/ios/setup.md`](agent/ios/setup.md).
 
 ### LaTeX pipeline
 
 ```bash
-./build_all.sh              # compiles en/ + ja/ templates → output/*.pdf
+./build_all.sh              # en/ + ja/ → output/*.pdf
 python tests/run_tests.py   # validate the compiled PDFs
 ```
 
-> Requires a `tectonic` binary on `PATH`.
+Requires `tectonic` on `PATH`.
 
-## Deployment (Vercel)
+## Deployment
 
-Deploy from the `editor` directory:
+**Web client (Vercel)** — static only; pushing to `main` auto-deploys. The API
+origin is baked in at build time via `VITE_API_BASE_URL`.
 
-```bash
-cd editor
-vercel
-```
-
-The Vite frontend is built and the Express API is exposed through
-`editor/api/[...path].js`. For durable production persistence, connect a Vercel
-Blob store and set:
+**Server (Azure)** — manual, and *not* triggered by a push:
 
 ```bash
-BLOB_READ_WRITE_TOKEN=...
+az acr build --registry ca7959c48768acr --image portal-compile:<sha> \
+  --platform linux/amd64 --file Dockerfile .
+az containerapp update -n portal-compile-jp -g internship-portal \
+  --image ca7959c48768acr.azurecr.io/portal-compile:<sha>
 ```
 
-Without that token the Vercel functions still run, but writes are not durable
-across deployments / cold starts.
+> ⚠️ `portal-compile-jp` (japaneast) is the live app — it holds the Gmail
+> connection and queue on its Azure Files mount. Always verify a **write** path
+> (`POST /api/integrations/gmail/sync-now` → 200) after deploying, not just a
+> read: a storage regression shows up only on writes.
 
 ## Repository Layout
 
 ```
-editor/          # Resume Studio web app (React + Express)
-en/              # English LaTeX résumé templates
-ja/              # Japanese LaTeX résumé templates (履歴書 / 職務経歴書)
+editor/          # Web app — React SPA + Express server
+ios/             # iOS app — SwiftUI
+contracts/       # Shared API/data/algorithm contracts (both clients)
+agent/web/       # Web knowledge base (architecture, api, decisions, state…)
+agent/ios/       # iOS knowledge base
+en/  ja/         # LaTeX résumé sources
 build_all.sh     # Compile all LaTeX templates → output/
 tests/           # PyMuPDF PDF validation suite
-docs/            # Deployment & compile notes
-agent/           # Agent knowledge base (architecture, api, components, …)
+docs/            # Deployment + compile notes
+CLAUDE.md        # Working rules for both surfaces
+DOCTOR.md        # Operating prompt for the code-review account
+PLAN-SIMPLIFICATION.md  # Architecture simplification plan + status
 ```
+
+## Quality
+
+A third **code-doctor** account audits the repo on a schedule and files findings
+as `doctor/*` pull requests — React/iOS lint passes, dead-code sweeps, and
+(highest value) **contract-conformance diffing** between the two clients'
+implementations of the shared algorithms. Both surface teams verify, fix, and
+close those PRs. See [`DOCTOR.md`](DOCTOR.md).

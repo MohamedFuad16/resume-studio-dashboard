@@ -16,7 +16,7 @@ normal branch flow; contract-touching steps go through `contracts/CHANGELOG.md`.
 | **sql.js (WASM SQLite) + snapshot persistence** | server KV on the Azure Files mount | 🔧 **Replace with native SQLite (`better-sqlite3`) on the same mount.** The WASM engine + whole-DB snapshot dance is the real jank, not SQLite itself. The server is deliberately single-replica (in-memory research jobs), so a single-writer file DB is the *right size* — this is a ~1-day change, zero new infra, zero new cost. |
 | — Postgres instead? | owner suggestion | ⚖️ **Valid, but not yet.** Managed Postgres (Azure Flexible Server) adds ~$13–30/mo + connection/firewall plumbing, and buys concurrency the single-replica design can't use. The moment we want multiple replicas or relational queries across users, Postgres is the move — and the storage layer (`storage.js`) is already a thin KV interface, so swapping later is contained. Decision: native SQLite now, Postgres as a planned Phase-2 if/when replicas matter. |
 | **Firebase Auth + Firestore** | identity + all user data | ✅ **Keep — this is the piece that looks redundant but isn't.** See below. |
-| Tectonic (LaTeX) | PDF engine | 🔧 **Typst is the better engine** — 10–100× faster compiles, one small binary (no font/glibc gymnastics), first-class CJK. But it means rewriting the EN/JA templates. Do it as a parity-gated spike: keep Tectonic until a Typst template matches the current PDFs pixel-for-purpose. Optional phase; the compile cache already hides most of Tectonic's cost. |
+| Tectonic (LaTeX) | PDF engine | ⏸️ **Spiked and deferred — see `docs/typst-spike.md`.** Typst works (a ported EN résumé compiles clean; CJK renders), but MEASURED it is ~3.6× faster here (1.90 s → 0.52 s), not the 10–100× this plan first claimed — and the compile cache already answers most requests in ~3 ms without any engine. Against that: rewriting 8 templates + a 993-line generator, on the documents that produce real résumés. Not worth it now. |
 | iOS app | SwiftUI native | ✅ Keep as-is (owner's call). |
 
 ## Why Firebase stays (the auth/data confusion, answered)
@@ -39,10 +39,10 @@ normal branch flow; contract-touching steps go through `contracts/CHANGELOG.md`.
 
 | # | What | Owner | Size | Notes |
 |---|---|---|---|---|
-| W1 | Delete `editor/api/[...path].js`, `vercel.json` function config, `@vercel/blob` dep + Blob code paths in `storage.js` | web | S | Verify nothing else reads Blob first. Vercel = static only. |
-| W2 | `storage.js`: sql.js → `better-sqlite3` on the Azure Files mount (same file, one-time schema import) | web | M | Back up `resume-studio.sqlite` before first deploy. contracts/ unaffected (KV interface unchanged). |
-| W3 | Tailwind migration of `index.css`, component-by-component with visual parity checks | web | L (ongoing) | Delete migrated CSS sections as you go; track % in agent/web/state.md. |
-| W4 | Typst spike: EN + JA resume template at parity, then swap `templates.js` + Dockerfile | web | L (optional) | Keep Tectonic until parity is proven side-by-side. |
+| W1 | ✅ **DONE** — serverless catch-all + `vercel.json` functions + `@vercel/blob` deleted; Vercel is static-only | web | S | Shipped with W2 (ADR-0040). |
+| W2 | ✅ **DONE (2nd attempt)** — `better-sqlite3` on a LOCAL working copy, snapshotted to the mount | web | M | First attempt opened the DB directly on the SMB mount → `SQLITE_BUSY` on every write, rolled back. The two-tier design avoids SQLite locking on the mount entirely. Verified in prod: `sqlite-snapshot`, 172 roles, `sync-now` 200, zero lock errors. ADR-0040. |
+| W3 | 🟡 **FOUNDATION DONE** — Tailwind enabled (preflight OFF) with design tokens wired to the CSS variables; migration is incremental | web | L (ongoing) | See "W3 status" below. |
+| W4 | ⏸️ **SPIKED, DEFERRED** — evidence in `docs/typst-spike.md` | web | L | Measured ~3.6× (not 10–100×); cost is 8 template rewrites on real résumés. Revisit only if latency becomes a complaint. |
 | W5 | Enrichment for known-but-sparse companies (see contracts/CHANGELOG 2026-07-19 request) | web | S | The LAPRAS case: Gmail row exists but has no URL/location/details. |
 | I1 | Background app refresh + auto-notifications | iOS | — | ✅ Done 2026-07-19. |
 | I2 | Surface enrichment + reapply fields in the record sheet UI | iOS | S | Data already round-trips; show it. |
@@ -52,3 +52,34 @@ normal branch flow; contract-touching steps go through `contracts/CHANGELOG.md`.
 **Sequencing:** W1 → W2 land first (small, kill the most confusion), W3 runs
 continuously behind features, W4 whenever there's slack. Nothing here blocks
 feature work on either surface.
+
+
+## W3 status — what is done, and how to continue
+
+**Done (safe to build on):**
+1. `@tailwind base/components/utilities` emitted from `index.css`, placed after the
+   font `@import` and before the app's own rules, so existing selectors still win
+   at equal specificity.
+2. **`corePlugins.preflight = false`** — and it must stay off until the migration
+   finishes. `index.css` ships its own reset and ~8.3k lines written against
+   browser defaults; preflight would restyle every heading, list, and form control
+   in the app the moment it is enabled.
+3. **Design tokens wired to the CSS variables** — `bg-panel`, `text-t2`, `border-b0`
+   etc. compile to `var(--panel)`, `var(--t2)`, `var(--b0)`. Verified in the built
+   bundle. This is the part that makes migration safe: utilities follow the
+   light/dark theme switch exactly like the hand-written CSS, instead of freezing
+   one theme's hex values into markup.
+4. Verified zero visual change (screenshot before/after is identical) and a green
+   build.
+
+**How to migrate a component (the loop):**
+1. Pick ONE component with a self-contained CSS block.
+2. Replace its classes with token utilities (`bg-panel`, `text-t2`, `rounded`, …) —
+   never raw hex, or theming breaks.
+3. Delete that CSS block from `index.css` **in the same commit**, so the line count
+   only ever goes down and there is never a second source of truth.
+4. Screenshot before/after; they must match.
+
+**Remaining:** ~8.3k lines. The `.auth-*` block (index.css ~6509+) is a good first
+target — it is cohesive, and the login screen is the one view renderable without
+signing in, so parity is directly verifiable.
