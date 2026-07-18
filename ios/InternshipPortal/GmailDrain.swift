@@ -97,20 +97,42 @@ extension PortalAPI {
 
 @MainActor
 extension CatalogStore {
-    /// Company key: strip the corporate suffix and fold punctuation, so
-    /// 株式会社ABEJA and "ABEJA" are one company. CJK is deliberately KEPT —
-    /// stripping it turned 株式会社カナリー into an empty string and dropped it.
+    /// Company key — the CANONICAL normalizer (contracts/normalization.md §1),
+    /// mirroring the web's `normalizeCompany` in reapplyCooldown.js exactly, so
+    /// 株式会社ABEJA and "ABEJA" are one company and both clients derive the same
+    /// key. CJK is deliberately KEPT — stripping it turned 株式会社カナリー into an
+    /// empty string and dropped it. The EN suffix is a TRAILING-anchored regex
+    /// peeled repeatedly, not an unanchored substring list: unanchored stripping
+    /// keyed "Acme Co" ≠ web ("acme co" vs "acme") and over-stripped mid-string
+    /// tokens ("ABC Inc. Japan" → "abc japan" while the web keeps "abc inc japan").
     nonisolated static func companyKey(_ raw: String?) -> String {
+        // JA corporate markers vanish wherever they appear (web: replace with "").
         var text = (raw ?? "").lowercased()
-        for suffix in ["株式会社", "合同会社", "有限会社", "(株)", "（株）", ", inc.", " inc.", ", inc", " inc", " ltd.", " ltd", " k.k.", " co."] {
-            text = text.replacingOccurrences(of: suffix, with: " ")
+        for marker in ["株式会社", "合同会社", "有限会社", "(株)", "（株）"] {
+            text = text.replacingOccurrences(of: marker, with: "")
         }
+        // A trailing EN corporate suffix: an optional comma, a separator, then one
+        // of the canonical tokens (inc, ltd, k.k., co) with an optional period, at
+        // the END. The required leading separator protects single-token names
+        // ("cisco"/"costco" keep their "co"); peeled repeatedly so stacked
+        // suffixes ("co., ltd.") fully unwind.
+        while true {
+            let peeled = text.replacingOccurrences(
+                of: #"[,\s]+(?:inc|ltd|k\.?k|co)\.?\s*$"#,
+                with: "", options: .regularExpression)
+            if peeled == text { break }
+            text = peeled
+        }
+        // Keep exactly what the web keeps — a-z, 0-9, hiragana/katakana, CJK
+        // ideographs — and fold everything else (incl. accented/fullwidth forms,
+        // which CharacterSet.alphanumerics would wrongly keep) to a space.
         let kept = text.unicodeScalars.map { scalar -> Character in
-            if CharacterSet.alphanumerics.contains(scalar) { return Character(scalar) }
-            // Keep CJK; fold everything else to a space.
             switch scalar.value {
-            case 0x3040...0x30FF, 0x4E00...0x9FFF: return Character(scalar)
-            default: return " "
+            case 0x30...0x39, 0x61...0x7A,          // 0-9, a-z (input is lowercased)
+                 0x3040...0x30FF, 0x4E00...0x9FFF:  // ぀-ヿ, 一-鿿
+                return Character(scalar)
+            default:
+                return " "
             }
         }
         return String(kept).split(separator: " ").joined(separator: " ")
