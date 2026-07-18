@@ -333,7 +333,7 @@ export function TagInput({ label, value, onChange, placeholder, suggestions = []
       >
         <div className="tag-pills tag-ms-pills">
           {tags.map((tag, i) => (
-            <span key={i} className="tag-pill">
+            <span key={tag} className="tag-pill">
               <span className="tag-pill-label">{tag}</span>
               <button type="button" className="tag-pill-remove" onClick={(e) => { e.stopPropagation(); removeTag(i); }}>
                 <I n="x" s={10} />
@@ -363,8 +363,8 @@ export function TagInput({ label, value, onChange, placeholder, suggestions = []
       </div>
       {open && (filteredSuggestions.length > 0 || (query.trim() && !tags.some(t => t.toLowerCase() === query.trim().toLowerCase()))) && (
         <div className="tag-dropdown tag-ms-dropdown">
-          {visibleSuggestions.map((s, idx) => (
-            <div key={idx} className="tag-dropdown-item" onClick={() => addTag(s)}>
+          {visibleSuggestions.map(s => (
+            <div key={s} className="tag-dropdown-item" onClick={() => addTag(s)}>
               {s}
             </div>
           ))}
@@ -423,8 +423,8 @@ export function SuggestInput({ label, value, onChange, placeholder, suggestions 
       </div>
       {open && filtered.length > 0 && (
         <div className="tag-dropdown suggest-dropdown">
-          {filtered.map((s, idx) => (
-            <div key={idx} className="tag-dropdown-item" onClick={() => { onChange(s); setOpen(false); }}>
+          {filtered.map(s => (
+            <div key={s} className="tag-dropdown-item" onClick={() => { onChange(s); setOpen(false); }}>
               {s}
             </div>
           ))}

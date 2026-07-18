@@ -119,7 +119,7 @@ export function useGmailInbox(profile) {
 
       // Oldest-first so the latest email's status wins (application → then
       // rejection = rejected), sharing one session map for company convergence.
-      const ordered = [...actions].sort((a, b) => new Date(a.receivedAt || 0) - new Date(b.receivedAt || 0));
+      const ordered = actions.toSorted((a, b) => new Date(a.receivedAt || 0) - new Date(b.receivedAt || 0));
       const session = new Map();
       const appliedIds = [];
       const appliedById = new Map();

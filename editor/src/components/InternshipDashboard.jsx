@@ -557,6 +557,8 @@ function CompanyResearchPanel({ company, t, isJa, job, results, error, onStart, 
   );
 }
 
+const REGION_FILTERS = ['All', 'Japan', 'Remote', 'Global'];
+
 export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, activeProfile, resume }) {
   const t = isJa ? copy.ja : copy.en;
   const { records, statusFor, updateStatus, addMilestone } = useApplicationTracker(activeProfile);
@@ -598,7 +600,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
     () => appliedCompaniesForProfile(activeProfile, records),
     [activeProfile, records],
   );
-  const regions = ['All', 'Japan', 'Remote', 'Global'];
+  const regions = REGION_FILTERS;
   const tracks = useMemo(() => ['All', ...new Set(visibleCatalog.map(item => item.track).filter(Boolean))], [visibleCatalog]);
   // Derive from the VISIBLE set (not raw tracker records) so the Saved button count
   // always equals the number of rows the Saved filter renders. A saved role that was
@@ -655,7 +657,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
           || (deadlineFilter === '30 days' && item.deadlineDate && item.deadlineDate <= new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)))
         && (!savedOnly || status === 'saved');
     });
-    return [...next].sort((a, b) => {
+    return next.toSorted((a, b) => {
       if (sort === 'deadline') {
         if (!a.deadlineDate && !b.deadlineDate) return b.score - a.score;
         if (!a.deadlineDate) return 1;

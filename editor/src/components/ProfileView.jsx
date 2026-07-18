@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { ArrowRight, FilePenLine, FileText, GraduationCap, Mail, MapPin, Phone, Sparkles, Upload, X } from 'lucide-react';
 import { displayValue } from '../utils/internshipDisplay.js';
 
+// Pure helper (module scope — no props/state): a comma-list string → trimmed items.
+const splitSkills = value => String(value || '').split(/,\s*/).map(s => s.trim()).filter(Boolean);
+
 const copy = {
   en: {
     title: 'Profile',
@@ -119,7 +122,6 @@ export default function ProfileView({ resume, isJa, onOpenEditor, onSavePersonal
   const skills = resume.skills || {};
   // Skills grouped by kind (languages / frameworks / tools) so the panel reads
   // as tidy labeled rows instead of one long chip soup.
-  const splitSkills = value => String(value || '').split(/,\s*/).map(s => s.trim()).filter(Boolean);
   const skillGroups = (Array.isArray(skills)
     ? [{ label: t.skillOther, items: skills.filter(Boolean) }]
     : [

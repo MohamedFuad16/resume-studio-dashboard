@@ -55,12 +55,13 @@ function ItemHeader({ label, index, total, onMove, onDelete, kind, isJa }) {
 }
 
 /* ── Personal — card-grouped layout ────────────────────── */
+const EMAIL_DOMAINS = ['gmail.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'yahoo.com', 'tokai.ac.jp'];
 export function PersonalSec({ data: d, onChange, isJa }) {
   const s = (k, v) => onChange({ ...d, [k]: v });
   const emailParts = (d.email || '').split('@');
   const emailLocal = emailParts[0] || '';
   const emailDomain = emailParts.slice(1).join('@') || 'gmail.com';
-  const emailDomains = ['gmail.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'yahoo.com', 'tokai.ac.jp'];
+  const emailDomains = EMAIL_DOMAINS;
   const [lookupState, setLookupState] = React.useState('idle');
   const [nameEnError, setNameEnError] = React.useState(false);
   const linkedinOk = !d.linkedin || /^https:\/\/(www\.)?linkedin\.com\/in\/[A-Za-z0-9_-]+\/?$/.test(d.linkedin.trim());
@@ -883,8 +884,8 @@ export function SkillsSec({ data, onChange, isJa }) {
             </button>
           </div>
           <div className="flat-skills-tags">
-            {data.map((s, idx) => (
-              <span key={idx} className="tag-pill" data-testid={`skill-tag-${s}`}>
+            {data.map(s => (
+              <span key={s} className="tag-pill" data-testid={`skill-tag-${s}`}>
                 <span className="tag-pill-label">{s}</span>
                 <button type="button" className="tag-pill-remove" data-testid={`delete-skill-${s}`} onClick={() => del(s)}>
                   <I n="x" s={10} />

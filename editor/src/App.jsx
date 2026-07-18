@@ -31,6 +31,13 @@ const EN = TEMPLATES.filter(t => t.lang === 'en');
 const JA = TEMPLATES.filter(t => t.lang === 'ja');
 let _tid = 0;
 
+// Heuristic keyword buckets for the free-text skills parser (module scope: the
+// sets are constant, so building them once beats rebuilding per parsed line, and
+// Set.has beats Array.includes for the per-word lookups below).
+const HEURISTIC_LANGS = new Set(['javascript', 'typescript', 'python', 'java', 'c++', 'c#', 'rust', 'go', 'ruby', 'php', 'swift', 'kotlin', 'sql', 'html', 'css', 'bash', 'shell']);
+const HEURISTIC_FWKS = new Set(['react', 'node', 'express', 'next', 'vue', 'angular', 'svelte', 'django', 'flask', 'spring', 'laravel', 'tailwind', 'bootstrap']);
+const HEURISTIC_TOOLS = new Set(['git', 'docker', 'kubernetes', 'aws', 'gcp', 'azure', 'sqlite', 'mysql', 'postgresql', 'mongodb', 'redis', 'firebase', 'vite', 'webpack', 'npm', 'yarn']);
+
 const chatWelcome = isJa => (
   isJa
     ? 'こんにちは。履歴書について相談したり、応募先に合わせた文章修正を依頼できます。変更する場合は、現在の履歴書を確認してから反映します。'
@@ -266,15 +273,11 @@ function parseResumeTextHeuristically(text) {
       else if (key.includes('spoken') || key.includes('speak') || key.includes('language')) spokenList.push(val);
     } else {
       const words = line.split(/[,\s|]+/).map(w => w.replace(/[:]/g, '').trim()).filter(Boolean);
-      const langs = ['javascript', 'typescript', 'python', 'java', 'c++', 'c#', 'rust', 'go', 'ruby', 'php', 'swift', 'kotlin', 'sql', 'html', 'css', 'bash', 'shell'];
-      const fwks = ['react', 'node', 'express', 'next', 'vue', 'angular', 'svelte', 'django', 'flask', 'spring', 'laravel', 'tailwind', 'bootstrap'];
-      const tls = ['git', 'docker', 'kubernetes', 'aws', 'gcp', 'azure', 'sqlite', 'mysql', 'postgresql', 'mongodb', 'redis', 'firebase', 'vite', 'webpack', 'npm', 'yarn'];
-      
       words.forEach(w => {
         const wl = w.toLowerCase();
-        if (langs.includes(wl)) langsList.push(w);
-        else if (fwks.includes(wl)) fwksList.push(w);
-        else if (tls.includes(wl)) toolsList.push(w);
+        if (HEURISTIC_LANGS.has(wl)) langsList.push(w);
+        else if (HEURISTIC_FWKS.has(wl)) fwksList.push(w);
+        else if (HEURISTIC_TOOLS.has(wl)) toolsList.push(w);
         else if (wl.includes('english') || wl.includes('japanese') || wl.includes('jlpt')) spokenList.push(w);
         else if (w.length > 3) conceptsList.push(w);
       });
