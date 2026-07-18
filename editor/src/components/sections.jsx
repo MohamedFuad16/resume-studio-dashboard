@@ -381,7 +381,7 @@ export function EducationSec({ data, onChange, isJa }) {
           </div>
         );
       })}
-      <button className="btn-add-item" data-testid="add-education" onClick={add}>
+      <button type="button" className="btn-add-item" data-testid="add-education" onClick={add}>
         {isJa ? "+ 学歴を追加" : "+ Add education"}
       </button>
     </Sec>
@@ -453,7 +453,7 @@ export function ExperienceSec({ data, onChange, isJa }) {
           </div>
         );
       })}
-      <button className="btn-add-item" data-testid="add-experience" onClick={add}>
+      <button type="button" className="btn-add-item" data-testid="add-experience" onClick={add}>
         {isJa ? "+ 職歴を追加" : "+ Add experience"}
       </button>
     </Sec>
@@ -509,7 +509,7 @@ export function ProjectsSec({ data, onChange, isJa }) {
           </div>
         );
       })}
-      <button className="btn-add-item" data-testid="add-project" onClick={add}>
+      <button type="button" className="btn-add-item" data-testid="add-project" onClick={add}>
         {isJa ? "+ プロジェクトを追加" : "+ Add project"}
       </button>
     </Sec>
@@ -571,7 +571,7 @@ export function ActivitiesSec({ data, onChange, isJa }) {
           </div>
         );
       })}
-      <button className="btn-add-item" data-testid="add-activity" onClick={add}>
+      <button type="button" className="btn-add-item" data-testid="add-activity" onClick={add}>
         {isJa ? "+ 活動・資格を追加" : "+ Add activity"}
       </button>
     </Sec>
@@ -849,9 +849,13 @@ export const CONCEPTS = ["RESTful APIs", "GraphQL", "OOP", "Functional Programmi
 export const SPOKEN = ["English (Native)", "English (Professional)", "English (Conversational)", "Japanese (Native)", "Japanese (Business)", "Japanese (JLPT N1)", "Japanese (JLPT N2)", "Japanese (JLPT N3)", "Spanish", "French", "German", "Chinese", "Korean", "Tamil", "Hindi", "Arabic"];
 
 export function SkillsSec({ data, onChange, isJa }) {
+  // Hook must run on every render: `data` can be a flat array (PDF-import wizard
+  // output) or the grouped object (blank-profile default), and the same mounted
+  // component can see both shapes — a conditional hook would change the hook
+  // order and crash the editor when the shape flips.
+  const [newSkill, setNewSkill] = React.useState('');
   if (Array.isArray(data)) {
     // Flat skills list editor fallback (for E2E tests)
-    const [newSkill, setNewSkill] = React.useState('');
     const add = () => {
       if (newSkill.trim() && !data.includes(newSkill.trim())) {
         onChange([...data, newSkill.trim()]);
