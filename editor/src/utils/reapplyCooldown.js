@@ -13,11 +13,29 @@
  * Data only — no JSX, no React.
  */
 
-// Same CJK-preserving normalizer the tracker/drain use, so "株式会社HENNGE",
-// "HENNGE", and "hennge" all collapse to one company key.
-const CORP = /株式会社|合同会社|有限会社|\(株\)|（株）/g;
+// Canonical company key (contracts/normalization.md §1) — the ONE normalizer the
+// tracker, the Gmail drain (useGmailInbox imports these), and iOS's GmailDrain
+// must all implement identically, or the same company lands on two records
+// depending on which client drained first. It strips JA corporate markers AND EN
+// suffixes so "株式会社HENNGE", "HENNGE", "hennge" collapse to one key, and
+// "Acme, Inc." / "Acme Co., Ltd." / "Acme" all key as "acme".
+const CORP_JA = /株式会社|合同会社|有限会社|\(株\)|（株）/g;
+// A trailing corporate suffix: an optional comma, a separator, then one of the
+// canonical tokens (inc, ltd, k.k., co) with an optional period, at the end. The
+// required leading separator protects single-token names ("Cisco"/"Costco" keep
+// their "co"). Applied repeatedly to peel stacked suffixes ("Co., Ltd.").
+const CORP_EN_SUFFIX = /[,\s]+(?:inc|ltd|k\.?k|co)\.?\s*$/i;
+function stripCorp(value) {
+  let out = String(value || '').replace(CORP_JA, '');
+  let previous;
+  do { previous = out; out = out.replace(CORP_EN_SUFFIX, ''); } while (out !== previous);
+  return out;
+}
 export const normalizeCompany = value =>
-  String(value || '').replace(CORP, '').toLowerCase().replace(/[^a-z0-9぀-ヿ一-鿿]+/gu, ' ').trim();
+  stripCorp(value).toLowerCase().replace(/[^a-z0-9぀-ヿ一-鿿]+/gu, ' ').trim();
+// Synthetic tracker id slug = the company key with spaces as dashes (so the id
+// derives from the SAME key as matching — they can never disagree).
+export const companySlug = value => normalizeCompany(value).replace(/\s+/g, '-');
 
 /** Add `months` calendar months to an ISO date/instant → 'YYYY-MM-DD' (or null). */
 export function addMonths(instant, months) {

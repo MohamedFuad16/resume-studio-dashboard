@@ -2,6 +2,12 @@ const FORBIDDEN_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 const TRACKER_STATUSES = new Set(['saved', 'applying', 'applied', 'interview', 'rejected']);
 const DATA_IMAGE = /^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=\s]+$/i;
 const PROFILE_ID = /^[a-zA-Z0-9_-]{1,80}$/;
+// Tracker KEYS are internship ids, which include Gmail synthetics whose slug can be
+// CJK (株式会社カナリー → `gmail-株式会社カナリー`) and catalog ids with dots
+// ("live-foo-2026"). The old PROFILE_ID rule rejected CJK and 400'd the ENTIRE
+// tracker save (contracts/normalization.md). Allow letters, digits, _ . - and the
+// CJK ranges the normalizer keeps, still anchored so path-ish junk fails.
+const TRACKER_KEY = /^[A-Za-z0-9_.\-぀-ヿ一-鿿]{1,200}$/u;
 // Postal/zip code: optional. Lenient enough for JP (123-4567) and other regions
 // (letters/digits/spaces/hyphens). Empty string is allowed (field is optional).
 const POSTAL_CODE = /^[0-9A-Za-z][0-9A-Za-z\s-]{0,15}$/;
@@ -31,6 +37,19 @@ function cleanHttpsUrl(value, label, required = false) {
   try { url = new URL(text); } catch { throw new RequestValidationError(`${label} must be a valid URL.`); }
   if (url.protocol !== 'https:') throw new RequestValidationError(`${label} must use HTTPS.`);
   return url.toString();
+}
+
+// Lenient URL sanitizer for INGESTED data (Gmail enrichment can yield an http://
+// URL or junk). A bad applyUrl must never 400 the whole tracker save
+// (contracts/api.md): upgrade http→https, and if it still won't parse, drop it to
+// '' rather than throw. Strict validation stays on user-entered fields.
+function sanitizeIngestedUrl(value) {
+  const text = typeof value === 'string' ? value.trim() : '';
+  if (!text || text.length > 2048) return '';
+  let url;
+  try { url = new URL(text); } catch { return ''; }
+  if (url.protocol === 'http:') url.protocol = 'https:';
+  return url.protocol === 'https:' ? url.toString() : '';
 }
 
 function assertSafeJson(value, path = 'payload', depth = 0, state = { nodes: 0 }) {
@@ -104,9 +123,9 @@ export function validateTracker(value) {
   const entries = Object.entries(tracker);
   if (entries.length > 500) throw new RequestValidationError('Tracker contains too many applications.');
   return Object.fromEntries(entries.map(([key, record]) => {
-    if (!PROFILE_ID.test(key) || !isRecord(record)) throw new RequestValidationError('Tracker record is invalid.');
+    if (!TRACKER_KEY.test(key) || !isRecord(record)) throw new RequestValidationError('Tracker record is invalid.');
     const status = TRACKER_STATUSES.has(record.status) ? record.status : 'saved';
-    const applyUrl = record.applyUrl ? cleanHttpsUrl(record.applyUrl, 'Application URL') : '';
+    const applyUrl = sanitizeIngestedUrl(record.applyUrl);
     const milestones = Array.isArray(record.milestones) ? record.milestones.slice(0, 100).map(item => ({
       id: cleanString(item?.id, 'Milestone id', 120, true),
       kind: cleanString(item?.kind, 'Milestone kind', 40),

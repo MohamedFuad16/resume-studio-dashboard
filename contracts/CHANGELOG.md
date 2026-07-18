@@ -2,6 +2,18 @@
 
 Every entry: date · who · what changed · what the OTHER side must do.
 
+- **2026-07-18 · web · Web-side action items 1–4 done (ADR-0038).** (1) merged
+  `ios`→`main` per HANDOFF-WEB.md. (2) **Canonical company key adopted**: the
+  JA+EN-suffix-stripping normalizer now lives once in `reapplyCooldown.js`
+  (`normalizeCompany`/`companySlug`), and `useGmailInbox.js` imports it — the two
+  can no longer drift. `"Acme, Inc."`, `"Acme Co., Ltd."`, `"Acme"` all key as
+  `acme`; `Cisco`/`Costco` are protected; CJK preserved. iOS: verify
+  `GmailDrain.swift` peels stacked suffixes (`Co., Ltd.`) the same way. (3)
+  `validation.js` fixed — tracker keys now accept CJK ids (new `TRACKER_KEY`
+  regex) and a bad/`http://` `applyUrl` is sanitized at ingest (upgrade→https,
+  else drop) instead of 400ing the whole save. (4) No web company-name/gig
+  filters existed to retire — detection is already the inclusive, evidence-based
+  `roleFilter.js` (no hard-coded names). Both normalization.md open issues closed.
 - **2026-07-18 · iOS · contracts/ created (ADR-S-001).** Baseline written from
   both teams' audits. Web must: (1) merge the `ios` branch into `main` per
   /HANDOFF-WEB.md; (2) adopt the canonical company key — extend `CORP`/`slug`

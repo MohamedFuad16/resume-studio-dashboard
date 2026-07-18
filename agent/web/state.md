@@ -25,6 +25,25 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-18 (ios→main merge + contract action items) — ADR-0038.** Merged the
+  `ios` branch into `main` (clean fast-forward, per HANDOFF-WEB.md): the `agent/`
+  KB split into `agent/web/` + `agent/ios/`, the new `contracts/` shared-surface
+  layer, the iOS app, and server-side Gmail fixes (quote-grounded evidence-based
+  internship detection in `classify.js`, ISO-8601 `receivedAt` in `sync.js`).
+  Now on the new `web` working branch (no more direct commits to `main`). Then
+  the four web action items from `contracts/CHANGELOG.md`: (1) **canonical
+  company key** — one JA+EN-suffix normalizer in `reapplyCooldown.js`
+  (`normalizeCompany`/`companySlug`), imported by `useGmailInbox.js` so they
+  can't drift; `"Acme, Inc."`/`"Acme Co., Ltd."`/`"Acme"` → `acme`, `Cisco`/
+  `Costco` protected, CJK kept. (2) **validation.js** — `TRACKER_KEY` regex
+  accepts CJK ids (was 400ing the whole KV save); `applyUrl` sanitized at ingest
+  (`http`→`https`, junk dropped) instead of throwing. (3) web had no company-name
+  filters to retire (`roleFilter.js` is already inclusive/no-hardcoded). (4)
+  `.dockerignore` now excludes `ios`/`contracts`; `docs/azure-deploy.md`
+  corrected — **`portal-compile-jp` (japaneast) is the LIVE app** (holds the
+  Gmail queue on Azure Files); `portal-compile` (westus2) is not. Build + 5/5
+  E2E green; normalizer + validation unit-checked. **User to verify Vercel
+  `VITE_API_BASE_URL` points at `-jp`.**
 - **2026-07-18 (later) — Radar table spacing overhaul + tracker save debounce.**
   (1) Radar list de-cluttered: MapPin/Globe2 icons removed from row location/language
   cells (text only; secondary lines muted `#93a0b0`); grid re-proportioned in **all

@@ -2,19 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { requestJson } from '../api/client.js';
 import { useApplicationTracker } from './useApplicationTracker.js';
 import { useInternshipCatalog } from './useInternshipCatalog.js';
-import { addMonths } from '../utils/reapplyCooldown.js';
+import { addMonths, normalizeCompany, companySlug } from '../utils/reapplyCooldown.js';
 
 const POLL_MS = 90000;
 const KIND_TO_STATUS = { applied: 'applied', rejected: 'rejected', interview: 'interview', offer: 'applied' };
 // Status precedence within one drain: a terminal outcome (rejected) must not be
 // overwritten by an earlier application/interview email for the same company.
 const STATUS_RANK = { saved: 0, applying: 1, applied: 1, interview: 2, rejected: 3 };
-// Keep CJK: a purely-Japanese company name (株式会社カナリー) must not normalize
-// to an empty string, or its actions get silently dropped. Corporate prefixes are
-// stripped so 株式会社ABEJA matches the catalog's "ABEJA".
-const CORP = /株式会社|合同会社|有限会社|\(株\)|（株）/g;
-const norm = s => String(s || '').replace(CORP, '').toLowerCase().replace(/[^a-z0-9぀-ヿ一-鿿]+/gu, ' ').trim();
-const slug = s => String(s || '').replace(CORP, '').toLowerCase().replace(/[^a-z0-9぀-ヿ一-鿿]+/gu, '-').replace(/^-|-$/g, '');
+// The canonical company key + slug live in reapplyCooldown.js so this drain and
+// the cooldown map (and iOS's GmailDrain, via contracts/normalization.md §1) share
+// ONE algorithm — CJK-preserving (株式会社カナリー must not normalize to empty) and
+// EN-suffix-stripping ("Acme, Inc." keys the same as "Acme").
+const norm = normalizeCompany;
+const slug = companySlug;
 
 // Drains the server-side Gmail action queue into the Firestore-backed tracker /
 // calendar. Runs full-auto: on load and on an interval while the tab is open, it
