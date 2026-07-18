@@ -581,21 +581,23 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
   const autoResearchStarted = useRef(new Set());
 
   const eligibleCatalog = catalog;
-  // The post-filter visible set: applied-type listings and time-expired listings are
-  // removed up front so they drop out of the table AND of everything derived below —
-  // the summary stat cards (dynamicStats), the track filter options, and the
-  // live-search gating — keeping every count consistent with what's actually shown.
+  // Company-wide reapply cooldowns from rejection emails that stated a wait
+  // window — the whole company is off-limits until the date passes.
+  const cooldownMap = useMemo(() => companyCooldownMap(records), [records]);
+  // The post-filter visible set: applied-type listings, time-expired listings,
+  // AND every role at a company on reapply cooldown are removed up front so they
+  // drop out of the table AND of everything derived below — the summary stat
+  // cards (dynamicStats), the track filter options, and the live-search gating —
+  // keeping every count consistent with what's actually shown. (A cooldown
+  // company can't be applied to, so it shouldn't sit at the top of the radar.)
   const visibleCatalog = useMemo(
-    () => eligibleCatalog.filter(item => isVisibleInRadar(item, statusFor(item.id))),
-    [eligibleCatalog, statusFor],
+    () => eligibleCatalog.filter(item => isVisibleInRadar(item, statusFor(item.id)) && !cooldownForCompany(cooldownMap, item.company)),
+    [eligibleCatalog, statusFor, cooldownMap],
   );
   const appliedCompanies = useMemo(
     () => appliedCompaniesForProfile(activeProfile, records),
     [activeProfile, records],
   );
-  // Company-wide reapply cooldowns from rejection emails that stated a wait
-  // window — blocks every role at that company until the date passes.
-  const cooldownMap = useMemo(() => companyCooldownMap(records), [records]);
   const regions = ['All', 'Japan', 'Remote', 'Global'];
   const tracks = useMemo(() => ['All', ...new Set(visibleCatalog.map(item => item.track).filter(Boolean))], [visibleCatalog]);
   // Derive from the VISIBLE set (not raw tracker records) so the Saved button count
@@ -903,8 +905,8 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
                     <span className="intern-rank">{(page - 1) * pageSize + index + 1}</span>
                     <span className="intern-company-cell"><CompanyLogo item={item} /><button type="button" className="intern-company-trigger" onClick={() => setSelectedId(item.id)} aria-label={`${displayCompany(item, isJa)}: ${isJa ? '詳細を開く' : 'Open internship details'}`}><strong>{displayCompany(item, isJa)}</strong><small className="intern-role-stack"><span>{roleLead}</span>{roleDetails.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</small></button></span>
                     <span className="intern-match"><strong>{item.score}%</strong><small>{item.priority ? t.priority : t.matchLabel(item.score)}</small></span>
-                    <span className="intern-location" data-label={t.location}><MapPin size={13} /><span className="intern-location-stack">{locationParts.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</span></span>
-                    <span className="intern-language" data-label={t.language}><Globe2 size={13} /><span className="intern-language-stack">{languageParts.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</span></span>
+                    <span className="intern-location" data-label={t.location}><span className="intern-location-stack">{locationParts.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</span></span>
+                    <span className="intern-language" data-label={t.language}><span className="intern-language-stack">{languageParts.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</span></span>
                     <span className="intern-duration" data-label={t.duration}><span className="intern-duration-stack">{durationParts.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</span></span>
                     <span className={`intern-deadline ${deadlineClass(item)}`} data-label={t.deadline}>{formatDeadline(item.deadline, isJa)}</span>
                     <select className={`intern-row-status ${status || 'untracked'}`} value={status} onClick={event => event.stopPropagation()} onChange={event => handleStatusSelect(item, event.target.value)} aria-label={`${t.status}: ${displayCompany(item, isJa)}`}><option value="">{t.track}</option>{APPLICATION_STATUSES.map(option => <option key={option.value} value={option.value}>{statusLabel(option.value, isJa)}</option>)}</select>

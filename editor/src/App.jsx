@@ -506,6 +506,16 @@ export default function App() {
 
   // AI Application Assistant states
   const [sidebarTab, setSidebarTab] = useState('editor'); // editor | chat
+  // Editor section-rail collapse — lets the user hide the section list and
+  // focus on the form fields. Persisted so it survives reloads.
+  const [railOpen, setRailOpen] = useState(() => {
+    try { return localStorage.getItem('resume-studio-rail') !== 'closed'; } catch { return true; }
+  });
+  const toggleRail = useCallback(() => setRailOpen(open => {
+    const next = !open;
+    try { localStorage.setItem('resume-studio-rail', next ? 'open' : 'closed'); } catch { /* ignore */ }
+    return next;
+  }), []);
   const [applications, setApplications] = useState([]);
   const [activeApp, setActiveApp] = useState(null);
   const [asstCompany, setAsstCompany] = useState('');
@@ -526,6 +536,8 @@ export default function App() {
 
   const cmpTimer = useRef(null);
   const lastCompiled = useRef('');
+  // Object URL of the current preview PDF blob (revoked when replaced).
+  const pdfBlobRef = useRef(null);
   const chatAbortRef = useRef(null);
 
   // ── Toasts ───────────────────────────────────────────────
@@ -658,30 +670,38 @@ export default function App() {
 
       const url = apiUrl(result.pdfUrl);
 
-      // Verify PDF content to support corrupt PDF payload error boundary
+      // Fetch the PDF and serve it from a SAME-ORIGIN blob URL. The compile
+      // backend runs on a different origin (Azure) and sends
+      // `X-Frame-Options: SAMEORIGIN`, so embedding its URL directly in the
+      // preview <iframe> is blocked by the browser ("… will not allow this page
+      // to be displayed"). A blob: URL is same-origin as the app, so it frames
+      // fine in every browser (this also runs the corrupt-PDF signature check).
+      let blobUrl;
       try {
         const checkRes = await fetch(url);
         if (!checkRes.ok) throw new Error(`PDF request failed (${checkRes.status})`);
-        const bytes = new Uint8Array(await checkRes.arrayBuffer());
+        const buffer = await checkRes.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
         const signature = String.fromCharCode(...bytes.slice(0, 5));
         if (signature !== '%PDF-') {
           throw new Error('pdf-render-error-alert: Corrupt PDF header');
         }
+        blobUrl = window.URL.createObjectURL(new Blob([buffer], { type: 'application/pdf' }));
       } catch (err) {
         throw new Error(`PDF Render Error: ${err.message}`);
       }
 
       lastCompiled.current = cacheKey;
 
-      // Force reload by appending v=timestamp, and use open parameters to hide chrome & document outline
-      // FitH (page-width) rather than Fit: the frame is sized to the page's
-      // aspect ratio, so page-width fills it edge-to-edge with no dark
-      // letterboxing from the embedded viewer.
+      // Open parameters hide the viewer chrome & outline. FitH (page-width)
+      // fills the frame edge-to-edge with no dark letterboxing. Each blob URL is
+      // unique, so no cache-buster is needed; revoke the previous one.
       const hash = zoom === 'Fit'
         ? 'view=FitH&toolbar=0&navpanes=0&pagemode=none&scrollbar=1'
         : `toolbar=0&navpanes=0&pagemode=none&scrollbar=1&zoom=${zoom}`;
-      const separator = url.includes('?') ? '&' : '?';
-      setPdfSrc(`${url}${separator}v=${Date.now()}#${hash}`);
+      if (pdfBlobRef.current) window.URL.revokeObjectURL(pdfBlobRef.current);
+      pdfBlobRef.current = blobUrl;
+      setPdfSrc(`${blobUrl}#${hash}`);
     } catch (e) {
       const message = e instanceof TypeError && /fetch|network/i.test(e.message)
         ? (isJa ? '履歴書サービスに接続できません。サーバーを確認して再試行してください。' : 'Resume service is unavailable. Check the server and retry.')
@@ -846,7 +866,9 @@ export default function App() {
     saveData(normalized, activeProfile);
     if (cmpTimer.current) clearTimeout(cmpTimer.current);
     if (autoCompile) {
-      cmpTimer.current = setTimeout(() => compile(normalized, template), 700);
+      // Snappier autocompile (was 700ms). The server content-hash cache makes a
+      // no-op recompile instant, so a shorter debounce doesn't waste Tectonic runs.
+      cmpTimer.current = setTimeout(() => compile(normalized, template), 400);
     }
   }, [template, saveData, saveProfileImmediately, compile, activeProfile, autoCompile, toast, isJa]);
 
@@ -1266,11 +1288,20 @@ export default function App() {
             }
           }}
         >
-          <div className="editor-workspace">
+          <div className={`editor-workspace ${railOpen ? '' : 'rail-collapsed'}`}>
             <nav className="section-rail" aria-label="Resume sections">
               <div className="rail-head">
                 <span>{isJa ? '入力項目' : 'Sections'}</span>
-                <strong>{sectionEntries.reduce((sum, entry) => sum + Number(entry.count || 0), 0)}</strong>
+                <button
+                  type="button"
+                  className="rail-toggle"
+                  onClick={toggleRail}
+                  aria-expanded={railOpen}
+                  aria-label={railOpen ? (isJa ? 'セクションを折りたたむ' : 'Collapse sections') : (isJa ? 'セクションを展開' : 'Expand sections')}
+                  title={railOpen ? (isJa ? 'セクションを折りたたむ' : 'Collapse sections') : (isJa ? 'セクションを展開' : 'Expand sections')}
+                >
+                  <I n="collapse" s={15} />
+                </button>
               </div>
               <div className="section-list">
                 {sectionEntries.map(entry => (
@@ -1279,6 +1310,7 @@ export default function App() {
                     key={entry.key}
                     className={`section-row ${entry.key === activeEntry.key ? 'active' : ''}`}
                     onClick={() => setActiveSection(entry.key)}
+                    title={entry.label}
                   >
                     <span className={`section-status s-${entry.key}`}><I n={entry.icon} s={13} /></span>
                     <span className="section-copy">

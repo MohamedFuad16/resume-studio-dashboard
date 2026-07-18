@@ -105,6 +105,34 @@ build and 5 E2E tests green.
   LogoImage.swift) applied but not rebuilt; user is verifying and has the changes
   uncommitted.** Gotcha recorded: new Swift files need `xcodegen generate` before
   they exist to the build.
+- **2026-07-18 (later) — Radar table spacing overhaul + tracker save debounce.**
+  (1) Radar list de-cluttered: MapPin/Globe2 icons removed from row location/language
+  cells (text only; secondary lines muted `#93a0b0`); grid re-proportioned in **all
+  five** `.intern-table-head`/`.intern-row` definitions (base + 1450/1250/1050 media)
+  to `40px minmax(0,2.4fr) 64px 1fr 1fr .75fr .85fr 100px 62px 32px`, gap 14, rows
+  88px min. Header↔content alignment made exact: company header `padding-left: 46px`
+  (34px logo + 12px gap), rank centered in both head and cell — JS-measured
+  pixel-perfect (all 10 column x-positions equal; header text x 383 = name x 383).
+  (2) `useApplicationTracker.commit` now **150ms trailing-debounced**: a Gmail drain
+  applying N actions used to fire N sequential full-tracker POSTs (10 observed);
+  every commit carries the complete snapshot so collapsing to the last one is
+  lossless. Verified: 3 rapid toggles → exactly 1 POST. Triple sync-cycle at load is
+  dev-only StrictMode double-mount, not a bug. Build + 5/5 E2E green; mobile 390px
+  radar verified no-overflow.
+- **2026-07-18 — Web UI polish batch (dashboard/radar/calendar/editor/mobile).** Branch
+  rebased onto latest main (which already had `a371e34` lazy-compile/tracker-cache/phone-
+  radar-grid). (1) Dashboard trend chart → smooth **line/area** chart (Catmull-Rom + GSAP
+  draw-in), not bars; Recent apps drop freelance/gig records via new `utils/roleFilter.js`
+  (`isGigRole`). (2) `CompanyLogo`: hi-res favicons (Google s2 sz=128 ≈114px) for curated
+  domains, DDG fallback kept — fixes blurry Rakuten/etc. (3) Calendar date badges → **black
+  chips** (today red); mobile month view compact. (4) Radar: tech-stack tags under each
+  listing's role (where `techStack` exists; `resolveTechIcon`). "checked <date>" already
+  correct locally (17 Jul); prod "Jul 2" was stale redeploy. (5) Editor: **section rail
+  collapses** to an icon strip (persisted `railOpen`); compile **content-hash cache**
+  (template+resume JSON) → identical recompile 2.05s→0.003s; debounce 700→400ms; education
+  end-date/Expected pill aligned; bullet delete = clean full-height button. (6) Mobile: top
+  nav fits ≤560px, editor stacks (rail-collapse neutralised ≤980 via `.editor-view`
+  specificity), calendar compact. Verified in-browser at 390px; build green.
 - **2026-07-17 (night) — Native TabView, Wabi bubble shading, splash + icon
   (ADR-0042).** Nav round 3: hand-rolled glass bars can only be worse copies — the
   fluid droplet/minimize behaviour lives in the system bar — so the app now uses

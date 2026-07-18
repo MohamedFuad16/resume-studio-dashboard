@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { trackerApi } from '../api/client.js';
+import { isInternshipApplication } from '../utils/roleFilter.js';
 
 export const TRACKER_EVENT = 'resume-studio:application-tracker-change';
 
@@ -89,14 +90,25 @@ export function useApplicationTracker(profileId) {
     }
   }, [activeProfile, replaceTracker]);
 
+  // Trailing-debounced save. A Gmail drain applies many actions back-to-back and
+  // each updateStatus() used to POST the FULL tracker — 10 actions = 10 identical
+  // growing snapshots (and 10 Firestore writes in prod). Every commit carries the
+  // complete tracker, so collapsing the burst to its LAST snapshot is lossless.
+  // The local cache + trackerRef update synchronously, so reads stay fresh; the
+  // timer deliberately survives unmount so a pending save is never dropped.
+  const commitTimer = useRef(null);
   const commit = useCallback(next => {
     trackerCache.set(activeProfile, next);
-    trackerApi.save(activeProfile, next)
-      .then(() => window.dispatchEvent(new CustomEvent(TRACKER_EVENT, { detail: { profileId: activeProfile, tracker: next } })))
-      .catch(saveError => {
-        setError(saveError.message || 'Could not save application tracker');
-        refresh();
-      });
+    if (commitTimer.current) clearTimeout(commitTimer.current);
+    commitTimer.current = setTimeout(() => {
+      commitTimer.current = null;
+      trackerApi.save(activeProfile, next)
+        .then(() => window.dispatchEvent(new CustomEvent(TRACKER_EVENT, { detail: { profileId: activeProfile, tracker: next } })))
+        .catch(saveError => {
+          setError(saveError.message || 'Could not save application tracker');
+          refresh();
+        });
+    }, 150);
   }, [activeProfile, refresh]);
 
   useEffect(() => {
@@ -118,8 +130,22 @@ export function useApplicationTracker(profileId) {
     if (!status) {
       delete next[internship.id];
     } else {
+      const prev = current[internship.id];
+      // Per-status event timestamps (from the Gmail email date; see useGmailInbox).
+      // Each is carried forward and only overwritten when a new value arrives.
+      const appliedAt = internship.appliedAt ?? prev?.appliedAt ?? null;
+      const rejectedAt = internship.rejectedAt ?? prev?.rejectedAt ?? null;
+      const interviewAt = internship.interviewAt ?? prev?.interviewAt ?? null;
+      const offerAt = internship.offerAt ?? prev?.offerAt ?? null;
+      const now = new Date().toISOString();
+      // updatedAt = this event's real date (Gmail) or now (in-app edit).
+      const updatedAt = internship.eventAt || now;
+      // createdAt = the EARLIEST known instant (first application, not the drain
+      // time) so "when applied" is accurate. ISO strings sort chronologically.
+      const createdAt = [prev?.createdAt, appliedAt, rejectedAt, interviewAt, offerAt, internship.eventAt]
+        .filter(Boolean).sort()[0] || now;
       next[internship.id] = {
-        ...current[internship.id],
+        ...prev,
         internshipId: internship.id,
         company: internship.company,
         role: internship.role,
@@ -132,17 +158,18 @@ export function useApplicationTracker(profileId) {
         status,
         // Provenance: 'web' (added in-app) vs 'gmail' (ingested from the inbox).
         // A record keeps its origin once set; only a fresh Gmail action can stamp it.
-        source: internship.source || current[internship.id]?.source || 'web',
-        sourceMeta: internship.sourceMeta || current[internship.id]?.sourceMeta || null,
+        source: internship.source || prev?.source || 'web',
+        sourceMeta: internship.sourceMeta || prev?.sourceMeta || null,
+        appliedAt, rejectedAt, interviewAt, offerAt,
         // Reapplication cooldown (set by a Gmail rejection that states a wait
         // window). Carried forward unless a new value arrives, so re-tracking a
         // role doesn't wipe the company's stated cooldown.
-        reapplyAfter: internship.reapplyAfter ?? current[internship.id]?.reapplyAfter ?? null,
-        reapplyNote: internship.reapplyNote ?? current[internship.id]?.reapplyNote ?? '',
-        reapplyMonths: internship.reapplyMonths ?? current[internship.id]?.reapplyMonths ?? null,
-        updatedAt: new Date().toISOString(),
-        createdAt: current[internship.id]?.createdAt || new Date().toISOString(),
-        milestones: Array.isArray(current[internship.id]?.milestones) ? current[internship.id].milestones : [],
+        reapplyAfter: internship.reapplyAfter ?? prev?.reapplyAfter ?? null,
+        reapplyNote: internship.reapplyNote ?? prev?.reapplyNote ?? '',
+        reapplyMonths: internship.reapplyMonths ?? prev?.reapplyMonths ?? null,
+        updatedAt,
+        createdAt,
+        milestones: Array.isArray(prev?.milestones) ? prev.milestones : [],
       };
     }
     replaceTracker(next);
@@ -199,8 +226,18 @@ export function useApplicationTracker(profileId) {
     replaceTracker(next);
     commit(next);
   }, [commit, replaceTracker]);
+  // `records` is the app's list of internship applications, so freelance/gig
+  // records mis-ingested from Gmail (e.g. "language expert", "email analyst",
+  // "AI trainer") are filtered out HERE — every consumer (dashboard recent +
+  // pipeline, Applications view + its counts, calendar) then treats them as
+  // non-existent. The raw `tracker` object still holds them (nothing is
+  // deleted); `statusFor` reads `tracker` directly, so status writes for any id
+  // still work. Filter is conservative (see roleFilter) — never hides a real
+  // internship.
   const records = useMemo(
-    () => Object.values(tracker).sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')),
+    () => Object.values(tracker)
+      .filter(isInternshipApplication)
+      .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')),
     [tracker],
   );
   const counts = useMemo(() => APPLICATION_STATUSES.reduce((acc, item) => {
