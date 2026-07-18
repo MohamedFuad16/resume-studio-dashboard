@@ -140,6 +140,14 @@ extension CatalogStore {
         isRebuilding = true
         defer { isRebuilding = false }
 
+        // A rebuild is only meaningful against the REAL tracker. On a cold launch
+        // the first load can complete before Firebase finishes restoring the
+        // session — uid still nil — and a rebuild in that window would purge the
+        // signed-out KV tracker, report success, and leave the Firestore junk
+        // untouched. That is precisely how earlier repair attempts "succeeded"
+        // while micro1/Turing survived on the phone.
+        guard uid != nil, profileID != nil else { return false }
+
         let profile = profileID ?? PortalAPI.profile
         guard (try? await PortalAPI.gmailStatus(profile: profile))?.connected == true else {
             toast = String(localized: "Connect Gmail first to rebuild.")

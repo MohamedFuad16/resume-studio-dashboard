@@ -75,6 +75,15 @@ struct RootView: View {
         let rebuildTag = "gmail-rebuild-2026-07-19a"
         if UserDefaults.standard.string(forKey: "gmailRebuildTag") != rebuildTag {
             Task {
+                // Wait out the auth/hydration race: RootView's first load can
+                // finish before AuthGate's setUser resolves the Firestore
+                // profile. The rebuild refuses to run unhydrated, so poll
+                // briefly instead of losing this launch's attempt to timing.
+                var waited = 0.0
+                while store.profileID == nil && waited < 15 {
+                    try? await Task.sleep(for: .seconds(0.5))
+                    waited += 0.5
+                }
                 // Consume the tag ONLY when the purge actually persisted. The
                 // previous version consumed it up front, so one launch where the
                 // rebuild bailed (offline / auth still restoring / Gmail check
