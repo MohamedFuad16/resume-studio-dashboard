@@ -2,6 +2,13 @@
 
 Every entry: date · who · what changed · what the OTHER side must do.
 
+- **2026-07-19 · web · Storage engine swapped; Vercel is static-only (ADR-0040).**
+  The server now runs native SQLite (working copy + snapshot to the mount) instead
+  of sql.js, and the Vercel origin no longer serves `/api` at all. **iOS: nothing
+  to change** — routes, payloads, and the Azure base URL are all unchanged; this is
+  purely how the server stores the shared catalog + Gmail queue. Worth knowing only
+  if you ever pointed a build at the Vercel origin for `/api`: don't, it's static now.
+
 - **2026-07-19 · web · W1+W2 attempted then REVERTED — SQLite can't write on
   Azure Files (SMB).** The better-sqlite3-direct-on-the-mount swap (W2) deployed
   with working reads but every WRITE failed `SQLITE_BUSY` (file-locking is

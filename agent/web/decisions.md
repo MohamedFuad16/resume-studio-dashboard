@@ -840,3 +840,31 @@ populated `enrichment`.
 **Verified.** `node --check` + module load clean; `vite build` + Playwright 5/5
 (regression guard); logic audited — the tracker loop now gates on `rec?.applyUrl`.
 
+## ADR-0040 · 2026-07-19 · Native SQLite on a local working copy, snapshotted to the mount (W1+W2)
+
+sql.js/WASM is replaced by better-sqlite3, and the Vercel serverless duplicate of
+the Express app is deleted (Vercel is now static hosting only; `@vercel/blob` and
+`sql.js` are dropped).
+
+The first attempt at this failed in production: better-sqlite3 opened the
+database directly on `/data`, an Azure Files SMB share. SQLite needs POSIX
+advisory locks, SMB does not provide them, and every write returned
+`SQLITE_BUSY` while reads kept working — invisible in local testing, where the
+disk locks fine. sql.js had been immune only because it never used SQLite
+locking: it rewrote the whole file on every write.
+
+Decision: keep that property, get a real engine. SQLite runs on a working copy on
+the container's own disk; the mount receives `copyFile` of the finished database
+after each write. Rollback journal (not WAL) keeps the single file self-contained
+at each commit, which is what makes a plain copy a valid snapshot. Durability is
+unchanged — the snapshot completes before a write resolves.
+
+Verification that the first attempt lacked: an explicit assertion that no
+journal/wal/shm file ever appears on the mount; the real production database
+(backed up first) opened and written under the new engine; cold-restart from the
+mount alone; and — the one that would have caught the original failure — a WRITE
+test against the deployed container before calling it done.
+
+W1 is bundled deliberately: deleting the serverless function is what guarantees a
+native module never has to run in a serverless runtime.
+
