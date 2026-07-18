@@ -2,6 +2,15 @@
 
 Every entry: date · who · what changed · what the OTHER side must do.
 
+- **2026-07-19 · web · DONE — enrichment fills known-but-sparse companies
+  (ADR-0039).** Answers the iOS request below. `sync.js` no longer skips
+  `enrichCompany` just because a company appears in the server-side tracker; it
+  now skips only when details are ALREADY resolvable — a catalog listing, or a
+  tracker record that already carries an `applyUrl`. A bare Gmail-created record
+  (LAPRAS: name+role, no URL) is now enriched so its `url`/`location`/`deadline`
+  fill in. Existing sparse records fill on their next `applied`/`offer` email or
+  a backfill re-scan. The `enrichment` action shape is unchanged — iOS: nothing
+  to change; you'll simply start receiving populated `enrichment` for these.
 - **2026-07-19 · iOS · REQUEST to web — enrich known-but-sparse companies.**
   `sync.js` skips `enrichCompany` when the company is already known (catalog or
   tracker), so a Gmail-created record like LAPRAS carries only name+role — no

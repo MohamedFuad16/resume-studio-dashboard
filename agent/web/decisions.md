@@ -815,3 +815,28 @@ targets `-jp`.
 variants→`acme`, `Cisco`/`Costco` intact, CJK preserved); `validateTracker`
 accepts a CJK-keyed record and an `http://` URL without throwing.
 
+---
+## ADR-0039 · 2026-07-19 · Enrich known-but-sparse companies (plan W5 / contract request)
+**Context.** `sync.js` enriches an `applied`/`offer` email's company (one web
+search via `enrichCompany` → posting url/location/deadline) only when the company
+is NOT already "known". The old `knownCompanyNames` counted the catalog AND every
+server-side tracker record — including bare Gmail-created rows. So a record like
+LAPRAS (name + role, no url) counted as known, enrichment was skipped, and its
+details were never filled (contracts/CHANGELOG 2026-07-19 request; PLAN-
+SIMPLIFICATION W5).
+**Decision.** Replace `knownCompanyNames`/`isKnownCompany` with
+`resolvableCompanyNames`/`isResolvableCompany`: a company is "resolvable" (skip the
+search) only when its details are ALREADY available — every catalog listing (full
+by construction), or a tracker record that ALREADY has an `applyUrl`. A tracker
+record without a url is sparse and now gets enriched instead of skipped. Per-run
+dedupe (`enrichedByCompany`) and the catalog-always-skip behavior are unchanged, so
+cost stays bounded (≤ one search per new sparse company per sync).
+**Consequences.** New Gmail-created records for non-catalog companies get real
+url/location/deadline. Existing sparse records fill on their next `applied`/`offer`
+email or a backfill re-scan (the incremental sync won't reprocess already-seen
+mail). Server-only change; takes effect on the Azure `-jp` deploy. The `enrichment`
+action shape is unchanged, so iOS needs nothing — it just starts receiving
+populated `enrichment`.
+**Verified.** `node --check` + module load clean; `vite build` + Playwright 5/5
+(regression guard); logic audited — the tracker loop now gates on `rec?.applyUrl`.
+

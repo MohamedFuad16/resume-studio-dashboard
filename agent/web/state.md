@@ -25,6 +25,17 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-19 — W5: enrich known-but-sparse companies (ADR-0039).** Merged the
+  07-19 `ios` work into `main` (only conflict: `contracts/CHANGELOG.md`, resolved
+  keeping both; my ADR-0038 work preserved) — brings `DOCTOR.md`,
+  `PLAN-SIMPLIFICATION.md`, CLAUDE.md rule 6 (doctor PRs). Then the first plan
+  item, **W5**: `sync.js` no longer skips `enrichCompany` for a company that only
+  has a sparse tracker record — it skips only when details are already resolvable
+  (catalog listing, or a tracker record with an `applyUrl`). A bare Gmail-created
+  row (LAPRAS) now gets its url/location/deadline filled. `knownCompanyNames`→
+  `resolvableCompanyNames`; server-only (takes effect on the Azure `-jp` deploy).
+  Remaining web plan items: W1 (strip Vercel serverless/Blob), W2
+  (sql.js→better-sqlite3), W3 (Tailwind migration, ongoing), W4 (Typst, optional).
 - **2026-07-18 (ios→main merge + contract action items) — ADR-0038.** Merged the
   `ios` branch into `main` (clean fast-forward, per HANDOFF-WEB.md): the `agent/`
   KB split into `agent/web/` + `agent/ios/`, the new `contracts/` shared-surface
