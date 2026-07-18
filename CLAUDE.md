@@ -29,3 +29,9 @@ ALWAYS read your surface's `agent.md` first and follow its routing table.
    `decisions.md` (iOS: `ADR-I-###` · web: `ADR-####` · shared:
    `contracts/decisions.md` `ADR-S-###`). Never commit secrets
    (`agent/web/secrets.md` is pointers-only).
+6. **Doctor PRs.** A third account audits the repo and files findings as
+   `doctor/*` PRs (see `DOCTOR.md`). At session start, check open doctor PRs
+   for YOUR surface: reproduce with the PR's "Verified by" command; if real,
+   fix on your branch and close the PR with a comment; if not, close with the
+   reason. Never leave one unanswered past a working day, and never merge a
+   doctor PR directly — the fix belongs on your branch.

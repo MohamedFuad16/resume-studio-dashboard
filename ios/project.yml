@@ -54,6 +54,13 @@ targets:
         # TimelineView-driven shaders is capped at 60 Hz on iPhone. With it, the
         # display drives at up to 120 Hz on supported devices.
         CADisableMinimumFrameDurationOnPhone: true
+        # Background app refresh: iOS wakes the app periodically to drain the
+        # Gmail queue, so new applications land (with a notification) without the
+        # user opening the app. The identifier must match the .backgroundTask
+        # registration in InternshipPortalApp.swift exactly.
+        UIBackgroundModes: [fetch]
+        BGTaskSchedulerPermittedIdentifiers:
+          - com.mohamedfuad.internshipportal.refresh
         # The app ships English + Japanese strings; iOS uses the device (or
         # per-app) locale to pick, and Settings offers an in-app override.
         CFBundleDevelopmentRegion: en

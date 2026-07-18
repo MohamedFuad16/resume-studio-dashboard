@@ -72,10 +72,18 @@ struct RootView: View {
         // Same mechanism as the onboarding-review reset — a stored tag, not a
         // launch argument, because devicectl doesn't reliably pass args into
         // NSUserDefaults' argument domain.
-        let rebuildTag = "gmail-rebuild-2026-07-18a"
+        let rebuildTag = "gmail-rebuild-2026-07-19a"
         if UserDefaults.standard.string(forKey: "gmailRebuildTag") != rebuildTag {
-            UserDefaults.standard.set(rebuildTag, forKey: "gmailRebuildTag")
-            Task { await store.rebuildFromGmail() }
+            Task {
+                // Consume the tag ONLY when the purge actually persisted. The
+                // previous version consumed it up front, so one launch where the
+                // rebuild bailed (offline / auth still restoring / Gmail check
+                // failed) burned the repair silently — which is exactly how the
+                // stale micro1/Turing rows survived a "successful" rebuild build.
+                if await store.rebuildFromGmail() {
+                    UserDefaults.standard.set(rebuildTag, forKey: "gmailRebuildTag")
+                }
+            }
         }
         #endif
 
