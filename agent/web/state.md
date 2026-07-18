@@ -25,19 +25,6 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
-- **2026-07-19 — W1+W2: Vercel static-only + native better-sqlite3 (ADR-0040).**
-  W1: deleted `editor/api/[...path].js` and stripped the `vercel.json`
-  function/`/api` route → Vercel serves ONLY the static client; all `/api/*` goes
-  to Azure via `VITE_API_BASE_URL`. Removed `@vercel/blob`. W2: `storage.js` swapped
-  sql.js-WASM+Blob for native **better-sqlite3** writing straight to the mounted
-  `resume-studio.sqlite` (same `kv` schema + interface, so no caller/contract
-  change; default journal — WAL unsafe on Azure Files SMB). Verified better-sqlite3
-  opens the REAL sql.js-written DB (15 keys/172 roles) and read+writes it — no
-  migration. `Dockerfile` adds `python3 make g++` for the native build. Removed the
-  Blob branch in `describePersistence` + Blob env juggling in `validate-catalog`.
-  Build + `validate:catalog` + Playwright 5/5; server boots `sqlite-mounted`.
-  **Deploy note: back up prod `resume-studio.sqlite` before the `-jp` cutover.**
-  Remaining web plan items: W3 (Tailwind migration, ongoing), W4 (Typst, optional).
 - **2026-07-19 — W5: enrich known-but-sparse companies (ADR-0039).** Merged the
   07-19 `ios` work into `main` (only conflict: `contracts/CHANGELOG.md`, resolved
   keeping both; my ADR-0038 work preserved) — brings `DOCTOR.md`,

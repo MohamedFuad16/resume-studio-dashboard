@@ -6,7 +6,7 @@
 //                    server/validation.js (`validateInternship`); flags duplicate
 //                    ids and duplicated list items (eligibility/reasons/techStack).
 //   2. DB ROUND-TRIP — saves the validated catalog through server/storage.js
-//                    (a throwaway local SQLite DB), reads it back, and asserts
+//                    (a throwaway local sql.js DB), reads it back, and asserts
 //                    structural equality so we know data is "properly formatted,
 //                    sent, and received" with no corruption.
 //   3. LINK LIVENESS (optional, network) — `--links` or VALIDATE_LINKS=1 fetches
@@ -199,9 +199,12 @@ function formatCheck(rawCatalog) {
 }
 
 async function dbRoundTrip(validated) {
-  // A throwaway on-disk SQLite file (never RESUME_STUDIO_DATA_DIR) so the round-trip
-  // is isolated from any real store.
   const localDbPath = path.join(os.tmpdir(), `resume-studio-validate-${randomUUID()}.sqlite`);
+  // Force the local sqlite backend regardless of ambient Vercel/Blob env.
+  const savedVercel = process.env.VERCEL;
+  const savedBlob = process.env.BLOB_READ_WRITE_TOKEN;
+  delete process.env.VERCEL;
+  delete process.env.BLOB_READ_WRITE_TOKEN;
   const store = createStore({ localDbPath });
   try {
     await store.init();
@@ -219,7 +222,8 @@ async function dbRoundTrip(validated) {
     }
     return { ok, backend: store.backend, count: Array.isArray(loaded) ? loaded.length : 0, mismatch };
   } finally {
-    store.close?.();
+    if (savedVercel !== undefined) process.env.VERCEL = savedVercel;
+    if (savedBlob !== undefined) process.env.BLOB_READ_WRITE_TOKEN = savedBlob;
     await import('node:fs/promises').then(fs => fs.rm(localDbPath, { force: true })).catch(() => {});
   }
 }

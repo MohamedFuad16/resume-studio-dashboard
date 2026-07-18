@@ -840,39 +840,3 @@ populated `enrichment`.
 **Verified.** `node --check` + module load clean; `vite build` + Playwright 5/5
 (regression guard); logic audited — the tracker loop now gates on `rec?.applyUrl`.
 
----
-## ADR-0040 · 2026-07-19 · Vercel static-only + native better-sqlite3 storage (plan W1+W2)
-**Context.** Two coupled simplifications from PLAN-SIMPLIFICATION. The app carried a
-Vercel serverless catch-all (`editor/api/[...path].js` re-exporting Express) and a
-Vercel Blob durability layer in `storage.js` — but in prod the client already calls
-Azure (`VITE_API_BASE_URL`), the data already lives on the Azure Files mount
-(ADR-0032), and the Blob round-trip was a dead, quota-failing call (BUG-011).
-`storage.js` also ran sql.js (WASM) and serialized the ENTIRE DB on every write.
-**Decision.**
-- **W1 — Vercel is static-only.** Deleted `editor/api/[...path].js`; stripped the
-  `functions` block and the `^/api/(.*)` route from `vercel.json` (now just
-  filesystem + SPA fallback). All `/api/*` goes to the Azure container via
-  `VITE_API_BASE_URL`. Removed the `@vercel/blob` dependency. This is also what
-  makes W2 safe: a NATIVE module never has to run in serverless.
-- **W2 — native SQLite.** `storage.js` now uses **better-sqlite3** writing straight
-  to the mounted `resume-studio.sqlite` — no WASM, no serialize-on-write, no Blob.
-  Same `kv` schema and same interface (`init/backend/getJson/setJson/deleteKey/
-  listJson`, + a `close()`), so no caller or contract changes (KV interface
-  unchanged, per the plan). Default rollback journal — WAL is unsafe on Azure Files
-  (SMB, no shared memory); single replica (min=max=1, ADR-0019) = one writer, so the
-  old sql.js serialize-queue is gone. The existing sql.js-written file is standard
-  SQLite3, so it opens as-is (no migration).
-- Removed the `vercel-blob-sqlite` branch in `describePersistence` (the `fs.stat`
-  st_dev comparison already proves the mount); removed the Blob env juggling in
-  `validate-catalog.js`. `Dockerfile` adds `python3 make g++` so the native module
-  compiles from its bundled amalgamation if no prebuilt binary matches.
-**Consequences.** The Vercel origin no longer serves `/api` (client + iOS already
-use the Azure base URL — informational CHANGELOG note added). Backend `storage.js`
-now runs only on the container + local dev, both of which have a native runtime and
-a real disk. Back up the prod `resume-studio.sqlite` before the first `-jp` deploy
-(the swap is non-destructive — identical file format — but back up anyway).
-**Verified.** better-sqlite3 opened the REAL sql.js-written DB (15 keys, 172-role
-catalog) and read+wrote it; store round-trip + reopen-durability pass; server boots
-clean (`storage: sqlite-mounted`, `/api/status` ok); `vite build` +
-`validate:catalog` (round-trips through the new engine) + Playwright 5/5.
-

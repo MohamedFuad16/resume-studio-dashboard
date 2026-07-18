@@ -2,8 +2,22 @@
   "version": 2,
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "functions": {
+    "api/**/*.js": {
+      "maxDuration": 60
+    }
+  },
   "routes": [
-    { "handle": "filesystem" },
-    { "src": "^/(.*)$", "dest": "/index.html" }
+    {
+      "src": "^/api/(.*)$",
+      "dest": "/api/[...path]?...path=$1"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "^/(.*)$",
+      "dest": "/index.html"
+    }
   ]
 }
