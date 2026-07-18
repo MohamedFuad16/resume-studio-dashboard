@@ -1,5 +1,15 @@
 # Compile/research backend on Azure (always-on)
 
+> ⚠️ **Which app is live:** there are TWO container apps in resource group
+> `internship-portal` — `portal-compile` (westus2) and **`portal-compile-jp`
+> (japaneast)**. **`-jp` is the live one**: it holds the Gmail OAuth token + action
+> queue on an Azure Files mount (`internshipportaljpdata/resume-studio-data`), so it
+> is the only one that must stay running. Its public FQDN is
+> `portal-compile-jp.redgrass-10389803.japaneast.azurecontainerapps.io`, and that is
+> what `VITE_API_BASE_URL` (Vercel) and iOS's `PortalAPIBaseURL` must point at.
+> **All deploys target `-jp`** — the generic `portal-compile` name in the one-time
+> recipe below is a placeholder; substitute `portal-compile-jp` when updating prod.
+
 Render's free tier **sleeps after ~15 min idle**, so the first search/compile after a
 break cold-starts (~30–60 s) and can fail ("company research failed"). Azure Container
 Apps with **min replicas = 1** stays warm — no cold starts. Same Docker image as Render.
@@ -70,6 +80,6 @@ In the **Vercel** project (`editor`) → Settings → Environment Variables, set
   persistence).
 - Always-on min-replicas=1 has a small ongoing cost (covered by your credits). To pause,
   set `--min-replicas 0 --max-replicas 0` (reintroduces cold starts).
-- Redeploy after code changes: `az acr build --registry <acr> --image portal-compile:latest
-  --file Dockerfile .` then `az containerapp update -n portal-compile -g internship-portal
-  --image <acr>.azurecr.io/portal-compile:latest`.
+- Redeploy after code changes (target the LIVE `-jp` app): `az acr build --registry
+  <acr> --image portal-compile:latest --file Dockerfile .` then `az containerapp update
+  -n portal-compile-jp -g internship-portal --image <acr>.azurecr.io/portal-compile:latest`.

@@ -34,19 +34,27 @@ const toISO = value => {
   return Number.isNaN(t) ? null : new Date(t).toISOString();
 };
 
-// Companies we already know — the internship catalog (stored, else seeds) and the
-// server-side tracker — never need a web search: the client resolves their
-// details from its own records/catalog when it drains the queue.
-async function knownCompanyNames(store, profile) {
+// Companies whose posting details the client can ALREADY resolve without a web
+// search — so enriching them would waste a call:
+//   • every internship-catalog listing (has url/location/deadline by construction);
+//   • tracker records that already carry a real `applyUrl`.
+// A tracker record that exists but is still sparse (a bare Gmail-created row like
+// LAPRAS: name + role, no url) is deliberately NOT counted — the owner wants
+// enrichment to FILL those in, not skip them (contracts/CHANGELOG 2026-07-19).
+async function resolvableCompanyNames(store, profile) {
   const names = [];
   const catalog = await store.getJson('internships:catalog', null).catch(() => null);
   for (const item of (Array.isArray(catalog) && catalog.length ? catalog : buildSeedCatalog())) names.push(norm(item?.company));
   const tracker = await store.getJson(`tracker:${profile}`, {}).catch(() => ({}));
-  for (const rec of Object.values(tracker && typeof tracker === 'object' ? tracker : {})) names.push(norm(rec?.company));
+  for (const rec of Object.values(tracker && typeof tracker === 'object' ? tracker : {})) {
+    // Only "resolvable" once the record has a posting URL — otherwise it's sparse
+    // and should be enriched, not treated as already-known.
+    if (rec?.applyUrl) names.push(norm(rec.company));
+  }
   return names.filter(Boolean);
 }
 
-const isKnownCompany = (names, company) => {
+const isResolvableCompany = (names, company) => {
   const needle = norm(company);
   return Boolean(needle) && names.some(n => n.includes(needle) || needle.includes(n));
 };
@@ -98,7 +106,7 @@ export async function syncProfile(store, profile, opts = {}) {
   // whether the inbox is clean or the ingest is dead.
   const dropped = { fetchFailed: 0, classifierFailed: 0, notApplication: 0, notInternship: 0, lowConfidence: 0, noCompany: 0 };
   const enrichedByCompany = new Map();
-  let knownNames = null; // loaded lazily on the first enrichment candidate
+  let resolvableNames = null; // loaded lazily on the first enrichment candidate
   for (const id of fresh) {
     let message;
     try { message = await getMessage(token, id); } catch { processed.add(id); dropped.fetchFailed++; continue; }
@@ -112,15 +120,17 @@ export async function syncProfile(store, profile, opts = {}) {
     if (verdict.confidence < MIN_CONFIDENCE) { dropped.lowConfidence++; continue; }
     if (!verdict.company) { dropped.noCompany++; continue; }
 
-    // Enrich once per company for application/offer emails, so the client can
-    // create a record with a real posting URL/location/deadline if it's new.
-    // Companies already in the catalog or tracker skip the search entirely.
+    // Enrich once per company for application/offer emails so the client can fill
+    // in a real posting URL/location/deadline. We skip the search only when the
+    // details are ALREADY resolvable (catalog listing, or a tracker record that
+    // already has a URL); a known-but-sparse record still gets enriched so its
+    // missing details get filled — not left as bare name+role.
     let enrichment = null;
     if ((verdict.kind === 'applied' || verdict.kind === 'offer')) {
       const key = norm(verdict.company);
       if (!enrichedByCompany.has(key)) {
-        if (!knownNames) knownNames = await knownCompanyNames(store, profile);
-        enrichedByCompany.set(key, isKnownCompany(knownNames, verdict.company) ? null : await enrichCompany(verdict.company, verdict.role));
+        if (!resolvableNames) resolvableNames = await resolvableCompanyNames(store, profile);
+        enrichedByCompany.set(key, isResolvableCompany(resolvableNames, verdict.company) ? null : await enrichCompany(verdict.company, verdict.role));
       }
       enrichment = enrichedByCompany.get(key);
     }

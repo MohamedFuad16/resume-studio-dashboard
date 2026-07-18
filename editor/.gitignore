@@ -1,6 +1,9 @@
 .vercel
 .env*
 
+# Vite build output (should never be committed or linted)
+dist/
+
 # Firebase CLI artifacts (config below IS committed: firebase.json, .firebaserc, firestore.rules)
 .firebase/
 firebase-debug.log

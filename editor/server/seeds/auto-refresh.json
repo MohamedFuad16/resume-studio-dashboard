@@ -1,6 +1,14 @@
 {
-  "updatedAt": "2026-07-16",
+  "updatedAt": "2026-07-18",
   "retired": [
+    {
+      "id": "global-066",
+      "company": "Rocket Lab USA",
+      "role": "Software Intern",
+      "retiredAt": "2026-07-18",
+      "reason": "apply URL HTTP-dead · model: no",
+      "evidenceUrl": "https://job-boards.greenhouse.io/rocketlab/jobs/7736776003"
+    },
     {
       "id": "global-091",
       "company": "Harbinger Motors",

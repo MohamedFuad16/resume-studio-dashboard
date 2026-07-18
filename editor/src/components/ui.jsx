@@ -65,28 +65,28 @@ export function ExportMenu({ onPDF, onTex, onJson, onAI, isJa = false }) {
 
   return (
     <div className="exp-wrap" ref={ref}>
-      <button className="btn" onClick={() => setOpen(o => !o)}>
+      <button type="button" className="btn" onClick={() => setOpen(o => !o)}>
         <I n="dl" s={12} /> {isJa ? '書き出し' : 'Export'}
       </button>
       {open && (
         <div className="exp-menu">
-          <button className="exp-item" onClick={() => go(onPDF)} data-testid="export-pdf-btn">
+          <button type="button" className="exp-item" onClick={() => go(onPDF)} data-testid="export-pdf-btn">
             <I n="file" s={12} style={{ color: 'var(--err)' }} />
             {isJa ? 'PDFをダウンロード' : 'Download PDF'}
             <span className="exp-sub">.pdf</span>
           </button>
-          <button className="exp-item" onClick={() => go(onTex)} data-testid="export-tex-btn">
+          <button type="button" className="exp-item" onClick={() => go(onTex)} data-testid="export-tex-btn">
             <I n="txt" s={12} style={{ color: 'var(--amber)' }} />
             {isJa ? 'LaTeXソースをダウンロード' : 'Download LaTeX source'}
             <span className="exp-sub">.tex</span>
           </button>
-          <button className="exp-item" onClick={() => go(onJson)} data-testid="export-json-btn">
+          <button type="button" className="exp-item" onClick={() => go(onJson)} data-testid="export-json-btn">
             <I n="json" s={12} style={{ color: 'var(--blue)' }} />
             {isJa ? '元データをダウンロード' : 'Download raw data'}
             <span className="exp-sub">.json</span>
           </button>
           <div className="exp-sep" />
-          <button className="exp-item" onClick={() => go(onAI)}>
+          <button type="button" className="exp-item" onClick={() => go(onAI)}>
             <I n="brain" s={12} style={{ color: 'var(--green)' }} />
             {isJa ? 'AI応募プロフィール' : 'AI Job Profile'}
             <span className="exp-sub">.md</span>
@@ -253,13 +253,13 @@ export function Bullets({ items, onChange }) {
           <div key={i} className="bullet-row">
             <AutoTextarea className="fta bullet-textarea" value={b} onChange={v => upd(i, v)}
               placeholder={`Point ${i + 1}…`} />
-            <button className="bullet-del" onClick={() => del(i)} title="Remove">
+            <button type="button" className="bullet-del" onClick={() => del(i)} title="Remove">
               <I n="x" s={11} />
             </button>
           </div>
         ))}
       </div>
-      <button className="btn-add-bullet" onClick={add}>+ Add point</button>
+      <button type="button" className="btn-add-bullet" onClick={add}>+ Add point</button>
     </div>
   );
 }
@@ -333,7 +333,7 @@ export function TagInput({ label, value, onChange, placeholder, suggestions = []
       >
         <div className="tag-pills tag-ms-pills">
           {tags.map((tag, i) => (
-            <span key={i} className="tag-pill">
+            <span key={tag} className="tag-pill">
               <span className="tag-pill-label">{tag}</span>
               <button type="button" className="tag-pill-remove" onClick={(e) => { e.stopPropagation(); removeTag(i); }}>
                 <I n="x" s={10} />
@@ -363,8 +363,8 @@ export function TagInput({ label, value, onChange, placeholder, suggestions = []
       </div>
       {open && (filteredSuggestions.length > 0 || (query.trim() && !tags.some(t => t.toLowerCase() === query.trim().toLowerCase()))) && (
         <div className="tag-dropdown tag-ms-dropdown">
-          {visibleSuggestions.map((s, idx) => (
-            <div key={idx} className="tag-dropdown-item" onClick={() => addTag(s)}>
+          {visibleSuggestions.map(s => (
+            <div key={s} className="tag-dropdown-item" onClick={() => addTag(s)}>
               {s}
             </div>
           ))}
@@ -423,8 +423,8 @@ export function SuggestInput({ label, value, onChange, placeholder, suggestions 
       </div>
       {open && filtered.length > 0 && (
         <div className="tag-dropdown suggest-dropdown">
-          {filtered.map((s, idx) => (
-            <div key={idx} className="tag-dropdown-item" onClick={() => { onChange(s); setOpen(false); }}>
+          {filtered.map(s => (
+            <div key={s} className="tag-dropdown-item" onClick={() => { onChange(s); setOpen(false); }}>
               {s}
             </div>
           ))}

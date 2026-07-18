@@ -11,6 +11,8 @@ editor/playwright-report
 **/*.log
 .claude
 agent
+contracts
+ios
 en
 ja
 tests

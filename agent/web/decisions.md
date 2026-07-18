@@ -778,3 +778,65 @@ company column to ~80px and leaving an empty cell where the hidden status select
 load, single compile on first Editor entry, JA + mobile verified in-browser at
 375/1366px.
 
+---
+## ADR-0038 · 2026-07-18 · Merge ios→main; adopt the shared contracts (canonical company key, lenient tracker validation)
+**Context.** The `ios` branch restructured the repo to end two-team collisions:
+`agent/` split into `agent/web/` + `agent/ios/`, a `contracts/` shared-surface
+layer was added, and server-side Gmail detection became evidence-based
+(quote-grounded, no denylist) with ISO-8601 email dates. `contracts/CHANGELOG.md`
+listed four web action items, two of them open bugs recorded in
+`contracts/normalization.md`.
+**Decision.**
+- Merged `origin/ios` into `main` as a clean fast-forward (my prior `main`,
+  `c4cf31f`, was the merge-base); pushed. New workflow: work on branch `web`,
+  merge to `main` when stable — no more direct commits to `main`.
+- **Canonical company key** (normalization.md §1) lives ONCE in
+  `reapplyCooldown.js` (`normalizeCompany`, `companySlug`); `useGmailInbox.js`
+  imports them (removed its local `CORP`/`norm`/`slug`). `stripCorp` peels JA
+  markers then repeatedly peels a trailing EN suffix (`inc|ltd|k.k|co`, requiring
+  a leading separator so `Cisco`/`Costco` survive), so `"Acme, Inc."` /
+  `"Acme Co., Ltd."` / `"Acme"` all key `acme`. The slug derives from the same
+  key → matching and id-minting can never disagree, killing the double-record bug.
+- **Lenient tracker validation** (server `validation.js`): tracker KEYS validate
+  with `TRACKER_KEY` (adds `.`, `-`, and the CJK ranges) so `gmail-株式会社カナリー`
+  saves; `applyUrl` goes through `sanitizeIngestedUrl` (upgrade `http`→`https`,
+  drop unparseable) instead of `cleanHttpsUrl` throwing. Ingested data must never
+  400 the whole save; strict validation stays on user-entered fields.
+- `.dockerignore` excludes `ios`/`contracts` (docs/native code, not in the Node
+  image). `docs/azure-deploy.md` corrected to name **`portal-compile-jp`
+  (japaneast)** as the live app (holds the Gmail queue on Azure Files); the
+  westus2 `portal-compile` is not live.
+**Consequences.** Normalizer edits now touch one file for both the drain and the
+cooldown map; iOS must mirror the stacked-suffix peel (flagged in CHANGELOG). The
+CJK-key relaxation only affects the signed-out/E2E KV path (signed-in saves are
+Firestore). Open follow-up for the user: confirm Vercel `VITE_API_BASE_URL`
+targets `-jp`.
+**Verified.** `vite build` clean; Playwright 5/5; normalizer unit-checked (Acme
+variants→`acme`, `Cisco`/`Costco` intact, CJK preserved); `validateTracker`
+accepts a CJK-keyed record and an `http://` URL without throwing.
+
+---
+## ADR-0039 · 2026-07-19 · Enrich known-but-sparse companies (plan W5 / contract request)
+**Context.** `sync.js` enriches an `applied`/`offer` email's company (one web
+search via `enrichCompany` → posting url/location/deadline) only when the company
+is NOT already "known". The old `knownCompanyNames` counted the catalog AND every
+server-side tracker record — including bare Gmail-created rows. So a record like
+LAPRAS (name + role, no url) counted as known, enrichment was skipped, and its
+details were never filled (contracts/CHANGELOG 2026-07-19 request; PLAN-
+SIMPLIFICATION W5).
+**Decision.** Replace `knownCompanyNames`/`isKnownCompany` with
+`resolvableCompanyNames`/`isResolvableCompany`: a company is "resolvable" (skip the
+search) only when its details are ALREADY available — every catalog listing (full
+by construction), or a tracker record that ALREADY has an `applyUrl`. A tracker
+record without a url is sparse and now gets enriched instead of skipped. Per-run
+dedupe (`enrichedByCompany`) and the catalog-always-skip behavior are unchanged, so
+cost stays bounded (≤ one search per new sparse company per sync).
+**Consequences.** New Gmail-created records for non-catalog companies get real
+url/location/deadline. Existing sparse records fill on their next `applied`/`offer`
+email or a backfill re-scan (the incremental sync won't reprocess already-seen
+mail). Server-only change; takes effect on the Azure `-jp` deploy. The `enrichment`
+action shape is unchanged, so iOS needs nothing — it just starts receiving
+populated `enrichment`.
+**Verified.** `node --check` + module load clean; `vite build` + Playwright 5/5
+(regression guard); logic audited — the tracker loop now gates on `rec?.applyUrl`.
+

@@ -25,6 +25,49 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+- **2026-07-19 — W1+W2 attempted, REVERTED (Azure Files can't do SQLite writes).**
+  Swapped `storage.js` to native better-sqlite3 on the `/data` mount + made Vercel
+  static-only. Reads worked in prod but every WRITE failed `SQLITE_BUSY` — SQLite
+  file-locking is unsupported on the Azure Files **SMB** share (sql.js was immune
+  because it rewrites the whole file, no locks). Rolled `-jp` back to `ac9b309`
+  (writes restored, verified) and reverted commit `b9fedf2`; `main` == prod, no
+  data lost, prod DB backed up. Full root-cause + the correct future approach
+  (better-sqlite3 on a LOCAL path + snapshot to the mount) in `agent/web/errors.md`.
+  **Owner decision (2026-07-19): keep sql.js, W2 closed** — the engine works on the
+  SMB mount and its only cost is the WASM dep; W2's benefit didn't justify the
+  local-path+snapshot complexity. W1 (Vercel static-only) is available as an
+  optional standalone cleanup if wanted. Remaining plan items: W3 (Tailwind), W4
+  (Typst, optional).
+- **2026-07-19 — W5: enrich known-but-sparse companies (ADR-0039).** Merged the
+  07-19 `ios` work into `main` (only conflict: `contracts/CHANGELOG.md`, resolved
+  keeping both; my ADR-0038 work preserved) — brings `DOCTOR.md`,
+  `PLAN-SIMPLIFICATION.md`, CLAUDE.md rule 6 (doctor PRs). Then the first plan
+  item, **W5**: `sync.js` no longer skips `enrichCompany` for a company that only
+  has a sparse tracker record — it skips only when details are already resolvable
+  (catalog listing, or a tracker record with an `applyUrl`). A bare Gmail-created
+  row (LAPRAS) now gets its url/location/deadline filled. `knownCompanyNames`→
+  `resolvableCompanyNames`; server-only (takes effect on the Azure `-jp` deploy).
+  Remaining web plan items: W1 (strip Vercel serverless/Blob), W2
+  (sql.js→better-sqlite3), W3 (Tailwind migration, ongoing), W4 (Typst, optional).
+- **2026-07-18 (ios→main merge + contract action items) — ADR-0038.** Merged the
+  `ios` branch into `main` (clean fast-forward, per HANDOFF-WEB.md): the `agent/`
+  KB split into `agent/web/` + `agent/ios/`, the new `contracts/` shared-surface
+  layer, the iOS app, and server-side Gmail fixes (quote-grounded evidence-based
+  internship detection in `classify.js`, ISO-8601 `receivedAt` in `sync.js`).
+  Now on the new `web` working branch (no more direct commits to `main`). Then
+  the four web action items from `contracts/CHANGELOG.md`: (1) **canonical
+  company key** — one JA+EN-suffix normalizer in `reapplyCooldown.js`
+  (`normalizeCompany`/`companySlug`), imported by `useGmailInbox.js` so they
+  can't drift; `"Acme, Inc."`/`"Acme Co., Ltd."`/`"Acme"` → `acme`, `Cisco`/
+  `Costco` protected, CJK kept. (2) **validation.js** — `TRACKER_KEY` regex
+  accepts CJK ids (was 400ing the whole KV save); `applyUrl` sanitized at ingest
+  (`http`→`https`, junk dropped) instead of throwing. (3) web had no company-name
+  filters to retire (`roleFilter.js` is already inclusive/no-hardcoded). (4)
+  `.dockerignore` now excludes `ios`/`contracts`; `docs/azure-deploy.md`
+  corrected — **`portal-compile-jp` (japaneast) is the LIVE app** (holds the
+  Gmail queue on Azure Files); `portal-compile` (westus2) is not. Build + 5/5
+  E2E green; normalizer + validation unit-checked. **User to verify Vercel
+  `VITE_API_BASE_URL` points at `-jp`.**
 - **2026-07-18 (later) — Radar table spacing overhaul + tracker save debounce.**
   (1) Radar list de-cluttered: MapPin/Globe2 icons removed from row location/language
   cells (text only; secondary lines muted `#93a0b0`); grid re-proportioned in **all

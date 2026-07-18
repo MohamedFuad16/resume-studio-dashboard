@@ -18,15 +18,18 @@ key(raw):
 
 Synthetic record ids are `gmail-` + key with spaces → `-`.
 
-⚠️ **Known divergence (open):** the web's `CORP` regex strips only the Japanese
-suffixes — `"Acme, Inc."` keys as `acme-inc` on web but `acme` on iOS → two
-records. **Canonical = the list above (strip EN suffixes too).** Web TODO:
-extend `CORP`/`slug` in useGmailInbox.js + reapplyCooldown.js to match.
+✅ **Resolved (2026-07-18, web ADR-0038):** the canonical normalizer (JA + EN
+suffixes) now lives once in `reapplyCooldown.js` as `normalizeCompany`/
+`companySlug`; `useGmailInbox.js` imports it (no local copy to drift). `"Acme,
+Inc."`, `"Acme Co., Ltd."`, `"Acme"` all key as `acme`; single-token names
+(`Cisco`/`Costco`) keep their `co`; CJK preserved. **iOS: confirm `GmailDrain`
+peels stacked suffixes (`Co., Ltd.`) the same way.**
 
-⚠️ **Known server bug (open):** `validation.js` requires tracker KEYS to match
-`/^[a-zA-Z0-9_-]{1,80}$/` — a CJK key (株式会社カナリー → `gmail-株式会社カナリー`)
-fails and 400s the ENTIRE tracker save on the KV path. Signed-in (Firestore)
-saves bypass it. Web TODO: relax the key rule or transliterate server-side.
+✅ **Resolved (2026-07-18, web ADR-0038):** `validation.js` now validates tracker
+KEYS with `TRACKER_KEY = /^[A-Za-z0-9_.\-぀-ヿ一-鿿]{1,200}$/u` (CJK ids like
+`gmail-株式会社カナリー` save fine), and `applyUrl` is sanitized at ingest
+(`sanitizeIngestedUrl`: `http://`→`https://`, unparseable→dropped) instead of
+throwing. A bad URL or CJK id no longer 400s the whole KV-path save.
 
 ## 2. Status rank (monotonic during a drain)
 
