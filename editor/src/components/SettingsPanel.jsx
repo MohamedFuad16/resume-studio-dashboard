@@ -302,7 +302,7 @@ export default function SettingsPanel({
           <div className="modal-card" onClick={e => e.stopPropagation()}>
             <div className="modal-hd">
               <h3>{confirmMode === 'account' ? t.deleteAccount : t.deleteProfile}</h3>
-              <button className="modal-close" onClick={closeConfirm}>
+              <button type="button" className="modal-close" onClick={closeConfirm}>
                 <I n="x" s={14} />
               </button>
             </div>

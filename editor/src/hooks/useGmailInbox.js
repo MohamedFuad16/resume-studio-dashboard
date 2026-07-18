@@ -26,8 +26,11 @@ export function useGmailInbox(profile) {
   const recordsRef = useRef(records);
   const catalogRef = useRef(catalog);
   const busy = useRef(false);
-  recordsRef.current = records;
-  catalogRef.current = catalog;
+  // Keep the latest values for the async drain without retriggering it. Written
+  // in an effect (not during render): React may replay/discard render work, and
+  // the drain only reads these after commit anyway.
+  useEffect(() => { recordsRef.current = records; }, [records]);
+  useEffect(() => { catalogRef.current = catalog; }, [catalog]);
 
   const applyAction = useCallback((action, session) => {
     const status = KIND_TO_STATUS[action.kind];
@@ -116,7 +119,7 @@ export function useGmailInbox(profile) {
 
       // Oldest-first so the latest email's status wins (application → then
       // rejection = rejected), sharing one session map for company convergence.
-      const ordered = [...actions].sort((a, b) => new Date(a.receivedAt || 0) - new Date(b.receivedAt || 0));
+      const ordered = actions.toSorted((a, b) => new Date(a.receivedAt || 0) - new Date(b.receivedAt || 0));
       const session = new Map();
       const appliedIds = [];
       const appliedById = new Map();

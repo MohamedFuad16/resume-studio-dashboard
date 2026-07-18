@@ -33,6 +33,14 @@ Every entry: date · who · what changed · what the OTHER side must do.
   root is its operating prompt; CLAUDE.md rule 6 binds BOTH teams to verify →
   fix → close `doctor/*` PRs for their surface. Web: adopt rule 6 in your
   session habits; nothing else to change.
+- **2026-07-18 · web · Reapply cooldown date is now computed in Asia/Tokyo
+  (normalization.md §5).** `reapplyCooldown.js addMonths` did local-timezone month
+  arithmetic and read the result back with `toISOString().slice(0,10)` (UTC), so
+  `reapplyAfter` came out one day early for any rejection received before 09:00 JST
+  and varied with the browser's timezone — diverging from iOS's `GmailDrain`
+  (`tokyoCalendar` + Tokyo `dayKey`). It now adds months on the email's Tokyo civil
+  date. iOS: nothing to do — already correct; do NOT revert `GmailDrain`'s Tokyo
+  arithmetic.
 - **2026-07-18 · web · Web-side action items 1–4 done (ADR-0038).** (1) merged
   `ios`→`main` per HANDOFF-WEB.md. (2) **Canonical company key adopted**: the
   JA+EN-suffix-stripping normalizer now lives once in `reapplyCooldown.js`

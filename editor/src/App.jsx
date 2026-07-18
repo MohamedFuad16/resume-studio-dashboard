@@ -31,6 +31,13 @@ const EN = TEMPLATES.filter(t => t.lang === 'en');
 const JA = TEMPLATES.filter(t => t.lang === 'ja');
 let _tid = 0;
 
+// Heuristic keyword buckets for the free-text skills parser (module scope: the
+// sets are constant, so building them once beats rebuilding per parsed line, and
+// Set.has beats Array.includes for the per-word lookups below).
+const HEURISTIC_LANGS = new Set(['javascript', 'typescript', 'python', 'java', 'c++', 'c#', 'rust', 'go', 'ruby', 'php', 'swift', 'kotlin', 'sql', 'html', 'css', 'bash', 'shell']);
+const HEURISTIC_FWKS = new Set(['react', 'node', 'express', 'next', 'vue', 'angular', 'svelte', 'django', 'flask', 'spring', 'laravel', 'tailwind', 'bootstrap']);
+const HEURISTIC_TOOLS = new Set(['git', 'docker', 'kubernetes', 'aws', 'gcp', 'azure', 'sqlite', 'mysql', 'postgresql', 'mongodb', 'redis', 'firebase', 'vite', 'webpack', 'npm', 'yarn']);
+
 const chatWelcome = isJa => (
   isJa
     ? 'こんにちは。履歴書について相談したり、応募先に合わせた文章修正を依頼できます。変更する場合は、現在の履歴書を確認してから反映します。'
@@ -266,15 +273,11 @@ function parseResumeTextHeuristically(text) {
       else if (key.includes('spoken') || key.includes('speak') || key.includes('language')) spokenList.push(val);
     } else {
       const words = line.split(/[,\s|]+/).map(w => w.replace(/[:]/g, '').trim()).filter(Boolean);
-      const langs = ['javascript', 'typescript', 'python', 'java', 'c++', 'c#', 'rust', 'go', 'ruby', 'php', 'swift', 'kotlin', 'sql', 'html', 'css', 'bash', 'shell'];
-      const fwks = ['react', 'node', 'express', 'next', 'vue', 'angular', 'svelte', 'django', 'flask', 'spring', 'laravel', 'tailwind', 'bootstrap'];
-      const tls = ['git', 'docker', 'kubernetes', 'aws', 'gcp', 'azure', 'sqlite', 'mysql', 'postgresql', 'mongodb', 'redis', 'firebase', 'vite', 'webpack', 'npm', 'yarn'];
-      
       words.forEach(w => {
         const wl = w.toLowerCase();
-        if (langs.includes(wl)) langsList.push(w);
-        else if (fwks.includes(wl)) fwksList.push(w);
-        else if (tls.includes(wl)) toolsList.push(w);
+        if (HEURISTIC_LANGS.has(wl)) langsList.push(w);
+        else if (HEURISTIC_FWKS.has(wl)) fwksList.push(w);
+        else if (HEURISTIC_TOOLS.has(wl)) toolsList.push(w);
         else if (wl.includes('english') || wl.includes('japanese') || wl.includes('jlpt')) spokenList.push(w);
         else if (w.length > 3) conceptsList.push(w);
       });
@@ -511,11 +514,12 @@ export default function App() {
   const [railOpen, setRailOpen] = useState(() => {
     try { return localStorage.getItem('resume-studio-rail') !== 'closed'; } catch { return true; }
   });
-  const toggleRail = useCallback(() => setRailOpen(open => {
-    const next = !open;
-    try { localStorage.setItem('resume-studio-rail', next ? 'open' : 'closed'); } catch { /* ignore */ }
-    return next;
-  }), []);
+  const toggleRail = useCallback(() => setRailOpen(open => !open), []);
+  // Persist outside the updater: React may run updater functions more than once,
+  // so side effects there can repeat; an effect writes exactly once per change.
+  useEffect(() => {
+    try { localStorage.setItem('resume-studio-rail', railOpen ? 'open' : 'closed'); } catch { /* ignore */ }
+  }, [railOpen]);
   const [applications, setApplications] = useState([]);
   const [activeApp, setActiveApp] = useState(null);
   const [asstCompany, setAsstCompany] = useState('');
@@ -1266,7 +1270,7 @@ export default function App() {
               ))}
             </div>
             <div className="editor-topbar-actions">
-              <button className="btn" onClick={saveNow} disabled={save === 'saving'}>
+              <button type="button" className="btn" onClick={saveNow} disabled={save === 'saving'}>
                 <I n="check" s={12} />
                 {save === 'saving' ? (isJa ? '保存中' : 'Saving') : (isJa ? '保存' : 'Save')}
               </button>
@@ -1343,7 +1347,7 @@ export default function App() {
               {isJa ? '履歴書プレビュー' : 'Resume Preview'}
               {/* Auto-compiled on every change — the manual Update button is gone,
                   but the E2E hook stays as an invisible recompile trigger. */}
-              <button
+              <button type="button"
                 data-testid="compile-btn"
                 style={{ display: 'none' }}
                 onClick={() => compile(resume, template, { force: true })}
@@ -1354,7 +1358,7 @@ export default function App() {
               <div className="p-zoom-grp">
                 <span className="p-zoom-lbl">Zoom</span>
                 {['Fit', 60, 80, 100, 120].map(z => (
-                  <button
+                  <button type="button"
                     key={z}
                     className={`zoom-btn ${zoom === z ? 'active' : ''}`}
                     onClick={() => {
@@ -1399,7 +1403,7 @@ export default function App() {
                 <I n="x" s={22} style={{ color: 'var(--err)' }} />
                 <p style={{ color: 'var(--err)' }}>{isJa ? '作成に失敗しました' : 'Compilation failed'}</p>
                 <p className="err-p">{errMsg.slice(0, 240)}</p>
-                <button className="btn" style={{ marginTop: 4 }} onClick={() => compile(resume, template, { force: true })}>
+                <button type="button" className="btn" style={{ marginTop: 4 }} onClick={() => compile(resume, template, { force: true })}>
                   <I n="sync" s={11} /> {isJa ? '再試行' : 'Retry'}
                 </button>
               </div>
@@ -1426,7 +1430,7 @@ export default function App() {
                 <h3>{activeApp.jobTitle}</h3>
                 <span className="m-subtitle">{activeApp.company} &bull; {activeApp.dateLogged}</span>
               </div>
-              <button className="modal-close" onClick={() => setActiveApp(null)}>
+              <button type="button" className="modal-close" onClick={() => setActiveApp(null)}>
                 <I n="x" s={14} />
               </button>
             </div>
@@ -1451,7 +1455,7 @@ export default function App() {
                 <div className="m-sec">
                   <div className="m-sec-hd">
                     <h4>Auto-Generated Cover Letter</h4>
-                    <button
+                    <button type="button"
                       className="btn"
                       onClick={() => {
                         navigator.clipboard.writeText(activeApp.coverLetter);
@@ -1485,7 +1489,7 @@ export default function App() {
                   </div>
                 )}
               </div>
-              <button className="wizard-close" onClick={() => setShowWizard(false)}>
+              <button type="button" className="wizard-close" onClick={() => setShowWizard(false)}>
                 <I n="x" s={14} />
               </button>
             </div>
@@ -1497,7 +1501,7 @@ export default function App() {
                     Create a new professional resume profile. Choose how you would like to start:
                   </p>
                   <div className="wizard-options">
-                    <button 
+                    <button type="button" 
                       className="wizard-opt-btn"
                       onClick={() => {
                         setWizardData({
@@ -1520,7 +1524,7 @@ export default function App() {
                       </div>
                     </button>
 
-                    <button 
+                    <button type="button" 
                       className="wizard-opt-btn"
                       onClick={() => setWizardStep('pdf-upload')}
                     >
@@ -1575,7 +1579,7 @@ export default function App() {
                     )}
                   </div>
 
-                  <button className="btn" onClick={() => setWizardStep('start')}>Back</button>
+                  <button type="button" className="btn" onClick={() => setWizardStep('start')}>Back</button>
                 </div>
               )}
 
@@ -1631,8 +1635,8 @@ export default function App() {
                   </div>
                   
                   <div className="wizard-actions">
-                    <button className="btn" onClick={() => setWizardStep('start')}>Back</button>
-                    <button className="btn btn-primary" onClick={() => setWizardStep(2)} disabled={!wizardData.personal.nameEn.trim()}>Next</button>
+                    <button type="button" className="btn" onClick={() => setWizardStep('start')}>Back</button>
+                    <button type="button" className="btn btn-primary" onClick={() => setWizardStep(2)} disabled={!wizardData.personal.nameEn.trim()}>Next</button>
                   </div>
                 </div>
               )}
@@ -1653,8 +1657,8 @@ export default function App() {
                   </div>
 
                   <div className="wizard-actions">
-                    <button className="btn" onClick={() => setWizardStep(1)}>Back</button>
-                    <button className="btn btn-primary" onClick={() => setWizardStep(3)}>Next</button>
+                    <button type="button" className="btn" onClick={() => setWizardStep(1)}>Back</button>
+                    <button type="button" className="btn btn-primary" onClick={() => setWizardStep(3)}>Next</button>
                   </div>
                 </div>
               )}
@@ -1668,7 +1672,7 @@ export default function App() {
                     <div className="wizard-list-view">
                       <div className="wizard-list-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                         <p className="wizard-help-text" style={{ margin: 0 }}>Add your universities, colleges, or high schools.</p>
-                        <button className="btn btn-sm" style={{ padding: '5px 10px', background: 'var(--b-focus)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }} onClick={() => {
+                        <button type="button" className="btn btn-sm" style={{ padding: '5px 10px', background: 'var(--b-focus)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }} onClick={() => {
                           const newList = [...(wizardData.education || []), { institution: '', institutionJa: '', location: '', degree: '', degreeJa: '', startDate: '', endDate: '', bullets: [] }];
                           setWizardData({...wizardData, education: newList});
                           setEditingIndex(newList.length - 1);
@@ -1686,8 +1690,8 @@ export default function App() {
                                 <p style={{ margin: 0, fontSize: '11.5px', color: 'var(--t3)' }}>{edu.degree || 'No Degree Specified'} ({edu.startDate || 'N/A'} - {edu.endDate || 'N/A'})</p>
                               </div>
                               <div className="wic-actions" style={{ display: 'flex', gap: '6px' }}>
-                                <button className="btn btn-sm" onClick={() => setEditingIndex(idx)}>Edit</button>
-                                <button className="btn btn-sm btn-delete-profile" onClick={() => {
+                                <button type="button" className="btn btn-sm" onClick={() => setEditingIndex(idx)}>Edit</button>
+                                <button type="button" className="btn btn-sm btn-delete-profile" onClick={() => {
                                   setWizardData({...wizardData, education: wizardData.education.filter((_, i) => i !== idx)});
                                 }}>Delete</button>
                               </div>
@@ -1697,8 +1701,8 @@ export default function App() {
                       </div>
 
                       <div className="wizard-actions">
-                        <button className="btn" onClick={() => setWizardStep(2)}>Back</button>
-                        <button className="btn btn-primary" onClick={() => setWizardStep(4)}>Next</button>
+                        <button type="button" className="btn" onClick={() => setWizardStep(2)}>Back</button>
+                        <button type="button" className="btn btn-primary" onClick={() => setWizardStep(4)}>Next</button>
                       </div>
                     </div>
                   ) : (
@@ -1795,7 +1799,7 @@ export default function App() {
                                   newList[editingIndex].bullets[bIdx] = e.target.value;
                                   setWizardData({...wizardData, education: newList});
                                 }} placeholder="e.g. Major GPA: 3.8/4.0..." style={{ minHeight: '40px', flex: 1 }} />
-                                <button className="bullet-del" style={{ alignSelf: 'center', background: 'transparent', border: 'none', color: 'var(--t3)', cursor: 'pointer' }} onClick={() => {
+                                <button type="button" className="bullet-del" style={{ alignSelf: 'center', background: 'transparent', border: 'none', color: 'var(--t3)', cursor: 'pointer' }} onClick={() => {
                                   const newList = [...wizardData.education];
                                   newList[editingIndex].bullets = newList[editingIndex].bullets.filter((_, i) => i !== bIdx);
                                   setWizardData({...wizardData, education: newList});
@@ -1803,7 +1807,7 @@ export default function App() {
                               </div>
                             ))}
                           </div>
-                          <button className="btn-add-bullet" style={{ marginTop: '6px', fontSize: '11px', color: 'var(--b-focus)', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }} onClick={() => {
+                          <button type="button" className="btn-add-bullet" style={{ marginTop: '6px', fontSize: '11px', color: 'var(--b-focus)', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }} onClick={() => {
                             const newList = [...wizardData.education];
                             newList[editingIndex].bullets = [...(newList[editingIndex].bullets || []), ''];
                             setWizardData({...wizardData, education: newList});
@@ -1812,7 +1816,7 @@ export default function App() {
                       </div>
 
                       <div className="wizard-subform-actions" style={{ display: 'flex', gap: '10px', marginTop: '16px', borderTop: '1px solid var(--b0)', paddingTop: '12px' }}>
-                        <button className="btn btn-primary" onClick={() => {
+                        <button type="button" className="btn btn-primary" onClick={() => {
                           const item = wizardData.education[editingIndex];
                           if (!item.institution.trim()) {
                             toast('Institution name is required', 'error');
@@ -1820,7 +1824,7 @@ export default function App() {
                           }
                           setEditingIndex(-1);
                         }}>Save School</button>
-                        <button className="btn" onClick={() => {
+                        <button type="button" className="btn" onClick={() => {
                           if (!wizardData.education[editingIndex].institution.trim()) {
                             setWizardData({...wizardData, education: wizardData.education.filter((_, i) => i !== editingIndex)});
                           }
@@ -1841,7 +1845,7 @@ export default function App() {
                     <div className="wizard-list-view">
                       <div className="wizard-list-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                         <p className="wizard-help-text" style={{ margin: 0 }}>Add your past or current jobs/internships.</p>
-                        <button className="btn btn-sm" style={{ padding: '5px 10px', background: 'var(--b-focus)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }} onClick={() => {
+                        <button type="button" className="btn btn-sm" style={{ padding: '5px 10px', background: 'var(--b-focus)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }} onClick={() => {
                           const newList = [...(wizardData.experience || []), { company: '', companyJa: '', role: '', roleJa: '', location: '', startDate: '', endDate: '', bullets: [] }];
                           setWizardData({...wizardData, experience: newList});
                           setEditingIndex(newList.length - 1);
@@ -1859,8 +1863,8 @@ export default function App() {
                                 <p style={{ margin: 0, fontSize: '11.5px', color: 'var(--t3)' }}>{exp.role || 'No Role Specified'} ({exp.startDate || 'N/A'} - {exp.endDate || 'N/A'})</p>
                               </div>
                               <div className="wic-actions" style={{ display: 'flex', gap: '6px' }}>
-                                <button className="btn btn-sm" onClick={() => setEditingIndex(idx)}>Edit</button>
-                                <button className="btn btn-sm btn-delete-profile" onClick={() => {
+                                <button type="button" className="btn btn-sm" onClick={() => setEditingIndex(idx)}>Edit</button>
+                                <button type="button" className="btn btn-sm btn-delete-profile" onClick={() => {
                                   setWizardData({...wizardData, experience: wizardData.experience.filter((_, i) => i !== idx)});
                                 }}>Delete</button>
                               </div>
@@ -1870,8 +1874,8 @@ export default function App() {
                       </div>
 
                       <div className="wizard-actions">
-                        <button className="btn" onClick={() => setWizardStep(3)}>Back</button>
-                        <button className="btn btn-primary" onClick={() => setWizardStep(5)}>Next</button>
+                        <button type="button" className="btn" onClick={() => setWizardStep(3)}>Back</button>
+                        <button type="button" className="btn btn-primary" onClick={() => setWizardStep(5)}>Next</button>
                       </div>
                     </div>
                   ) : (
@@ -1968,7 +1972,7 @@ export default function App() {
                                   newList[editingIndex].bullets[bIdx] = e.target.value;
                                   setWizardData({...wizardData, experience: newList});
                                 }} placeholder="e.g. Handled translation for KDDI services..." style={{ minHeight: '40px', flex: 1 }} />
-                                <button className="bullet-del" style={{ alignSelf: 'center', background: 'transparent', border: 'none', color: 'var(--t3)', cursor: 'pointer' }} onClick={() => {
+                                <button type="button" className="bullet-del" style={{ alignSelf: 'center', background: 'transparent', border: 'none', color: 'var(--t3)', cursor: 'pointer' }} onClick={() => {
                                   const newList = [...wizardData.experience];
                                   newList[editingIndex].bullets = newList[editingIndex].bullets.filter((_, i) => i !== bIdx);
                                   setWizardData({...wizardData, experience: newList});
@@ -1976,7 +1980,7 @@ export default function App() {
                               </div>
                             ))}
                           </div>
-                          <button className="btn-add-bullet" style={{ marginTop: '6px', fontSize: '11px', color: 'var(--b-focus)', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }} onClick={() => {
+                          <button type="button" className="btn-add-bullet" style={{ marginTop: '6px', fontSize: '11px', color: 'var(--b-focus)', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }} onClick={() => {
                             const newList = [...wizardData.experience];
                             newList[editingIndex].bullets = [...(newList[editingIndex].bullets || []), ''];
                             setWizardData({...wizardData, experience: newList});
@@ -1985,7 +1989,7 @@ export default function App() {
                       </div>
 
                       <div className="wizard-subform-actions" style={{ display: 'flex', gap: '10px', marginTop: '16px', borderTop: '1px solid var(--b0)', paddingTop: '12px' }}>
-                        <button className="btn btn-primary" onClick={() => {
+                        <button type="button" className="btn btn-primary" onClick={() => {
                           const item = wizardData.experience[editingIndex];
                           if (!item.company.trim()) {
                             toast('Company name is required', 'error');
@@ -1993,7 +1997,7 @@ export default function App() {
                           }
                           setEditingIndex(-1);
                         }}>Save Job</button>
-                        <button className="btn" onClick={() => {
+                        <button type="button" className="btn" onClick={() => {
                           if (!wizardData.experience[editingIndex].company.trim()) {
                             setWizardData({...wizardData, experience: wizardData.experience.filter((_, i) => i !== editingIndex)});
                           }
@@ -2014,7 +2018,7 @@ export default function App() {
                     <div className="wizard-list-view">
                       <div className="wizard-list-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                         <p className="wizard-help-text" style={{ margin: 0 }}>Add academic or personal software/hardware projects.</p>
-                        <button className="btn btn-sm" style={{ padding: '5px 10px', background: 'var(--b-focus)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }} onClick={() => {
+                        <button type="button" className="btn btn-sm" style={{ padding: '5px 10px', background: 'var(--b-focus)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }} onClick={() => {
                           const newList = [...(wizardData.projects || []), { title: '', tech: '', year: '', bullets: [] }];
                           setWizardData({...wizardData, projects: newList});
                           setEditingIndex(newList.length - 1);
@@ -2032,8 +2036,8 @@ export default function App() {
                                 <p style={{ margin: 0, fontSize: '11.5px', color: 'var(--t3)' }}>{proj.tech || 'No Stack Specified'} ({proj.year || 'N/A'})</p>
                               </div>
                               <div className="wic-actions" style={{ display: 'flex', gap: '6px' }}>
-                                <button className="btn btn-sm" onClick={() => setEditingIndex(idx)}>Edit</button>
-                                <button className="btn btn-sm btn-delete-profile" onClick={() => {
+                                <button type="button" className="btn btn-sm" onClick={() => setEditingIndex(idx)}>Edit</button>
+                                <button type="button" className="btn btn-sm btn-delete-profile" onClick={() => {
                                   setWizardData({...wizardData, projects: wizardData.projects.filter((_, i) => i !== idx)});
                                 }}>Delete</button>
                               </div>
@@ -2043,8 +2047,8 @@ export default function App() {
                       </div>
 
                       <div className="wizard-actions">
-                        <button className="btn" onClick={() => setWizardStep(4)}>Back</button>
-                        <button className="btn btn-primary" onClick={() => setWizardStep(6)}>Next</button>
+                        <button type="button" className="btn" onClick={() => setWizardStep(4)}>Back</button>
+                        <button type="button" className="btn btn-primary" onClick={() => setWizardStep(6)}>Next</button>
                       </div>
                     </div>
                   ) : (
@@ -2096,7 +2100,7 @@ export default function App() {
                                   newList[editingIndex].bullets[bIdx] = e.target.value;
                                   setWizardData({...wizardData, projects: newList});
                                 }} placeholder="e.g. Integrated OpenRouter API for voice chat..." style={{ minHeight: '40px', flex: 1 }} />
-                                <button className="bullet-del" style={{ alignSelf: 'center', background: 'transparent', border: 'none', color: 'var(--t3)', cursor: 'pointer' }} onClick={() => {
+                                <button type="button" className="bullet-del" style={{ alignSelf: 'center', background: 'transparent', border: 'none', color: 'var(--t3)', cursor: 'pointer' }} onClick={() => {
                                   const newList = [...wizardData.projects];
                                   newList[editingIndex].bullets = newList[editingIndex].bullets.filter((_, i) => i !== bIdx);
                                   setWizardData({...wizardData, projects: newList});
@@ -2104,7 +2108,7 @@ export default function App() {
                               </div>
                             ))}
                           </div>
-                          <button className="btn-add-bullet" style={{ marginTop: '6px', fontSize: '11px', color: 'var(--b-focus)', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }} onClick={() => {
+                          <button type="button" className="btn-add-bullet" style={{ marginTop: '6px', fontSize: '11px', color: 'var(--b-focus)', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }} onClick={() => {
                             const newList = [...wizardData.projects];
                             newList[editingIndex].bullets = [...(newList[editingIndex].bullets || []), ''];
                             setWizardData({...wizardData, projects: newList});
@@ -2113,7 +2117,7 @@ export default function App() {
                       </div>
 
                       <div className="wizard-subform-actions" style={{ display: 'flex', gap: '10px', marginTop: '16px', borderTop: '1px solid var(--b0)', paddingTop: '12px' }}>
-                        <button className="btn btn-primary" onClick={() => {
+                        <button type="button" className="btn btn-primary" onClick={() => {
                           const item = wizardData.projects[editingIndex];
                           if (!item.title.trim()) {
                             toast('Project title is required', 'error');
@@ -2121,7 +2125,7 @@ export default function App() {
                           }
                           setEditingIndex(-1);
                         }}>Save Project</button>
-                        <button className="btn" onClick={() => {
+                        <button type="button" className="btn" onClick={() => {
                           if (!wizardData.projects[editingIndex].title.trim()) {
                             setWizardData({...wizardData, projects: wizardData.projects.filter((_, i) => i !== editingIndex)});
                           }
@@ -2176,8 +2180,8 @@ export default function App() {
                   </div>
 
                   <div className="wizard-actions">
-                    <button className="btn" onClick={() => setWizardStep(5)}>Back</button>
-                    <button className="btn btn-primary" onClick={() => setWizardStep(7)}>Next</button>
+                    <button type="button" className="btn" onClick={() => setWizardStep(5)}>Back</button>
+                    <button type="button" className="btn btn-primary" onClick={() => setWizardStep(7)}>Next</button>
                   </div>
                 </div>
               )}
@@ -2191,7 +2195,7 @@ export default function App() {
                     <div className="wizard-list-view">
                       <div className="wizard-list-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                         <p className="wizard-help-text" style={{ margin: 0 }}>Add professional associations, certifications, or awards.</p>
-                        <button className="btn btn-sm" style={{ padding: '5px 10px', background: 'var(--b-focus)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }} onClick={() => {
+                        <button type="button" className="btn btn-sm" style={{ padding: '5px 10px', background: 'var(--b-focus)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }} onClick={() => {
                           const newList = [...(wizardData.activities || []), { title: '', org: '', location: '', startDate: '', endDate: '', bullets: [] }];
                           setWizardData({...wizardData, activities: newList});
                           setEditingIndex(newList.length - 1);
@@ -2209,8 +2213,8 @@ export default function App() {
                                 <p style={{ margin: 0, fontSize: '11.5px', color: 'var(--t3)' }}>{act.org || 'No Organization'} ({act.startDate || 'N/A'} - {act.endDate || 'N/A'})</p>
                               </div>
                               <div className="wic-actions" style={{ display: 'flex', gap: '6px' }}>
-                                <button className="btn btn-sm" onClick={() => setEditingIndex(idx)}>Edit</button>
-                                <button className="btn btn-sm btn-delete-profile" onClick={() => {
+                                <button type="button" className="btn btn-sm" onClick={() => setEditingIndex(idx)}>Edit</button>
+                                <button type="button" className="btn btn-sm btn-delete-profile" onClick={() => {
                                   setWizardData({...wizardData, activities: wizardData.activities.filter((_, i) => i !== idx)});
                                 }}>Delete</button>
                               </div>
@@ -2220,8 +2224,8 @@ export default function App() {
                       </div>
 
                       <div className="wizard-actions">
-                        <button className="btn" onClick={() => setWizardStep(6)}>Back</button>
-                        <button className="btn btn-primary" onClick={() => setWizardStep(8)}>Next</button>
+                        <button type="button" className="btn" onClick={() => setWizardStep(6)}>Back</button>
+                        <button type="button" className="btn btn-primary" onClick={() => setWizardStep(8)}>Next</button>
                       </div>
                     </div>
                   ) : (
@@ -2285,7 +2289,7 @@ export default function App() {
                                   newList[editingIndex].bullets[bIdx] = e.target.value;
                                   setWizardData({...wizardData, activities: newList});
                                 }} placeholder="e.g. Conducted workshops on network protocols..." style={{ minHeight: '40px', flex: 1 }} />
-                                <button className="bullet-del" style={{ alignSelf: 'center', background: 'transparent', border: 'none', color: 'var(--t3)', cursor: 'pointer' }} onClick={() => {
+                                <button type="button" className="bullet-del" style={{ alignSelf: 'center', background: 'transparent', border: 'none', color: 'var(--t3)', cursor: 'pointer' }} onClick={() => {
                                   const newList = [...wizardData.activities];
                                   newList[editingIndex].bullets = newList[editingIndex].bullets.filter((_, i) => i !== bIdx);
                                   setWizardData({...wizardData, activities: newList});
@@ -2293,7 +2297,7 @@ export default function App() {
                               </div>
                             ))}
                           </div>
-                          <button className="btn-add-bullet" style={{ marginTop: '6px', fontSize: '11px', color: 'var(--b-focus)', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }} onClick={() => {
+                          <button type="button" className="btn-add-bullet" style={{ marginTop: '6px', fontSize: '11px', color: 'var(--b-focus)', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }} onClick={() => {
                             const newList = [...wizardData.activities];
                             newList[editingIndex].bullets = [...(newList[editingIndex].bullets || []), ''];
                             setWizardData({...wizardData, activities: newList});
@@ -2302,7 +2306,7 @@ export default function App() {
                       </div>
 
                       <div className="wizard-subform-actions" style={{ display: 'flex', gap: '10px', marginTop: '16px', borderTop: '1px solid var(--b0)', paddingTop: '12px' }}>
-                        <button className="btn btn-primary" onClick={() => {
+                        <button type="button" className="btn btn-primary" onClick={() => {
                           const item = wizardData.activities[editingIndex];
                           if (!item.title.trim()) {
                             toast('Activity title is required', 'error');
@@ -2310,7 +2314,7 @@ export default function App() {
                           }
                           setEditingIndex(-1);
                         }}>Save Activity</button>
-                        <button className="btn" onClick={() => {
+                        <button type="button" className="btn" onClick={() => {
                           if (!wizardData.activities[editingIndex].title.trim()) {
                             setWizardData({...wizardData, activities: wizardData.activities.filter((_, i) => i !== editingIndex)});
                           }
@@ -2353,8 +2357,8 @@ export default function App() {
                   )}
 
                   <div className="wizard-actions">
-                    <button className="btn" onClick={() => setWizardStep(7)}>Back</button>
-                    <button
+                    <button type="button" className="btn" onClick={() => setWizardStep(7)}>Back</button>
+                    <button type="button"
                       className="btn btn-submit-app"
                       disabled={!wizardOnboarding && (!wizardData._profileId || !wizardData._profileId.trim())}
                       onClick={async () => {
@@ -2411,13 +2415,13 @@ export default function App() {
           <div className="modal-card" onClick={e => e.stopPropagation()}>
             <div className="modal-hd">
               <h3>Empty Resume Warning</h3>
-              <button className="modal-close" onClick={() => setShowEmptyWarning(false)}>
+              <button type="button" className="modal-close" onClick={() => setShowEmptyWarning(false)}>
                 <I n="x" s={14} />
               </button>
             </div>
             <div className="modal-bd">
               <p>Your resume data is empty. Please enter some details before exporting.</p>
-              <button className="btn" onClick={() => setShowEmptyWarning(false)}>Dismiss</button>
+              <button type="button" className="btn" onClick={() => setShowEmptyWarning(false)}>Dismiss</button>
             </div>
           </div>
         </div>

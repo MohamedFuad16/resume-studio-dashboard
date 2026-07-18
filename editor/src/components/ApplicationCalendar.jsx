@@ -26,6 +26,21 @@ const TOKYO_DATE_KEY = new Intl.DateTimeFormat('en-CA', {
   day: '2-digit',
 });
 
+// Memoized DateTimeFormat factory: constructing an Intl.DateTimeFormat is costly,
+// and the header/weekday/day-cell labels rebuild them every render. `locale` is
+// one of two values here, so a tiny module-scope cache keyed by locale+options
+// keeps one formatter per shape instead of one per render.
+const _dtfCache = new Map();
+const dtf = (locale, options) => {
+  const key = `${locale}|${JSON.stringify(options)}`;
+  let formatter = _dtfCache.get(key);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, options);
+    _dtfCache.set(key, formatter);
+  }
+  return formatter;
+};
+
 // Asia/Tokyo day key for a real instant (Date or ISO/epoch stamp); null when missing
 // or unparseable. Use this for anything derived from a timestamp ("now", applied-at…)
 // so the day is resolved in Tokyo, not in the host timezone.
@@ -210,9 +225,9 @@ export function ApplicationCalendar({ records, addMilestone, removeMilestone, is
 
   const todayKey = instantDateKey(new Date());
   const title = view === 'month'
-    ? new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(anchor)
-    : `${new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(dates[0])} – ${new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', year: 'numeric' }).format(dates[6])}`;
-  const weekdayLabels = Array.from({ length: 7 }, (_, index) => new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(addDays(startOfWeek(new Date(2026, 0, 5, 12)), index)));
+    ? dtf(locale, { month: 'long', year: 'numeric' }).format(anchor)
+    : `${dtf(locale, { month: 'short', day: 'numeric' }).format(dates[0])} – ${dtf(locale, { month: 'short', day: 'numeric', year: 'numeric' }).format(dates[6])}`;
+  const weekdayLabels = Array.from({ length: 7 }, (_, index) => dtf(locale, { weekday: 'short' }).format(addDays(startOfWeek(new Date(2026, 0, 5, 12)), index)));
   const shift = direction => setAnchor(current => view === 'month'
     ? new Date(current.getFullYear(), current.getMonth() + direction, 1, 12)
     : addDays(current, direction * 7));
@@ -283,7 +298,7 @@ export function ApplicationCalendar({ records, addMilestone, removeMilestone, is
             const row = view === 'month' ? Math.floor((firstCol + index) / 7) : 0;
             return (
               <div className={`calendar-day ${key === todayKey ? 'today' : ''}`} key={key} data-col={col} data-row={row} style={gridColumnStart ? { gridColumnStart } : undefined}>
-                <span className="calendar-day-number">{view === 'week' ? new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(date) : date.getDate()}</span>
+                <span className="calendar-day-number">{view === 'week' ? dtf(locale, { month: 'short', day: 'numeric' }).format(date) : date.getDate()}</span>
                 <div className="calendar-day-events">
                   {dayEvents.slice(0, limit).map(event => {
                     const item = { id: event.internshipId, company: event.company, role: event.role, url: event.applyUrl, companyDomain: event.companyDomain, logoUrl: event.logoUrl };

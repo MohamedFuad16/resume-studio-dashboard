@@ -55,12 +55,13 @@ function ItemHeader({ label, index, total, onMove, onDelete, kind, isJa }) {
 }
 
 /* ── Personal — card-grouped layout ────────────────────── */
+const EMAIL_DOMAINS = ['gmail.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'yahoo.com', 'tokai.ac.jp'];
 export function PersonalSec({ data: d, onChange, isJa }) {
   const s = (k, v) => onChange({ ...d, [k]: v });
   const emailParts = (d.email || '').split('@');
   const emailLocal = emailParts[0] || '';
   const emailDomain = emailParts.slice(1).join('@') || 'gmail.com';
-  const emailDomains = ['gmail.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'yahoo.com', 'tokai.ac.jp'];
+  const emailDomains = EMAIL_DOMAINS;
   const [lookupState, setLookupState] = React.useState('idle');
   const [nameEnError, setNameEnError] = React.useState(false);
   const linkedinOk = !d.linkedin || /^https:\/\/(www\.)?linkedin\.com\/in\/[A-Za-z0-9_-]+\/?$/.test(d.linkedin.trim());
@@ -381,7 +382,7 @@ export function EducationSec({ data, onChange, isJa }) {
           </div>
         );
       })}
-      <button className="btn-add-item" data-testid="add-education" onClick={add}>
+      <button type="button" className="btn-add-item" data-testid="add-education" onClick={add}>
         {isJa ? "+ 学歴を追加" : "+ Add education"}
       </button>
     </Sec>
@@ -453,7 +454,7 @@ export function ExperienceSec({ data, onChange, isJa }) {
           </div>
         );
       })}
-      <button className="btn-add-item" data-testid="add-experience" onClick={add}>
+      <button type="button" className="btn-add-item" data-testid="add-experience" onClick={add}>
         {isJa ? "+ 職歴を追加" : "+ Add experience"}
       </button>
     </Sec>
@@ -509,7 +510,7 @@ export function ProjectsSec({ data, onChange, isJa }) {
           </div>
         );
       })}
-      <button className="btn-add-item" data-testid="add-project" onClick={add}>
+      <button type="button" className="btn-add-item" data-testid="add-project" onClick={add}>
         {isJa ? "+ プロジェクトを追加" : "+ Add project"}
       </button>
     </Sec>
@@ -571,7 +572,7 @@ export function ActivitiesSec({ data, onChange, isJa }) {
           </div>
         );
       })}
-      <button className="btn-add-item" data-testid="add-activity" onClick={add}>
+      <button type="button" className="btn-add-item" data-testid="add-activity" onClick={add}>
         {isJa ? "+ 活動・資格を追加" : "+ Add activity"}
       </button>
     </Sec>
@@ -849,9 +850,13 @@ export const CONCEPTS = ["RESTful APIs", "GraphQL", "OOP", "Functional Programmi
 export const SPOKEN = ["English (Native)", "English (Professional)", "English (Conversational)", "Japanese (Native)", "Japanese (Business)", "Japanese (JLPT N1)", "Japanese (JLPT N2)", "Japanese (JLPT N3)", "Spanish", "French", "German", "Chinese", "Korean", "Tamil", "Hindi", "Arabic"];
 
 export function SkillsSec({ data, onChange, isJa }) {
+  // Hook must run on every render: `data` can be a flat array (PDF-import wizard
+  // output) or the grouped object (blank-profile default), and the same mounted
+  // component can see both shapes — a conditional hook would change the hook
+  // order and crash the editor when the shape flips.
+  const [newSkill, setNewSkill] = React.useState('');
   if (Array.isArray(data)) {
     // Flat skills list editor fallback (for E2E tests)
-    const [newSkill, setNewSkill] = React.useState('');
     const add = () => {
       if (newSkill.trim() && !data.includes(newSkill.trim())) {
         onChange([...data, newSkill.trim()]);
@@ -879,8 +884,8 @@ export function SkillsSec({ data, onChange, isJa }) {
             </button>
           </div>
           <div className="flat-skills-tags">
-            {data.map((s, idx) => (
-              <span key={idx} className="tag-pill" data-testid={`skill-tag-${s}`}>
+            {data.map(s => (
+              <span key={s} className="tag-pill" data-testid={`skill-tag-${s}`}>
                 <span className="tag-pill-label">{s}</span>
                 <button type="button" className="tag-pill-remove" data-testid={`delete-skill-${s}`} onClick={() => del(s)}>
                   <I n="x" s={10} />
