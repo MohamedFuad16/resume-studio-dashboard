@@ -644,6 +644,16 @@ struct GmailSettingsView: View {
             }
 
             Section {
+                Button {
+                    Task { await Notifier.sendTest() }
+                } label: {
+                    Label(String(localized: "Send a test notification"), systemImage: "bell.badge")
+                }
+            } footer: {
+                Text("Posts a sample banner in 3 seconds — the same layout, logo, and wording a real discovery uses. Background the app to see it on the lock screen.")
+            }
+
+            Section {
                 if status?.connected == true {
                     Button(String(localized: "Disconnect Gmail"), role: .destructive) {
                         confirmDisconnect = true

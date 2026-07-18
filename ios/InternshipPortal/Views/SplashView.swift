@@ -36,14 +36,18 @@ struct SplashView: View {
         }
     }
 
+    /// Radii are ~1.28× the first pass and the satellites sit ~10% further out
+    /// from the centre to keep the extra size from muddying the cluster. Checked
+    /// against the field box: nothing clips (widest right edge 0.958, lowest
+    /// 0.580 against a 0.68 field).
     private static let orbs: [Orb] = [
-        Orb(id: 0, company: "Rakuten", domain: "rakuten.com", tint: .indigo, x: 0.50, y: 0.34, r: 0.155),
-        Orb(id: 1, company: "NVIDIA", domain: "nvidia.com", tint: .teal, x: 0.28, y: 0.22, r: 0.105),
-        Orb(id: 2, company: "Mercari", domain: "mercari.com", tint: .blue, x: 0.72, y: 0.23, r: 0.095),
-        Orb(id: 3, company: "Cloudflare", domain: "cloudflare.com", tint: .orange, x: 0.15, y: 0.40, r: 0.070),
-        Orb(id: 4, company: "HENNGE", domain: "hennge.com", tint: .purple, x: 0.70, y: 0.45, r: 0.080),
-        Orb(id: 5, company: "1Password", domain: "1password.com", tint: .indigo, x: 0.87, y: 0.35, r: 0.055),
-        Orb(id: 6, company: "Sakana AI", domain: "sakana.ai", tint: .orange, x: 0.35, y: 0.50, r: 0.050),
+        Orb(id: 0, company: "Rakuten", domain: "rakuten.com", tint: .indigo, x: 0.500, y: 0.340, r: 0.198),
+        Orb(id: 1, company: "NVIDIA", domain: "nvidia.com", tint: .teal, x: 0.258, y: 0.208, r: 0.134),
+        Orb(id: 2, company: "Mercari", domain: "mercari.com", tint: .blue, x: 0.742, y: 0.219, r: 0.122),
+        Orb(id: 3, company: "Cloudflare", domain: "cloudflare.com", tint: .orange, x: 0.115, y: 0.406, r: 0.090),
+        Orb(id: 4, company: "HENNGE", domain: "hennge.com", tint: .purple, x: 0.720, y: 0.461, r: 0.102),
+        Orb(id: 5, company: "1Password", domain: "1password.com", tint: .indigo, x: 0.888, y: 0.350, r: 0.070),
+        Orb(id: 6, company: "Sakana AI", domain: "sakana.ai", tint: .orange, x: 0.335, y: 0.516, r: 0.064),
     ]
 
     var body: some View {
@@ -61,12 +65,16 @@ struct SplashView: View {
                         .frame(width: w, height: fieldHeight)
 
                     VStack(spacing: 10) {
+                        // The app's own display voice (SF Pro, tight tracking) —
+                        // the same face the onboarding headings and Home use. The
+                        // serif here was a one-off that read as a different app's
+                        // title card the moment it sat next to the real UI.
                         Text("Internship Portal")
-                            .font(.system(size: 33, weight: .semibold, design: .serif))
-                            .tracking(-0.5)
+                            .font(.system(size: 34, weight: .bold))
+                            .tracking(-0.8)
                             .foregroundStyle(Palette.ink)
                         Text("Every application, one calm place.")
-                            .font(.system(size: 15, weight: .regular))
+                            .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(Palette.ink500)
                     }
                     // The words arrive after the cluster has gathered, so the eye

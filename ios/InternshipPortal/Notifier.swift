@@ -22,8 +22,44 @@ enum Notifier {
     /// Ask once, quietly. A denied prompt is not an error: the drain still works
     /// and the app still updates, you just do not get the banner.
     static func requestAuthorization() async {
+        UNUserNotificationCenter.current().delegate = foregroundPresenter
         _ = try? await UNUserNotificationCenter.current()
             .requestAuthorization(options: [.alert, .sound, .badge])
+    }
+
+    /// Without a delegate, iOS SUPPRESSES a notification while its own app is
+    /// frontmost. That is usually right, but here the banner is how you learn an
+    /// application was discovered — and it is the only way to see one at all while
+    /// testing with the app open.
+    private static let foregroundPresenter = ForegroundPresenter()
+
+    private final class ForegroundPresenter: NSObject, UNUserNotificationCenterDelegate {
+        func userNotificationCenter(
+            _ center: UNUserNotificationCenter,
+            willPresent notification: UNNotification
+        ) async -> UNNotificationPresentationOptions {
+            [.banner, .sound, .list]
+        }
+    }
+
+    /// Post a sample banner so the real thing can be seen on demand — same code
+    /// path, same layout, same logo attachment as a genuine discovery.
+    static func sendTest() async {
+        let content = UNMutableNotificationContent()
+        content.title = "Rakuten"
+        content.body = String(localized: "You applied for Software Engineer Intern")
+        content.sound = .default
+        let candidates = logoCandidateURLs(logoUrl: nil, domain: "rakuten.com", name: "Rakuten")
+        if let attachment = await logoAttachment(candidates: candidates, key: "test-\(Int(Date().timeIntervalSince1970))") {
+            content.attachments = [attachment]
+        }
+        // A short delay, not nil: a banner posted in the same run loop as the tap
+        // can be swallowed, and it gives you a moment to background the app if you
+        // want to see it on the lock screen instead.
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 3, repeats: false)
+        try? await UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: trigger)
+        )
     }
 
     private static var announced: Set<String> {

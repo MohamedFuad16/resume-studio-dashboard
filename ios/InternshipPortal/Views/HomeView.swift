@@ -117,6 +117,11 @@ private struct InsightGrid: View {
     @Environment(CatalogStore.self) private var store
     @Binding var tab: AppTab
 
+    // The donut above already counts applied / interview / rejected, so these four
+    // deliberately answer questions it CANNOT: how am I doing, what is next, what
+    // is about to expire, and am I still moving. Repeating the donut's numbers in
+    // tiles was four cards of decoration.
+
     /// Share of sent applications that got ANY answer (interview or rejection).
     private var heardBack: String {
         let sent = store.count(of: .applied) + store.count(of: .interview) + store.count(of: .rejected)
@@ -125,38 +130,51 @@ private struct InsightGrid: View {
         return "\(Int((Double(answered) / Double(sent) * 100).rounded()))%"
     }
 
+    private var today: String { CatalogStore.dayKey(.now) }
+
+    /// The soonest interview still ahead of you — the one thing on this screen
+    /// that is a commitment rather than a statistic.
+    private var nextInterview: (value: String, sub: String) {
+        let upcoming = store.events
+            .filter { $0.kind == "interview" && $0.date >= today }
+            .sorted { $0.date < $1.date }
+        guard let next = upcoming.first else {
+            return (value: "—", sub: String(localized: "nothing booked"))
+        }
+        return (value: Self.shortDate(next.date), sub: next.company)
+    }
+
+    /// Deadlines inside the next two weeks — what will quietly expire if ignored.
+    private var closingSoon: Int {
+        let horizon = CatalogStore.dayKey(Date(timeIntervalSinceNow: 14 * 86_400))
+        return store.events.filter { $0.kind == "deadline" && $0.date >= today && $0.date <= horizon }.count
+    }
+
+    /// Applications first tracked this calendar month — momentum, not total.
+    private var sentThisMonth: Int {
+        let month = String(today.prefix(7))   // YYYY-MM
+        return store.tracker.values.filter { record in
+            guard let stamp = record.createdAt,
+                  let date = ISO8601DateFormatter.parse(stamp) else { return false }
+            return CatalogStore.dayKey(date).hasPrefix(month)
+        }.count
+    }
+
+    /// "2026-07-24" → "Jul 24", in the user's locale.
+    private static func shortDate(_ key: String) -> String {
+        let parts = key.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3 else { return key }
+        var components = DateComponents()
+        components.year = parts[0]; components.month = parts[1]; components.day = parts[2]
+        guard let date = CatalogStore.tokyoCalendar.date(from: components) else { return key }
+        return date.formatted(.dateTime.month(.abbreviated).day())
+    }
+
     var body: some View {
         VStack(spacing: 12) {
             StatusBreakdownCard { tab = .applications }
 
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                InsightCard(
-                    title: String(localized: "Applied"),
-                    subtitle: String(localized: "sent so far"),
-                    value: "\(store.count(of: .applied))",
-                    action: { tab = .applications }
-                ) {
-                    IconTile(symbol: "paperplane", tint: .sky, size: 36, glyph: 16)
-                }
-
-                InsightCard(
-                    title: String(localized: "Interviews"),
-                    subtitle: String(localized: "in progress"),
-                    value: "\(store.count(of: .interview))",
-                    action: { tab = .applications }
-                ) {
-                    IconTile(symbol: "calendar.badge.clock", tint: .violet, size: 36, glyph: 16)
-                }
-
-                InsightCard(
-                    title: String(localized: "Rejected"),
-                    subtitle: String(localized: "closed doors"),
-                    value: "\(store.count(of: .rejected))",
-                    action: { tab = .applications }
-                ) {
-                    IconTile(symbol: "circle.slash", tint: .rose, size: 36, glyph: 16)
-                }
-
                 InsightCard(
                     title: String(localized: "Heard back"),
                     subtitle: String(localized: "of sent applications"),
@@ -164,6 +182,33 @@ private struct InsightGrid: View {
                     action: { tab = .applications }
                 ) {
                     IconTile(symbol: "arrow.uturn.left", tint: .teal, size: 36, glyph: 16)
+                }
+
+                InsightCard(
+                    title: String(localized: "Next interview"),
+                    subtitle: nextInterview.sub,
+                    value: nextInterview.value,
+                    action: { tab = .calendar }
+                ) {
+                    IconTile(symbol: "calendar.badge.clock", tint: .yellow, size: 36, glyph: 16)
+                }
+
+                InsightCard(
+                    title: String(localized: "Closing soon"),
+                    subtitle: String(localized: "deadlines in 14 days"),
+                    value: "\(closingSoon)",
+                    action: { tab = .calendar }
+                ) {
+                    IconTile(symbol: "clock.badge.exclamationmark", tint: .orange, size: 36, glyph: 16)
+                }
+
+                InsightCard(
+                    title: String(localized: "This month"),
+                    subtitle: String(localized: "new applications"),
+                    value: "\(sentThisMonth)",
+                    action: { tab = .applications }
+                ) {
+                    IconTile(symbol: "chart.line.uptrend.xyaxis", tint: .blue, size: 36, glyph: 16)
                 }
             }
         }

@@ -147,24 +147,54 @@ struct RootView: View {
         }
     }
 
+    /// The status pill. Two states, because "syncing" and "synced" are not the
+    /// same news: a message still in progress (trailing ellipsis) shows a spinner
+    /// and holds longer; a finished one shows a check and leaves quickly. It rises
+    /// and settles on a spring rather than sliding flatly in — the same motion
+    /// language as the rest of the app.
     @ViewBuilder private var toast: some View {
         if let message = store.toast {
+            let working = message.hasSuffix("…")
+
             HStack(spacing: 10) {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(Palette.teal400)
+                Group {
+                    if working {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(Palette.teal400)
+                    } else {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(Palette.teal400)
+                    }
+                }
+                .frame(width: 18, height: 18)
+
                 Text(message)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(.white)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 14)
-            .background(Palette.ink, in: .rect(cornerRadius: Radius.row, style: .continuous))
+            .padding(.horizontal, 18)
+            .padding(.vertical, 13)
+            .background {
+                // Ink, but slightly translucent over a blur so it reads as a layer
+                // floating above the content rather than a flat black slab.
+                Capsule(style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay { Capsule(style: .continuous).fill(Palette.ink.opacity(0.92)) }
+            }
+            .clipShape(.capsule(style: .continuous))
             .floatShadow()
+            .padding(.horizontal, 24)
             .padding(.bottom, 76)   // rides above the system tab bar
-            .transition(.move(edge: .bottom).combined(with: .opacity))
-            .task {
-                try? await Task.sleep(for: .seconds(3))
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { store.toast = nil }
+            .transition(.asymmetric(
+                insertion: .move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.92, anchor: .bottom)),
+                removal: .opacity.combined(with: .scale(scale: 0.96, anchor: .bottom))
+            ))
+            .task(id: message) {
+                try? await Task.sleep(for: .seconds(working ? 6 : 3))
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) { store.toast = nil }
             }
         }
     }

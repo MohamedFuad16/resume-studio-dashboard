@@ -8,6 +8,9 @@ struct ApplicationsView: View {
 
     @State private var filter: ApplicationStatus?
     @State private var showCompanies = false
+    /// Set by the row's Remove action; drives the confirmation below. Deleting a
+    /// tracked application is not undoable, so it asks first.
+    @State private var pendingRemoval: TrackerRecord?
 
     private var companyCount: Int {
         Set(store.internships.map { $0.displayCompany.lowercased() }).count
@@ -80,9 +83,36 @@ struct ApplicationsView: View {
                 LazyVStack(spacing: 10) {
                     ForEach(results) { record in
                         ApplicationCard(record: record) { route = .record(record) }
+                            // Long-press to remove. Not `.swipeActions` — that is
+                            // List-only and this is a LazyVStack of cards. The
+                            // classifier decides what ARRIVES, but nothing else
+                            // could remove a row it got wrong (a role you never
+                            // applied to), so the tracker had no correction path
+                            // short of a full rebuild.
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    pendingRemoval = record
+                                } label: {
+                                    Label(String(localized: "Remove"), systemImage: "trash")
+                                }
+                            }
                     }
                 }
             }
+        }
+        .alert(
+            String(localized: "Remove this application?"),
+            isPresented: .init(get: { pendingRemoval != nil }, set: { if !$0 { pendingRemoval = nil } }),
+            presenting: pendingRemoval
+        ) { record in
+            Button(String(localized: "Remove"), role: .destructive) {
+                let id = record.id
+                pendingRemoval = nil
+                Task { await store.removeRecord(id) }
+            }
+            Button(String(localized: "Cancel"), role: .cancel) { pendingRemoval = nil }
+        } message: { record in
+            Text("\(record.displayCompany) — \(record.displayRole) will be removed from your tracker. If Gmail still has the email, a future sync can bring it back; rebuild from Settings to re-derive everything.")
         }
         .task {
             // Screenshot hook: `simctl launch … -sheet companies`.
