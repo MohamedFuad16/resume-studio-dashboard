@@ -1,5 +1,33 @@
 # Known issues, gotchas & fixes
 
+## Gotchas / hard constraints
+
+### GOTCHA — SQLite file-locking does NOT work on Azure Files (SMB) — 2026-07-19
+- **What happened:** W2 (PLAN-SIMPLIFICATION) swapped `server/storage.js` from
+  sql.js-WASM to native **better-sqlite3** writing directly to the mounted
+  `/data/resume-studio.sqlite`. Deployed to `portal-compile-jp` (rev `0000014`):
+  **reads worked** (catalog served 172 roles) but **every write failed** with
+  `SqliteError: database is locked` (`SQLITE_BUSY`) after waiting the full
+  `busy_timeout`; `sync-now` → HTTP 500.
+- **Root cause:** `/data` is an **Azure Files SMB** share. SQLite's write path
+  needs advisory/byte-range locks + a journal file, which the SMB client does not
+  honor reliably, so SQLite can never take the RESERVED/EXCLUSIVE lock. Reads
+  (SHARED lock) mostly work; writes don't. (WAL is even worse on SMB — needs shared
+  memory — which is why it was already avoided.)
+- **Why sql.js was immune:** it never used SQLite locking — it loaded the whole
+  file into WASM memory and wrote it back with `fs.writeFile` (plain I/O, fine on
+  SMB). That opaque-blob model is exactly why it worked on the mount.
+- **Recovery:** rolled `-jp` back to image `ac9b309` (sql.js) → writes restored
+  (`sync-now` 200, clean `gmail-sync` tally, no lock errors); reverted commit
+  `b9fedf2` so `main` matches prod. Prod DB backed up to
+  `~/Downloads/resume-studio-BACKUP-2026-07-19-preW2.sqlite`. **No data lost** —
+  writes failed loudly, the file was never corrupted.
+- **For any future W2:** better-sqlite3 must run against a **local (container)
+  path** where locking works and snapshot the file to the mount for durability
+  (the sql.js persistence model, native engine) — do NOT open the DB directly on
+  the SMB mount. Alternative: move shared data off file-SQLite (the plan's parked
+  Postgres Phase-2). Either way, **test the WRITE path on Azure before shipping.**
+
 ## Fixed
 
 ### BUG-016 — Every radar deadline rendered urgent-coral — FIXED 2026-07-16

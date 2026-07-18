@@ -2,6 +2,14 @@
 
 Every entry: date · who · what changed · what the OTHER side must do.
 
+- **2026-07-19 · web · W1+W2 attempted then REVERTED — SQLite can't write on
+  Azure Files (SMB).** The better-sqlite3-direct-on-the-mount swap (W2) deployed
+  with working reads but every WRITE failed `SQLITE_BUSY` (file-locking is
+  unsupported on the SMB share; sql.js worked only because it rewrites the whole
+  file, no locks). Rolled the container back to the sql.js image and reverted the
+  commit; prod is stable, no data lost. Storage stays on sql.js for now. **iOS:
+  nothing changed — API/shapes/base-URL all unchanged.** A future W2 must run
+  better-sqlite3 on a local path + snapshot to the mount (see agent/web/errors.md).
 - **2026-07-19 · web · DONE — enrichment fills known-but-sparse companies
   (ADR-0039).** Answers the iOS request below. `sync.js` no longer skips
   `enrichCompany` just because a company appears in the server-side tracker; it
