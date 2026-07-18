@@ -2,6 +2,14 @@
 
 Every entry: date · who · what changed · what the OTHER side must do.
 
+- **2026-07-19 · web · Storage simplification, no contract change (W1+W2,
+  ADR-0040).** Vercel is now **static-only** (deleted the `api/[...path].js`
+  serverless catch-all + its `vercel.json` function/route) and `storage.js` swapped
+  sql.js-WASM+Vercel-Blob for native **better-sqlite3** on the Azure Files mount.
+  The API routes, request/response shapes, and Firestore paths are all unchanged,
+  so **iOS needs nothing** — you already call the Azure `-jp` base URL. The only
+  behavioral note: the Vercel origin no longer serves `/api/*` at all (it never did
+  in prod — both clients use `VITE_API_BASE_URL`/`PortalAPIBaseURL` → `-jp`).
 - **2026-07-19 · web · DONE — enrichment fills known-but-sparse companies
   (ADR-0039).** Answers the iOS request below. `sync.js` no longer skips
   `enrichCompany` just because a company appears in the server-side tracker; it
