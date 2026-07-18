@@ -206,8 +206,9 @@ struct RadarView: View {
                     )
                 } else {
                     LazyVStack(spacing: 10) {
-                        ForEach(results) { item in
+                        ForEach(Array(results.enumerated()), id: \.element.id) { index, item in
                             MatchCard(item: item) { route = .internship(item) }
+                                .smoothAppear(index)
                         }
                     }
                 }

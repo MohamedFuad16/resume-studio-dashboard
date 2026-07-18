@@ -139,7 +139,12 @@ struct InternshipPortalApp: App {
     static func scheduleBackgroundRefresh() {
         let request = BGAppRefreshTaskRequest(identifier: refreshTaskID)
         request.earliestBeginDate = Date(timeIntervalSinceNow: 30 * 60)
-        try? BGTaskScheduler.shared.submit(request)
+        // submitTaskRequest(_:completionHandler:), not the deprecated submit():
+        // iOS 27 reports scheduling failures through the handler that the throwing
+        // form could not surface. A failure here is not actionable (the usual
+        // cause is a request already pending, or the user disabling Background App
+        // Refresh), so it is swallowed — but deliberately, not by omission.
+        BGTaskScheduler.shared.submitTaskRequest(request) { _ in }
     }
 
     /// The background wake's work. ~30s budget from iOS; the drain's own request

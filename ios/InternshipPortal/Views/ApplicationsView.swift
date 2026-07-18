@@ -81,8 +81,9 @@ struct ApplicationsView: View {
                 )
             } else {
                 LazyVStack(spacing: 10) {
-                    ForEach(results) { record in
+                    ForEach(Array(results.enumerated()), id: \.element.id) { index, record in
                         ApplicationCard(record: record) { route = .record(record) }
+                            .smoothAppear(index)
                             // Long-press to remove. Not `.swipeActions` — that is
                             // List-only and this is a LazyVStack of cards. The
                             // classifier decides what ARRIVES, but nothing else
@@ -98,6 +99,9 @@ struct ApplicationsView: View {
                             }
                     }
                 }
+                // The whole list is replaced when a filter changes; without this it
+                // swaps in one frame.
+                .animation(.snappy(duration: 0.35), value: filter)
             }
         }
         .alert(

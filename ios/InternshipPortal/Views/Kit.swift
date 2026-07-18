@@ -490,6 +490,35 @@ struct EmptyNote: View {
 
 /// The component gallery: every piece of the vocabulary on one canvas, so a token
 /// change can be judged everywhere at once instead of screen by screen.
+/// A list row's arrival: a short fade and rise, staggered by position.
+///
+/// Rows used to pop in fully formed the instant data landed, which reads as a
+/// jump — especially after a sync replaces the whole list at once. The stagger is
+/// capped so a long list doesn't make the last row wait: past ~8 rows every row
+/// shares the final delay, and rows below the fold have animated before you ever
+/// scroll to them.
+struct SmoothAppear: ViewModifier {
+    var index: Int
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var shown = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(shown || reduceMotion ? 1 : 0)
+            .offset(y: shown || reduceMotion ? 0 : 12)
+            .task {
+                guard !reduceMotion else { return }
+                try? await Task.sleep(for: .seconds(min(Double(index), 8) * 0.045))
+                withAnimation(.snappy(duration: 0.42)) { shown = true }
+            }
+    }
+}
+
+extension View {
+    /// Stagger a row into view by its position in the list.
+    func smoothAppear(_ index: Int) -> some View { modifier(SmoothAppear(index: index)) }
+}
+
 #if DEBUG
 #Preview("Component gallery") {
     ScrollView {

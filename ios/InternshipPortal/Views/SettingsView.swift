@@ -351,8 +351,15 @@ struct EditProfileView: View {
             VStack(spacing: 20) {
                 // The photo IS the button — tapping your own face to change it
                 // is the convention every profile screen has taught.
+                // `avatar`/`initials` are read into locals FIRST: PhotosPicker's
+                // label builder is a Sendable closure, so touching main-actor
+                // state inside it is a Swift 6 isolation violation (warning now,
+                // error later). The values are plain snapshots — capturing them
+                // is both legal and what the view wants anyway.
+                let currentAvatar = avatar
+                let currentInitials = initials
                 PhotosPicker(selection: $photoItem, matching: .images) {
-                    AvatarView(avatar: avatar, initials: initials, size: 112)
+                    AvatarView(avatar: currentAvatar, initials: currentInitials, size: 112)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(String(localized: "Change photo"))
