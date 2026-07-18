@@ -25,6 +25,34 @@ first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links`
 build and 5 E2E tests green.
 
 ## Recent changes
+
+- **2026-07-19 (later) — README rewritten; W3 foundation laid; W4 spiked and deferred.**
+  README documented a system that no longer exists (Vercel serverless + Blob, no iOS
+  app, no Azure, no Firestore, no contracts); rewritten around what actually runs,
+  including WHY storage looks unusual (SQLite cannot lock on SMB).
+  **W3:** Tailwind emitted with `preflight: false` and the design tokens mapped onto
+  the existing CSS variables, so utilities follow the theme switch — verified in the
+  built bundle (`.bg-panel{background-color:var(--panel)}`), build green, before/after
+  screenshot identical. Migration loop documented in PLAN-SIMPLIFICATION.md; ~8.3k CSS
+  lines remain and `.auth-*` is the suggested first target (renderable without signing
+  in, so parity is directly checkable).
+  **W4:** measured, not assessed — Typst compiles a ported EN résumé cleanly and
+  handles CJK, but is ~3.6x faster here (1.90s → 0.52s), NOT the 10–100x the plan
+  claimed (corrected). Deferred against 8 template rewrites on the documents that
+  produce real résumés. Evidence: docs/typst-spike.md.
+  NB a Playwright run showed 5 failures purely because a dev server held port 5173;
+  with it stopped, 5/5 pass. Not a regression.
+
+- **2026-07-19 — W1+W2 SHIPPED on the second attempt (ADR-0040).** SUPERSEDES the
+  "attempted, REVERTED" entry below — that rollback was real, but the conclusion
+  ("native SQLite is impossible here") was too broad. What is impossible is opening
+  the DB *directly on the mount*: SQLite needs fcntl locks and SMB has none. Running
+  the engine on a LOCAL working copy and snapshotting the finished file to the mount
+  avoids locking entirely — the same property that made sql.js survive. Shipped and
+  verified in prod (revision 0000016): `storage: sqlite-snapshot`, 172 roles,
+  `sync-now` HTTP 200 (the call that 500'd before), zero lock errors, mount file
+  updating. Production DB backed up first. W1 rode along: Vercel is static-only,
+  `@vercel/blob` + `sql.js` removed.
 - **2026-07-19 — W1+W2 attempted, REVERTED (Azure Files can't do SQLite writes).**
   Swapped `storage.js` to native better-sqlite3 on the `/data` mount + made Vercel
   static-only. Reads worked in prod but every WRITE failed `SQLITE_BUSY` — SQLite
