@@ -3,6 +3,8 @@
 // The app is deliberately light: the web owns the résumé editor and the LaTeX
 // compile; the phone owns the things you do away from a desk — checking new
 // roles, moving an application forward, and knowing what is next on the calendar.
+import BackgroundTasks
+import FirebaseAuth
 import FirebaseCore
 import GoogleSignIn
 import SwiftUI
@@ -63,14 +65,19 @@ struct InternshipPortalApp: App {
                 GIDSignIn.sharedInstance.handle(url)
             }
             .onChange(of: scenePhase) { _, phase in
-                guard phase == .active else { return }
-
-                // Coming forward is the app's cue to check the inbox. This is what
-                // makes a new application "just appear": you apply, the reply lands
-                // in Gmail, and the next time you open the app it is already there
-                // with a banner — no pull-to-refresh, no Settings trip.
-                Task { await store.drainGmail() }
-
+                switch phase {
+                case .active:
+                    // Coming forward is the app's cue to check the inbox. This is
+                    // what makes a new application "just appear": you apply, the
+                    // reply lands in Gmail, and the next time you open the app it
+                    // is already there with a banner.
+                    Task { await store.drainGmail() }
+                case .background:
+                    // Going away is the cue to book the next background wake.
+                    Self.scheduleBackgroundRefresh()
+                default:
+                    break
+                }
                 // NB: the splash is shown on COLD LAUNCH only. It used to replay on
                 // every foreground, but taking a screenshot briefly deactivates and
                 // reactivates the app, which made the splash flash back every time
@@ -98,6 +105,43 @@ struct InternshipPortalApp: App {
                 #endif
             }
         }
+        // Background refresh: iOS wakes the app (typically every few hours, at its
+        // own discretion — the earliestBeginDate below is a floor, not a schedule),
+        // the drain pulls whatever Gmail queued, and Notifier posts the "You
+        // applied for <role> at <company>" banner with the real logo. This is how
+        // an application shows up on the phone without the app ever being opened.
+        .backgroundTask(.appRefresh(Self.refreshTaskID)) {
+            await Self.scheduleBackgroundRefresh()   // book the next wake first
+            await backgroundDrain()
+        }
+    }
+
+    static let refreshTaskID = "com.mohamedfuad.internshipportal.refresh"
+
+    /// Ask for a wake no sooner than 30 minutes out. iOS decides the real cadence
+    /// from usage patterns; submitting again while one is pending is a no-op error
+    /// we deliberately ignore.
+    static func scheduleBackgroundRefresh() {
+        let request = BGAppRefreshTaskRequest(identifier: refreshTaskID)
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 30 * 60)
+        try? BGTaskScheduler.shared.submit(request)
+    }
+
+    /// The background wake's work. ~30s budget from iOS; the drain's own request
+    /// timeouts keep it inside that.
+    ///
+    /// A background launch has NO UI: AuthGate never runs, so the store arrives
+    /// empty — no uid, no profile, no tracker. Draining in that state would apply
+    /// actions onto an empty tracker and save it to the wrong store (the KV
+    /// fallback). Restore the Firebase session synchronously and hydrate first;
+    /// a signed-out phone has nothing to sync in the background.
+    @MainActor
+    private func backgroundDrain() async {
+        if store.uid == nil, let uid = Auth.auth().currentUser?.uid {
+            await store.setUser(uid)   // resolves profileID + loads the tracker
+        }
+        guard store.uid != nil else { return }
+        await store.drainGmail()
     }
 }
 

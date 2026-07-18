@@ -129,15 +129,29 @@ extension CatalogStore {
     /// Safe because Gmail rows are DERIVED data: the emails are the source of
     /// truth and are still sitting in the inbox. Anything you added by hand has a
     /// different `source` and is not touched.
-    func rebuildFromGmail(days: Int = 90) async {
-        guard !isRebuilding else { return }
+    /// - Returns: true once the PURGE persisted (the repair happened), whether or
+    ///   not the re-scan landed in time. Callers holding a one-shot trigger must
+    ///   only consume it on true — an early version consumed the trigger even
+    ///   when this bailed (offline, auth not ready, Gmail disconnected), which
+    ///   burned the repair on a bad launch and left the stale rows forever.
+    @discardableResult
+    func rebuildFromGmail(days: Int = 90) async -> Bool {
+        guard !isRebuilding else { return false }
         isRebuilding = true
         defer { isRebuilding = false }
+
+        // A rebuild is only meaningful against the REAL tracker. On a cold launch
+        // the first load can complete before Firebase finishes restoring the
+        // session — uid still nil — and a rebuild in that window would purge the
+        // signed-out KV tracker, report success, and leave the Firestore junk
+        // untouched. That is precisely how earlier repair attempts "succeeded"
+        // while micro1/Turing survived on the phone.
+        guard uid != nil, profileID != nil else { return false }
 
         let profile = profileID ?? PortalAPI.profile
         guard (try? await PortalAPI.gmailStatus(profile: profile))?.connected == true else {
             toast = String(localized: "Connect Gmail first to rebuild.")
-            return
+            return false
         }
         let doomed = tracker.filter { $0.value.source == "gmail" }.count
 
@@ -158,7 +172,7 @@ extension CatalogStore {
         } catch {
             tracker = previous
             toast = String(localized: "Couldn't rebuild — check your connection.")
-            return
+            return false
         }
         // The re-adds that follow are old news, not new arrivals.
         Notifier.resetBaseline()
@@ -182,10 +196,14 @@ extension CatalogStore {
         if !actions.isEmpty {
             // Already purged above, so this applies additively onto the clean base.
             let added = await applyGmailActions(actions, profile: profile, replacingGmailRows: false)
-            toast = String(localized: "Rebuilt \(added) from Gmail — \(doomed) old rows cleared.")
+            // The profile id is in the toast deliberately: if the phone and the web
+            // ever show different data, the first question is whether they are
+            // reading the same tracker document — this answers it on sight.
+            toast = String(localized: "Rebuilt \(added) from Gmail — \(doomed) old rows cleared (\(profile)).")
         } else {
-            toast = String(localized: "Cleared \(doomed) old rows — your internships will reappear as Gmail re-syncs.")
+            toast = String(localized: "Cleared \(doomed) old rows (\(profile)) — internships reappear as Gmail re-syncs.")
         }
+        return true
     }
 
     /// The routine drain: pull whatever Gmail has queued, apply it additively, ack

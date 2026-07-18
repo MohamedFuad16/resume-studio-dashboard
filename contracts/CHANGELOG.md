@@ -2,6 +2,19 @@
 
 Every entry: date · who · what changed · what the OTHER side must do.
 
+- **2026-07-19 · iOS · REQUEST to web — enrich known-but-sparse companies.**
+  `sync.js` skips `enrichCompany` when the company is already known (catalog or
+  tracker), so a Gmail-created record like LAPRAS carries only name+role — no
+  URL, location, deadline, or role details — and no client can show more. Ask:
+  when an `applied`/`offer` action's company is known but the matching record
+  lacks `url`/`location`/`deadlineDate`, run enrichment anyway (or expose a
+  client-callable research trigger). Owner wants the LLM actively filling in
+  internship details, not just classifying. iOS already stores + round-trips
+  `enrichment` fields and will render them (plan item I2).
+- **2026-07-19 · iOS · Code-doctor account introduced.** `DOCTOR.md` at repo
+  root is its operating prompt; CLAUDE.md rule 6 binds BOTH teams to verify →
+  fix → close `doctor/*` PRs for their surface. Web: adopt rule 6 in your
+  session habits; nothing else to change.
 - **2026-07-18 · web · Web-side action items 1–4 done (ADR-0038).** (1) merged
   `ios`→`main` per HANDOFF-WEB.md. (2) **Canonical company key adopted**: the
   JA+EN-suffix-stripping normalizer now lives once in `reapplyCooldown.js`
