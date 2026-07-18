@@ -3,6 +3,17 @@
 ## Gotchas / hard constraints
 
 ### GOTCHA — SQLite file-locking does NOT work on Azure Files (SMB) — 2026-07-19
+
+> **RESOLVED 2026-07-19 (ADR-0040).** The gotcha below is accurate — SQLite
+> cannot lock a file on SMB — but the conclusion "native SQLite is impossible
+> here" was too broad. What is impossible is opening the database *directly on
+> the mount*. Running the engine on a LOCAL working copy and snapshotting the
+> finished file to the mount avoids locking entirely (the mount only ever sees
+> `copyFile`), which is the same property that made sql.js work. Shipped and
+> verified in production: `storage: sqlite-snapshot`, `sync-now` HTTP 200, zero
+> lock errors, mount file updating. Keep the analysis below — it is why the
+> two-tier design exists.
+
 - **What happened:** W2 (PLAN-SIMPLIFICATION) swapped `server/storage.js` from
   sql.js-WASM to native **better-sqlite3** writing directly to the mounted
   `/data/resume-studio.sqlite`. Deployed to `portal-compile-jp` (rev `0000014`):

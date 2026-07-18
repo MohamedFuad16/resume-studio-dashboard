@@ -409,8 +409,6 @@ app.use('/public', express.static(PUBLIC_DIR));
 // persistent:true for months while the container wrote to its ephemeral image
 // layer and lost every live-research result on each restart (BUG-011, ADR-0032).
 async function describePersistence() {
-  if (store.backend === 'vercel-blob-sqlite') return { persistent: true, reason: 'vercel-blob' };
-
   // Outside a container the data dir is a real disk, so it survives a restart.
   const containerized = Boolean(
     process.env.CONTAINER_APP_NAME || process.env.VERCEL || process.env.KUBERNETES_SERVICE_HOST
