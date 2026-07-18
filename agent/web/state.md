@@ -33,8 +33,11 @@ build and 5 E2E tests green.
   (writes restored, verified) and reverted commit `b9fedf2`; `main` == prod, no
   data lost, prod DB backed up. Full root-cause + the correct future approach
   (better-sqlite3 on a LOCAL path + snapshot to the mount) in `agent/web/errors.md`.
-  **W1+W2 are NOT done** — pending a decision on the corrected approach. Storage
-  stays on sql.js. Remaining plan items unchanged: W3 (Tailwind), W4 (Typst).
+  **Owner decision (2026-07-19): keep sql.js, W2 closed** — the engine works on the
+  SMB mount and its only cost is the WASM dep; W2's benefit didn't justify the
+  local-path+snapshot complexity. W1 (Vercel static-only) is available as an
+  optional standalone cleanup if wanted. Remaining plan items: W3 (Tailwind), W4
+  (Typst, optional).
 - **2026-07-19 — W5: enrich known-but-sparse companies (ADR-0039).** Merged the
   07-19 `ios` work into `main` (only conflict: `contracts/CHANGELOG.md`, resolved
   keeping both; my ADR-0038 work preserved) — brings `DOCTOR.md`,
