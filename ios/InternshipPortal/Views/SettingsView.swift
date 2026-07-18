@@ -716,12 +716,35 @@ struct GmailSettingsView: View {
         }
     }
 
+    /// Sync now / Rescan. Both used to look broken: `drainGmail` returns 0 and
+    /// says nothing when there is no queued mail — and, worse, it returns
+    /// IMMEDIATELY while a rebuild owns the queue (the launch-triggered repair
+    /// holds that flag for up to two minutes while it polls). The button flashed
+    /// and nothing happened, with no way to tell "nothing to do" from "blocked".
+    /// Every path now reports itself.
     private func resync(backfill: Bool) {
+        guard !syncing else { return }
+        if store.isRebuilding {
+            store.toast = String(localized: "A rebuild is still running — try again in a moment.")
+            return
+        }
         syncing = true
         Task {
             defer { syncing = false }
-            await store.drainGmail(backfillDays: backfill ? 90 : nil)
+            store.toast = backfill
+                ? String(localized: "Rescanning the last 90 days…")
+                : String(localized: "Checking for new mail…")
+
+            let applied = await store.drainGmail(backfillDays: backfill ? 90 : nil)
             await refresh()
+
+            if applied == 0 {
+                store.toast = backfill
+                    // A backfill outlives this request, so "nothing yet" is the
+                    // honest answer rather than "nothing found".
+                    ? String(localized: "Rescan started — new applications appear as it finishes.")
+                    : String(localized: "No new mail to apply.")
+            }
         }
     }
 

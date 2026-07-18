@@ -6,6 +6,7 @@
 // Firebase SDK lands here, iOS reads/writes the `mohamed_fuad` profile's KV
 // records. It is real, persistent tracking — just not yet the same store as a
 // signed-in web session.
+import FirebaseAuth
 import Foundation
 import Observation
 
@@ -298,6 +299,11 @@ final class CatalogStore {
     }
 
     private func loadTracker() async -> [String: TrackerRecord] {
+        // Adopt a session that Firebase has already restored but AuthGate hasn't
+        // pushed in yet. Without this, a refresh landing in that window read the
+        // KV fallback — a DIFFERENT tracker — and replaced good data with it.
+        if uid == nil, let restored = Auth.auth().currentUser?.uid { uid = restored }
+
         guard let uid else {
             profileID = nil
             return (try? await PortalAPI.fetchTracker()) ?? [:]
@@ -309,12 +315,15 @@ final class CatalogStore {
                 // Signed in, but the account has no profile document yet — the web
                 // seeds one on first login. Say so instead of showing a bare zero.
                 toast = "No résumé profile in this account yet — open the web app once."
-                return [:]
+                return tracker
             }
             return try await FirestoreData.fetchTracker(uid: uid, profile: profile)
         } catch {
+            // Keep what is already on screen. Returning [:] here made a transient
+            // network blip look like "all your applications are gone", and the
+            // next write would then persist that emptiness.
             toast = "Couldn't read your applications: \(error.localizedDescription)"
-            return [:]
+            return tracker
         }
     }
 
@@ -409,13 +418,39 @@ final class CatalogStore {
 
     /// Writes go back to whichever store the read came from, so a signed-in edit
     /// lands in the same document the web reads.
+    /// A signed-in session, even if `uid` hasn't propagated into the store yet.
+    ///
+    /// AuthGate pushes the uid in asynchronously, so there is a window on launch
+    /// where Firebase HAS a user but the store does not know it. Reading Auth
+    /// directly closes that window — without it the store treated the moment as
+    /// "signed out" and silently used the KV fallback.
+    var hasSession: Bool { uid != nil || Auth.auth().currentUser != nil }
+
+    enum TrackerStoreError: LocalizedError {
+        case sessionNotReady
+        var errorDescription: String? { "Your account is still loading." }
+    }
+
+    /// THE one place a tracker write picks its destination.
+    ///
+    /// Signed in → Firestore. Genuinely signed out → the KV fallback. Never
+    /// silently the other one. Writing a signed-in user's tracker to KV is
+    /// exactly how the phone and the web came apart: a rebuild's purge landed in
+    /// the KV store while Firestore kept the stale rows, so every "Refresh data"
+    /// faithfully restored the fake interviews it had just removed.
+    func writeTracker() async throws {
+        if let uid, let profileID {
+            try await FirestoreData.saveTracker(tracker, uid: uid, profile: profileID)
+        } else if hasSession {
+            throw TrackerStoreError.sessionNotReady   // never fall through to KV
+        } else {
+            try await PortalAPI.saveTracker(tracker)
+        }
+    }
+
     private func persist(rollingBackTo previous: [String: TrackerRecord]) async {
         do {
-            if let uid, let profileID {
-                try await FirestoreData.saveTracker(tracker, uid: uid, profile: profileID)
-            } else {
-                try await PortalAPI.saveTracker(tracker)
-            }
+            try await writeTracker()
         } catch {
             tracker = previous   // never let the UI lie about what saved
             toast = "Couldn't save — check your connection."

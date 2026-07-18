@@ -186,11 +186,7 @@ extension CatalogStore {
         let previous = tracker
         tracker = tracker.filter { $0.value.source != "gmail" }
         do {
-            if let uid, let profileID {
-                try await FirestoreData.saveTracker(tracker, uid: uid, profile: profileID)
-            } else {
-                try await PortalAPI.saveTracker(tracker)
-            }
+            try await writeTracker()
         } catch {
             tracker = previous
             toast = String(localized: "Couldn't rebuild — check your connection.")
@@ -453,11 +449,7 @@ extension CatalogStore {
         let previous = tracker
         tracker = next
         do {
-            if let uid, let profileID {
-                try await FirestoreData.saveTracker(tracker, uid: uid, profile: profileID)
-            } else {
-                try await PortalAPI.saveTracker(tracker)
-            }
+            try await writeTracker()
             try? await PortalAPI.gmailAck(ids: acked, profile: profile)
         } catch {
             tracker = previous

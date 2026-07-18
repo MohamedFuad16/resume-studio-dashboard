@@ -72,7 +72,7 @@ struct RootView: View {
         // Same mechanism as the onboarding-review reset — a stored tag, not a
         // launch argument, because devicectl doesn't reliably pass args into
         // NSUserDefaults' argument domain.
-        let rebuildTag = "gmail-rebuild-2026-07-19a"
+        let rebuildTag = "gmail-rebuild-2026-07-19b"   // b: first run may have purged the KV store, not Firestore
         if UserDefaults.standard.string(forKey: "gmailRebuildTag") != rebuildTag {
             Task {
                 // Wait out the auth/hydration race: RootView's first load can
