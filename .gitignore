@@ -33,8 +33,14 @@ __pycache__/
 .DS_Store
 *.log
 
-# Local Claude Code settings + dev launch configs (machine-specific)
-.claude/
+# Claude Code. The agents, skills, hooks and settings.json ARE repo state and are
+# committed (ADR-S-003) — only the per-machine pieces stay out: settings.local.json
+# carries the owner's iMessage handle, and the rest is scratch.
+.claude/*
+!.claude/agents/
+!.claude/skills/
+!.claude/hooks/
+!.claude/settings.json
 editor/.claude/
 # Firebase CLI artifacts (committed config: firebase.json, .firebaserc, firestore.rules)
 editor/.firebase/

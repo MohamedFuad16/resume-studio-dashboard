@@ -20,3 +20,11 @@ Rules:
   same commit.
 - Branch: work on `ios`; integrate through `main`; pull `main` regularly and
   read `contracts/CHANGELOG.md` on every merge.
+- **Before merging any `ios/**` change to `main`, run `/preflight`** (i.e.
+  `scripts/verify-ios.sh`: xcodegen, a generic-iOS build with zero errors,
+  `swiftlint --strict`). This is a hard gate, not a habit: there is no macOS CI
+  and there will not be one, so skipping it ships Swift nobody has compiled —
+  the exact failure the doctor filed as issue #18. Paste its `Verified by` block
+  into the commit or PR body.
+- Commit with `/commit`: Conventional, and never any AI attribution — a hook
+  blocks the ones that carry it.

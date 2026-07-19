@@ -252,6 +252,14 @@ extension CatalogStore {
     ///   rows removed, so the batch fully reconstructs them — used by the rebuild
     ///   to drop rows an older classifier got wrong.
     @discardableResult
+    // KNOWN DEBT — complexity 27 against a limit of 15. This one function carries
+    // company resolution, monotonic status ranking, detail backfill, web-parity
+    // stamps and milestone dedupe, because they all read the same per-action state
+    // and splitting them means threading that state back through. The suppression
+    // is deliberate and local rather than a raised global limit, so the rule keeps
+    // catching anything else that grows this large. Extract when the drain is next
+    // touched for a reason other than a data-correctness fix.
+    // swiftlint:disable:next cyclomatic_complexity
     func applyGmailActions(
         _ actions: [GmailAction], profile: String, replacingGmailRows: Bool
     ) async -> Int {

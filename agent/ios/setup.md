@@ -62,3 +62,31 @@ UserDefaults **tags** are the working pattern (below).
 logo.dev publishable token lives in `Models.swift` (`logoDevToken`) — it is a
 client-side pk_ token by design. `fallback=404` on logo.dev URLs is
 load-bearing (otherwise monograms beat real favicons).
+
+## The preflight gate (required before merging to `main`)
+
+```bash
+scripts/verify-ios.sh          # or /preflight, which picks the surface for you
+brew install swiftlint swiftformat            # first-time setup
+brew install peripheryapp/periphery/periphery # doctor lens only, not a gate
+```
+
+Three steps: `xcodegen generate`, a `generic/platform=iOS` build whose **error
+count must be zero**, and `swiftlint --strict` against `ios/.swiftlint.yml`.
+This is the owner's answer to issue #18 — a local ritual instead of a macOS CI
+runner — so it is the only compiled verification this surface ever gets. On
+pass it prints a `Verified by` block; paste that into the commit or PR body.
+
+Two things that will bite you if you run the tools by hand instead:
+
+- The script exports `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`.
+  Without it SwiftLint aborts with `Loading sourcekitdInProc.framework failed`,
+  because this machine's `xcode-select -p` points at CommandLineTools.
+- `swiftlint:disable:next` must sit **between** `@discardableResult` (or any
+  attribute) and `func`. Placed above the attribute it suppresses the wrong line
+  and you get three errors instead of one — the original, plus "Superfluous
+  Disable Command", plus "Orphaned Doc Comment" if a `///` block got detached.
+
+`.swiftformat` exists but is never run inside a feature commit; formatting
+sweeps are `mech` agent jobs on their own commit, so a real diff never arrives
+buried in whitespace.

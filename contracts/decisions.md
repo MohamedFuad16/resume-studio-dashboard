@@ -46,3 +46,46 @@ correctly dropped 23 non-internships (gig/support mail) and queued 20 real
 internships with real dates. Client-side company-name filters are to be retired
 (web's micro1/gig filters included) — junk in the queue means fixing
 classify.js, not filtering names downstream.
+
+## ADR-S-003 · 2026-07-20 · The agentic toolkit is checked in, and it binds both surfaces
+
+Two devices, two Claude Code sessions, one repo — and until now nothing about
+how those sessions work was written down. Each session invented its own commit
+style, its own idea of "verified", and its own moment to update the docs. The
+symptoms were visible in the history: AI attribution trailers the owner had to
+strip by hand, and issue #18 — a Swift change reaching `main` that nobody had
+ever compiled, because "build it first" lived only in whoever's head was
+driving that day.
+
+Decision: `.claude/` is repo state, not machine state. Committed and shared:
+four subagents (`code-reviewer` on opus for unbiased pre-merge review,
+`verifier` on haiku for the battery, `scribe` on sonnet for doc upkeep, `mech`
+on haiku for rote sweeps), four skills (`commit`, `pr`, `preflight`, `docs`),
+and four hooks. Model choice is deliberate rather than uniform: review is the
+one job where a fresh, expensive, unpersuadable reader earns its cost, and
+running the battery is the one job where a cheap model reading exit codes is
+just as correct.
+
+Two pieces are load-bearing rather than convenience:
+
+- **`scripts/verify-{web,ios}.sh` is a single source of truth**, invoked by the
+  `preflight` skill, the `verifier` agent, and the code doctor alike. When those
+  three ran different commands, "green on my machine" and "the doctor filed a
+  bug" were both true at once.
+- **`guard-commit.sh` blocks AI attribution at the tool call** (`exit 2`, so the
+  refusal is fed back to the model and it retries). A rule stated in CLAUDE.md is
+  advice; a rule that fails the command is a rule. The guard fails *safe* — if it
+  cannot parse the hook payload it scans the raw text rather than allowing the
+  commit through, because a guard that silently permits everything the moment its
+  parser trips is worse than no guard at all.
+
+Two deliberate non-decisions: no push-to-`main` guard (merging into `main` IS
+the workflow under rule 3), and no session-start doctor-PR check (a network
+round-trip on every session start to enforce something rule 6 already says).
+
+Consequence for both teams: pull, then restart the session — **hook
+configuration is read once at session start**, so a session that predates the
+pull is running without the guard. Anything personal (the iMessage handle for
+`notify.sh`) belongs in the uncommitted `.claude/settings.local.json`; with the
+variable unset the notifier is a silent no-op, which is what the second device
+should see. → CLAUDE.md rule 7, DOCTOR.md

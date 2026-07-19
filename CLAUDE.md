@@ -35,3 +35,11 @@ ALWAYS read your surface's `agent.md` first and follow its routing table.
    fix on your branch and close the PR with a comment; if not, close with the
    reason. Never leave one unanswered past a working day, and never merge a
    doctor PR directly — the fix belongs on your branch.
+7. **Toolkit.** Commit with the `/commit` skill: Conventional, surface-scoped,
+   and **never carrying AI attribution** — no `Co-Authored-By: Claude`, no
+   "Generated with…", no 🤖. A `PreToolUse` hook blocks commits and PRs that do.
+   Before merging to `main`, run `/preflight` (the local verification ritual —
+   `scripts/verify-web.sh` / `scripts/verify-ios.sh`; there is no CI for iOS, so
+   skipping it ships unverified Swift), then the `code-reviewer` agent on the
+   diff. After substantive changes, the `scribe` agent updates state.md, ADRs
+   and the contracts changelog. Rote multi-file sweeps go to `mech`.

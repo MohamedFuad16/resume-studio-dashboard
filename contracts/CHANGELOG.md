@@ -2,6 +2,17 @@
 
 Every entry: date · who · what changed · what the OTHER side must do.
 
+- **2026-07-20 · repo · Agentic toolkit checked in — `.claude/` + `scripts/`
+  (ADR-S-003).** Four subagents, four skills, four hooks, and two verification
+  batteries (`scripts/verify-web.sh`, `scripts/verify-ios.sh`) now live in the
+  repo instead of in each device's head. Commits and PRs carry **no AI
+  attribution** — a `PreToolUse` hook blocks the ones that do (CLAUDE.md rule 7).
+  **Other side: pull, then RESTART your Claude Code session** — hook config is
+  read once at session start, so a session older than the pull runs unguarded.
+  Optionally set `CLAUDE_NOTIFY_IMESSAGE` in your own (uncommitted)
+  `.claude/settings.local.json` for iMessage alerts; unset, the notifier is a
+  silent no-op. Nothing about API routes, payloads, or Firestore paths changed.
+
 - **2026-07-19 · web · Storage engine swapped; Vercel is static-only (ADR-0040).**
   The server now runs native SQLite (working copy + snapshot to the mount) instead
   of sql.js, and the Vercel origin no longer serves `/api` at all. **iOS: nothing

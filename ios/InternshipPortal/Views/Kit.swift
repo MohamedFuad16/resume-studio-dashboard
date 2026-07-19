@@ -394,7 +394,6 @@ struct Chevron: View {
     }
 }
 
-
 /// The Gmail envelope, ported from the web's GmailMark.jsx (nominative use, to
 /// label the integration and tag inbox-sourced records). Drawn as paths so it
 /// stays crisp at badge sizes — an SF envelope glyph is not Gmail.

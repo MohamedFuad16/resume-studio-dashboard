@@ -1,0 +1,69 @@
+# SwiftLint for the Internship Portal iOS app.
+#
+# Tuned against the real codebase (37 violations on the first run, each triaged)
+# rather than left at defaults. The principle: a rule stays on only if a violation
+# would be a genuine defect here. A linter reporting dozens of findings you intend
+# to ignore trains you to ignore the linter, and then it catches nothing.
+#
+# Run it through `scripts/verify-ios.sh`, which exports DEVELOPER_DIR — SwiftLint
+# needs it to find sourcekitd, and this machine's `xcode-select` points at
+# CommandLineTools, where loading it fails outright.
+
+disabled_rules:
+  # The view files are long and comment-dense on purpose: they carry the
+  # reasoning behind shader, layout and concurrency decisions.
+  - line_length
+  - file_length
+  - type_body_length
+  - function_body_length     # a SwiftUI `body` is one long expression
+  - identifier_name          # `t`, `w`, `r` are the right names in shader math
+  - todo                     # tracked in agent/*/state.md, not by a linter
+
+  # Trailing commas in multiline literals are this codebase's consistent style,
+  # and they keep a diff to one line when a member is appended.
+  - trailing_comma
+
+  # `Button { } label: { }`, `SettingsRow(...) { }` — the standard SwiftUI
+  # shapes. The rule was written for UIKit completion handlers.
+  - multiple_closures_with_trailing_closure
+
+  # Fires where an explanatory comment sits between `if` and `else if` (the
+  # JSONValue decoder's "Bool before number" note, for one). The comment is the
+  # point; collapsing the branches to satisfy the rule would delete where it sits.
+  - statement_position
+
+opt_in_rules:
+  - empty_count
+  - closure_spacing
+  - contains_over_first_not_nil
+  - redundant_nil_coalescing
+  - unowned_variable_capture
+  - weak_delegate
+  - toggle_bool
+  - last_where
+  - first_where
+
+# Kept on, with limits that match the code: a labelled 5-member accumulator tuple
+# and a 3-point Bézier triple read fine; anything larger should become a struct.
+large_tuple:
+  warning: 5
+  error: 7
+
+# SwiftUI bodies and the enum-mapping helpers branch a lot without being complex.
+cyclomatic_complexity:
+  warning: 15
+  error: 25
+
+# `P` is a deliberate local alias for CGPoint in the Google-mark Bézier tables.
+type_name:
+  min_length: 1
+  max_length: 50
+
+excluded:
+  - InternshipPortal.xcodeproj
+  - .build
+
+# Warnings, not errors, so a Debug build still runs while you fix them — but both
+# fail `swiftlint --strict`, which is what the preflight gate uses.
+force_cast: warning
+force_try: warning

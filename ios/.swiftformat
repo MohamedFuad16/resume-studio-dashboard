@@ -1,0 +1,16 @@
+# SwiftFormat for the Internship Portal iOS app.
+#
+# Formatting runs are `mech` agent jobs on their own commit — never mixed into a
+# feature change, where a hundred reformatted lines would bury the three that
+# matter.
+
+--swiftversion 6.0
+--indent 4
+--maxwidth 100
+
+# redundantSelf: Swift 6 actor isolation reads far more clearly with explicit
+# `self.` at capture points, and stripping it makes @MainActor boundaries harder
+# to see. wrapMultilineStatementBraces: fights SwiftUI's modifier chains.
+--disable redundantSelf,wrapMultilineStatementBraces
+
+--exclude InternshipPortal.xcodeproj,.build

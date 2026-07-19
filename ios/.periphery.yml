@@ -1,0 +1,12 @@
+# Periphery — dead Swift code detection. Run by the code-doctor account, not by
+# the pre-merge gate: unused-code findings are a cleanup backlog, not a reason to
+# block a merge.
+project: InternshipPortal.xcodeproj
+schemes:
+  - InternshipPortal
+targets:
+  - InternshipPortal
+# #Preview bodies look unused to static analysis but are the whole point of the
+# preview fixtures.
+retain_swift_ui_previews: true
+retain_public: false

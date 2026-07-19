@@ -21,6 +21,38 @@ inbox (80 scanned → 20 real internships queued, 23 non-internships dropped).
 
 ## Recent changes
 
+- **2026-07-20 — Repo agentic toolkit + the iOS static-analysis trio (ADR-S-003).**
+  `.claude/` is now committed repo state shared by both devices: four subagents,
+  four skills, four hooks. What matters on this side is `scripts/verify-ios.sh` —
+  xcodegen, a generic-iOS build whose error count must be zero, and
+  `swiftlint --strict` — run via `/preflight` before every merge to `main`. There
+  is no macOS CI and there will not be one (owner's call on issue #18), so this
+  script is the only thing between a Swift change and `main`. It exports
+  `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`; without it
+  SwiftLint dies loading sourcekitd, because this machine's `xcode-select` points
+  at CommandLineTools.
+  `.swiftlint.yml` was tuned against the 37 violations of its first real run
+  rather than left at defaults — `trailing_comma`, `multiple_closures_with_trailing_closure`
+  and `statement_position` are off because each fights a deliberate idiom here
+  (trailing commas keep append-diffs to one line; `Button { } label: { }` is the
+  standard SwiftUI shape the rule predates; the third fires wherever an
+  explanatory comment sits between `if` and `else if`). Limits were raised where
+  the code is honestly fine (`large_tuple` 5, `cyclomatic_complexity` 15) and
+  exactly one violation was a real defect — a stray double blank in `Kit.swift`.
+  `applyGmailActions` carries a local `swiftlint:disable:next cyclomatic_complexity`
+  with a debt note: complexity 27 against a limit of 15, suppressed narrowly so
+  the rule keeps catching anything *else* that grows that large. Placement is
+  fussy — the comment must sit between `@discardableResult` and `func`, since the
+  violation is reported at the `func` line; above the attribute it orphans the doc
+  comment and adds a "Superfluous Disable Command" error on top of the original.
+  Also confirmed here: PR #15's merged `companyKey` rewrite compiles with zero
+  errors and zero warnings — the specific thing issue #18 said nobody had checked.
+  `.swiftformat` and `.periphery.yml` landed too; formatter runs are `mech` jobs,
+  never mixed into a feature commit, and periphery stays a doctor lens rather than
+  a merge gate.
+  **After pulling this, restart your session** — hook config is read once at
+  session start, so the commit guard is inert in a session older than the pull.
+
 - **2026-07-18 — Repo split executed (ADR-S-001) + loss-proof tracker writes (ADR-I-014).**
   agent/ split into ios/ + web/ with disjoint ADR spaces; contracts/ created and
   populated from both teams' audits; CLAUDE.md rewritten as the two-surface router;
