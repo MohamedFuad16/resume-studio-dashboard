@@ -10,8 +10,16 @@ No secrets are committed in source. Configuration is environment-variable driven
 
 ## Environment variables (consumed in code)
 Secret / sensitive:
-- `BLOB_READ_WRITE_TOKEN` — Vercel Blob read/write token (durable SQLite snapshots,
-  used in `server/storage.js`). **Secret.**
+- `GOOGLE_CLIENT_SECRET` (with `GOOGLE_CLIENT_ID`, `GOOGLE_OAUTH_REDIRECT_URI`) —
+  Gmail read-only OAuth (`server/gmail/*`). **Secret.**
+- `GMAIL_TOKEN_ENC_KEY` — AES-256-GCM key encrypting the stored Gmail token
+  (`server/gmail/store.js`). **Secret.**
+
+Retired (do NOT set; no code reads them since ADR-0040 / the Azure move):
+`BLOB_READ_WRITE_TOKEN`, `RESUME_STUDIO_DB_BLOB_KEY` — the Vercel Blob path is
+gone; durable storage is the Azure Files mount (`RESUME_STUDIO_DATA_DIR=/data`)
+with a local better-sqlite3 working copy (`RESUME_STUDIO_DB_WORKDIR`, defaults
+to the OS tmpdir — must be real local disk, not the SMB mount).
 
 Configuration (not secret, but environment-specific):
 - `PORT` (default `5005`) — Express port (`server/index.js`).

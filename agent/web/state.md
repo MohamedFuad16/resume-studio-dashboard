@@ -1,28 +1,20 @@
 # Project state
 
-## Overhaul plan status (PLAN-2026-07-03) — 2026-07-03
-All phases complete on branch `feat/firebase-auth-firestore` (pushed, not merged to main):
-Phase 4 (auth gate + login), Phase 2-migration (client-direct Firestore), Phase 0 (bug fixes),
-Phase 1 (data/logos), Phase 2 (Settings + profile menu), Phase 3 (live-search key/CTA), Phase 5
-(editor Present pill), Phase 6 (Jake's Clean JA), Phase 7 (LLM audit), Phase 8 (audit + cleanup).
-**Deployed to prod: through Phase 0 only** (editor-omega-two.vercel.app) — Phases 1/2/3/5/6/7/8 are
-committed+pushed but NOT yet redeployed. Deferred: App.jsx + index.css splits (org-only; spawned as
-separate tasks).
-
 ## Current state summary
 Two-track résumé project. **Track A — Internship Portal** (`editor/`): React 18 + Vite
-client and an ESM Node/Express server with sql.js (SQLite) KV storage (Vercel Blob in
-prod), Tectonic-based LaTeX compile, an internship radar/tracker, an application
-calendar, and an AI application assistant (OpenRouter `gpt-5-mini`). **Track B**: static
-LaTeX résumés (`en/`, `ja/`) compiled by `build_all.sh` to `output/`. Latest refresh
-(2026-07-03): **Firebase Auth gate + full per-user Firestore migration** (project
-`resume-841f9`) — Email/Password + Google sign-in wall (redesigned bilingual login window),
-open sign-up; per-user data (profiles/résumé, tracker, applications) now lives in Firestore
-under `users/{uid}/...` via a client-direct data layer with owner-only rules; the `/api/*`
-KV/Blob path is kept only for the no-auth/E2E case; the internship catalog stays server-seeded. Prior (2026-07-02): official-source catalog audit
-with runtime retirements, 173 live seed roles, profile-aware HENNGE/Rakuten ranking, and the
-first JA editor option mapped to Jake's Clean Japanese. `validate:catalog:links` 173/173 live;
-build and 5 E2E tests green.
+client and an ESM Node/Express server with a better-sqlite3 KV store (local working
+copy + snapshot to the durable path per write, ADR-0040; prod durability = the Azure
+Files mount `/data`), Tectonic-based LaTeX compile, an internship radar/tracker, an
+application calendar, a Gmail→tracker ingest pipeline, and an AI application
+assistant (OpenRouter). Signed-in users' data lives client-direct in Firestore
+`users/{uid}/**` (project `resume-841f9`, owner-only rules); the server KV holds
+only the shared catalog, the Gmail queue, and the no-auth/E2E path. Prod topology:
+Vercel serves the static client (portal.mohamedfuad.com); ALL `/api` runs on Azure
+Container Apps `portal-compile-jp` (japaneast) via `VITE_API_BASE_URL`. **Track B**:
+static LaTeX résumés (`en/`, `ja/`) compiled by `build_all.sh` to `output/`.
+(The 2026-07-03 overhaul-plan status that used to sit here described the
+feat/firebase-auth-firestore rollout, long since merged and deployed — see the
+dated entries below for history.)
 
 ## Recent changes
 
