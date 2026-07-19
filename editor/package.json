@@ -15,7 +15,8 @@
     "refresh:catalog": "node server/refresh-catalog.js",
     "audit:catalog:llm": "node server/audit-catalog-llm.js",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "lint": "eslint src server"
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",
@@ -29,6 +30,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.44.1",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
@@ -38,6 +40,9 @@
     "@vitejs/plugin-react": "^4.3.0",
     "autoprefixer": "^10.4.19",
     "concurrently": "^8.2.2",
+    "eslint": "^10.7.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.7.0",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",
     "typescript": "^5.4.5",

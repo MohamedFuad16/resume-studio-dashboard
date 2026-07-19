@@ -18,6 +18,35 @@ dated entries below for history.)
 
 ## Recent changes
 
+- **2026-07-20 — ESLint exists again; `scripts/verify-web.sh` is now the battery
+  (ADR-S-003).** The doctor's every-run "eslint skipped — no config" gap is
+  closed by `editor/eslint.config.js`, deliberately small: react-doctor stays the
+  deep scanner, and ESLint is here for the one thing an on-demand scan cannot
+  give you — rules-of-hooks in the editor as you type. That rule has already
+  caught a real crash in this codebase (`SkillsSec` calling useState inside a
+  conditional, so a résumé whose `skills` arrived as an array changed the hook
+  count between renders; PR #14). `eslint-plugin-react` is deliberately absent —
+  its peer range stops at eslint 9 and it overlaps react-doctor almost entirely.
+  Baseline is ~60 findings (21 errors) on existing code, mostly eslint 10's newer
+  rules (`preserve-caught-error` ×7, `no-case-declarations` ×6, plus 4
+  irregular-whitespace worth a look). So `verify-web.sh` runs eslint **advisory —
+  WARN, never FAIL**; gating on a pre-existing backlog would block every commit
+  and teach everyone to ignore the gate. Promote it to gating once the backlog is
+  cleared.
+  The battery itself (`scripts/verify-web.sh`) is build · `validate:catalog` ·
+  Playwright · react-doctor, and it is what the doctor now runs too, so both
+  sides measure the same thing. Two gotchas are encoded in it rather than
+  rediscovered: **a git worktree gets its own `node_modules`, and merging a
+  branch that changed dependencies does not reinstall them** — the script names
+  the missing packages and tells you to `npm ci`, which is exactly how the ios
+  worktree was silently missing `better-sqlite3` after the W1/W2 swap; and a dev
+  server holding **port 5173** makes every Playwright spec fail like a code
+  regression, so the script says so instead.
+  The react-doctor baseline is **46, not the 49** issue #13 recorded. Nothing
+  regressed — react-doctor is invoked unpinned (`@latest`), so the tool moved
+  under us. The score is also only machine-readable in the share URL (`?…&s=46`);
+  the human banner is boxed ANSI art. Treat 46 as a floor, not a target.
+
 - **2026-07-19 (later) — README rewritten; W3 foundation laid; W4 spiked and deferred.**
   README documented a system that no longer exists (Vercel serverless + Blob, no iOS
   app, no Azure, no Firestore, no contracts); rewritten around what actually runs,
