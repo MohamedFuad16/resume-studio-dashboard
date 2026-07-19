@@ -32,7 +32,3 @@ export function isInternshipApplication(record) {
   return INTERNSHIP_MARKERS.test(`${record.role || ''} ${record.company || ''}`);
 }
 
-/** Keep only internship applications (drops gigs / non-internships). */
-export function internshipRecordsOnly(records) {
-  return (records || []).filter(isInternshipApplication);
-}

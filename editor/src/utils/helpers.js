@@ -17,10 +17,6 @@ export function debounce(fn, delay) {
   return debounced;
 }
 
-// Deep clone
-export function clone(obj) {
-  return JSON.parse(JSON.stringify(obj));
-}
 
 export const TEMPLATES = [
   { id: 'en_01', label: "Jake's Clean",   lang: 'en' },

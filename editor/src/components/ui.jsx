@@ -116,7 +116,7 @@ export function Sec({ icon, label, count, children, open: init = false, testId, 
 }
 
 /* ── Field primitives ───────────────────────────────────── */
-export const Lbl = ({ t }) => <span className="fl">{t}</span>;
+const Lbl = ({ t }) => <span className="fl">{t}</span>;
 
 export function Inp({ label, value, onChange, placeholder, type = 'text', ...props }) {
   return (

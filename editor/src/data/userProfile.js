@@ -34,11 +34,6 @@ export async function syncUserDoc(user) {
   await setDoc(ref, base, { merge: true });
 }
 
-export async function getUserDoc(uid) {
-  if (!authAvailable || !db || !uid) return null;
-  const snap = await getDoc(userDocRef(uid));
-  return snap.exists() ? snap.data() : null;
-}
 
 // Deletes the users/{uid} identity doc. Part of account deletion — without it the
 // account's email/displayName would outlive the account itself, since the rules

@@ -665,9 +665,6 @@ export function displayCompany(item, isJa = false) {
   return isJa ? (item.companyJa || info.ja || item.company) : item.company;
 }
 
-export function brandInfo(item) {
-  return COMPANY_DISPLAY[item.company] || { brand: 'default', mark: item.company };
-}
 
 // De-duplicate a rendered bullet list case-insensitively, preserving the first
 // occurrence and order. This prevents repeated eligibility bullets — e.g. several
