@@ -6,9 +6,9 @@
   pipeline shell out to it. Default path `/opt/homebrew/bin/tectonic` (override with
   `TECTONIC_PATH`). Install: `brew install tectonic`.
 - **Python 3** + `PyMuPDF` (`pip install pymupdf`) only for the LaTeX E2E tests.
-- (Optional) **d2** for regenerating `agent/graph/architecture.svg`: `brew install d2`.
+- (Optional) **d2** for regenerating `agent/web/graph/architecture.svg`: `brew install d2`.
 
-## Resume Studio web app (`editor/`)
+## Internship Portal web app (`editor/`)
 
 ```bash
 cd editor
@@ -30,19 +30,28 @@ The Vite dev server proxies `/api` and `/public` to `http://localhost:5005`
 (`editor/vite.config.js`).
 
 ### Environment variables (web app)
-All optional for local dev; see `agent/secrets.md` for full pointers.
-- `PORT` (default `5005`), `RESUME_STUDIO_DATA_DIR` (default `server/.data`).
+All optional for local dev; see `agent/web/secrets.md` for full pointers.
+- `PORT` (default `5005`), `RESUME_STUDIO_DATA_DIR` (default `server/.data` — where
+  the durable SQLite snapshot lives; the Azure Files mount `/data` in prod).
+- `RESUME_STUDIO_DB_WORKDIR` — where the LIVE better-sqlite3 working copy opens
+  (default: OS tmpdir). Must be real local disk; SQLite locking does not work on
+  the SMB mount (ADR-0040 — see `server/storage.js` header).
 - `TECTONIC_PATH` (default `/opt/homebrew/bin/tectonic`).
-- `BLOB_READ_WRITE_TOKEN`, `RESUME_STUDIO_DB_BLOB_KEY` — Vercel Blob persistence.
-- `RESUME_CHAT_ENGINE` (`local` | default Codex), `RESUME_CHAT_CODEX_TIMEOUT_MS`.
+- `RESUME_CHAT_ENGINE=local` forces deterministic edits; default is OpenRouter
+  (`OPENROUTER_API_KEY`). `RESUME_CHAT_CODEX_TIMEOUT_MS` is the request timeout
+  (legacy name; no Codex CLI involved).
 - `INTERNSHIP_RESEARCH_TIMEOUT_MS`.
 - `RESUME_STUDIO_APP_ORIGIN`, `VERCEL_URL`, `VERCEL_PROJECT_PRODUCTION_URL` — CORS.
-- `VITE_API_BASE_URL` (client; default same-origin).
+- `VITE_API_BASE_URL` (client) — MUST point at the Azure API in prod; the Vercel
+  origin is static-only. Same-origin default works only in local dev (Vite proxy).
 
 ### Deploy
-From `editor/`: `vercel`. Client is a Vite build; the Express API is exposed via
-`editor/api/[...path].js`. For durable prod writes, connect a Vercel Blob store and
-set `BLOB_READ_WRITE_TOKEN` (otherwise writes are ephemeral per cold start).
+Client: Vite build served statically by Vercel (`vercel deploy --prod` from the
+repo root) — the Vercel origin serves NO `/api`. Server (API + compile + Gmail +
+catalog loops): the root `Dockerfile` deployed to Azure Container Apps
+(`portal-compile-jp`, RG `internship-portal`, japaneast) with Azure Files mounted
+at `/data` (`RESUME_STUDIO_DATA_DIR=/data`). Build with `az acr build --file
+Dockerfile .`, then update the container app — see `docs/azure-deploy.md`.
 
 ## LaTeX résumé pipeline (repo root)
 

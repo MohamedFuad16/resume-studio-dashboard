@@ -1,10 +1,14 @@
-# Web knowledge base — Resume (Resume Studio + LaTeX résumés)
+# Web knowledge base — Internship Portal (web app + LaTeX résumés)
 
-Bilingual (EN/JA) résumé project: a React + Node "Resume Studio" web app (`editor/`)
-plus a LaTeX résumé build pipeline (`en/`, `ja/` → `output/` PDFs via `build_all.sh`).
+Bilingual (EN/JA) résumé project: the React + Node "Internship Portal" web app
+(`editor/`) plus a LaTeX résumé build pipeline (`en/`, `ja/` → `output/` PDFs via
+`build_all.sh`).
 
-**Stack:** React 18 + Vite, Node/Express (ESM), sql.js (SQLite) + Vercel Blob,
-Tectonic/XeLaTeX, Playwright, Tailwind. Deployed to Vercel (`editor/api/[...path].js`) + Azure Container Apps (compile/Gmail).
+**Stack:** React 18 + Vite, Node/Express (ESM), better-sqlite3 (local working copy
++ snapshot to the durable mount, ADR-0040), Firebase Auth + client-direct Firestore
+(per-user data), Tectonic/XeLaTeX, Playwright, Tailwind. Deployed as a static Vite
+client on Vercel + the full API on Azure Container Apps (`portal-compile-jp`,
+japaneast — compile/Gmail/catalog; the Vercel origin serves NO `/api`).
 
 > This is the WEB team's knowledge base. iOS lives in `agent/ios/`; anything both
 > clients depend on is contract-bound in `contracts/` — read `contracts/README.md`
@@ -34,5 +38,3 @@ Tectonic/XeLaTeX, Playwright, Tailwind. Deployed to Vercel (`editor/api/[...path
 - After changes, update `agent/web/state.md` (summary + dated entry) and append an ADR
   to `agent/web/decisions.md` for notable decisions. Record bugs in `agent/web/errors.md`.
 
-Legacy/auxiliary (do NOT delete): `.agents/`, `.workflow/`, `graphify-out/`,
-`graphify_root` (older coordination + code-structure artifacts).

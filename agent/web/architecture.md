@@ -2,23 +2,31 @@
 
 The repo has **two independent tracks** that share the same résumé content.
 
-## Track A — Resume Studio web app (`editor/`)
+## Track A — Internship Portal web app (`editor/`)
 
-A local-first / Vercel-deployable bilingual résumé editor, internship tracker, and
-LaTeX→PDF compiler.
+A bilingual résumé editor, internship tracker, and LaTeX→PDF compiler. Signed-in
+users' data lives client-direct in Firestore (`users/{uid}/**`, CLAUDE.md rule 4);
+the Express server holds only the shared catalog, compile, and the Gmail queue.
 
 ```
 Browser (React 18 + Vite SPA, editor/src)
-  │  fetch  /api/*   (vite dev proxy → :5005, or Vercel function in prod)
+  │  fetch  /api/*   (vite dev proxy → :5005 locally; the Azure Container App in
+  │                   prod via VITE_API_BASE_URL — the Vercel origin is static-only)
   ▼
 Express app (editor/server/index.js, ESM)
-  ├─ storage.js      → sql.js (WASM SQLite) KV table `kv`
-  │                     local file: server/.data/resume-studio.sqlite
-  │                     prod:       Vercel Blob (versioned snapshots)
+  ├─ storage.js      → better-sqlite3 KV table `kv` (ADR-0040): live working copy
+  │                     on LOCAL disk (RESUME_STUDIO_DB_WORKDIR), snapshotted to
+  │                     the durable path after every write
+  │                     local: server/.data/resume-studio.sqlite
+  │                     prod:  Azure Files mount /data (SMB — no SQLite locking,
+  │                            hence the working-copy design; see storage.js header)
   ├─ templates.js    → generateLatex(template, resume) → .tex string
   │                     → tectonic (XeLaTeX) child process → PDF bytes
   ├─ seeds/*         → internship catalog (static dataset, enriched at read)
-  ├─ resume-chat.js  → AI "application assistant" (local heuristics or Codex CLI)
+  ├─ resume-chat.js  → AI "application assistant" (OpenRouter; deterministic local
+  │                     edits when keyless or RESUME_CHAT_ENGINE=local)
+  ├─ gmail/*         → read-only Gmail OAuth + classify → per-profile action queue
+  │                     (clients drain it into Firestore; contracts/gmail-action.md)
   └─ internship-research.js → live company internship lookup (async jobs)
 ```
 
@@ -62,7 +70,7 @@ tests/              → Python (PyMuPDF) opaque-box E2E suite over the PDFs
 ```
 
 `build_all.sh` compiles EN 01–04 and JA 01–03 with `tectonic`, copies results into
-`output/`, and prints a pass/fail tally. The `tests/` suite (see `agent/tests.md`)
+`output/`, and prints a pass/fail tally. The `tests/` suite (see `agent/web/tests.md`)
 validates page counts, fonts (Mincho vs Gothic), no-italic-CJK, and content accuracy.
 
 ### Where the two tracks meet
@@ -72,7 +80,7 @@ PDF consistent with the static `ja/` and `en/` sources. The internship-radar fea
 is web-app-only.
 
 ## Diagrams
-- Source: `agent/graph/architecture.d2`
-- Rendered: `agent/graph/architecture.svg`
-- Module dependency graph: `agent/graph/dependencies.json` / `.dot`, summarized in
-  `agent/graph/graph.md`.
+- Source: `agent/web/graph/architecture.d2`
+- Rendered: `agent/web/graph/architecture.svg`
+- Module dependency graph: `agent/web/graph/dependencies.json` / `.dot`, summarized in
+  `agent/web/graph/graph.md`.

@@ -1,9 +1,13 @@
 # Data models
 
-Persistence is a single key→JSON KV store (`server/storage.js`, sql.js table `kv`).
-Keys: `profile:<id>`, `tracker:<id>`, `applications:<id>`, `internships:catalog`,
-`customInternships`. Local file `server/.data/resume-studio.sqlite`; prod = Vercel
-Blob snapshots. All writes pass `server/validation.js`.
+Persistence is a single key→JSON KV store (`server/storage.js`, better-sqlite3
+table `kv` — live working copy on local disk, snapshotted to the durable path per
+write, ADR-0040). Keys: `profile:<id>`, `tracker:<id>`, `applications:<id>`,
+`internships:catalog`, `customInternships`. Local file
+`server/.data/resume-studio.sqlite`; prod = the Azure Files mount `/data`.
+All writes pass `server/validation.js`. Signed-in users' data is NOT here — it
+lives client-direct in Firestore `users/{uid}/**` (CLAUDE.md rule 4); this KV
+holds the shared catalog, the Gmail queue, and the no-auth/E2E path.
 
 ## Résumé (`profile:<id>`) — seeded from `server/profiles/<id>.json`
 ```jsonc

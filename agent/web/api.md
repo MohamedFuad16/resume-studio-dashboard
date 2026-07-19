@@ -1,7 +1,8 @@
 # API — Express server (`editor/server/index.js`)
 
-ESM Express app. Mounted locally on `:5005` (Vite proxies `/api` + `/public`), and
-on Vercel via `editor/api/[...path].js`. All `/api` writes are size-limited
+ESM Express app. Mounted locally on `:5005` (Vite proxies `/api` + `/public`); in
+prod it runs ONLY on the Azure Container App (`portal-compile-jp`) — the Vercel
+origin is static-only (ADR-0040). All `/api` writes are size-limited
 (`express.json({ limit: '12mb' })`) and validated by `server/validation.js`.
 Errors go through `sendRequestError` (400 = validation, 500 = internal).
 Client wrappers live in `editor/src/api/client.js`.
@@ -10,7 +11,7 @@ Client wrappers live in `editor/src/api/client.js`.
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/status` | Health + storage backend (`local-sqlite` / `vercel-blob-sqlite` / ephemeral). |
+| GET | `/api/status` | Health + storage backend (`sqlite-snapshot`; persistence probed by a real write, not a label). |
 | GET | `/api/resume?profile=` | Read a profile's résumé JSON. |
 | POST | `/api/resume?profile=` | Write résumé (validated). |
 | POST | `/api/save?profile=` | Back-compat autosave alias for POST `/api/resume`. |
@@ -54,11 +55,14 @@ Valid compile/export templates (`VALID_TEMPLATES`): `en_01..en_04`, `ja_01..ja_0
   `<id>.json` exists) so a fresh DB lists both. New profiles are created by POST
   `/api/resume?profile=<newId>` (no dedicated create route).
 
-## External connectors (no secrets — see `agent/secrets.md`)
+## External connectors (no secrets — see `agent/web/secrets.md`)
 - **Tectonic** (`TECTONIC_PATH`): child process for LaTeX→PDF (compile/export).
-- **Vercel Blob** (`@vercel/blob`, `BLOB_READ_WRITE_TOKEN`): durable SQLite snapshots.
-- **Codex CLI** (`resume-chat.js`, `RESUME_CHAT_ENGINE`): AI résumé edits; falls back
-  to deterministic local edits.
+- **OpenRouter** (`resume-chat.js`, `internship-research.js`, `gmail/classify.js`;
+  `OPENROUTER_API_KEY`): AI résumé edits, live research, Gmail triage. Deterministic
+  local edits when keyless or `RESUME_CHAT_ENGINE=local`.
+- **Gmail** (`server/gmail/*`; `GOOGLE_CLIENT_ID`/`SECRET`, `GMAIL_TOKEN_ENC_KEY`):
+  read-only OAuth inbox sync feeding the per-profile action queue
+  (`/api/integrations/gmail/*` — contract-bound, see `contracts/api.md`).
 - **Company research** (`internship-research.js`): async live internship lookup
   (timeout `INTERNSHIP_RESEARCH_TIMEOUT_MS`); jobs held in-memory (lost on restart).
 - **MCP** (`server/mcp-server.js`, `register-mcp.js`): optional Model Context Protocol
