@@ -32,9 +32,6 @@ export const autoRefreshData = load();
 export const autoRetiredIds = new Set(autoRefreshData.retired.map(entry => entry.id).filter(Boolean));
 export const autoDeadlinePatches = new Map(Object.entries(autoRefreshData.deadlinePatches));
 
-export function isAutoRetiredId(id) {
-  return autoRetiredIds.has(id);
-}
 
 // Outermost catalog overlay: drop auto-retired listings, then apply any deadline
 // patch onto the surviving entries. Filtering is defensive — isRetiredInternshipId()

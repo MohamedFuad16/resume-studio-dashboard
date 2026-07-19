@@ -131,7 +131,3 @@ export async function getMessage(accessToken, id) {
   };
 }
 
-export function clearTokenCache(profile) {
-  if (profile) tokenCache.delete(profile);
-  else tokenCache.clear();
-}
