@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { trackerApi } from '../api/client.js';
-import { isInternshipApplication } from '../utils/roleFilter.js';
 
 export const TRACKER_EVENT = 'resume-studio:application-tracker-change';
 
@@ -226,17 +225,12 @@ export function useApplicationTracker(profileId) {
     replaceTracker(next);
     commit(next);
   }, [commit, replaceTracker]);
-  // `records` is the app's list of internship applications, so freelance/gig
-  // records mis-ingested from Gmail (e.g. "language expert", "email analyst",
-  // "AI trainer") are filtered out HERE — every consumer (dashboard recent +
-  // pipeline, Applications view + its counts, calendar) then treats them as
-  // non-existent. The raw `tracker` object still holds them (nothing is
-  // deleted); `statusFor` reads `tracker` directly, so status writes for any id
-  // still work. Filter is conservative (see roleFilter) — never hides a real
-  // internship.
+  // `records` is every tracker record, in updated-at order. Nothing is hidden
+  // client-side: per ADR-S-002 internship detection is server-side and
+  // evidence-based, so junk in the list means fixing the classifier
+  // (`editor/server/gmail/classify.js`), not filtering names downstream.
   const records = useMemo(
     () => Object.values(tracker)
-      .filter(isInternshipApplication)
       .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')),
     [tracker],
   );

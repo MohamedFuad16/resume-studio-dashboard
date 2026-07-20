@@ -23,7 +23,6 @@ import { prepareProfilePhoto } from '../utils/imageUpload.js';
 import { appliedCompaniesForProfile, compareCompanyAwareMatch } from '../utils/internshipRanking.js';
 import { resolveTechList } from '../utils/techIcons.js';
 import { companyCooldownMap, cooldownForCompany, cooldownLabel } from '../utils/reapplyCooldown.js';
-import { isInternshipApplication } from '../utils/roleFilter.js';
 
 const STATUS_ICONS = {
   saved: Bookmark,
@@ -122,10 +121,8 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
   const { records, counts, statusFor, updateStatus, addMilestone } = useApplicationTracker(activeProfile);
   const { catalog } = useInternshipCatalog();
   const [selectedItem, setSelectedItem] = useState(null);
-  // Recent shows only real internships — freelance/gig records (e.g. an
-  // "AI trainer" or "language expert" gig ingested from Gmail) are filtered out.
   const recent = useMemo(
-    () => records.filter(record => APPLIED_STATUSES.has(record.status) && isInternshipApplication(record)).slice(0, 5),
+    () => records.filter(record => APPLIED_STATUSES.has(record.status)).slice(0, 5),
     [records],
   );
   const tokyoMatches = useMemo(() => {
