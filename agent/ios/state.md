@@ -21,6 +21,11 @@ inbox (80 scanned → 20 real internships queued, 23 non-internships dropped).
 
 ## Recent changes
 
+- **2026-07-21 — AI Brain MCP registered for the source project.** Root `.mcp.json` points
+  at this machine's local `brain-mcp` stdio server in `ai-brain-platform`, giving Claude Code
+  the same search, current-ADR, convention, impact, resource, and prompt surface as Codex.
+  This is developer-tool wiring only; no iOS product code or shared contract changed.
+
 - **2026-07-21 — Company pages behind the orb expansion; records stay sheets.**
   Card-expand on Applications records doubled the chrome (RecordSheet's close
   button under the expander's — owner's screenshot), so records are SHEETS again
