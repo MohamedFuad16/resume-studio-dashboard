@@ -15,7 +15,12 @@
 // The rules here mirror useGmailInbox.js exactly, because both write the same
 // records and a disagreement would show up as data that changes when you switch
 // device:
-//   • one record per COMPANY (applied + rejected for the same firm converge),
+//   • one record per COMPANY **AND ROLE** — see contracts/SPEC-per-role-keying.md.
+//     This file used to key on company alone, so applied + rejected for the same
+//     firm converged; that collapsed five Rakuten applications into one row
+//     reading "rejected" and hid a live HENNGE interview. DO NOT "restore parity"
+//     by reintroducing the collapse: the web client made the identical change, and
+//     per-role keying is the contract both clients now implement.
 //   • statuses are monotonic — a re-classified email can never pull a record
 //     backwards (saved < applying/applied < interview < rejected),
 //   • milestones carry a deterministic id (gmail-<messageId>) so re-draining
@@ -106,9 +111,16 @@ extension CatalogStore {
     /// peeled repeatedly, not an unanchored substring list: unanchored stripping
     /// keyed "Acme Co" ≠ web ("acme co" vs "acme") and over-stripped mid-string
     /// tokens ("ABC Inc. Japan" → "abc japan" while the web keeps "abc inc japan").
+    ///
+    /// NFKC FIRST (contracts/SPEC-per-role-keying.md Rule 1): full-width Latin
+    /// (Ｓｋｙ株式会社) sits outside every kept range, so without compatibility
+    /// mapping the key folded to "" and the `key.isEmpty` guard dropped the whole
+    /// company — silently. NFKC maps full-width Latin/digits to ASCII and leaves
+    /// kana and CJK ideographs alone. It must run BEFORE lowercasing, so that
+    /// half-width katakana normalizes to full-width kana first.
     nonisolated static func companyKey(_ raw: String?) -> String {
         // JA corporate markers vanish wherever they appear (web: replace with "").
-        var text = (raw ?? "").lowercased()
+        var text = (raw ?? "").precomposedStringWithCompatibilityMapping.lowercased()
         for marker in ["株式会社", "合同会社", "有限会社", "(株)", "（株）"] {
             text = text.replacingOccurrences(of: marker, with: "")
         }
@@ -127,6 +139,26 @@ extension CatalogStore {
         // Keep exactly what the web keeps — a-z, 0-9, hiragana/katakana, CJK
         // ideographs — and fold everything else (incl. accented/fullwidth forms,
         // which CharacterSet.alphanumerics would wrongly keep) to a space.
+        return foldToKeptScalars(text)
+    }
+
+    /// Role key (contracts/SPEC-per-role-keying.md Rule 2) — the second half of a
+    /// record's identity. Same normalization as `companyKey` minus the corporate
+    /// marker/suffix peeling, which is meaningless for a role. Empty folds to the
+    /// sentinel `"general"`, which Rule 3 then resolves onto a live application
+    /// instead of letting it mint a phantom row.
+    nonisolated static func roleKey(_ raw: String?) -> String {
+        let folded = foldToKeptScalars(
+            (raw ?? "").precomposedStringWithCompatibilityMapping.lowercased()
+        )
+        return folded.isEmpty ? "general" : folded
+    }
+
+    /// Keep exactly what the web keeps — a-z, 0-9, hiragana/katakana, CJK
+    /// ideographs — and fold everything else (incl. accented forms, which
+    /// CharacterSet.alphanumerics would wrongly keep) to a space; then collapse
+    /// runs of spaces and trim. Input must already be NFKC'd and lowercased.
+    nonisolated private static func foldToKeptScalars(_ text: String) -> String {
         let kept = text.unicodeScalars.map { scalar -> Character in
             switch scalar.value {
             case 0x30...0x39, 0x61...0x7A,          // 0-9, a-z (input is lowercased)
@@ -137,6 +169,61 @@ extension CatalogStore {
             }
         }
         return String(kept).split(separator: " ").joined(separator: " ")
+    }
+
+    /// Rule 3 — resolve an action that carries NO role onto an existing record for
+    /// the same company, rather than minting `<company>-general` beside the real
+    /// rows. Rejections routinely omit the role ("we will not be moving forward"),
+    /// and they must land on the application still in flight.
+    ///
+    /// Order, exactly as specified: exactly one record → that one; several → the
+    /// most recently `updatedAt` NON-terminal one; all terminal → the most recently
+    /// `updatedAt`; none → nil (caller creates `<company>-general`).
+    ///
+    /// Rule 8: only records the DRAIN OWNS are candidates. Rule 3 hunts for any
+    /// record of the company and the caller then stamps it `source = "gmail"` —
+    /// applied to a row the user typed by hand that flips it Gmail-derived, and the
+    /// next rebuild purge deletes it. Silent, permanent, user-authored data loss.
+    /// A company whose only row is hand-added therefore falls through to nil and
+    /// the caller mints `<company>-general` beside it.
+    ///
+    /// Rule 6: `updatedAt` is compared as an INSTANT, never lexicographically.
+    /// Records carry whatever `ISO8601DateFormatter.flexible` wrote; actions carry
+    /// UTC `Z` straight off the wire, so `…T23:00:00+09:00` sorts *after*
+    /// `…T15:30:00Z` as a string while being the EARLIER instant. Unparseable →
+    /// `.distantPast`, so it can never outrank a real stamp.
+    ///
+    /// Rule 7: ties break on the tracker DICTIONARY KEY, never on `record.id` —
+    /// `TrackerRecord.id` is `internshipId ?? UUID().uuidString` and `fetchTracker`
+    /// does not backfill `internshipId`, so a record stored without that field
+    /// yields a fresh random id on every evaluation. That is a non-deterministic
+    /// comparator inside the very function Rule 4 exists to make deterministic.
+    ///
+    /// - Returns: the tracker key AND the record — the key is what the caller keys
+    ///   the write on, and re-deriving it from the record is exactly the trap
+    ///   Rule 7 describes.
+    nonisolated private static func resolveRolelessRecord(
+        company key: String, in records: [String: TrackerRecord]
+    ) -> (key: String, record: TrackerRecord)? {
+        let forCompany = records
+            .filter { companyKey($0.value.company) == key && isGmailDerived($0.value) }
+            .map { (key: $0.key, record: $0.value) }
+            .sorted { $0.key < $1.key }
+        guard forCompany.count > 1 else { return forCompany.first }
+
+        // Sort is STABLE in Swift only by construction, so fold the tiebreak into
+        // the comparator: newest updatedAt first, then lowest tracker key.
+        func mostRecent(
+            _ candidates: [(key: String, record: TrackerRecord)]
+        ) -> (key: String, record: TrackerRecord)? {
+            candidates.max { lhs, rhs in
+                let left = ISO8601DateFormatter.parse(lhs.record.updatedAt) ?? .distantPast
+                let right = ISO8601DateFormatter.parse(rhs.record.updatedAt) ?? .distantPast
+                return left == right ? lhs.key > rhs.key : left < right
+            }
+        }
+        let live = forCompany.filter { $0.record.appStatus != .rejected }
+        return mostRecent(live) ?? mostRecent(forCompany)
     }
 
     /// Throw away everything Gmail wrote and rebuild it from a fresh re-scan.
@@ -157,7 +244,6 @@ extension CatalogStore {
     ///   only consume it on true — an early version consumed the trigger even
     ///   when this bailed (offline, auth not ready, Gmail disconnected), which
     ///   burned the repair on a bad launch and left the stale rows forever.
-    @discardableResult
     /// A row counts as Gmail-derived if it SAYS so or if it LOOKS so.
     ///
     /// Source stamping arrived after the first drains shipped, so the oldest junk
@@ -169,7 +255,11 @@ extension CatalogStore {
     /// ever minted by the drain, so it identifies the pre-stamping rows too.
     ///
     /// Hand-added rows match neither clause and are never touched.
-    func isGmailDerived(_ record: TrackerRecord) -> Bool {
+    func isGmailDerived(_ record: TrackerRecord) -> Bool { Self.isGmailDerived(record) }
+
+    /// The same test, reachable from the `nonisolated` key/resolution helpers
+    /// (Rule 8 needs it inside `resolveRolelessRecord`).
+    nonisolated static func isGmailDerived(_ record: TrackerRecord) -> Bool {
         record.source == "gmail" || (record.internshipId ?? "").hasPrefix("gmail-")
     }
 
@@ -336,8 +426,9 @@ extension CatalogStore {
     ///   rows removed, so the batch fully reconstructs them — used by the rebuild
     ///   to drop rows an older classifier got wrong.
     @discardableResult
-    // KNOWN DEBT — complexity 27 against a limit of 15. This one function carries
-    // company resolution, monotonic status ranking, detail backfill, web-parity
+    // KNOWN DEBT — still over the limit of 15. Record resolution has since been
+    // extracted to `gmailBase`/`resolveRolelessRecord`; what remains here is
+    // monotonic status ranking, detail backfill, web-parity
     // stamps and milestone dedupe, because they all read the same per-action state
     // and splitting them means threading that state back through. The suppression
     // is deliberate and local rather than a raised global limit, so the rule keeps
@@ -351,7 +442,9 @@ extension CatalogStore {
         if replacingGmailRows { Notifier.resetBaseline() }
 
         // Oldest first, so the newest email's status wins (applied → then
-        // rejected = rejected), sharing one session map for company convergence.
+        // rejected = rejected), sharing one session map — keyed "company|role" —
+        // so the emails for ONE application converge while sibling roles at the
+        // same company stay separate rows.
         let ordered = actions.sorted { ($0.receivedAt ?? "") < ($1.receivedAt ?? "") }
 
         var session: [String: (item: Internship, rank: Int?)] = [:]
@@ -371,43 +464,32 @@ extension CatalogStore {
             guard let status = Self.status(forKind: action.kind) else { continue }
 
             let key = Self.companyKey(action.company)
-            guard !key.isEmpty else { continue }
-
-            // One record per company: reuse a base resolved earlier in THIS drain,
-            // else an existing tracked record, else a catalog listing, else a
-            // synthetic entry keyed by company.
-            var base: Internship
-            var rank: Int?
-            if let hit = session[key] {
-                base = hit.item
-                rank = hit.rank
-            } else if let existing = next.values.first(where: {
-                let other = Self.companyKey($0.company)
-                return other.contains(key) || key.contains(other)
-            }) {
-                base = Internship(
-                    id: existing.internshipId ?? "gmail-\(key.replacingOccurrences(of: " ", with: "-"))",
-                    company: existing.company, role: existing.role, location: existing.location,
-                    deadline: existing.deadline, deadlineDate: existing.deadlineDate,
-                    url: existing.applyUrl, companyDomain: existing.companyDomain,
-                    logoUrl: existing.logoUrl
-                )
-                rank = existing.appStatus.rank
-            } else if let match = internships.first(where: {
-                let other = Self.companyKey($0.company)
-                return other.contains(key) || key.contains(other)
-            }) {
-                base = match
-            } else {
-                base = Internship(
-                    id: "gmail-\(key.replacingOccurrences(of: " ", with: "-"))",
-                    company: action.company, role: action.role ?? "Application",
-                    location: action.enrichment?.location,
-                    deadline: action.enrichment?.deadline ?? "Not stated",
-                    deadlineDate: action.enrichment?.deadlineDate,
-                    url: action.enrichment?.url
-                )
+            // A key that is STILL empty after NFKC is a dropped application, not a
+            // routine outcome — it must leave a trace (Rule 1). Silence here is
+            // what hid Ｓｋｙ株式会社, interview included.
+            guard !key.isEmpty else {
+                log("gmail action \(action.id) (\(action.kind)) skipped — "
+                    + "company key empty after NFKC for company \"\(action.company ?? "")\"")
+                continue
             }
+
+            // Rule 2: identity is (companyKey, roleKey). Rule 3: an action with no
+            // role attaches to a live application for that company instead of
+            // minting a phantom "<company>-general" row beside the real ones.
+            var role = Self.roleKey(action.role)
+            // Carry the RESOLVED record through, not just its roleKey. Handing
+            // `gmailBase` the key alone made it re-scan and it could land on a
+            // DIFFERENT record whose role folds to the same key — resolving one
+            // row and then writing another.
+            var resolved: (key: String, record: TrackerRecord)?
+            if role == "general" {
+                resolved = Self.resolveRolelessRecord(company: key, in: next)
+                if let resolved { role = Self.roleKey(resolved.record.role) }
+            }
+            var (base, rank) = gmailBase(
+                for: action, companyKey: key, roleKey: role,
+                resolved: resolved, session: session, existing: next
+            )
 
             // Backfill better details from whichever email has them — the
             // application email usually carries the role/URL the rejection lacks.
@@ -426,16 +508,47 @@ extension CatalogStore {
             // Monotonic: never downgrade a terminal outcome.
             let incoming = status.rank
             let shouldSet = rank == nil || incoming >= rank!
-            session[key] = (base, shouldSet ? incoming : rank)
+            session["\(key)|\(role)"] = (base, shouldSet ? incoming : rank)
 
             if shouldSet {
                 // Announce only what the tracker did not already say. A record
                 // that merely gets richer (a role backfilled from a second email)
                 // is not news; a company arriving, or moving to a new status, is.
                 let previousStatus = tracker[base.id]?.appStatus
-                if previousStatus != status {
+                // The key is per RECORD, not per company: two roles at one company
+                // both reaching "rejected" are two pieces of news.
+                //
+                // It is NOT byte-identical to the old "gmail-<company>-<status>"
+                // key, and an earlier comment here wrongly claimed it was. The old
+                // key kept the spaces in the company key ("gmail-tokyo
+                // electron-rejected"); the new one is built from `base.id`, which
+                // has spaces replaced by "-" and the roleKey appended
+                // ("gmail-tokyo-electron-ai-engineer-rejected"). Every re-derived
+                // row therefore MISSES the announced set and reads as brand new.
+                //
+                // That matters because the first `drainGmail(backfillDays:)` after
+                // this ships re-offers already-processed mail and — unlike
+                // rebuildFromGmail — does NOT call `Notifier.resetBaseline()`. Left
+                // alone, every newly-split sibling row fires a banner: roughly six
+                // for this user, all announcing mail they read weeks ago.
+                //
+                // So: a record that did not exist before this drain, carrying mail
+                // older than the notification baseline, is backfill and not news.
+                // Suppressed at the SOURCE rather than at `announce`, so the key
+                // never enters the announced set and a genuine later status change
+                // on the same row still announces normally. A status change on a
+                // row that already existed is real news and is never suppressed,
+                // whatever the email's age.
+                // "New" is measured against the PRE-drain tracker, not `next`: a
+                // row this same drain created one action ago is still backfill, and
+                // testing `next` would announce the rejection half of every
+                // applied→rejected pair it had just suppressed.
+                let isBackfilledRow = tracker[base.id] == nil
+                    && (ISO8601DateFormatter.parse(action.receivedAt) ?? .distantPast)
+                        < Notifier.baselineDate
+                if previousStatus != status, !isBackfilledRow {
                     discovered.append(
-                        (key: "gmail-\(key)-\(status.rawValue)",
+                        (key: "\(base.id)-\(status.rawValue)",
                          company: base.displayCompany,
                          role: base.displayRole,
                          status: status,
@@ -445,7 +558,12 @@ extension CatalogStore {
                     )
                 }
 
-                var record = next[base.id] ?? TrackerRecord()
+                let existingRecord = next[base.id]
+                // Rule 8: the drain owns a row it created, or one already stamped
+                // gmail. It must never CONVERT a hand-added row — that would make
+                // the next rebuild purge delete data Gmail cannot re-derive.
+                let drainOwnsRecord = existingRecord.map { isGmailDerived($0) } ?? true
+                var record = existingRecord ?? TrackerRecord()
                 record.internshipId = base.id
                 record.company = base.company
                 record.role = base.role
@@ -456,7 +574,7 @@ extension CatalogStore {
                 record.companyDomain = base.companyDomain
                 record.logoUrl = base.logoUrl
                 record.status = status.rawValue
-                record.source = "gmail"
+                if drainOwnsRecord { record.source = "gmail" }
                 // The EMAIL's date, never `now`. Stamping the clock made every
                 // ingested record read "applied 6 minutes ago" and dropped each
                 // one on today's calendar — for mail that arrived days earlier.
@@ -568,6 +686,73 @@ extension CatalogStore {
             toast = String(localized: "Synced \(touched) applications from Gmail")
         }
         return touched
+    }
+
+    /// Resolve the record an action attaches to: a base resolved earlier in THIS
+    /// drain, else an existing tracked record, else a catalog listing, else a
+    /// synthetic entry — all keyed on the PAIR (companyKey, roleKey).
+    ///
+    /// Rule 4: matching is EXACT companyKey equality, never a substring test —
+    /// `contains` merged genuinely different companies whose keys nest. And every
+    /// scan runs over a collection sorted by record id, because `Dictionary.values`
+    /// has unspecified order, so the old `first(where:)` landed an action on a
+    /// different record between runs of the same data.
+    private func gmailBase(
+        for action: GmailAction, companyKey key: String, roleKey role: String,
+        resolved: (key: String, record: TrackerRecord)? = nil,
+        session: [String: (item: Internship, rank: Int?)],
+        existing: [String: TrackerRecord]
+    ) -> (item: Internship, rank: Int?) {
+        if let hit = session["\(key)|\(role)"] { return hit }
+
+        let syntheticId = "gmail-\(key)-\(role)".replacingOccurrences(of: " ", with: "-")
+
+        // Rule 3 already picked a record for a roleless action. Use THAT one —
+        // re-scanning by folded roleKey can match a sibling row with the same
+        // folded key and write to the wrong one. Its tracker key (not a derived
+        // `record.id`, per Rule 7) is what the write is keyed on.
+        if let resolved {
+            let record = resolved.record
+            let base = Internship(
+                id: record.internshipId ?? resolved.key,
+                company: record.company, role: record.role, location: record.location,
+                deadline: record.deadline, deadlineDate: record.deadlineDate,
+                url: record.applyUrl, companyDomain: record.companyDomain,
+                logoUrl: record.logoUrl
+            )
+            return (base, record.appStatus.rank)
+        }
+
+        if let record = existing.sorted(by: { $0.key < $1.key }).first(where: {
+            Self.companyKey($0.value.company) == key && Self.roleKey($0.value.role) == role
+        })?.value {
+            let base = Internship(
+                id: record.internshipId ?? syntheticId,
+                company: record.company, role: record.role, location: record.location,
+                deadline: record.deadline, deadlineDate: record.deadlineDate,
+                url: record.applyUrl, companyDomain: record.companyDomain,
+                logoUrl: record.logoUrl
+            )
+            return (base, record.appStatus.rank)
+        }
+
+        // A catalog listing is only the base when it is the SAME role too. Taking
+        // it on a company match alone would hand every role at that company one
+        // shared listing id — the per-company collapse this change exists to stop.
+        if let match = internships.sorted(by: { $0.id < $1.id }).first(where: {
+            Self.companyKey($0.company) == key && Self.roleKey($0.role) == role
+        }) {
+            return (match, nil)
+        }
+
+        return (Internship(
+            id: syntheticId,
+            company: action.company, role: action.role ?? "Application",
+            location: action.enrichment?.location,
+            deadline: action.enrichment?.deadline ?? "Not stated",
+            deadlineDate: action.enrichment?.deadlineDate,
+            url: action.enrichment?.url
+        ), nil)
     }
 
     private static func status(forKind kind: String) -> ApplicationStatus? {

@@ -71,12 +71,45 @@ enum TrackerMigrations {
         set { UserDefaults.standard.set(Array(newValue), forKey: defaultsKey) }
     }
 
+    #if DEBUG
+    /// Print every tracked record once the store has hydrated.
+    private static func dumpTracker(_ store: CatalogStore) async {
+        var waited = 0.0
+        while store.profileID == nil && waited < 20 {
+            try? await Task.sleep(for: .seconds(0.5))
+            waited += 0.5
+        }
+        // Give the load drain a moment to apply anything queued.
+        try? await Task.sleep(for: .seconds(3))
+        let rows = store.tracker.values.sorted { ($0.company ?? "") < ($1.company ?? "") }
+        log("── tracker dump: \(rows.count) rows ──")
+        for record in rows {
+            let milestones = (record.milestones ?? [])
+                .map { "\($0.kind ?? "?")@\($0.date ?? "?")" }
+                .joined(separator: ",")
+            log("  \(record.status ?? "?")".padding(toLength: 12, withPad: " ", startingAt: 0)
+                + "\(record.company ?? "?") | \(record.role ?? "-") "
+                + "| id=\(record.internshipId ?? "-") | src=\(record.source ?? "-") "
+                + "| upd=\(record.updatedAt ?? "-")"
+                + (milestones.isEmpty ? "" : " | \(milestones)"))
+        }
+        log("── end dump ──")
+    }
+    #endif
+
     /// Runs any migration that has not yet succeeded on this device.
     ///
     /// Call from a launch hook, not from `init` — it waits on hydration, and it
     /// deliberately gives up rather than blocking the app if auth never resolves.
     /// A migration that does not run today simply runs on the next launch.
     static func run(on store: CatalogStore) async {
+        #if DEBUG
+        // Ground truth for "the phone shows the wrong thing". Reading the tracker
+        // out of Firestore from a laptop is impossible (owner-only rules, no
+        // admin key by design), so the app is the only witness to its own state.
+        Task { await dumpTracker(store) }
+        #endif
+
         var done = completed
         let pending = all.filter { !done.contains($0.id) }
         guard !pending.isEmpty else {

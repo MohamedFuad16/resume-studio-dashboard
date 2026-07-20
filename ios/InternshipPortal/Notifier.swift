@@ -82,8 +82,31 @@ enum Notifier {
             || UserDefaults.standard.bool(forKey: "\(announcedKey).seeded")
     }
 
+    /// The instant the current baseline was established: mail that arrived BEFORE
+    /// it has already been seen and is never news, however the tracker happens to
+    /// be shaped now.
+    ///
+    /// The announced-key set alone cannot answer that. Per-role keying changes the
+    /// key of every row (`gmail-<company>-<status>` → `gmail-<company>-<role>-…`),
+    /// so after it ships every re-derived sibling row misses the set and reads as
+    /// brand new — a burst of banners for mail read weeks ago. A date survives the
+    /// re-keying because it is a fact about the MAIL, not about the row.
+    ///
+    /// Absent (an install that seeded its baseline before this shipped) it is
+    /// lazily stamped `now` on first read: everything already in the inbox is
+    /// therefore older than the baseline and silent, and only genuinely later mail
+    /// announces. That is the same bargain `seed` already makes on a fresh install.
+    static var baselineDate: Date {
+        let key = "\(announcedKey).baselineAt"
+        if let stored = UserDefaults.standard.object(forKey: key) as? Date { return stored }
+        let now = Date.now
+        UserDefaults.standard.set(now, forKey: key)
+        return now
+    }
+
     static func markBaselineSeeded() {
         UserDefaults.standard.set(true, forKey: "\(announcedKey).seeded")
+        UserDefaults.standard.set(Date.now, forKey: "\(announcedKey).baselineAt")
     }
 
     /// Forget what has been announced, so the next drain re-establishes the
@@ -93,6 +116,7 @@ enum Notifier {
     static func resetBaseline() {
         UserDefaults.standard.removeObject(forKey: announcedKey)
         UserDefaults.standard.removeObject(forKey: "\(announcedKey).seeded")
+        UserDefaults.standard.removeObject(forKey: "\(announcedKey).baselineAt")
     }
 
     /// Announce one application, if it has not been announced before.
