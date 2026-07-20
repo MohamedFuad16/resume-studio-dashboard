@@ -564,6 +564,79 @@ struct AIKeysView: View {
 
 // MARK: - Gmail (in-app connect / status / disconnect via the portal server)
 
+/// A running Gmail job, and how long it is honestly expected to take.
+///
+/// The budgets are measured against this code, not guessed: `Sync now` is one
+/// request with a 30s client timeout; a rescan kicks off a 90-day backfill the
+/// SERVER keeps working on after our request returns, so results land on a later
+/// sync rather than this one; a rebuild adds a poll loop that gives up after
+/// 120s in 6s steps. Showing a maximum matters more than showing a percentage —
+/// a progress bar that cannot know its denominator is a lie, but "this can take
+/// up to three minutes" is something you can decide to wait for.
+struct SyncJob {
+    enum Kind { case syncNow, rescan, rebuild }
+    let kind: Kind
+    let startedAt: Date
+
+    var title: String {
+        switch kind {
+        case .syncNow: String(localized: "Checking for new mail")
+        case .rescan: String(localized: "Rescanning the last 90 days")
+        case .rebuild: String(localized: "Rebuilding from Gmail")
+        }
+    }
+
+    /// The reassurance line: what it usually costs, and the point past which
+    /// something is actually wrong.
+    var budget: String {
+        switch kind {
+        case .syncNow: String(localized: "usually a few seconds · up to 30s")
+        case .rescan: String(localized: "usually under a minute · the server finishes in the background")
+        case .rebuild: String(localized: "usually about a minute · up to ~3 min")
+        }
+    }
+
+    /// Only the rebuild has a bounded local wait worth drawing a bar for.
+    var determinateFraction: Double? {
+        guard kind == .rebuild else { return nil }
+        return min(Date().timeIntervalSince(startedAt) / 180, 1)
+    }
+}
+
+private struct SyncProgressRow: View {
+    let job: SyncJob
+    let now: Date
+    let stage: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text(job.title).font(Font2.body)
+                Spacer()
+                // Monospaced digits: without them the counter jitters the whole
+                // row sideways once a second, which reads as instability.
+                Text(elapsed)
+                    .font(Font2.caption.monospacedDigit())
+                    .foregroundStyle(Palette.ink500)
+            }
+            if let stage {
+                Text(stage).font(Font2.caption).foregroundStyle(Palette.ink500)
+            }
+            Text(job.budget).font(Font2.caption).foregroundStyle(Palette.ink500)
+        }
+        .padding(.vertical, 2)
+        .animation(.smooth(duration: 0.25), value: stage)
+    }
+
+    private var elapsed: String {
+        let seconds = max(0, Int(now.timeIntervalSince(job.startedAt)))
+        return seconds < 60
+            ? String(localized: "\(seconds)s")
+            : String(localized: "\(seconds / 60)m \(seconds % 60)s")
+    }
+}
+
 struct GmailSettingsView: View {
     @Environment(CatalogStore.self) private var store
     @Environment(\.openURL) private var openURL
@@ -575,10 +648,22 @@ struct GmailSettingsView: View {
     @State private var confirmDisconnect = false
     @State private var confirmRebuild = false
 
+    /// The running job, if any, and a 1s heartbeat to redraw its elapsed counter.
+    @State private var job: SyncJob?
+    @State private var tick = Date()
+
     /// Gmail connections are keyed by the SERVER profile id (the web passes its
     /// active profile). Mirror that: the resolved Firestore profile id matches the
     /// web's for the owner account, with the KV default as the fallback.
     private var profile: String { store.profileID ?? PortalAPI.profile }
+
+    /// A job this screen started, or one already running when you arrived — the
+    /// launch migration's rebuild being the case that used to look like a freeze.
+    private var activeJob: SyncJob? {
+        if let job { return job }
+        guard store.isRebuilding else { return nil }
+        return SyncJob(kind: .rebuild, startedAt: store.syncStartedAt ?? Date())
+    }
 
     var body: some View {
         Form {
@@ -643,10 +728,13 @@ struct GmailSettingsView: View {
                         }
                     }
                     .disabled(syncing)
+                    if let active = activeJob {
+                        SyncProgressRow(job: active, now: tick, stage: store.syncStage)
+                    }
                 } header: {
                     Text("Resync")
                 } footer: {
-                    Text("Sync now reads new mail. A rescan re-reads 90 days and can take a couple of minutes — useful after a rule change, or when something is missing. Rebuild throws away every application Gmail added and re-derives them from your mail: the repair for records an older rule got wrong.")
+                    Text("Sync now reads new mail. A rescan re-reads 90 days and can take a couple of minutes — useful after a rule change, or when something is missing. Rebuild throws away every application Gmail added and re-derives them from your mail: the repair for records an older rule got wrong.\n\nA rebuild is slow because almost none of the work is on your phone: the server re-reads up to 90 days of mail, re-classifies every message from scratch — each one has to quote its own evidence, and the quote is verified against the email — and this app then polls until those results are queued. Leaving this screen is fine; anything that lands late is applied on the next sync.")
                 }
             }
 
@@ -691,6 +779,15 @@ struct GmailSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { await refresh() }
         .refreshable { await refresh() }
+        // Drives the elapsed counter, and only while something is actually
+        // running — a timer ticking behind an idle screen is pure battery.
+        .task(id: activeJob != nil) {
+            guard activeJob != nil else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                tick = Date()
+            }
+        }
         // Alerts, not confirmation dialogs — same reason as Sign out: attached to a
         // Form/ScrollView a confirmation dialog mis-anchors as a corner popover.
         .alert(String(localized: "Rebuild from Gmail?"), isPresented: $confirmRebuild) {
@@ -709,9 +806,13 @@ struct GmailSettingsView: View {
 
     private func rebuild() {
         syncing = true
+        job = SyncJob(kind: .rebuild, startedAt: Date())
         Task {
-            defer { syncing = false }
-            await store.rebuildFromGmail()
+            defer {
+                syncing = false
+                job = nil
+            }
+            _ = await store.rebuildFromGmail()
             await refresh()
         }
     }
@@ -729,11 +830,19 @@ struct GmailSettingsView: View {
             return
         }
         syncing = true
+        job = SyncJob(kind: backfill ? .rescan : .syncNow, startedAt: Date())
         Task {
-            defer { syncing = false }
+            defer {
+                syncing = false
+                job = nil
+                store.syncStage = nil
+            }
             store.toast = backfill
                 ? String(localized: "Rescanning the last 90 days…")
                 : String(localized: "Checking for new mail…")
+            store.syncStage = backfill
+                ? String(localized: "Asking the server to re-read 90 days of mail…")
+                : String(localized: "Checking for anything new…")
 
             let applied = await store.drainGmail(backfillDays: backfill ? 90 : nil)
             await refresh()

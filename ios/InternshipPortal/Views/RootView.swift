@@ -65,36 +65,11 @@ struct RootView: View {
     /// to a tab, and optionally to the first internship's sheet. Launch arguments
     /// prefixed with `-` land in UserDefaults automatically.
     private func applyLaunchHooks() {
-        #if DEBUG
-        // DEBUGGING PHASE: run the Gmail rebuild ONCE per tag, here (after load, so
-        // the Firestore profile is resolved and the purge writes to the right
-        // place). Bump the tag to force a fresh repair on the next cold launch.
-        // Same mechanism as the onboarding-review reset — a stored tag, not a
-        // launch argument, because devicectl doesn't reliably pass args into
-        // NSUserDefaults' argument domain.
-        let rebuildTag = "gmail-rebuild-2026-07-19b"   // b: first run may have purged the KV store, not Firestore
-        if UserDefaults.standard.string(forKey: "gmailRebuildTag") != rebuildTag {
-            Task {
-                // Wait out the auth/hydration race: RootView's first load can
-                // finish before AuthGate's setUser resolves the Firestore
-                // profile. The rebuild refuses to run unhydrated, so poll
-                // briefly instead of losing this launch's attempt to timing.
-                var waited = 0.0
-                while store.profileID == nil && waited < 15 {
-                    try? await Task.sleep(for: .seconds(0.5))
-                    waited += 0.5
-                }
-                // Consume the tag ONLY when the purge actually persisted. The
-                // previous version consumed it up front, so one launch where the
-                // rebuild bailed (offline / auth still restoring / Gmail check
-                // failed) burned the repair silently — which is exactly how the
-                // stale micro1/Turing rows survived a "successful" rebuild build.
-                if await store.rebuildFromGmail() {
-                    UserDefaults.standard.set(rebuildTag, forKey: "gmailRebuildTag")
-                }
-            }
-        }
-        #endif
+        // One-shot data repairs. Deliberately NOT #if DEBUG — a repair the user's
+        // shipping build cannot run is not a repair. Each is recorded per-id only
+        // on success, so a launch that bails (offline, auth restoring) retries on
+        // the next one instead of burning the attempt. See TrackerMigrations.
+        Task { await TrackerMigrations.run(on: store) }
 
         guard UserDefaults.standard.string(forKey: "sheet") == "first",
               let first = store.internships.first else { return }

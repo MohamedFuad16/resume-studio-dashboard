@@ -21,6 +21,36 @@ inbox (80 scanned → 20 real internships queued, 23 non-internships dropped).
 
 ## Recent changes
 
+- **2026-07-20 (later) — Rebuild made non-destructive after it wiped the tracker
+  (ADR-I-015).** A launch migration ran `rebuildFromGmail()` unattended; it
+  purged 21 rows, committed, and the re-scan returned nothing. Tracker empty.
+  Recovered by triggering the backfill directly against the server
+  (`listed=100 fresh=80 queued=20`) and letting the app drain the queue — all 20
+  applications are back (Rakuten, HENNGE, Money Forward, LAPRAS, ispace,
+  Atilika, AICE, ABEJA, enechain, Atom11, Sky).
+  Two fixes, both in `GmailDrain.swift`: **order** — rebuild now polls for
+  actions first and returns untouched when none arrive, purges only with the
+  replacement in hand, and restores the snapshot if the apply writes nothing;
+  and **concurrency** — an `isSyncing` gate on the store, because a cold launch
+  fired three syncs at once (load drain, foreground drain, backfill) which raced
+  on one connection record and made the backfill report `listed=0`. That empty
+  listing is what turned a bad order into lost data.
+  `TrackerMigrations` survives but its list is **empty**, with the rule written
+  into the file: a migration must be idempotent and safe to run with the network
+  down and the server returning nothing. The stale-row cleanup it was written
+  for still wants doing — as an in-place repair, not a purge-and-refetch.
+  Repairs are now instrumented (`os_log` subsystem
+  `com.mohamedfuad.internshipportal`, category `migrations`; stdout too in Debug,
+  since reading os_log off a device needs root but
+  `devicectl process launch --console` carries stdout). Read it with that, not
+  by guessing — three previous "fixes" looked identical to a silent bail.
+  Also landed: the Gmail duration UX. Sync now / Rescan / Rebuild show a live
+  stage, elapsed seconds and an honest budget ("usually about a minute · up to
+  ~3 min"), driven by `store.syncStage`/`syncStartedAt`, so a rebuild started by
+  something other than the button still shows progress when you open the screen.
+  The footer explains WHY rebuild is slow: the server re-reads 90 days and
+  re-classifies every message with quote-verified evidence while the app polls.
+
 - **2026-07-20 — Repo agentic toolkit + the iOS static-analysis trio (ADR-S-003).**
   `.claude/` is now committed repo state shared by both devices: four subagents,
   four skills, four hooks. What matters on this side is `scripts/verify-ios.sh` —

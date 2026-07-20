@@ -565,3 +565,54 @@ Three coupled fixes so the split can't corrupt shared data:
   at launch with the literal as fallback — a web-side infra change becomes a
   config bump instead of a dead shipped binary.
 
+
+## ADR-I-015 · 2026-07-20 · Rebuild fetches before it deletes; launch migrations may not delete at all
+
+**This ADR exists because a repair destroyed the owner's tracker.** Writing it
+down so the shape of the mistake outlives the memory of it.
+
+What happened: a `TrackerMigrations` runner was added to fix stale Gmail rows —
+rows written before source-stamping, which the old purge predicate
+(`source == "gmail"`) could not see. The migration ran `rebuildFromGmail()`
+automatically at launch. Rebuild purges every Gmail-derived row, **commits that
+purge**, and only then asks the server to re-derive them. On the owner's phone
+it wrote 21 rows → 0, and the re-scan returned nothing. The tracker sat empty.
+
+Two independent defects had to line up, and both are now fixed:
+
+1. **The rescan could legitimately return nothing.** The server log for that
+   sync reads `listed=0 fresh=0 queued=0` for a 90-day backfill that should have
+   listed 100 messages. A cold launch fires three syncs at once — the load
+   drain, the foreground drain, and the rebuild's backfill — and they race on
+   one server-side connection record. The loser reports an empty listing.
+   Fixed with an `isSyncing` gate on the store: exactly one sync-now is ever in
+   flight, and the rebuild waits out any drain that started before it.
+
+2. **The order was wrong, and that is what made defect 1 fatal.** Purge-then-
+   refetch is not a rebuild; it is a delete with an optimistic follow-up. The
+   original comment argued the bad rows should die "whether or not the re-scan
+   finishes" — which is exactly the reasoning that loses data. Rebuild now polls
+   for actions FIRST and returns early, untouched, when none arrive; the purge
+   happens only with the replacement in hand, and if the apply writes nothing it
+   restores the snapshot.
+
+**The standing rule for `TrackerMigrations.all`: a migration must be idempotent
+and safe to run with the network down and the server returning nothing.**
+In-place repairs qualify — stripping bad milestones, renaming a field, fixing a
+status. Purge-and-refetch does not, unless the replacement is verified before
+the delete commits. The list is deliberately empty; the entry that broke this
+rule was removed rather than fixed in place, because the data it was meant to
+clean is better handled by an in-place repair when someone writes one.
+
+Recovery, for the record: the 20 queued actions were still derivable from Gmail.
+A backfill triggered directly against `/api/integrations/gmail/sync-now`
+(`listed=100 fresh=80 queued=20`) refilled the queue and the app drained it.
+Nothing was permanently lost — but that was luck, not design.
+
+**Instrument repairs.** The same bug survived three rounds of "fixed" because
+nothing observable said whether a repair ran, bailed, or succeeded against the
+wrong store. Migration and purge breadcrumbs now go to `os_log` (subsystem
+`com.mohamedfuad.internshipportal`, category `migrations`), plus stdout in
+Debug, since reading os_log off an attached device needs root while
+`devicectl process launch --console` carries stdout. That log is what caught
+this within a minute of it happening.

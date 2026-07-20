@@ -21,6 +21,7 @@
 //   • milestones carry a deterministic id (gmail-<messageId>) so re-draining
 //     the same email never duplicates a calendar entry.
 import Foundation
+import OSLog
 
 // MARK: - Wire types
 
@@ -157,10 +158,30 @@ extension CatalogStore {
     ///   when this bailed (offline, auth not ready, Gmail disconnected), which
     ///   burned the repair on a bad launch and left the stale rows forever.
     @discardableResult
+    /// A row counts as Gmail-derived if it SAYS so or if it LOOKS so.
+    ///
+    /// Source stamping arrived after the first drains shipped, so the oldest junk
+    /// — micro1, the gig "internships", the Revolut role never applied to — has
+    /// `source` nil or `"web"` and survived every previous rebuild untouched.
+    /// That is the whole reason "Refresh data" kept bringing the ghosts back: the
+    /// purge was asking a question those rows were written before anyone thought
+    /// to answer. The id prefix is the reliable tell — `gmail-<msgId>` is only
+    /// ever minted by the drain, so it identifies the pre-stamping rows too.
+    ///
+    /// Hand-added rows match neither clause and are never touched.
+    func isGmailDerived(_ record: TrackerRecord) -> Bool {
+        record.source == "gmail" || (record.internshipId ?? "").hasPrefix("gmail-")
+    }
+
     func rebuildFromGmail(days: Int = 90) async -> Bool {
         guard !isRebuilding else { return false }
         isRebuilding = true
-        defer { isRebuilding = false }
+        syncStartedAt = Date()
+        defer {
+            isRebuilding = false
+            syncStage = nil
+            syncStartedAt = nil
+        }
 
         // A rebuild is only meaningful against the REAL tracker. On a cold launch
         // the first load can complete before Firebase finishes restoring the
@@ -175,34 +196,41 @@ extension CatalogStore {
             toast = String(localized: "Connect Gmail first to rebuild.")
             return false
         }
-        let doomed = tracker.filter { $0.value.source == "gmail" }.count
+        let doomed = tracker.filter { isGmailDerived($0.value) }.count
 
-        // STEP 1 — purge every Gmail-derived row NOW and persist. This is the part
-        // that must not depend on timing: the stale rows an old classifier wrote
-        // (a Revolut role never applied to, micro1, gig "internships", phantom
-        // interviews, dates stamped as today) are gone the moment Rebuild runs,
-        // whether or not the re-scan below finishes in time. Hand-added rows carry
-        // a different `source` and are untouched.
-        let previous = tracker
-        tracker = tracker.filter { $0.value.source != "gmail" }
-        do {
-            try await writeTracker()
-        } catch {
-            tracker = previous
-            toast = String(localized: "Couldn't rebuild — check your connection.")
-            return false
-        }
-        // The re-adds that follow are old news, not new arrivals.
-        Notifier.resetBaseline()
-
-        // STEP 2 — re-scan and re-add only what the CURRENT classifier confirms.
-        // Whatever is already queued applies immediately; a fresh backfill fills in
-        // the rest. The re-scan is fast (known companies skip web enrichment) but
-        // still ~a minute, so poll. If it doesn't land in time, the routine drain
-        // picks it up on the next open — the bad rows are already gone regardless.
+        // ORDER IS THE WHOLE DESIGN: fetch the replacement FIRST, purge only once
+        // it is in hand.
+        //
+        // This used to run the other way round — purge, persist, then re-scan —
+        // on the theory that the bad rows should die even if the re-scan was slow.
+        // On 2026-07-20 that cost the owner their tracker. The purge wrote 21 rows
+        // → 0, and the re-scan returned nothing: the server's own log shows
+        // `listed=0 queued=0` for that sync, because three syncs fired
+        // concurrently (load drain, foreground drain, this backfill) and raced on
+        // the same connection record. The tracker sat empty until the actions were
+        // recovered by hand. A rescan CAN return nothing, so a design that has
+        // already deleted by the time it finds out is not a rebuild — it is a
+        // delete with an optimistic follow-up.
+        //
+        // Below, nothing is destroyed until `actions` is non-empty. If the scan
+        // comes back empty the tracker is exactly as it was.
         toast = String(localized: "Rebuilding from Gmail — re-reading your inbox…")
+
+        // Let any drain that started before `isRebuilding` went up finish first —
+        // the guard in drainGmail only turns away drains that start after us.
+        var waitedForDrain = 0.0
+        while isSyncing && waitedForDrain < 60 {
+            syncStage = String(localized: "Waiting for a sync already in progress…")
+            try? await Task.sleep(for: .seconds(1))
+            waitedForDrain += 1
+        }
+        isSyncing = true
+        defer { isSyncing = false }
+
+        syncStage = String(localized: "Asking the server to re-read \(days) days of mail…")
         await PortalAPI.gmailSyncNow(profile: profile, backfillDays: days)
 
+        syncStage = String(localized: "Waiting for classified results…")
         var actions = (try? await PortalAPI.gmailPending(profile: profile)) ?? []
         var waited = 0
         while actions.isEmpty && waited < 120 {
@@ -211,17 +239,68 @@ extension CatalogStore {
             actions = (try? await PortalAPI.gmailPending(profile: profile)) ?? []
         }
 
-        if !actions.isEmpty {
-            // Already purged above, so this applies additively onto the clean base.
-            let added = await applyGmailActions(actions, profile: profile, replacingGmailRows: false)
-            // The profile id is in the toast deliberately: if the phone and the web
-            // ever show different data, the first question is whether they are
-            // reading the same tracker document — this answers it on sight.
-            toast = String(localized: "Rebuilt \(added) from Gmail — \(doomed) old rows cleared (\(profile)).")
-        } else {
-            toast = String(localized: "Cleared \(doomed) old rows (\(profile)) — internships reappear as Gmail re-syncs.")
+        guard !actions.isEmpty else {
+            // The safe outcome, and the one that used to be catastrophic.
+            log("rebuild aborted — scan returned no actions; tracker left untouched (\(tracker.count) rows)")
+            toast = String(localized: "Couldn't re-read your mail just now — nothing was changed. Try again in a minute.")
+            return false
         }
+
+        // The replacement is in hand. NOW purge.
+        let previous = tracker
+        tracker = tracker.filter { !isGmailDerived($0.value) }
+
+        // Purging rows is not enough. A phantom interview can ride on a row that
+        // SURVIVES the purge: the drain attaches `gmail-<msgId>` milestones to
+        // catalog-id rows (a real Rakuten application, say), so deleting only
+        // Gmail-derived rows leaves the invented interview dates sitting on the
+        // legitimate ones. Strip them and let the re-scan re-add whatever the
+        // current classifier still stands behind.
+        var strippedMilestones = 0
+        for (key, var record) in tracker {
+            guard let milestones = record.milestones else { continue }
+            let kept = milestones.filter { !$0.id.hasPrefix("gmail-") }
+            guard kept.count != milestones.count else { continue }
+            strippedMilestones += milestones.count - kept.count
+            record.milestones = kept.isEmpty ? nil : kept
+            tracker[key] = record
+        }
+
+        log("purge: \(previous.count) rows → \(tracker.count) "
+            + "(\(doomed) gmail-derived, \(strippedMilestones) stale milestones stripped), "
+            + "replacing with \(actions.count) queued actions")
+
+        // The re-adds that follow are old news, not new arrivals.
+        Notifier.resetBaseline()
+        syncStage = String(localized: "Applying \(actions.count) applications…")
+        let added = await applyGmailActions(actions, profile: profile, replacingGmailRows: false)
+
+        // applyGmailActions persists; if it wrote nothing the purge would still be
+        // live in memory, so restore rather than leave the user staring at a gap.
+        guard added > 0 else {
+            tracker = previous
+            try? await writeTracker()
+            log("rebuild applied 0 of \(actions.count) actions — restored \(previous.count) rows")
+            toast = String(localized: "Rebuild found nothing to apply — your applications were left as they were.")
+            return false
+        }
+
+        // The profile id is in the toast deliberately: if the phone and the web
+        // ever show different data, the first question is whether they are reading
+        // the same tracker document — this answers it on sight.
+        toast = String(localized: "Rebuilt \(added) from Gmail — \(doomed) old rows, \(strippedMilestones) stale dates cleared (\(profile)).")
         return true
+    }
+
+    /// Rebuild/migration breadcrumbs. os_log for a shipping build; stdout too in
+    /// Debug, because reading os_log off an attached device requires root and the
+    /// `--console` bridge only carries stdout.
+    fileprivate func log(_ message: String) {
+        Logger(subsystem: "com.mohamedfuad.internshipportal", category: "migrations")
+            .info("\(message, privacy: .public)")
+        #if DEBUG
+        print("[migrations] \(message)")
+        #endif
     }
 
     /// The routine drain: pull whatever Gmail has queued, apply it additively, ack
@@ -234,6 +313,11 @@ extension CatalogStore {
         // apply the backfill's actions on top of the old rows the rebuild is about
         // to purge, and ack them out from under it.
         guard !isRebuilding else { return 0 }
+        // One sync at a time. Two drains racing produce two server-side scans on
+        // one connection record, and the loser reports listing nothing.
+        guard !isSyncing else { return 0 }
+        isSyncing = true
+        defer { isSyncing = false }
 
         let profile = profileID ?? PortalAPI.profile
         guard (try? await PortalAPI.gmailStatus(profile: profile))?.connected == true else { return 0 }
@@ -273,7 +357,7 @@ extension CatalogStore {
         var session: [String: (item: Internship, rank: Int?)] = [:]
         // Hand-added records keep a different `source` and survive a rebuild; the
         // emails are the source of truth for the rest and are still in the inbox.
-        var next = replacingGmailRows ? tracker.filter { $0.value.source != "gmail" } : tracker
+        var next = replacingGmailRows ? tracker.filter { !isGmailDerived($0.value) } : tracker
         var touched = 0
         var acked: [String] = []
         var discovered: [(key: String, company: String, role: String,

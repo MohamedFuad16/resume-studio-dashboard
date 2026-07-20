@@ -145,6 +145,33 @@ final class CatalogStore {
     /// rebuild can purge-and-replace with them.
     var isRebuilding = false
 
+    /// What a long Gmail job is doing right now, in the user's words.
+    ///
+    /// A rebuild spends most of its life waiting on the server to re-read and
+    /// re-classify 90 days of mail — nothing local is happening and there is
+    /// nothing to show. Without this the UI can only offer an indeterminate
+    /// spinner, which is indistinguishable from a hang, which is why the buttons
+    /// read as broken. Set at each step; cleared when the job ends.
+    var syncStage: String?
+
+    /// When the current long job started. A rebuild can be kicked off by the
+    /// launch migration rather than by a button, and the Gmail screen should show
+    /// the same live progress when you wander into it mid-run — otherwise the
+    /// buttons sit disabled with no explanation, which is exactly how "nothing
+    /// works in that section" was reported.
+    var syncStartedAt: Date?
+
+    /// True while a sync-now request is in flight, so only ONE ever is.
+    ///
+    /// A cold launch fires three at once — the load drain, the foreground drain,
+    /// and (previously) the launch repair's backfill. They race on the same
+    /// server-side connection record, and the server's log for 2026-07-20 shows
+    /// the loser: `listed=0 queued=0` for a 90-day backfill that should have
+    /// listed 100 messages. That empty result is what let a rebuild purge the
+    /// tracker and refill it with nothing. Mutated only on the MainActor, so
+    /// check-and-set is atomic without a lock.
+    var isSyncing = false
+
     /// Set by RootView from AuthService. nil = signed out → KV path.
     var uid: String?
     /// Which Firestore profile document the tracker lives in. Resolved on load.
