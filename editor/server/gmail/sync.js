@@ -273,6 +273,15 @@ export async function syncProfile(store, profile, opts = {}) {
       enrichment,
       confidence: verdict.confidence,
       subject: message.subject.slice(0, 200),
+      // WHY this kind, carried on the action itself. classify.js has always
+      // computed these and always thrown them away, so every dispute about a
+      // status ("why is enechain rejected when the subject is about scheduling?")
+      // needed the original mail and a re-run to answer. `kindRule` is one of
+      // model | rejection-phrase | decision-notice | interview-demoted, and
+      // `kindEvidence` is the verified quote it turned on — the same quote
+      // discipline the internship gate uses.
+      kindRule: verdict.kindRule || 'model',
+      kindEvidence: verdict.kindEvidence || null,
       source: 'gmail',
     });
   }
