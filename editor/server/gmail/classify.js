@@ -64,6 +64,43 @@ const fold = text =>
     .replace(/\s+/g, ' ')
     .trim();
 
+// Bulk / mailing-list mail is not the user's application mail — and no amount of
+// reading the body can tell you otherwise.
+//
+// On 2026-07-20 the classifier recorded "Revolut · Software Engineer (Java) ·
+// interview" from Gmail message 19f6ffe0478300cf: a Reddit digest from
+// noreply@redditmail.com quoting a STRANGER's post — "A Revolut recruiter
+// contacted me on LinkedIn about the Graduate Programme 2027… I received a
+// HackerRank assessment link". A fake company, a fake role, and an `interview`
+// status invented from an email in which the word "interview" appears zero times.
+//
+// The internship quote-check did not help and could not have: it verifies that a
+// quote is really IN the email, not whose experience the quote describes. That is
+// the whole lesson — a digest is full of true sentences about other people's
+// applications. So the guard runs BEFORE the classifier and keys on the envelope,
+// not the prose:
+//
+//   • List-Unsubscribe / List-Id — the strongest single signal. RFC 2369 headers
+//     mean the message was broadcast to a subscriber list. An ATS or a recruiter
+//     writing to one candidate does not set them (transactional mail from Workday,
+//     Greenhouse, Lever, SmartRecruiters and friends carries neither).
+//   • List-Post — same family, an actual discussion list.
+//   • Precedence: bulk | list | junk — the RFC 3834 marker for mass mail.
+//
+// Deliberately NOT a blocklist of sender names or domains: the owner's standing
+// rule is that companies are never hardcoded anywhere, and a name list ages badly
+// and punishes a firm for its name instead of for what it sent. A header rule
+// states the actual property we care about — "this was addressed to a list, not
+// to you" — and needs no maintenance.
+const BULK_PRECEDENCE = /^\s*(bulk|list|junk)\s*$/i;
+export function isBulkMail(message) {
+  const bulk = message?.bulk || {};
+  if (String(bulk.listUnsubscribe || '').trim()) return true;
+  if (String(bulk.listId || '').trim()) return true;
+  if (String(bulk.listPost || '').trim()) return true;
+  return BULK_PRECEDENCE.test(String(bulk.precedence || ''));
+}
+
 /// True when `evidence` is a real quote from `haystack` AND names an internship.
 export function internshipEvidenceHolds(evidence, haystack) {
   const quote = fold(evidence);

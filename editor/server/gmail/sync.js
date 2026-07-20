@@ -4,7 +4,7 @@
 // existing records — the server can't read the user's client-direct Firestore).
 import { getConnection, saveConnection, pushQueue } from './store.js';
 import { getAccessToken, listNewMessageIds, listRecentMessageIds, getProfileHistoryId, getMessage, ReauthRequiredError } from './gmailClient.js';
-import { classifyMessage, enrichCompany, llmAvailable } from './classify.js';
+import { classifyMessage, enrichCompany, llmAvailable, isBulkMail } from './classify.js';
 import { buildSeedCatalog } from '../seeds/catalog.js';
 
 const MIN_CONFIDENCE = Number(process.env.GMAIL_MIN_CONFIDENCE || 0.6);
@@ -104,12 +104,18 @@ export async function syncProfile(store, profile, opts = {}) {
   // A sync that returns "0 actions" is otherwise unfalsifiable: a correct filter
   // and a broken one look identical from outside, and the difference decides
   // whether the inbox is clean or the ingest is dead.
-  const dropped = { fetchFailed: 0, classifierFailed: 0, notApplication: 0, notInternship: 0, lowConfidence: 0, noCompany: 0 };
+  const dropped = { fetchFailed: 0, bulkMail: 0, classifierFailed: 0, notApplication: 0, notInternship: 0, lowConfidence: 0, noCompany: 0 };
   const enrichedByCompany = new Map();
   let resolvableNames = null; // loaded lazily on the first enrichment candidate
   for (const id of fresh) {
     let message;
     try { message = await getMessage(token, id); } catch { processed.add(id); dropped.fetchFailed++; continue; }
+    // Newsletters and digests never reach the classifier. A real application
+    // email is addressed to the user by a company or an ATS; a mailing-list
+    // digest is full of OTHER people's applications, and the model happily
+    // attributes them to the user (see isBulkMail). Marked processed: the verdict
+    // is a property of the headers and will not change on a retry.
+    if (isBulkMail(message)) { processed.add(id); dropped.bulkMail++; continue; }
     const verdict = await classifyMessage(message);
     if (!verdict) { dropped.classifierFailed++; continue; } // leave unprocessed so a later sync retries
     processed.add(id);
