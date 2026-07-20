@@ -440,3 +440,55 @@ test('an English ATS confirmation and a JA entry mail both admit', () => {
   assert.ok(bulkAdmission({ subject: 'Thank you for applying to ispace', text: 'We have received your application.' }, {}));
   assert.ok(bulkAdmission({ subject: '【Ｓｋｙ株式会社】エントリーありがとうございます', text: 'マイページのご案内' }, {}));
 });
+
+// ── A quoted phrase is not automatically an asserted one ────────────────────
+//
+// msg 19f15f718ce90069. ispace's application CONFIRMATION was queued as a
+// REJECTION on the evidence "not selected for". The owner confirmed they have
+// had exactly one mail from ispace and it was this one.
+
+const ISPACE_CONFIRMATION = {
+  subject: 'Thank you for your application to ispace, inc.  / Ground Systems / Testing Infrastructure Intern',
+  body: [
+    'Hi Mohamed,',
+    'Thank you for your interest in ispace, inc.!',
+    'We wanted to let you know that we received your application for the position of Ground Systems / Testing Infrastructure Intern, and we are delighted that you are considering joining our team.',
+    'We will review your application and will be in touch if your qualifications match our needs for the role. If you are not selected for this position, we invite you to check back on our Careers Page as we keep growing and adding new job postings.',
+    'Best,',
+    'The HR Team | ispace, inc.',
+  ].join('\n'),
+};
+
+test('ispace — a CONDITIONAL rejection phrase is not a rejection', () => {
+  // "If you are not selected for this position" describes a possible future.
+  // Quote verification passed and was never the question: grounding a claim in a
+  // real quote does not read the quote's MOOD, the same way it does not read its
+  // PERSON (which is how a Reddit digest became an application).
+  const out = resolve(ISPACE_CONFIRMATION, 'applied');
+  assert.notEqual(out.kind, 'rejected');
+  assert.notEqual(out.rule, 'rejection-phrase');
+});
+
+test('a real rejection is still a rejection when the mail also speculates', () => {
+  // The guard must not be so eager that a genuine decision escapes it: the
+  // conditional test looks backward only to the start of ITS OWN sentence.
+  const out = resolveKind({
+    kind: 'applied',
+    subject: 'Application update',
+    body: [
+      'If you have any questions, please reach out.',
+      'We regret to inform you that we will not be moving forward with your application.',
+    ].join('\n'),
+  });
+  assert.equal(out.kind, 'rejected');
+  assert.equal(out.rule, 'rejection-phrase');
+});
+
+test('Japanese conditional rejection language is also refused', () => {
+  const out = resolveKind({
+    kind: 'applied',
+    subject: 'ご応募ありがとうございます',
+    body: '選考の結果、ご希望に沿えない場合はマイページにてお知らせいたします。',
+  });
+  assert.notEqual(out.kind, 'rejected');
+});

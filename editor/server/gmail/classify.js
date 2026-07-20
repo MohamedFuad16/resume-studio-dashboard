@@ -286,6 +286,78 @@ const OFFER_PHRASES = ['内定', '採用が決定', 'pleased to offer', 'happy t
 
 const firstMatch = (phrases, folded) => phrases.find(p => p && folded.includes(p)) || '';
 
+// Words that turn a rejection phrase into a HYPOTHETICAL one.
+//
+// ispace's application CONFIRMATION was queued as a rejection on the evidence
+// "not selected for". The sentence was:
+//
+//   "We will review your application and will be in touch if your qualifications
+//    match our needs for the role. If you are not selected for this position, we
+//    invite you to check back on our Careers Page"
+//
+// The phrase is really in the mail — quote verification passed, exactly as
+// designed — but it describes a possible future, not a decision. Confirmation
+// mail routinely pre-empts the rejection it might later send, so this is not a
+// rare shape. Grounding a claim in a quote is not the same as reading the quote's
+// mood, which is the same lesson the Reddit digest taught about person.
+// English marks a condition BEFORE the clause it governs ("*If* you are not
+// selected…"), Japanese marks it AFTER (「ご希望に沿えない*場合は*」). Scanning one
+// direction catches one language and silently misses the other, so each list is
+// checked on its own side.
+const CONDITIONAL_BEFORE = [
+  'if you are', 'if you have', 'if your', 'if we', 'if the',
+  'should you', 'should we', 'in the event', 'in case', 'unless',
+  '万が一', 'たとえ', 'もし',
+];
+const CONDITIONAL_AFTER = [
+  '場合', 'ばあい', 'ときは', 'となった際', 'に際して',
+];
+/// How far past the phrase a Japanese conditional suffix may sit. 場合 follows
+/// almost immediately; a wider window would swallow the next clause.
+const CONDITIONAL_AFTER_WINDOW = 12;
+
+/// Like `fold`, but KEEPS sentence terminators.
+///
+/// `fold` deliberately flattens all punctuation so a model's quote matches the
+/// mail despite a stray full stop — which also erases every sentence boundary. Run
+/// the conditional test on that and "If you have any questions, please reach out."
+/// merges into the rejection that follows it, and a genuine rejection is dismissed
+/// as hypothetical. So this fold keeps `.!?。` and newlines, and nothing else.
+const softFold = text =>
+  String(text || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s.!?。]+/gu, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
+
+/// True when the phrase sits inside a conditional clause — i.e. the mail is
+/// describing a possible outcome rather than announcing one.
+///
+/// Takes SOFT-folded text so sentence boundaries survive.
+function isConditional(folded, phrase) {
+  const at = folded.indexOf(phrase);
+  if (at < 0) return false;
+
+  // Backward, to the start of ITS OWN sentence only: a conditional two sentences
+  // earlier says nothing about this one.
+  const sentenceStart = Math.max(
+    folded.lastIndexOf('.', at), folded.lastIndexOf('!', at),
+    folded.lastIndexOf('?', at), folded.lastIndexOf('。', at),
+    folded.lastIndexOf('\n', at),
+  );
+  const before = folded.slice(sentenceStart + 1, at);
+  if (CONDITIONAL_BEFORE.some(marker => before.includes(marker))) return true;
+
+  const after = folded.slice(at + phrase.length, at + phrase.length + CONDITIONAL_AFTER_WINDOW);
+  return CONDITIONAL_AFTER.some(marker => after.includes(marker));
+}
+
+/// The first phrase that is present AND is not hypothetical. Matching stays on
+/// the fully-folded text (punctuation-insensitive, as everywhere else); only the
+/// conditional test reads the soft-folded copy, which still has its sentences.
+const firstAssertedMatch = (phrases, folded, soft) =>
+  phrases.find(p => p && folded.includes(p) && !isConditional(soft, p)) || '';
+
 /**
  * Override the model's `kind` with verified phrase evidence from the email.
  *
@@ -315,7 +387,7 @@ export function resolveKind({ kind, subject, body, hasInterviewDate = false }) {
   const foldedSubject = fold(subject);
   const foldedAll = fold(`${subject || ''} ${body || ''}`);
 
-  const rejection = firstMatch(REJECTION_PHRASES, foldedAll);
+  const rejection = firstAssertedMatch(REJECTION_PHRASES, foldedAll, softFold(`${subject}\n${body}`));
   if (rejection) return { kind: 'rejected', evidence: rejection, rule: 'rejection-phrase' };
 
   const invitation = firstMatch(INTERVIEW_INVITATION_PHRASES, foldedAll);
