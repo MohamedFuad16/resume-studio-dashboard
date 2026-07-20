@@ -94,6 +94,10 @@ enum CardExpandSpace {
 /// expanded twin is up.
 struct CardExpandContainer<Content: View, Detail: View>: View {
     @Binding var expandedID: String?
+    /// Collapsed corner radius for a given source frame. Cards use the default;
+    /// the Companies orbs pass `{ $0.width / 2 }` so a circle grows out of a
+    /// circle instead of snapping square on the first frame.
+    var collapsedRadius: (CGRect) -> CGFloat = { _ in CardExpandMotion.collapsedRadius }
     /// The card face to draw inside the expanded sheet, so the header is the
     /// same view the user tapped rather than a lookalike.
     let face: (String) -> AnyView
@@ -119,7 +123,7 @@ struct CardExpandContainer<Content: View, Detail: View>: View {
                     .allowsHitTesting(!isOpen)
 
                 if let id = expandedID, let origin = frames[id] {
-                    overlay(id: id, origin: origin, size: proxy.size)
+                    overlay(id: id, origin: origin, size: proxy.size, insets: proxy.safeAreaInsets)
                 }
             }
             .onAppear { containerSize = proxy.size }
@@ -129,16 +133,27 @@ struct CardExpandContainer<Content: View, Detail: View>: View {
         .onPreferenceChange(CardFrameKey.self) { frames = $0 }
     }
 
-    private func overlay(id: String, origin: CGRect, size: CGSize) -> some View {
+    private func overlay(id: String, origin: CGRect, size: CGSize, insets: EdgeInsets) -> some View {
         // Interpolate the frame directly. `progress` is the only input, so the
         // drag and the open/close animation compose instead of competing.
+        //
+        // The target is the FULL SCREEN, not the safe area. The container sits
+        // inside a navigation stack, so `size` stops at the nav bar and the tab
+        // bar — growing to it produced a floating cutout card with bars still
+        // showing around it (owner's screenshot, 2026-07-21). The safe-area
+        // insets are added back so the sheet lands edge-to-edge; the bars are
+        // hidden by the host view while something is expanded.
         let p = progress
-        let width = origin.width + (size.width - origin.width) * p
-        let height = origin.height + (size.height - origin.height) * p
-        let x = origin.midX + (size.width / 2 - origin.midX) * p
-        let y = origin.midY + (size.height / 2 - origin.midY) * p
-        let radius = CardExpandMotion.collapsedRadius
-            + (CardExpandMotion.expandedRadius - CardExpandMotion.collapsedRadius) * p
+        let fullWidth = size.width + insets.leading + insets.trailing
+        let fullHeight = size.height + insets.top + insets.bottom
+        let targetX = (size.width + insets.trailing - insets.leading) / 2
+        let targetY = (size.height + insets.bottom - insets.top) / 2
+        let width = origin.width + (fullWidth - origin.width) * p
+        let height = origin.height + (fullHeight - origin.height) * p
+        let x = origin.midX + (targetX - origin.midX) * p
+        let y = origin.midY + (targetY - origin.midY) * p
+        let startRadius = collapsedRadius(origin)
+        let radius = startRadius + (CardExpandMotion.expandedRadius - startRadius) * p
         let dragScale = 1 - min(max(dragY, 0) / CardExpandMotion.dragRange, 1)
             * (1 - CardExpandMotion.dragMinScale)
 

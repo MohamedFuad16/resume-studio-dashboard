@@ -11,8 +11,6 @@ struct ApplicationsView: View {
     /// Set by the row's Remove action; drives the confirmation below. Deleting a
     /// tracked application is not undoable, so it asks first.
     @State private var pendingRemoval: TrackerRecord?
-    /// The record whose card is currently expanded to full screen.
-    @State private var expandedID: String?
 
     private var companyCount: Int {
         Set(store.internships.map { $0.displayCompany.lowercased() }).count
@@ -29,31 +27,15 @@ struct ApplicationsView: View {
         // stack's own ground is opaque and would cover it), and the tab's screen
         // keeps its custom header, so the bar stays hidden until a push.
         NavigationStack {
-            // The expand container wraps the whole screen, not just the list: the
-            // card grows to fill the tab area, and the list behind it has to scale
-            // as one piece (header included) or the retreat reads as the rows
-            // sliding independently of their own heading.
-            CardExpandContainer(
-                expandedID: $expandedID,
-                face: { id in
-                    AnyView(
-                        store.records.first { $0.id == id }
-                            .map { ApplicationCard(record: $0, action: {}) }
-                    )
-                },
-                content: {
-                    AmbientCanvas(active: route == nil && expandedID == nil) { content }
-                        .navigationDestination(isPresented: $showCompanies) { CompaniesView() }
-                        .toolbar(.hidden, for: .navigationBar)
-                },
-                detail: { id in
-                    if let record = store.records.first(where: { $0.id == id }) {
-                        // The finished detail view, reused as-is. The card grows
-                        // into it rather than into a second copy of it.
-                        RecordSheet(record: record)
-                    }
-                }
-            )
+            // Application records open as SHEETS, deliberately. The card-expand
+            // treatment was tried here first and produced a double chrome — the
+            // expander's close button stacked over RecordSheet's own — because
+            // RecordSheet is a finished view with its own header. Expansion lives
+            // where a view can own the whole canvas: the Companies orbs
+            // (CompanyDetailView). Owner's call, 2026-07-20.
+            AmbientCanvas(active: route == nil) { content }
+                .navigationDestination(isPresented: $showCompanies) { CompaniesView() }
+                .toolbar(.hidden, for: .navigationBar)
         }
     }
 
@@ -106,13 +88,7 @@ struct ApplicationsView: View {
             } else {
                 LazyVStack(spacing: 10) {
                     ForEach(Array(results.enumerated()), id: \.element.id) { index, record in
-                        ApplicationCard(record: record) {
-                            expandedID = record.id
-                        }
-                            .cardExpandSource(record.id)
-                            // Hidden, not removed: removing it would collapse the
-                            // scroll offset under the expanded card.
-                            .opacity(expandedID == record.id ? 0 : 1)
+                        ApplicationCard(record: record) { route = .record(record) }
                             .smoothAppear(index)
                             // Long-press to remove. Not `.swipeActions` — that is
                             // List-only and this is a LazyVStack of cards. The

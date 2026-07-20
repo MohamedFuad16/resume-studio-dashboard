@@ -4,13 +4,14 @@
 //
 // Sequence on a first cold launch: static launch screen → splash → these → login.
 // One AppStorage flag; returning users never see it again.
-import AudioToolbox
 import SwiftUI
 import UIKit
 
-/// A soft tactile + audible "stick" for a bubble arriving into the cluster. Haptic
-/// carries the feel on device; the system "pop" carries the sound. Respects Reduce
-/// Motion by simply not being called from the animation path.
+/// A soft tactile "stick" for a bubble arriving into the cluster. Haptic only,
+/// by the owner's ear: a synthesised pop was tried (2026-07-21) and asked to be
+/// removed — "the sound itself is weird". If sound returns it should be a
+/// designed asset, not math. (The system sound 1520 that used to sit here is a
+/// haptic alias and was silent on most devices anyway.)
 @MainActor
 enum SoftFeedback {
     private static let generator = UIImpactFeedbackGenerator(style: .soft)
@@ -18,7 +19,6 @@ enum SoftFeedback {
     static func stick() {
         generator.impactOccurred(intensity: 0.75)
         generator.prepare()
-        AudioServicesPlaySystemSound(1520)   // a soft, bubble-like "pop"
     }
 }
 

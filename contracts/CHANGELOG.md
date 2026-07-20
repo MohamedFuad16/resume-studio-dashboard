@@ -2,6 +2,19 @@
 
 Every entry: date · who · what changed · what the OTHER side must do.
 
+- **2026-07-20 · iOS · REQUEST to web — company facts in the research payload.**
+  iOS now has a company page (tap an orb in Companies → it expands into
+  `CompanyDetailView`) that shows real stats: catalog popularity, listings, the
+  owner's per-role history, and the `research-company` job's summary + verified
+  openings. The owner wants funding, work-life balance, headcount and similar
+  facts there. iOS will NOT invent these client-side. Ask: extend the
+  research-company job JSON with an optional `facts` object —
+  `{funding, workLifeBalance, employees, founded, rating}`, strings, each
+  omitted when the search cannot ground it (grounded like everything else in
+  that pipeline; no guesses). iOS already decodes and renders `facts` if
+  present (`ResearchJob.Facts` in `Views/CompanyDetailView.swift`), so shipping
+  it lights the page up with no app update.
+
 - **2026-07-20 · both · The owner can overrule the pipeline: `statusPinned` +
   tombstones (ADR-S-004).** The tracker was a cache of classifier output — the
   owner deleted a wrong row and the next rescan re-created it; they knew they were

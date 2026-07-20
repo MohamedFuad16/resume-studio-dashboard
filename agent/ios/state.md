@@ -21,6 +21,24 @@ inbox (80 scanned → 20 real internships queued, 23 non-internships dropped).
 
 ## Recent changes
 
+- **2026-07-21 — Company pages behind the orb expansion; records stay sheets.**
+  Card-expand on Applications records doubled the chrome (RecordSheet's close
+  button under the expander's — owner's screenshot), so records are SHEETS again
+  everywhere and the gesture moved to the Companies orbs: tap one and it grows,
+  circle-out-of-circle (`collapsedRadius` is now a function of the source frame),
+  into the new `CompanyDetailView`. First ship rendered as a floating cutout —
+  the overlay grew to the SAFE AREA, boxed by the nav and tab bars; it now adds
+  the safe-area insets back and both bars hide while a page is up, so it lands
+  edge-to-edge. The page shows only numbers that exist: catalog popularity (the
+  same score that drives Radar rank), listing count, per-role history with pin
+  badges, and the research-company job's summary + verified openings behind a
+  button. Funding/WLB/headcount are requested from web in contracts/CHANGELOG —
+  `ResearchJob.Facts` already decodes and renders the object when it ships.
+  Sounds were built (synthesised AVAudioEngine pops), shipped, and REMOVED the
+  same day — the owner found them weird. Onboarding feedback is haptic-only
+  again; if sound returns it should be a designed asset, not math. Onboarding
+  replay tag bumped to `2026-07-20a`.
+
 - **2026-07-20 (later) — Rebuild made non-destructive after it wiped the tracker
   (ADR-I-015).** A launch migration ran `rebuildFromGmail()` unattended; it
   purged 21 rows, committed, and the re-scan returned nothing. Tracker empty.

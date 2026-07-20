@@ -97,7 +97,7 @@ struct InternshipPortalApp: App {
                 // so it can be seen on a device that already onboarded — without
                 // forcing four screens on every single foreground. Bump the tag to
                 // show it again. Remove this block before shipping.
-                let tag = "onboarding-review-2026-07-19a"
+                let tag = "onboarding-review-2026-07-20a"   // bumped: owner asked to see onboarding again, now with sound
                 if UserDefaults.standard.string(forKey: "onboardingReviewTag") != tag {
                     hasOnboarded = false
                     UserDefaults.standard.set(tag, forKey: "onboardingReviewTag")
