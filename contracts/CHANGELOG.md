@@ -2,6 +2,21 @@
 
 Every entry: date · who · what changed · what the OTHER side must do.
 
+- **2026-07-20 · both · The owner can overrule the pipeline: `statusPinned` +
+  tombstones (ADR-S-004).** The tracker was a cache of classifier output — the
+  owner deleted a wrong row and the next rescan re-created it; they knew they were
+  rejected and the record said "applied" until the classifier was repaired. Now:
+  a status set by hand sets `statusPinned: true` and no drain ever moves that
+  record's status, stamps or milestones again (detail enrichment still applies;
+  pinned records survive the rebuild purge whatever `source` says). Deleting a
+  record writes a `(companyKey, roleKey)` tombstone stored BESIDE the tracker map
+  in the SAME document write; a drain never re-creates a tombstoned pair, and an
+  `applied` action strictly newer than the tombstone lifts it. Full rules in
+  `contracts/tracker-record.md` "User truth outranks the pipeline".
+  **Both clients implement this identically** — iOS commit 6d939f9, web commit
+  79cf962. This entry is late by one commit on the iOS side (rule 2 says same
+  commit); noted here rather than hidden.
+
 - **2026-07-20 · both · Tracker records are keyed by COMPANY + ROLE, not company
   (SPEC-per-role-keying.md).** The drain kept one record per company, so repeated
   applications to one firm collapsed into a single row that then lied about its
