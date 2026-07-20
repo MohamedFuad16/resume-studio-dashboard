@@ -18,7 +18,7 @@
 // Japanese ATS the owner applies through.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveKind, internshipEvidenceHolds, isBulkMail } from './classify.js';
+import { resolveKind, internshipEvidenceHolds, isBulkMail, bulkAdmission } from './classify.js';
 import { admitsCarriedDecision, provesInternshipApplication, companyKey } from './sync.js';
 
 // ── The four defects of 2026-07-20 ──────────────────────────────────────────
@@ -347,10 +347,96 @@ test('an application admits a rejection processed later in the SAME run', () => 
   assert.equal(admitsCarriedDecision(REJECTION_VERDICT, seenReversed), false);
 });
 
-// ── The bulk-mail guard is untouched ────────────────────────────────────────
+// ── Bulk headers are evidence, not a verdict ────────────────────────────────
+//
+// The header test itself is unchanged. What changed is what the sync DOES with
+// it: shipping it as a hard skip dropped 27 of 80 messages on the first
+// production run and took Sky's rejection, LAPRAS and Atom11 with it, because
+// Japanese ATSs deliver personally-addressed mail through bulk services.
 
-test('bulk mail is still refused before the classifier', () => {
+test('the bulk header test itself is unchanged', () => {
   assert.equal(isBulkMail({ bulk: { listUnsubscribe: '<mailto:x@y.z>' } }), true);
   assert.equal(isBulkMail({ bulk: { precedence: 'bulk' } }), true);
   assert.equal(isBulkMail({ bulk: {} }), false);
+});
+
+// The two messages that must land on OPPOSITE sides of this line. Both carry
+// List-Unsubscribe; only one is written to the owner.
+const SKY_REJECTION = {
+  from: 'skygroup@mail.axol.jp',
+  subject: '＜選考結果のご連絡＞5daysインターンシップ/3daysワークショップ【Ｓｋｙ株式会社】',
+  text: [
+    'ーーーーーーーーーーーーーーーーーーーーーーーーーーー',
+    '応募いただいた情報をもとにお送りしております。',
+    'ーーーーーーーーーーーーーーーーーーーーーーーーーーー',
+    'こんにちは。Ｓｋｙ株式会社 管理本部 人財部 リクルーティング課です。',
+    '＜5daysインターンシップ＞の選考結果につきまして、マイページよりご確認ください。',
+  ].join('\n'),
+  bulk: { listUnsubscribe: '<mailto:unsub@mail.axol.jp>' },
+};
+
+const REDDIT_DIGEST = {
+  from: 'noreply@redditmail.com',
+  subject: '"Gemini 3.5 Pro falls behind Kimi k3 — Another setback for Google?"',
+  text: [
+    'r/cscareerquestionsEU',
+    'Revolut Graduate Programme 2027: Software Engineer (Java)',
+    'Hi all,',
+    'A Revolut recruiter contacted me on LinkedIn about the Graduate Programme 2027:',
+    'Software Engineer (Java) role. I sent my CV and email, a few days later, I',
+    'received a HackerRank assessment link...',
+  ].join('\n'),
+  bulk: { listUnsubscribe: '<https://click.redditmail.com/unsub>', listId: 'digest.redditmail.com' },
+};
+
+test('a bulk-delivered ATS rejection addressed to the owner is admitted', () => {
+  // Sky's mail is the reason this rule exists: mail.axol.jp is a bulk delivery
+  // service, so the envelope is indistinguishable from a newsletter.
+  assert.ok(bulkAdmission(SKY_REJECTION, { knownCompanies: new Set() }));
+});
+
+test('the Reddit digest is still skipped — "Hi all" is not an addressee', () => {
+  // The digest quotes a stranger's first-person application story. Every earlier
+  // guard that read the PROSE fell for it; only the addressee separates them.
+  assert.equal(bulkAdmission(REDDIT_DIGEST, { knownCompanies: new Set() }), null);
+});
+
+test('a digest is not rescued by naming a company the owner applied to', () => {
+  // The sender signal keys on the FROM display name, not on body mentions — so a
+  // digest that happens to discuss HENNGE cannot ride in on HENNGE's history.
+  const known = new Set(['revolut', 'hennge']);
+  assert.equal(bulkAdmission(REDDIT_DIGEST, { knownCompanies: known, senderKey: 'reddit' }), null);
+});
+
+test('admission reasons are specific, so production telemetry is diagnosable', () => {
+  assert.equal(
+    bulkAdmission({ text: 'モハメド フアド様\nお世話になっております。', subject: '' }, {}),
+    'addressed-to-owner',
+  );
+  assert.equal(
+    bulkAdmission({ text: 'この度はご応募いただきありがとうございました。', subject: '' }, {}),
+    'first-party-application',
+  );
+  assert.equal(
+    bulkAdmission({ text: 'nothing relevant here', subject: '', from: 'Atilika <no-reply@atilika.com>' },
+      { knownCompanies: new Set(['atilika']), senderKey: 'atilika' }),
+    'known-applied-company',
+  );
+});
+
+test('collective greetings do not count as an addressee', () => {
+  for (const greeting of ['Hi all,', 'Dear all,', 'Hey everyone,', 'Dear Team,', 'Dear Sir or Madam,']) {
+    assert.equal(
+      bulkAdmission({ text: `${greeting}\nWe are hiring interns!`, subject: '' }, {}),
+      null,
+      `"${greeting}" must not admit`,
+    );
+  }
+});
+
+test('an English ATS confirmation and a JA entry mail both admit', () => {
+  // The cold-start case: the owner's FIRST mail from a company, before
+  // internshipCompanies knows anything about it.
+  assert.ok(bulkAdmission({ subject: 'Thank you for applying to ispace', text: 'We have received your application.' }, {}));
+  assert.ok(bulkAdmission({ subject: '【Ｓｋｙ株式会社】エントリーありがとうございます', text: 'マイページのご案内' }, {}));
 });

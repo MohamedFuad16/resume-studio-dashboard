@@ -93,13 +93,87 @@ const fold = text =>
 // states the actual property we care about — "this was addressed to a list, not
 // to you" — and needs no maintenance.
 const BULK_PRECEDENCE = /^\s*(bulk|list|junk)\s*$/i;
-export function isBulkMail(message) {
+export function hasBulkHeaders(message) {
   const bulk = message?.bulk || {};
   if (String(bulk.listUnsubscribe || '').trim()) return true;
   if (String(bulk.listId || '').trim()) return true;
   if (String(bulk.listPost || '').trim()) return true;
   return BULK_PRECEDENCE.test(String(bulk.precedence || ''));
 }
+
+// ── and why the header alone is NOT the verdict ────────────────────────────────
+//
+// Everything above is true and still cost the owner real data. Shipping the
+// header check as a hard skip dropped 27 of 80 messages on the first production
+// run and took three genuine records with it: Ｓｋｙ株式会社's REJECTION vanished,
+// and LAPRAS and Atom11 — both real applications — never reached the tracker.
+//
+// The reason is structural, not a tuning miss. Japanese recruiting is run through
+// bulk-mail delivery services: Sky sends candidate mail via mail.axol.jp, AICE via
+// HERP, and those carry List-Unsubscribe exactly like a newsletter does. The
+// envelope cannot separate "broadcast to strangers" from "sent to you, through a
+// vendor" in this market, so a binary gate on it is guaranteed to be wrong in one
+// direction or the other. Every earlier fix in this pipeline failed the same way:
+// source-stamp checks missed rows written before stamping, company-only keys
+// merged distinct roles, and now header checks eat ATS mail.
+//
+// So bulk-ness is EVIDENCE, weighed against whether the message is written TO the
+// owner, rather than a verdict of its own. What actually separated the Reddit
+// digest from Sky's rejection was never the envelope — it was the addressee. A
+// digest talks ABOUT applications in the third person and greets nobody (or
+// greets "all"); an ATS writes 「モハメド フアド様」 and says 応募いただいた情報を
+// もとに. That distinction is language-level and needs no company names.
+const PERSONAL_SALUTATION = [
+  // <name>様 / <name>さん at the head of a line — the JA business form. Bounded
+  // length so a sentence that merely ends in 様 does not qualify.
+  /(?:^|\n)[^\n]{1,40}(?:様|さん)[\s、,]*(?:\n|$)/u,
+  // "Dear Mohamed", "Dear Ms Pullali". Deliberately excludes the collective
+  // greetings a digest uses — "Hi all", "Dear all", "Hey everyone" — which is
+  // exactly how the Reddit post opens ("Hi all,").
+  /(?:^|\n)\s*dear\s+(?!all\b|everyone\b|team\b|sir\b|madam\b|hiring\b)[a-z][a-z'’-]+/i,
+];
+
+// Phrases a COMPANY writes to an APPLICANT about that applicant's own application.
+// Not "words about applications" — a digest is full of those. These are
+// second-person/transactional forms that a third-party post does not contain.
+const FIRST_PARTY_APPLICATION = [
+  /応募(?:が完了|いただき|ありがとう|くださり)/u,
+  /ご応募/u,
+  /エントリー(?:ありがとう|いただき|完了)/u,
+  /選考(?:結果|の結果|状況)/u,
+  /(?:書類|一次|二次|最終)選考/u,
+  /your\s+application/i,
+  /thank\s+you\s+for\s+(?:applying|your\s+application|your\s+interest)/i,
+  /we\s+(?:have\s+)?received\s+your/i,
+  /application\s+(?:has\s+been\s+)?(?:received|submitted|completed)/i,
+];
+
+/// Why a bulk-headered message may still be the owner's mail — or null to skip.
+///
+/// `senderKey` is the From display name already normalised by the CALLER. It is
+/// passed in rather than computed here because the canonical normaliser lives in
+/// sync.js, which imports this module — deriving a second copy here is exactly
+/// the cross-implementation drift `contracts/` exists to prevent. Empty for a bare
+/// address (the common ATS case), so it can only ever ADD an admission.
+export function bulkAdmission(message, { knownCompanies, senderKey } = {}) {
+  const head = String(message?.text || '').slice(0, 800);
+  const whole = `${message?.subject || ''}\n${message?.text || ''}`;
+
+  if (PERSONAL_SALUTATION.some(re => re.test(head))) return 'addressed-to-owner';
+  if (FIRST_PARTY_APPLICATION.some(re => re.test(whole))) return 'first-party-application';
+  if (senderKey && knownCompanies?.has?.(senderKey)) return 'known-applied-company';
+
+  return null;
+}
+
+/// The display name on a From header, stripped of the address. Normalise the
+/// result with the caller's company-key function.
+export function senderDisplayName(from) {
+  return String(from || '').replace(/<[^>]*>/g, '').replace(/["']/g, '').trim();
+}
+
+/// Retained for callers that only need the envelope fact.
+export const isBulkMail = hasBulkHeaders;
 
 /// True when `evidence` is a real quote from `haystack` AND names an internship.
 export function internshipEvidenceHolds(evidence, haystack) {

@@ -4,7 +4,7 @@
 // existing records — the server can't read the user's client-direct Firestore).
 import { getConnection, saveConnection, pushQueue } from './store.js';
 import { getAccessToken, listNewMessageIds, listRecentMessageIds, getProfileHistoryId, getMessage, ReauthRequiredError } from './gmailClient.js';
-import { classifyMessage, enrichCompany, llmAvailable, isBulkMail } from './classify.js';
+import { classifyMessage, enrichCompany, llmAvailable, hasBulkHeaders, bulkAdmission, senderDisplayName } from './classify.js';
 import { buildSeedCatalog } from '../seeds/catalog.js';
 
 const MIN_CONFIDENCE = Number(process.env.GMAIL_MIN_CONFIDENCE || 0.6);
@@ -152,7 +152,12 @@ export async function syncProfile(store, profile, opts = {}) {
   // A sync that returns "0 actions" is otherwise unfalsifiable: a correct filter
   // and a broken one look identical from outside, and the difference decides
   // whether the inbox is clean or the ingest is dead.
-  const dropped = { fetchFailed: 0, bulkMail: 0, classifierFailed: 0, notApplication: 0, notInternship: 0, lowConfidence: 0, noCompany: 0 };
+  const dropped = { fetchFailed: 0, bulkSkipped: 0, classifierFailed: 0, notApplication: 0, notInternship: 0, lowConfidence: 0, noCompany: 0 };
+  // Bulk-headered mail that was let through anyway because it is addressed to the
+  // owner. Counted, not silent: the first version of this guard skipped 27 of 80
+  // messages and took Sky's rejection and two real applications with it, and the
+  // only reason that was ever noticed is that the owner said so out loud.
+  let bulkAdmitted = 0;
   // Decisions admitted on a prior tracked application rather than on their own
   // internship evidence (see the gate below). Not a drop — counted separately so
   // the telemetry still balances: listed → fresh → queued + dropped.
@@ -169,12 +174,28 @@ export async function syncProfile(store, profile, opts = {}) {
   for (const id of fresh) {
     let message;
     try { message = await getMessage(token, id); } catch { processed.add(id); dropped.fetchFailed++; continue; }
-    // Newsletters and digests never reach the classifier. A real application
-    // email is addressed to the user by a company or an ATS; a mailing-list
-    // digest is full of OTHER people's applications, and the model happily
-    // attributes them to the user (see isBulkMail). Marked processed: the verdict
-    // is a property of the headers and will not change on a retry.
-    if (isBulkMail(message)) { processed.add(id); dropped.bulkMail++; continue; }
+    // Bulk headers are evidence, not a verdict. Japanese ATSs deliver
+    // personally-addressed decision mail through bulk services — Sky via
+    // mail.axol.jp, AICE via HERP — so a hard skip on List-Unsubscribe throws away
+    // real rejections along with the newsletters. A bulk message is let through
+    // when it is written TO the owner (a salutation, a first-party application
+    // phrase, or a company already known to hold one of their applications), and
+    // skipped otherwise. That is what separates Sky's rejection from a Reddit
+    // digest quoting a stranger — the addressee, never the envelope.
+    if (hasBulkHeaders(message)) {
+      const why = bulkAdmission(message, {
+        knownCompanies: internshipCompanies,
+        senderKey: companyKey(senderDisplayName(message.from)),
+      });
+      if (!why) {
+        // Marked processed: this verdict is a property of the headers and the
+        // prose, and will not change on a retry.
+        processed.add(id);
+        dropped.bulkSkipped++;
+        continue;
+      }
+      bulkAdmitted++;
+    }
     const verdict = await classifyMessage(message);
     if (!verdict) { dropped.classifierFailed++; continue; } // leave unprocessed so a later sync retries
     processed.add(id);
@@ -271,8 +292,9 @@ export async function syncProfile(store, profile, opts = {}) {
   // only, never mail content: this is someone's inbox.
   console.log(
     `gmail-sync[${profile}] listed=${messageIds.length} fresh=${fresh.length} ` +
-    `queued=${actions.length} carriedInternship=${carriedInternship} dropped=${JSON.stringify(dropped)}`
+    `queued=${actions.length} carriedInternship=${carriedInternship} ` +
+    `bulkAdmitted=${bulkAdmitted} dropped=${JSON.stringify(dropped)}`
   );
 
-  return { scanned: fresh.length, actions: actions.length, carriedInternship, dropped };
+  return { scanned: fresh.length, actions: actions.length, carriedInternship, bulkAdmitted, dropped };
 }
