@@ -105,12 +105,14 @@ async function readInternshipCatalog() {
   const seedCatalog = buildSeedCatalog().map(validateInternship);
   if (Array.isArray(stored) && stored.length) {
     const seedIds = new Set(seedCatalog.map(item => item.id));
-    const liveResearch = stored
-      .filter(item => item?.prestigeTier === 'Live company research' && !isRetiredInternshipId(item?.id))
-      .map(validateInternship);
-    const nonSeedStored = stored
-      .filter(item => item?.prestigeTier !== 'Live company research' && !seedIds.has(item?.id) && !isRetiredInternshipId(item?.id))
-      .map(validateInternship);
+    // One pass over `stored` sorts every entry into its bucket (or drops it).
+    const liveResearch = [];
+    const nonSeedStored = [];
+    for (const item of stored) {
+      if (isRetiredInternshipId(item?.id)) continue;
+      if (item?.prestigeTier === 'Live company research') liveResearch.push(validateInternship(item));
+      else if (!seedIds.has(item?.id)) nonSeedStored.push(validateInternship(item));
+    }
     const catalog = mergeInternships(liveResearch, seedCatalog, nonSeedStored);
     if (catalog.length !== stored.length || JSON.stringify(catalog) !== JSON.stringify(stored)) {
       await store.setJson(INTERNSHIP_CATALOG_KEY, catalog);
@@ -118,26 +120,33 @@ async function readInternshipCatalog() {
     return rememberCatalog(catalog);
   }
   const legacyCustom = await store.getJson('customInternships', []);
-  const catalog = mergeInternships(
-    Array.isArray(legacyCustom)
-      ? legacyCustom.filter(item => !isRetiredInternshipId(item?.id)).map(validateInternship)
-      : [],
-    seedCatalog,
-  );
+  const legacyValidated = [];
+  if (Array.isArray(legacyCustom)) {
+    for (const item of legacyCustom) {
+      if (!isRetiredInternshipId(item?.id)) legacyValidated.push(validateInternship(item));
+    }
+  }
+  const catalog = mergeInternships(legacyValidated, seedCatalog);
   await store.setJson(INTERNSHIP_CATALOG_KEY, catalog);
   return rememberCatalog(catalog);
 }
 
 async function writeInternshipCatalog(items) {
-  const catalog = mergeInternships(
-    items.filter(item => !isRetiredInternshipId(item?.id)).map(validateInternship),
-  );
+  const surviving = [];
+  for (const item of items) {
+    if (!isRetiredInternshipId(item?.id)) surviving.push(validateInternship(item));
+  }
+  const catalog = mergeInternships(surviving);
   await store.setJson(INTERNSHIP_CATALOG_KEY, catalog);
   return rememberCatalog(catalog);
 }
 
 function internshipCatalogMeta(items) {
-  const verifiedDates = items.map(item => item.verifiedDate).filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date || '')).sort();
+  const verifiedDates = [];
+  for (const item of items) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(item.verifiedDate || '')) verifiedDates.push(item.verifiedDate);
+  }
+  verifiedDates.sort();
   // The auto-refresh overlay liveness-checks the WHOLE catalog on each run, so
   // its updatedAt is the honest "checked <date>" — usually newer than the last
   // per-listing verifiedDate (which only moves when a listing is re-researched).
@@ -205,10 +214,13 @@ async function writeProfile(profileId, data) {
 async function listProfiles() {
   const stored = await store.listJson('profile:');
   if (stored.length) {
-    return stored
-      .map(({ key, value }) => ({ id: key.replace(/^profile:/, ''), value }))
-      .filter(({ id }) => !RETIRED_PROFILE_IDS.includes(id))
-      .map(({ id, value }) => ({ id, name: value.personal?.nameEn || value.personalInfo?.fullName || id, fileName: `${id}.json` }));
+    const profiles = [];
+    for (const { key, value } of stored) {
+      const id = key.replace(/^profile:/, '');
+      if (RETIRED_PROFILE_IDS.includes(id)) continue;
+      profiles.push({ id, name: value.personal?.nameEn || value.personalInfo?.fullName || id, fileName: `${id}.json` });
+    }
+    return profiles;
   }
   await ensureSampleProfiles();
   return listProfiles();
@@ -218,20 +230,20 @@ async function listProfiles() {
 // <id>.json file exists. Idempotent: readProfile returns stored data untouched
 // when present and only writes to the store when seeding from disk.
 async function ensureSampleProfiles() {
-  for (const sampleId of SAMPLE_PROFILE_IDS) {
-    await readProfile(sampleId);
-  }
+  // Each sample seeds its own independent profile:<id> key — safe in parallel.
+  await Promise.all(SAMPLE_PROFILE_IDS.map(sampleId => readProfile(sampleId)));
 }
 
 // Delete the KV rows for any retired profile ids (profile:/tracker:/applications:).
 // Idempotent — safe to run on every boot; rewrites the Blob snapshot so prod is cleaned
 // on the next deploy. See BUG-008.
 async function purgeRetiredProfiles() {
-  for (const id of RETIRED_PROFILE_IDS) {
-    await store.deleteKey(profileKey(id)).catch(() => {});
-    await store.deleteKey(trackerKey(id)).catch(() => {});
-    await store.deleteKey(applicationsKey(id)).catch(() => {});
-  }
+  // Independent keys; failures are individually swallowed, so run them together.
+  await Promise.all(RETIRED_PROFILE_IDS.flatMap(id => [
+    store.deleteKey(profileKey(id)).catch(() => {}),
+    store.deleteKey(trackerKey(id)).catch(() => {}),
+    store.deleteKey(applicationsKey(id)).catch(() => {}),
+  ]));
 }
 
 // Live LaTeX compilation cannot run on Vercel (no Tectonic binary), so the PDF
@@ -337,11 +349,12 @@ async function initPersistentStore() {
     if (!migrated.length) {
       try {
         const files = await fs.readdir(PROFILES_DIR);
-        for (const file of files.filter(f => f.endsWith('.json'))) {
+        // Each profile file migrates to its own key — independent, run together.
+        await Promise.all(files.filter(f => f.endsWith('.json')).map(async file => {
           const id = file.replace(/\.json$/, '');
           const raw = await fs.readFile(path.join(PROFILES_DIR, file), 'utf8');
           await store.setJson(profileKey(id), JSON.parse(raw));
-        }
+        }));
       } catch (error) {
         if (error.code !== 'ENOENT') console.error('Could not migrate profile files:', error.message);
       }
@@ -1123,13 +1136,15 @@ function buildAIProfile(r) {
   const acts = r.activities || [];
   const now = new Date().toISOString().slice(0, 10);
 
-  // Build tag cloud from skills
-  const allTechTags = [
-    ...(sk.languages || '').split(','),
-    ...(sk.frameworks || '').split(','),
-    ...(sk.tools || '').split(','),
-    ...(sk.concepts || '').split(','),
-  ].map(t => t.trim()).filter(Boolean).map(t => `[${t}]`).join(' ');
+  // Build tag cloud from skills — one pass over the four comma-lists.
+  const techTags = [];
+  for (const group of [sk.languages, sk.frameworks, sk.tools, sk.concepts]) {
+    for (const tag of String(group || '').split(',')) {
+      const trimmed = tag.trim();
+      if (trimmed) techTags.push(`[${trimmed}]`);
+    }
+  }
+  const allTechTags = techTags.join(' ');
 
   const spokenTags = (sk.spoken || '').split(',').map(t => `[${t.trim()}]`).join(' ');
 
@@ -1268,9 +1283,8 @@ async function getApplications(profileId = 'mohamed_fuad') {
     await fs.mkdir(dir, { recursive: true });
     const files = await fs.readdir(dir);
     const mdFiles = files.filter(f => f.endsWith('.md'));
-    const list = [];
-
-    for (const f of mdFiles) {
+    // Independent reads — parse every dossier concurrently.
+    const list = await Promise.all(mdFiles.map(async f => {
       const fullPath = path.join(dir, f);
       const content = await fs.readFile(fullPath, 'utf8');
 
@@ -1319,7 +1333,7 @@ async function getApplications(profileId = 'mohamed_fuad') {
         }
       }
 
-      list.push({
+      return {
         fileName: f,
         company,
         jobTitle,
@@ -1328,8 +1342,8 @@ async function getApplications(profileId = 'mohamed_fuad') {
         jobDescription,
         notes,
         coverLetter
-      });
-    }
+      };
+    }));
 
     list.sort((a, b) => b.dateLogged.localeCompare(a.dateLogged));
     await store.setJson(applicationsKey(profile), list);

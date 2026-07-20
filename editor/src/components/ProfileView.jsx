@@ -210,8 +210,8 @@ export default function ProfileView({ resume, isJa, onOpenEditor, onSavePersonal
           <section className="profile-panel">
             <h3>{t.education}</h3>
             <div className="profile-entry-list">
-              {education.map((edu, i) => (
-                <div className="profile-entry" key={i}>
+              {education.map(edu => (
+                <div className="profile-entry" key={edu.id ?? `${edu.institution}-${range(edu)}`}>
                   <b>{(isJa ? edu.institutionJa : edu.institution) || edu.institution || t.none}</b>
                   <small>{[(isJa ? edu.degreeJa : edu.degree) || edu.degree, range(edu)].filter(Boolean).join(' · ')}</small>
                 </div>
@@ -224,12 +224,17 @@ export default function ProfileView({ resume, isJa, onOpenEditor, onSavePersonal
           <section className="profile-panel">
             <h3>{t.experience}</h3>
             <div className="profile-entry-list">
-              {experience.filter(x => x.company || x.companyJa).map((exp, i) => (
-                <div className="profile-entry" key={i}>
-                  <b>{(isJa ? exp.roleJa : exp.role) || exp.role || ''}{((isJa ? exp.companyJa : exp.company) || exp.company) ? ` · ${(isJa ? exp.companyJa : exp.company) || exp.company}` : ''}</b>
-                  <small>{range(exp)}</small>
-                </div>
-              ))}
+              {experience.reduce((rows, exp) => {
+                if (!(exp.company || exp.companyJa)) return rows;
+                const label = `${(isJa ? exp.roleJa : exp.role) || exp.role || ''}${((isJa ? exp.companyJa : exp.company) || exp.company) ? ` · ${(isJa ? exp.companyJa : exp.company) || exp.company}` : ''}`;
+                rows.push(
+                  <div className="profile-entry" key={`${label}-${range(exp)}`}>
+                    <b>{label}</b>
+                    <small>{range(exp)}</small>
+                  </div>,
+                );
+                return rows;
+              }, [])}
             </div>
           </section>
         ) : null}

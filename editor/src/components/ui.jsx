@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { newItemId } from '../utils/helpers.js';
 
 /* ── Micro icon set ─────────────────────────────────────── */
 export const I = ({ n, s = 14, style }) => {
@@ -166,7 +167,7 @@ const MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'
 
 // Parse any stored date string ("Apr 2024", "2024-04", "2024年4月", …) → "YYYY-MM"
 // for the native <input type="month"> value. Returns '' when no month is present.
-export function toMonthValue(str) {
+function toMonthValue(str) {
   if (!str) return '';
   const s = String(str).trim();
   const map = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
@@ -183,7 +184,7 @@ export function toMonthValue(str) {
 
 // "YYYY-MM" → canonical human display "Mon YYYY" (e.g. "Apr 2024"). Stored verbatim;
 // the EN résumé template prints it as-is and the JA template re-parses it via parseDateJa.
-export function formatMonthDisplay(yyyymm) {
+function formatMonthDisplay(yyyymm) {
   const m = String(yyyymm || '').match(/^(\d{4})-(\d{2})$/);
   if (!m) return '';
   return `${MONTHS_EN[Math.min(12, Math.max(1, +m[2])) - 1]} ${m[1]}`;
@@ -242,16 +243,29 @@ export function MonthInput({ label, value, onChange, ongoingMode, isJa = false, 
 
 /* ── Bullet list ────────────────────────────────────────── */
 export function Bullets({ items, onChange }) {
+  // Bullets are plain strings, so identity has to live beside them: slot ids are
+  // created per row and maintained ONLY in the handlers (delete removes the id
+  // with its row; add appends a fresh one). Keys therefore follow the row across
+  // deletions instead of shifting — a trailing textarea no longer inherits the
+  // autosized height/focus of the row deleted above it.
+  const [slotIds, setSlotIds] = useState(() => items.map(() => newItemId()));
+  const rows = items.map((value, index) => ({ value, slotKey: slotIds[index] ?? `slot-${index}` }));
   const upd = (i, v) => { const n = [...items]; n[i] = v; onChange(n); };
-  const del = i => onChange(items.filter((_, x) => x !== i));
-  const add = () => onChange([...items, '']);
+  const del = i => {
+    setSlotIds(ids => ids.filter((_, x) => x !== i));
+    onChange(items.filter((_, x) => x !== i));
+  };
+  const add = () => {
+    setSlotIds(ids => [...ids, newItemId()]);
+    onChange([...items, '']);
+  };
   return (
     <div className="f">
       <Lbl t="Bullet points" />
       <div className="bullet-stack">
-        {items.map((b, i) => (
-          <div key={i} className="bullet-row">
-            <AutoTextarea className="fta bullet-textarea" value={b} onChange={v => upd(i, v)}
+        {rows.map((row, i) => (
+          <div key={row.slotKey} className="bullet-row">
+            <AutoTextarea className="fta bullet-textarea" value={row.value} onChange={v => upd(i, v)}
               placeholder={`Point ${i + 1}…`} />
             <button type="button" className="bullet-del" onClick={() => del(i)} title="Remove">
               <I n="x" s={11} />

@@ -126,15 +126,25 @@ export function validateTracker(value) {
     if (!TRACKER_KEY.test(key) || !isRecord(record)) throw new RequestValidationError('Tracker record is invalid.');
     const status = TRACKER_STATUSES.has(record.status) ? record.status : 'saved';
     const applyUrl = sanitizeIngestedUrl(record.applyUrl);
-    const milestones = Array.isArray(record.milestones) ? record.milestones.slice(0, 100).map(item => ({
-      id: cleanString(item?.id, 'Milestone id', 120, true),
-      kind: cleanString(item?.kind, 'Milestone kind', 40),
-      date: /^\d{4}-\d{2}-\d{2}$/.test(item?.date || '') ? item.date : null,
-      time: /^\d{2}:\d{2}$/.test(item?.time || '') ? item.time : null,
-      timeZone: 'Asia/Tokyo',
-      title: cleanString(item?.title, 'Milestone title', 300),
-      createdAt: cleanString(item?.createdAt, 'Milestone createdAt', 80),
-    })).filter(item => item.date) : [];
+    // One pass over (at most) the first 100 raw milestones, keeping dated ones —
+    // same semantics as slice(0,100).map(...).filter(has date), without 3 passes.
+    const milestones = [];
+    if (Array.isArray(record.milestones)) {
+      const rawCount = Math.min(record.milestones.length, 100);
+      for (let i = 0; i < rawCount; i++) {
+        const item = record.milestones[i];
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(item?.date || '')) continue;
+        milestones.push({
+          id: cleanString(item?.id, 'Milestone id', 120, true),
+          kind: cleanString(item?.kind, 'Milestone kind', 40),
+          date: item.date,
+          time: /^\d{2}:\d{2}$/.test(item?.time || '') ? item.time : null,
+          timeZone: 'Asia/Tokyo',
+          title: cleanString(item?.title, 'Milestone title', 300),
+          createdAt: cleanString(item?.createdAt, 'Milestone createdAt', 80),
+        });
+      }
+    }
     return [key, {
       ...record,
       internshipId: cleanString(record.internshipId || key, 'Internship id', 120, true),

@@ -166,9 +166,11 @@ async function mapPool(items, size, worker) {
 
 async function main() {
   const catalog = buildSeedCatalog();
-  const candidates = catalog
-    .map(item => ({ item, reasons: staleRisk(item) }))
-    .filter(c => c.reasons.length);
+  const candidates = [];
+  for (const item of catalog) {
+    const reasons = staleRisk(item);
+    if (reasons.length) candidates.push({ item, reasons });
+  }
 
   console.log(`\n[LLM catalog audit] ${todayIso}`);
   console.log(`Catalog: ${catalog.length} entries · stale-risk candidates: ${candidates.length} (model: ${AUDIT_MODEL})`);

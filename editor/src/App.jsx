@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './index.css';
-import { apiUrl, applicationApi, profileApi, requestJson } from './api/client.js';
-import { debounce, TEMPLATES } from './utils/helpers.js';
+import { apiUrl, profileApi, requestJson } from './api/client.js';
+import { debounce, newItemId, TEMPLATES } from './utils/helpers.js';
 import { I, Toasts, ExportMenu, TagInput, SuggestInput } from './components/ui.jsx';
 import { InternshipDashboard } from './components/InternshipDashboard.jsx';
 import { ProfileDashboard } from './components/ProfileDashboard.jsx';
@@ -21,11 +21,13 @@ import { signOutUser, deleteAccount } from './auth/useAuth.js';
 import {
   PersonalSec, SummarySec, EducationSec,
   ExperienceSec, ProjectsSec, SkillsSec, ActivitiesSec,
+} from './components/sections.jsx';
+import {
   LANGS, FRAMEWORKS, TOOLS, CONCEPTS, SPOKEN,
   INSTITUTIONS_EN, INSTITUTIONS_JA, DEGREES_EN, DEGREES_JA,
   COMPANIES_EN, COMPANIES_JA, ROLES_EN, ROLES_JA,
   LOCATIONS, YEARS, TECH_SUGGESTIONS,
-} from './components/sections.jsx';
+} from './constants/resumeOptions.js';
 
 const EN = TEMPLATES.filter(t => t.lang === 'en');
 const JA = TEMPLATES.filter(t => t.lang === 'ja');
@@ -38,11 +40,19 @@ const HEURISTIC_LANGS = new Set(['javascript', 'typescript', 'python', 'java', '
 const HEURISTIC_FWKS = new Set(['react', 'node', 'express', 'next', 'vue', 'angular', 'svelte', 'django', 'flask', 'spring', 'laravel', 'tailwind', 'bootstrap']);
 const HEURISTIC_TOOLS = new Set(['git', 'docker', 'kubernetes', 'aws', 'gcp', 'azure', 'sqlite', 'mysql', 'postgresql', 'mongodb', 'redis', 'firebase', 'vite', 'webpack', 'npm', 'yarn']);
 
-const chatWelcome = isJa => (
-  isJa
-    ? 'こんにちは。履歴書について相談したり、応募先に合わせた文章修正を依頼できます。変更する場合は、現在の履歴書を確認してから反映します。'
-    : 'Hi — ask me anything about your resume, or request a direct edit for a target role. I read the current resume before applying changes.'
-);
+// URL ↔ active-profile helpers (pure window access — no component state).
+const getUrlProfile = () => {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('profile') || 'mohamed_fuad';
+};
+const syncUrlWithProfile = (id) => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('profile') !== id) {
+    params.set('profile', id);
+    window.history.pushState(null, '', `?${params.toString()}`);
+  }
+};
+
 
 // ── PDF.js Dynamic Loader and Text Extractor ────────────────────────
 const loadPdfJs = () => {
@@ -87,16 +97,17 @@ function isResumeBlank(r) {
 }
 
 async function extractTextFromPdfFile(file) {
-  const pdfjs = await loadPdfJs();
-  const arrayBuffer = await file.arrayBuffer();
+  // Library load and file read don't depend on each other; pages are
+  // independent too, so extract them all concurrently and join in order.
+  const [pdfjs, arrayBuffer] = await Promise.all([loadPdfJs(), file.arrayBuffer()]);
   const pdf = await pdfjs.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
-  let text = '';
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const textContent = await page.getTextContent();
-    text += textContent.items.map(item => item.str).join(' ') + '\n';
-  }
-  return text;
+  const pageTexts = await Promise.all(
+    Array.from({ length: pdf.numPages }, (_, index) =>
+      pdf.getPage(index + 1)
+        .then(page => page.getTextContent())
+        .then(content => content.items.map(item => item.str).join(' '))),
+  );
+  return pageTexts.join('\n') + '\n';
 }
 
 function parseResumeTextHeuristically(text) {
@@ -304,11 +315,11 @@ function parseResumeTextHeuristically(text) {
       linkedin: linkedinMatch ? `https://${linkedinMatch[0]}` : '',
       github: githubMatch ? `https://${githubMatch[0]}` : '',
     },
-    education: parseListSection(sections.education, true),
-    experience: parseListSection(sections.experience, false),
-    projects: parseProjects(sections.projects),
+    education: parseListSection(sections.education, true).map(item => ({ ...item, id: newItemId() })),
+    experience: parseListSection(sections.experience, false).map(item => ({ ...item, id: newItemId() })),
+    projects: parseProjects(sections.projects).map(item => ({ ...item, id: newItemId() })),
     skills: parsedSkills,
-    activities: parseListSection(sections.activities, false),
+    activities: parseListSection(sections.activities, false).map(item => ({ ...item, id: newItemId() })),
     summary: summaryText || '',
   };
 }
@@ -465,6 +476,14 @@ function normalizeResume(data) {
     r.activities = [];
   }
 
+  // Every section item carries a stable id (list keys must track the ITEM, not
+  // its slot — reorder/delete otherwise leaves focus and textarea state behind).
+  // Backfills legacy data; the id persists with the résumé and is ignored by
+  // the LaTeX templates.
+  for (const section of ['education', 'experience', 'projects', 'activities']) {
+    r[section] = r[section].map(item => (item && !item.id ? { ...item, id: newItemId() } : item));
+  }
+
   return r;
 }
 
@@ -508,7 +527,6 @@ export default function App() {
   }, [lang]);
 
   // AI Application Assistant states
-  const [sidebarTab, setSidebarTab] = useState('editor'); // editor | chat
   // Editor section-rail collapse — lets the user hide the section list and
   // focus on the form fields. Persisted so it survives reloads.
   const [railOpen, setRailOpen] = useState(() => {
@@ -520,29 +538,12 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem('resume-studio-rail', railOpen ? 'open' : 'closed'); } catch { /* ignore */ }
   }, [railOpen]);
-  const [applications, setApplications] = useState([]);
-  const [activeApp, setActiveApp] = useState(null);
-  const [asstCompany, setAsstCompany] = useState('');
-  const [asstRole, setAsstRole] = useState('');
-  const [asstDesc, setAsstDesc] = useState('');
-  const [asstNotes, setAsstNotes] = useState('');
-  const [asstLetter, setAsstLetter] = useState('');
-  const [submittingApp, setSubmittingApp] = useState(false);
   const [zoom, setZoom] = useState('Fit');
-  const [chatDraft, setChatDraft] = useState('');
-  const [chatSending, setChatSending] = useState(false);
-  const [chatMessages, setChatMessages] = useState([
-    {
-      role: 'assistant',
-      text: chatWelcome(false)
-    }
-  ]);
 
   const cmpTimer = useRef(null);
   const lastCompiled = useRef('');
   // Object URL of the current preview PDF blob (revoked when replaced).
   const pdfBlobRef = useRef(null);
-  const chatAbortRef = useRef(null);
 
   // ── Toasts ───────────────────────────────────────────────
   const toast = useCallback((msg, type = 'info') => {
@@ -552,51 +553,9 @@ export default function App() {
   }, []);
   const dismiss = id => setToasts(p => p.filter(t => t.id !== id));
 
-  // ── Applications List loader ─────────────────────────────
-  const fetchApps = useCallback(profileId => {
-    const profile = profileId || new URLSearchParams(window.location.search).get('profile') || 'mohamed_fuad';
-    applicationApi.list(profile).then(setApplications).catch(() => setApplications([]));
-  }, []);
 
-  // Log job application via web UI
-  const handleLogApp = async (e) => {
-    if (e) e.preventDefault();
-    if (!asstCompany.trim() || !asstRole.trim() || !asstDesc.trim()) {
-      toast('Please fill in Company, Job Title, and Description', 'error');
-      return;
-    }
-    setSubmittingApp(true);
-    try {
-      const data = await applicationApi.create(activeProfile, {
-        company: asstCompany,
-        jobTitle: asstRole,
-        jobDescription: asstDesc,
-        notes: asstNotes,
-      });
-      toast(`Logged application for ${asstRole} at ${asstCompany}!`, 'success');
-      setAsstLetter(data.coverLetter);
-      fetchApps(activeProfile);
-    } catch (err) {
-      toast(err.message, 'error');
-    } finally {
-      setSubmittingApp(false);
-    }
-  };
 
   // ── Profile management states & helpers ──────────────────
-  const getUrlProfile = () => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('profile') || 'mohamed_fuad';
-  };
-
-  const syncUrlWithProfile = (id) => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('profile') !== id) {
-      params.set('profile', id);
-      window.history.pushState(null, '', `?${params.toString()}`);
-    }
-  };
-
   const [profiles, setProfiles] = useState([]);
   const [activeProfile, setActiveProfile] = useState(getUrlProfile());
   // Same source the dashboard's "N roles tracked" pipeline reads, so the sidebar
@@ -740,7 +699,6 @@ export default function App() {
       setActiveProfile(id);
       const normalized = normalizeResume(data);
       setResume(normalized);
-      fetchApps(id);
       if (!skipUrl) {
         syncUrlWithProfile(id);
       }
@@ -813,10 +771,9 @@ export default function App() {
       } catch {
         toast('Could not load resume data', 'error');
       }
-      fetchApps(initProfile);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchApps]);
+  }, []);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -843,10 +800,6 @@ export default function App() {
       if (lang === 'en' && !prev.startsWith('en_')) return 'en_01';
       if (lang === 'ja' && !prev.startsWith('ja_')) return 'ja_01';
       return prev;
-    });
-    setChatMessages(prev => {
-      if (prev.length !== 1 || prev[0].role !== 'assistant') return prev;
-      return [{ role: 'assistant', text: chatWelcome(lang === 'ja') }];
     });
   }, [lang]);
 
@@ -875,54 +828,6 @@ export default function App() {
       cmpTimer.current = setTimeout(() => compile(normalized, template), 400);
     }
   }, [template, saveData, saveProfileImmediately, compile, activeProfile, autoCompile, toast, isJa]);
-
-  const handleResumeChat = useCallback(async () => {
-    const text = chatDraft.trim();
-    if (!text || !resume || chatSending) return;
-    setChatDraft('');
-    setChatMessages(prev => [...prev, { role: 'user', text }]);
-    setChatSending(true);
-    const controller = new AbortController();
-    chatAbortRef.current = controller;
-    try {
-      const result = await requestJson('/api/chat/edit', {
-        method: 'POST',
-        signal: controller.signal,
-        body: { profile: activeProfile, instruction: text, resume, language: lang },
-      });
-      if (result.changedSections?.length && result.resume) {
-        const nextResume = normalizeResume(result.resume);
-        change(nextResume);
-        setActiveSection(result.focusSection || result.changedSections?.[0] || 'summary');
-      }
-      setChatMessages(prev => [...prev, {
-        role: 'assistant',
-        text: result.type === 'conversation'
-          ? result.message
-          : `${result.message}${result.engine ? ` · ${result.engine}` : ''}`,
-      }]);
-    } catch (error) {
-      if (error.name === 'AbortError') {
-        setChatMessages(prev => [...prev, {
-          role: 'assistant',
-          text: isJa ? '処理をキャンセルしました。' : 'Cancelled. You can edit your request and try again.',
-        }]);
-        return;
-      }
-      setChatMessages(prev => [...prev, {
-        role: 'assistant',
-        text: isJa ? `変更を適用できませんでした: ${error.message}` : `I could not apply that change: ${error.message}`,
-      }]);
-      toast(error.message, 'error');
-    } finally {
-      setChatSending(false);
-      chatAbortRef.current = null;
-    }
-  }, [chatDraft, resume, chatSending, activeProfile, lang, change, isJa, toast]);
-
-  const handleCancelChat = useCallback(() => {
-    chatAbortRef.current?.abort();
-  }, []);
 
   const sec = key => val => change({ ...resume, [key]: val });
 
@@ -1422,56 +1327,6 @@ export default function App() {
         </div>
       )}
 
-      {activeApp && (
-        <div className="modal-overlay" onClick={() => setActiveApp(null)}>
-          <div className="modal-card" onClick={e => e.stopPropagation()}>
-            <div className="modal-hd">
-              <div>
-                <h3>{activeApp.jobTitle}</h3>
-                <span className="m-subtitle">{activeApp.company} &bull; {activeApp.dateLogged}</span>
-              </div>
-              <button type="button" className="modal-close" onClick={() => setActiveApp(null)}>
-                <I n="x" s={14} />
-              </button>
-            </div>
-            <div className="modal-bd">
-              <div className="m-sec">
-                <h4>Status</h4>
-                <span className={`alc-badge ${activeApp.status.includes('MCP') ? 'mcp' : 'web'}`}>{activeApp.status}</span>
-              </div>
-              {activeApp.jobDescription && (
-                <div className="m-sec">
-                  <h4>Job Description & Requirements</h4>
-                  <p className="m-desc-text">{activeApp.jobDescription}</p>
-                </div>
-              )}
-              {activeApp.notes && (
-                <div className="m-sec">
-                  <h4>Notes</h4>
-                  <p className="m-notes-text">{activeApp.notes}</p>
-                </div>
-              )}
-              {activeApp.coverLetter && (
-                <div className="m-sec">
-                  <div className="m-sec-hd">
-                    <h4>Auto-Generated Cover Letter</h4>
-                    <button type="button"
-                      className="btn"
-                      onClick={() => {
-                        navigator.clipboard.writeText(activeApp.coverLetter);
-                        toast('Copied to clipboard!', 'success');
-                      }}
-                    >
-                      Copy Letter
-                    </button>
-                  </div>
-                  <pre className="cover-letter-pre">{activeApp.coverLetter}</pre>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── Resume Creator Wizard Overlay ──────────────────── */}
       {showWizard && (
@@ -1673,7 +1528,7 @@ export default function App() {
                       <div className="wizard-list-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                         <p className="wizard-help-text" style={{ margin: 0 }}>Add your universities, colleges, or high schools.</p>
                         <button type="button" className="btn btn-sm" style={{ padding: '5px 10px', background: 'var(--b-focus)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }} onClick={() => {
-                          const newList = [...(wizardData.education || []), { institution: '', institutionJa: '', location: '', degree: '', degreeJa: '', startDate: '', endDate: '', bullets: [] }];
+                          const newList = [...(wizardData.education || []), { id: newItemId(), institution: '', institutionJa: '', location: '', degree: '', degreeJa: '', startDate: '', endDate: '', bullets: [] }];
                           setWizardData({...wizardData, education: newList});
                           setEditingIndex(newList.length - 1);
                         }}>+ Add School</button>
@@ -1684,7 +1539,7 @@ export default function App() {
                           <div className="wizard-list-empty" style={{ textAlign: 'center', padding: '20px', background: 'var(--card)', borderRadius: '6px', color: 'var(--t3)', border: '1px dashed var(--b1)' }}>No education entries added yet.</div>
                         ) : (
                           wizardData.education.map((edu, idx) => (
-                            <div key={idx} className="wizard-item-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--card)', border: '1px solid var(--b0)', borderRadius: '8px' }}>
+                            <div key={edu.id ?? edu.institution} className="wizard-item-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--card)', border: '1px solid var(--b0)', borderRadius: '8px' }}>
                               <div className="wic-info">
                                 <h5 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: '600' }}>{edu.institution || 'Unnamed Institution'}</h5>
                                 <p style={{ margin: 0, fontSize: '11.5px', color: 'var(--t3)' }}>{edu.degree || 'No Degree Specified'} ({edu.startDate || 'N/A'} - {edu.endDate || 'N/A'})</p>
@@ -1846,7 +1701,7 @@ export default function App() {
                       <div className="wizard-list-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                         <p className="wizard-help-text" style={{ margin: 0 }}>Add your past or current jobs/internships.</p>
                         <button type="button" className="btn btn-sm" style={{ padding: '5px 10px', background: 'var(--b-focus)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }} onClick={() => {
-                          const newList = [...(wizardData.experience || []), { company: '', companyJa: '', role: '', roleJa: '', location: '', startDate: '', endDate: '', bullets: [] }];
+                          const newList = [...(wizardData.experience || []), { id: newItemId(), company: '', companyJa: '', role: '', roleJa: '', location: '', startDate: '', endDate: '', bullets: [] }];
                           setWizardData({...wizardData, experience: newList});
                           setEditingIndex(newList.length - 1);
                         }}>+ Add Job</button>
@@ -1857,7 +1712,7 @@ export default function App() {
                           <div className="wizard-list-empty" style={{ textAlign: 'center', padding: '20px', background: 'var(--card)', borderRadius: '6px', color: 'var(--t3)', border: '1px dashed var(--b1)' }}>No experience entries added yet.</div>
                         ) : (
                           wizardData.experience.map((exp, idx) => (
-                            <div key={idx} className="wizard-item-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--card)', border: '1px solid var(--b0)', borderRadius: '8px' }}>
+                            <div key={exp.id ?? exp.company} className="wizard-item-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--card)', border: '1px solid var(--b0)', borderRadius: '8px' }}>
                               <div className="wic-info">
                                 <h5 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: '600' }}>{exp.company || 'Unnamed Company'}</h5>
                                 <p style={{ margin: 0, fontSize: '11.5px', color: 'var(--t3)' }}>{exp.role || 'No Role Specified'} ({exp.startDate || 'N/A'} - {exp.endDate || 'N/A'})</p>
@@ -2019,7 +1874,7 @@ export default function App() {
                       <div className="wizard-list-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                         <p className="wizard-help-text" style={{ margin: 0 }}>Add academic or personal software/hardware projects.</p>
                         <button type="button" className="btn btn-sm" style={{ padding: '5px 10px', background: 'var(--b-focus)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }} onClick={() => {
-                          const newList = [...(wizardData.projects || []), { title: '', tech: '', year: '', bullets: [] }];
+                          const newList = [...(wizardData.projects || []), { id: newItemId(), title: '', tech: '', year: '', bullets: [] }];
                           setWizardData({...wizardData, projects: newList});
                           setEditingIndex(newList.length - 1);
                         }}>+ Add Project</button>
@@ -2030,7 +1885,7 @@ export default function App() {
                           <div className="wizard-list-empty" style={{ textAlign: 'center', padding: '20px', background: 'var(--card)', borderRadius: '6px', color: 'var(--t3)', border: '1px dashed var(--b1)' }}>No projects added yet.</div>
                         ) : (
                           wizardData.projects.map((proj, idx) => (
-                            <div key={idx} className="wizard-item-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--card)', border: '1px solid var(--b0)', borderRadius: '8px' }}>
+                            <div key={proj.id ?? proj.title} className="wizard-item-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--card)', border: '1px solid var(--b0)', borderRadius: '8px' }}>
                               <div className="wic-info">
                                 <h5 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: '600' }}>{proj.title || 'Unnamed Project'}</h5>
                                 <p style={{ margin: 0, fontSize: '11.5px', color: 'var(--t3)' }}>{proj.tech || 'No Stack Specified'} ({proj.year || 'N/A'})</p>
@@ -2196,7 +2051,7 @@ export default function App() {
                       <div className="wizard-list-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                         <p className="wizard-help-text" style={{ margin: 0 }}>Add professional associations, certifications, or awards.</p>
                         <button type="button" className="btn btn-sm" style={{ padding: '5px 10px', background: 'var(--b-focus)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }} onClick={() => {
-                          const newList = [...(wizardData.activities || []), { title: '', org: '', location: '', startDate: '', endDate: '', bullets: [] }];
+                          const newList = [...(wizardData.activities || []), { id: newItemId(), title: '', org: '', location: '', startDate: '', endDate: '', bullets: [] }];
                           setWizardData({...wizardData, activities: newList});
                           setEditingIndex(newList.length - 1);
                         }}>+ Add Activity</button>
@@ -2207,7 +2062,7 @@ export default function App() {
                           <div className="wizard-list-empty" style={{ textAlign: 'center', padding: '20px', background: 'var(--card)', borderRadius: '6px', color: 'var(--t3)', border: '1px dashed var(--b1)' }}>No activities added yet.</div>
                         ) : (
                           wizardData.activities.map((act, idx) => (
-                            <div key={idx} className="wizard-item-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--card)', border: '1px solid var(--b0)', borderRadius: '8px' }}>
+                            <div key={act.id ?? act.title} className="wizard-item-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--card)', border: '1px solid var(--b0)', borderRadius: '8px' }}>
                               <div className="wic-info">
                                 <h5 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: '600' }}>{act.title || 'Unnamed Activity'}</h5>
                                 <p style={{ margin: 0, fontSize: '11.5px', color: 'var(--t3)' }}>{act.org || 'No Organization'} ({act.startDate || 'N/A'} - {act.endDate || 'N/A'})</p>
