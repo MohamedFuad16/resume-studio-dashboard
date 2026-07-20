@@ -23,7 +23,6 @@ import { prepareProfilePhoto } from '../utils/imageUpload.js';
 import { appliedCompaniesForProfile, compareCompanyAwareMatch } from '../utils/internshipRanking.js';
 import { resolveTechList } from '../utils/techIcons.js';
 import { companyCooldownMap, cooldownForCompany, cooldownLabel } from '../utils/reapplyCooldown.js';
-import { isInternshipApplication } from '../utils/roleFilter.js';
 
 const STATUS_ICONS = {
   saved: Bookmark,
@@ -122,10 +121,8 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
   const { records, counts, statusFor, updateStatus, addMilestone } = useApplicationTracker(activeProfile);
   const { catalog } = useInternshipCatalog();
   const [selectedItem, setSelectedItem] = useState(null);
-  // Recent shows only real internships — freelance/gig records (e.g. an
-  // "AI trainer" or "language expert" gig ingested from Gmail) are filtered out.
   const recent = useMemo(
-    () => records.filter(record => APPLIED_STATUSES.has(record.status) && isInternshipApplication(record)).slice(0, 5),
+    () => records.filter(record => APPLIED_STATUSES.has(record.status)).slice(0, 5),
     [records],
   );
   const tokyoMatches = useMemo(() => {
@@ -161,12 +158,14 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
     }
   };
 
+  // A hand-picked status PINS the record — the Gmail drain may enrich its
+  // details afterwards but never move its status again (ADR-S-004).
   const onStatusChange = (item, value) => {
     if (value === 'interview') {
       setInterviewPending(item);
       return;
     }
-    updateStatus(item, value);
+    updateStatus(item, value, { pin: true });
   };
 
   const onApply = item => {
@@ -185,7 +184,7 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
     const item = interviewPending;
     if (!item) return;
     const [date, time = ''] = String(value || '').trim().split(/[ T]/);
-    updateStatus(item, 'interview');
+    updateStatus(item, 'interview', { pin: true });
     if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       addMilestone(item.id, { kind: 'interview', date, time: time || null });
     }

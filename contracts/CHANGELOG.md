@@ -17,6 +17,7 @@ Every entry: date · who · what changed · what the OTHER side must do.
   79cf962. This entry is late by one commit on the iOS side (rule 2 says same
   commit); noted here rather than hidden.
 
+
 - **2026-07-20 · both · Tracker records are keyed by COMPANY + ROLE, not company
   (SPEC-per-role-keying.md).** The drain kept one record per company, so repeated
   applications to one firm collapsed into a single row that then lied about its
@@ -43,6 +44,22 @@ Every entry: date · who · what changed · what the OTHER side must do.
   re-derive from the Gmail queue; do it FETCH-FIRST, never purge-then-refetch
   (ADR-I-015).
 
+
+- **2026-07-20 · server · Bulk headers are evidence, not a verdict; actions carry
+  their kind's reason.** The bulk-mail guard shipped hours earlier dropped 27 of 80
+  messages on its first production run and took real records with it — Sky's
+  REJECTION vanished, LAPRAS and Atom11 never arrived — because Japanese ATSs
+  deliver personally-addressed mail through bulk services (mail.axol.jp, HERP) that
+  set `List-Unsubscribe` exactly like a newsletter. A bulk message is now admitted
+  when it is written TO the owner (personal salutation, first-party application
+  phrasing, or a sender company already holding one of their applications) and
+  skipped otherwise; the addressee is what separates an ATS rejection from a digest
+  quoting a stranger. Telemetry splits `bulkSkipped` / `bulkAdmitted`.
+  **Queue shape gained `kindRule` + `kindEvidence`** (gmail-action.md) — diagnostic
+  only, round-trip them like any unknown field. **Clients: nothing to change.**
+  (This entry was meant to land with web commit 3e6f2f7; the insertion silently
+  no-opped and was caught during the main merge.)
+
 - **2026-07-20 · repo · Agentic toolkit checked in — `.claude/` + `scripts/`
   (ADR-S-003).** Four subagents, four skills, four hooks, and two verification
   batteries (`scripts/verify-web.sh`, `scripts/verify-ios.sh`) now live in the
@@ -53,6 +70,19 @@ Every entry: date · who · what changed · what the OTHER side must do.
   Optionally set `CLAUDE_NOTIFY_IMESSAGE` in your own (uncommitted)
   `.claude/settings.local.json` for iMessage alerts; unset, the notifier is a
   silent no-op. Nothing about API routes, payloads, or Firestore paths changed.
+
+
+- **2026-07-20 · web · Résumé list items now carry an `id` (ADR-0041).** Every
+  item in `resume.education`, `resume.experience`, `resume.projects` and
+  `resume.activities` gains a persisted `id` (UUID string), backfilled onto
+  existing résumés the first time the web editor loads them. It exists purely to
+  give the editor's reorderable lists a stable React key; nothing derives meaning
+  from it. **iOS: round-trip it, don't drop it** (CLAUDE.md rule 4). iOS reads
+  only `resume.personal` and never writes résumés, so this is a heads-up rather
+  than a work item — but if that ever changes, a write that strips `id` would
+  make the web editor re-mint ids and lose focus on the next reorder. The server
+  needed no change: `validateResume` passes unknown per-item fields through, and
+  LaTeX generation reads named fields only (output verified byte-identical).
 
 - **2026-07-20 · doctor (owner-directed) · Résumé section items now carry a
   persisted `id`.** Education/experience/projects/activities entries gain a

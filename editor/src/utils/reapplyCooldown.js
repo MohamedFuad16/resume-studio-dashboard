@@ -31,11 +31,35 @@ function stripCorp(value) {
   do { previous = out; out = out.replace(CORP_EN_SUFFIX, ''); } while (out !== previous);
   return out;
 }
+// NFKC FIRST — before lowercasing, before any peeling (SPEC-per-role-keying §1).
+// The fold below keeps only [0-9a-z], kana and CJK ideographs, and full-width
+// Latin (`Ｓｋｙ` = U+FF33 U+FF4B U+FF59) is in none of those ranges: without
+// NFKC the key comes out EMPTY and the whole company is silently dropped, which
+// is how `Ｓｋｙ株式会社` disappeared from the tracker on 2026-07-20. NFKC maps
+// full-width Latin and digits to ASCII and half-width katakana to full-width
+// kana, and leaves CJK ideographs alone. iOS: precomposedStringWithCompatibilityMapping.
+const nfkc = value => String(value || '').normalize('NFKC');
 export const normalizeCompany = value =>
-  stripCorp(value).toLowerCase().replace(/[^a-z0-9぀-ヿ一-鿿]+/gu, ' ').trim();
+  stripCorp(nfkc(value)).toLowerCase().replace(/[^a-z0-9぀-ヿ一-鿿]+/gu, ' ').trim();
 // Synthetic tracker id slug = the company key with spaces as dashes (so the id
 // derives from the SAME key as matching — they can never disagree).
 export const companySlug = value => normalizeCompany(value).replace(/\s+/g, '-');
+
+// Role key (SPEC-per-role-keying §2). Same fold as the company key but WITHOUT
+// the corporate-marker peeling — a role is not a company name. Empty folds to
+// the sentinel `general`, which Rule 3 treats as "this email named no role"
+// rather than as a role literally called "general".
+export const GENERAL_ROLE = 'general';
+export const normalizeRole = value =>
+  nfkc(value).toLowerCase().replace(/[^a-z0-9぀-ヿ一-鿿]+/gu, ' ').trim();
+export const roleKey = value => normalizeRole(value) || GENERAL_ROLE;
+export const roleSlug = value => roleKey(value).replace(/\s+/g, '-');
+// Record identity is the PAIR (companyKey, roleKey): `gmail-<companyKey>-<roleKey>`.
+// Keying by company alone collapsed five distinct Rakuten applications into one
+// row reading "rejected" and hid a live HENNGE interview.
+export const gmailRecordId = (company, role) => `gmail-${companySlug(company)}-${roleSlug(role)}`;
+// The in-drain session map key for a (company, role) pair.
+export const sessionKeyFor = (companyKey, role) => `${companyKey}|${role}`;
 
 /**
  * Add `months` calendar months to an ISO date/instant → 'YYYY-MM-DD' (or null),

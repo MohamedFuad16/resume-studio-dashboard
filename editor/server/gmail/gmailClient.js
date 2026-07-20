@@ -117,7 +117,15 @@ function extractText(payload) {
   return text.replace(/\s+\n/g, '\n').replace(/[ \t]{2,}/g, ' ').trim();
 }
 
-// Fetch one message and return { id, from, subject, date, snippet, text }.
+// Fetch one message and return { id, from, subject, date, snippet, text, bulk }.
+//
+// `bulk` carries the RFC 2369 / RFC 3834 mailing-list headers, and nothing else
+// from the header block. They are what separates mail SENT TO the user from mail
+// BROADCAST to a list, which is the only thing that distinguishes a real
+// application email from a digest that happens to talk about applications
+// (see isBulkMail in classify.js). Deliberately a narrow named subset rather than
+// the whole header map: nothing downstream should be able to read the inbox's
+// headers wholesale.
 export async function getMessage(accessToken, id) {
   const msg = await gmailGet(accessToken, `/messages/${id}?format=full`);
   const headers = Object.fromEntries((msg.payload?.headers || []).map(h => [h.name.toLowerCase(), h.value]));
@@ -129,6 +137,12 @@ export async function getMessage(accessToken, id) {
     date: headers.date || '',
     snippet: msg.snippet || '',
     text: extractText(msg.payload).slice(0, 6000),
+    bulk: {
+      listUnsubscribe: headers['list-unsubscribe'] || '',
+      listId: headers['list-id'] || '',
+      listPost: headers['list-post'] || '',
+      precedence: headers.precedence || '',
+    },
   };
 }
 

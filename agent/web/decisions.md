@@ -868,3 +868,51 @@ test against the deployed container before calling it done.
 W1 is bundled deliberately: deleting the serverless function is what guarantees a
 native module never has to run in a serverless runtime.
 
+
+## ADR-0041 · 2026-07-20 · Résumé list items carry a persisted `id`
+
+The four reorderable editor lists (education, experience, projects, activities)
+keyed by array index. Every one of them has move-up/move-down/delete controls,
+which is the exact case where an index key is a defect rather than a style
+nit: React binds component state and uncontrolled DOM state — focus, caret
+offset, autosized textarea height — to the slot, not the item. Reordering swapped
+the data and left that state behind on the position, attached to a different
+entry.
+
+The two keys that would not have required a schema change both fail:
+
+- **Object identity.** `upd`/`set` map the row to a new object on every
+  keystroke, so an identity key would remount the row while the user types and
+  drop focus on every character — strictly worse than the bug being fixed.
+- **Content.** `add()` pushes an all-empty row, so `school + startDate` collides
+  the moment there are two blank rows.
+
+Decision: give items real identity. `id: crypto.randomUUID()` (with a non-secure-
+context fallback) at every creation site, backfilled once on load in
+`normalizeResume`, which is the single chokepoint every `setResume` path already
+runs through. Existing stored résumés migrate on first load and persist ids on
+the next save.
+
+Activities needed a normalization pass written for it — it had only an
+`Array.isArray` guard, so unlike the other three there was no `{...e}` spread to
+hang the backfill on. That asymmetry is why the list was easy to miss.
+
+The field is free on both ends and was checked rather than assumed:
+`validateResume` only asserts array-ness and length and passes unknown per-item
+fields through (`id` is not in `FORBIDDEN_KEYS`), and `templates.js` reads named
+fields only — no key enumeration.
+
+Bullets remain index-keyed on purpose: they have no reorder control, so the
+failure mode does not exist there, and giving every bullet a UUID would bloat
+the stored résumé for nothing.
+
+**Verified.** `generateLatex` output byte-identical with and without `id` across
+all 7 real templates (so PDF output cannot change). In-browser against issue
+#19's repro, with a negative control: index keys restored → focus stayed on
+position 0 and read back the *other* entry's value; `key={item.id}` → focus,
+caret offset (5) and both textarea heights (997, 2719) travelled with the item to
+position 1. Adding a blank row works; ids persisted through the server and were
+unchanged after a reload. Battery: `vite build` clean, Playwright 5/5,
+react-doctor 47 (baseline 46 — the eight remaining `no-array-index-as-key`
+findings are read-only display lists plus the bullets component), eslint 60
+findings (unchanged, all pre-existing).

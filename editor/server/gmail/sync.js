@@ -4,12 +4,16 @@
 // existing records — the server can't read the user's client-direct Firestore).
 import { getConnection, saveConnection, pushQueue } from './store.js';
 import { getAccessToken, listNewMessageIds, listRecentMessageIds, getProfileHistoryId, getMessage, ReauthRequiredError } from './gmailClient.js';
-import { classifyMessage, enrichCompany, llmAvailable } from './classify.js';
+import { classifyMessage, enrichCompany, llmAvailable, hasBulkHeaders, bulkAdmission, senderDisplayName } from './classify.js';
 import { buildSeedCatalog } from '../seeds/catalog.js';
 
 const MIN_CONFIDENCE = Number(process.env.GMAIL_MIN_CONFIDENCE || 0.6);
 const MAX_MESSAGES_PER_SYNC = Number(process.env.GMAIL_MAX_MESSAGES_PER_SYNC || 25);
 const PROCESSED_CAP = 500;
+// Same shape and the same reason as PROCESSED_CAP: the connection record is a
+// KV blob and must not grow without bound. Insertion-ordered, so slice(-CAP)
+// keeps the most recently seen companies.
+const INTERNSHIP_COMPANY_CAP = 500;
 let counter = 0;
 
 // Backfill uses a keyword search (EN + JA) so application mail surfaces regardless
@@ -59,6 +63,43 @@ const isResolvableCompany = (names, company) => {
   return Boolean(needle) && names.some(n => n.includes(needle) || needle.includes(n));
 };
 
+// A DECISION about an application we have already seen. See the gate below.
+export const DECISION_KINDS = new Set(['rejected', 'interview', 'offer']);
+
+// The canonical company key used by the two gates below. Exported so the tests
+// can assert on the same function the sync uses.
+export const companyKey = norm;
+
+// Does queueing this verdict PROVE, on the mail's own words, that the owner
+// applied to an internship at this company? Only a proven-internship
+// application or offer counts: `isInternship` has already survived the quote
+// check in classify.js, so this can never be self-fulfilling — a decision
+// admitted by the gate below has isInternship=false and adds nothing.
+export function provesInternshipApplication(verdict) {
+  return Boolean(verdict?.isInternship && verdict?.company)
+    && (verdict.kind === 'applied' || verdict.kind === 'offer');
+}
+
+// The gate. A decision (rejected/interview/offer) about a company for which
+// THIS profile has previously emitted an internship application is admitted
+// even though the decision mail itself carries no internship evidence.
+//
+// `internshipCompanies` is a Set of canonical company keys the SERVER has
+// itself queued an internship `applied`/`offer` for — never a read of the
+// owner's tracker. The tracker is client-direct Firestore (`users/{uid}/
+// trackers/{profileId}`) and the server deliberately holds no user data
+// (CLAUDE.md rule 4, contracts/README.md "the one data rule"); the old
+// `tracker:{profile}` KV read was of a store that is essentially always empty,
+// which is why carriedInternship was 0 on every run.
+//
+// Matched on EXACT normalized company equality, never a substring test
+// (SPEC-per-role-keying §4).
+export function admitsCarriedDecision(verdict, internshipCompanies) {
+  if (!DECISION_KINDS.has(verdict?.kind) || !verdict?.company) return false;
+  const key = companyKey(verdict.company);
+  return Boolean(key) && internshipCompanies.has(key);
+}
+
 export async function syncProfile(store, profile, opts = {}) {
   const conn = await getConnection(store, profile);
   if (!conn?.refreshTokenEnc) return { skipped: 'not-connected' };
@@ -97,26 +138,94 @@ export async function syncProfile(store, profile, opts = {}) {
   const processed = new Set(conn.processedMessageIds || []);
   // Backfill is a deliberate one-time rescan: ignore the processed list (the
   // queue dedupes by message:kind), so a scan that ran misconfigured can rerun.
-  const fresh = (backfillDays > 0 ? messageIds : messageIds.filter(id => !processed.has(id))).slice(0, cap);
+  // Gmail lists newest-first, and the cap must keep the most RECENT messages —
+  // but the carry-forward below needs the application confirmation to be seen
+  // BEFORE the decision it admits. So cap first, then reverse: oldest-first
+  // processing, same window of mail. (Queue order is irrelevant to the client,
+  // which sorts by receivedAt before applying — normalization.md §4.)
+  const fresh = (backfillDays > 0 ? messageIds : messageIds.filter(id => !processed.has(id)))
+    .slice(0, cap)
+    .reverse();
 
   const actions = [];
   // Why messages were dropped, as COUNTS ONLY — no subjects, no senders, no quotes.
   // A sync that returns "0 actions" is otherwise unfalsifiable: a correct filter
   // and a broken one look identical from outside, and the difference decides
   // whether the inbox is clean or the ingest is dead.
-  const dropped = { fetchFailed: 0, classifierFailed: 0, notApplication: 0, notInternship: 0, lowConfidence: 0, noCompany: 0 };
+  const dropped = { fetchFailed: 0, bulkSkipped: 0, classifierFailed: 0, notApplication: 0, notInternship: 0, lowConfidence: 0, noCompany: 0 };
+  // Bulk-headered mail that was let through anyway because it is addressed to the
+  // owner. Counted, not silent: the first version of this guard skipped 27 of 80
+  // messages and took Sky's rejection and two real applications with it, and the
+  // only reason that was ever noticed is that the owner said so out loud.
+  let bulkAdmitted = 0;
+  // Decisions admitted on a prior tracked application rather than on their own
+  // internship evidence (see the gate below). Not a drop — counted separately so
+  // the telemetry still balances: listed → fresh → queued + dropped.
+  let carriedInternship = 0;
   const enrichedByCompany = new Map();
   let resolvableNames = null; // loaded lazily on the first enrichment candidate
+  // Every company this profile has EVER had an internship application queued
+  // for, seeded from the connection record so it survives restarts, and added
+  // to as this run goes so an application can admit a decision processed later
+  // in the SAME run (the fresh-backfill case: both mails arrive together).
+  const internshipCompanies = new Set(
+    (Array.isArray(conn.internshipCompanies) ? conn.internshipCompanies : []).filter(Boolean),
+  );
   for (const id of fresh) {
     let message;
     try { message = await getMessage(token, id); } catch { processed.add(id); dropped.fetchFailed++; continue; }
+    // Bulk headers are evidence, not a verdict. Japanese ATSs deliver
+    // personally-addressed decision mail through bulk services — Sky via
+    // mail.axol.jp, AICE via HERP — so a hard skip on List-Unsubscribe throws away
+    // real rejections along with the newsletters. A bulk message is let through
+    // when it is written TO the owner (a salutation, a first-party application
+    // phrase, or a company already known to hold one of their applications), and
+    // skipped otherwise. That is what separates Sky's rejection from a Reddit
+    // digest quoting a stranger — the addressee, never the envelope.
+    if (hasBulkHeaders(message)) {
+      const why = bulkAdmission(message, {
+        knownCompanies: internshipCompanies,
+        senderKey: companyKey(senderDisplayName(message.from)),
+      });
+      if (!why) {
+        // Marked processed: this verdict is a property of the headers and the
+        // prose, and will not change on a retry.
+        processed.add(id);
+        dropped.bulkSkipped++;
+        continue;
+      }
+      bulkAdmitted++;
+    }
     const verdict = await classifyMessage(message);
     if (!verdict) { dropped.classifierFailed++; continue; } // leave unprocessed so a later sync retries
     processed.add(id);
     // Internships only: freelance/gig/annotation/part-time applications (e.g. an
     // LLM-trainer gig or an AI-interview support role) never reach the tracker.
     if (!verdict.isApplicationRelated) { dropped.notApplication++; continue; }
-    if (!verdict.isInternship) { dropped.notInternship++; continue; }
+    // Internships only — the evidence gate (classify.js) requires a quoted
+    // internship term from the mail itself, and it stays exactly as strict.
+    //
+    // But a DECISION mail frequently contains no internship word anywhere. The
+    // owner's ABEJA rejection is 「厳正なる選考の結果、誠に残念ながら今回は貴意に
+    // 添いかねることとなりました」 and its AICE counterpart is the same shape:
+    // correct, complete rejections of real internship applications that name no
+    // program, no role and no 「インターン」. Both were dropped here as
+    // notInternship and the tracker sat frozen at "applied" — the application
+    // confirmation had been ingested, its outcome never was.
+    //
+    // Their internship-ness was already PROVEN, by the confirmation mail this
+    // very server queued (「＜新卒通年インターン＞…応募が完了しました」). So a
+    // decision about a company this profile has already applied to as an
+    // internship is admitted on that earlier evidence — remembered server-side
+    // (see admitsCarriedDecision), not read out of the owner's Firestore.
+    //
+    // This does not loosen the gate: a company never seen applying to an
+    // internship is not in the set, so a gig rejection is dropped exactly as
+    // before.
+    if (!verdict.isInternship) {
+      if (!admitsCarriedDecision(verdict, internshipCompanies)) { dropped.notInternship++; continue; }
+      carriedInternship++;
+    }
     if (verdict.confidence < MIN_CONFIDENCE) { dropped.lowConfidence++; continue; }
     if (!verdict.company) { dropped.noCompany++; continue; }
 
@@ -133,6 +242,16 @@ export async function syncProfile(store, profile, opts = {}) {
         enrichedByCompany.set(key, isResolvableCompany(resolvableNames, verdict.company) ? null : await enrichCompany(verdict.company, verdict.role));
       }
       enrichment = enrichedByCompany.get(key);
+    }
+
+    // Remember, for this profile, that this company is one the owner applied to
+    // as an internship — the only thing that ever opens the gate above. Recorded
+    // here, next to the push, so what the server REMEMBERS is exactly what it
+    // QUEUED. Re-adding moves the key to the end of the insertion order, so the
+    // cap below evicts the least recently seen company first.
+    if (provesInternshipApplication(verdict)) {
+      const key = companyKey(verdict.company);
+      if (key) { internshipCompanies.delete(key); internshipCompanies.add(key); }
     }
 
     actions.push({
@@ -154,6 +273,15 @@ export async function syncProfile(store, profile, opts = {}) {
       enrichment,
       confidence: verdict.confidence,
       subject: message.subject.slice(0, 200),
+      // WHY this kind, carried on the action itself. classify.js has always
+      // computed these and always thrown them away, so every dispute about a
+      // status ("why is enechain rejected when the subject is about scheduling?")
+      // needed the original mail and a re-run to answer. `kindRule` is one of
+      // model | rejection-phrase | decision-notice | interview-demoted, and
+      // `kindEvidence` is the verified quote it turned on — the same quote
+      // discipline the internship gate uses.
+      kindRule: verdict.kindRule || 'model',
+      kindEvidence: verdict.kindEvidence || null,
       source: 'gmail',
     });
   }
@@ -165,6 +293,7 @@ export async function syncProfile(store, profile, opts = {}) {
     lastSyncAt: new Date().toISOString(),
     lastError: null,
     processedMessageIds: [...processed].slice(-PROCESSED_CAP),
+    internshipCompanies: [...internshipCompanies].slice(-INTERNSHIP_COMPANY_CAP),
   });
 
   // A backfill outlives the request that starts it (the gateway gives up at 240s),
@@ -172,8 +301,9 @@ export async function syncProfile(store, profile, opts = {}) {
   // only, never mail content: this is someone's inbox.
   console.log(
     `gmail-sync[${profile}] listed=${messageIds.length} fresh=${fresh.length} ` +
-    `queued=${actions.length} dropped=${JSON.stringify(dropped)}`
+    `queued=${actions.length} carriedInternship=${carriedInternship} ` +
+    `bulkAdmitted=${bulkAdmitted} dropped=${JSON.stringify(dropped)}`
   );
 
-  return { scanned: fresh.length, actions: actions.length, dropped };
+  return { scanned: fresh.length, actions: actions.length, carriedInternship, bulkAdmitted, dropped };
 }

@@ -25,9 +25,19 @@ and `ios/InternshipPortal/GmailDrain.swift` (iOS, on load + foreground).
   role:           string,
   interview:      { date: "YYYY-MM-DD", time: "HH:mm"|null } | null,
   reapplyMonths:  { min: int, max: int } | null,   // from a rejection's stated wait
-  enrichment:     { url, location, deadline, deadlineDate } | null
+  enrichment:     { url, location, deadline, deadlineDate } | null,
+  kindRule:       "model" | "rejection-phrase" | "decision-notice"
+                  | "interview-demoted",     // WHY `kind` is what it is
+  kindEvidence:   string | null              // the verified quote it turned on
 }
 ```
+
+`kindRule`/`kindEvidence` are diagnostic, added 2026-07-20. Clients may ignore
+them, but must round-trip them like any other unknown field. They exist because
+the deterministic layer that reads Japanese rejections can override the model,
+and without the reason on the action itself every dispute about a status needed
+the original mail and a re-run to settle — "why is this company rejected when the
+subject is about interview scheduling?" is answerable from the queue now.
 
 ## Queue semantics
 

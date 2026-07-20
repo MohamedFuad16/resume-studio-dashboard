@@ -7586,6 +7586,10 @@ body,
 .applications-view .application-nolink { color: #b6bfcd; }
 .src-gmail { display: inline-flex; vertical-align: middle; margin-left: 6px; opacity: .9; }
 .src-gmail svg { display: block; }
+/* The owner set this status by hand — a Gmail drain will never move it again
+   (ADR-S-004). Same inline badge slot as the Gmail mark, so a row can carry both. */
+.src-pinned { display: inline-flex; vertical-align: middle; margin-left: 6px; opacity: .75; }
+.src-pinned svg { display: block; }
 
 /* ── Profile view ──────────────────────────────────────────────────── */
 .profile-view-hero { display: flex; align-items: center; gap: 22px; padding: 6px 2px 24px; margin-bottom: 22px; border-bottom: 1px solid #eef0f4; }

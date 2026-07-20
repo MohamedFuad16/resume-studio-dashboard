@@ -826,17 +826,22 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
   const toggleSaved = item => updateStatus(item, statusFor(item.id) === 'saved' ? '' : 'saved');
   // Choosing "Interview" defers the status write until the user supplies a date in the
   // shared modal; every other status change applies immediately as before.
+  // Hand-picked statuses are PINNED (ADR-S-004): the owner overruled the
+  // pipeline, and no drain moves that status again. `onApply`/`toggleSaved`
+  // above deliberately do NOT pin — they are an apply click and a bookmark, not
+  // the owner stating an outcome, and pinning them would freeze every saved row
+  // against the mail that reports what actually happened.
   const handleStatusSelect = (item, status) => {
     if (status === 'interview') {
       setInterviewTarget(item);
       return;
     }
-    updateStatus(item, status);
+    updateStatus(item, status, { pin: true });
   };
   const confirmInterviewDate = value => {
     if (!interviewTarget) return;
     const [date, time] = String(value || '').trim().split(/[ T]/);
-    updateStatus(interviewTarget, 'interview');
+    updateStatus(interviewTarget, 'interview', { pin: true });
     addMilestone(interviewTarget.id, { kind: 'interview', date, time: time || null });
     setInterviewTarget(null);
   };

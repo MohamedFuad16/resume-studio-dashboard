@@ -18,6 +18,63 @@ dated entries below for history.)
 
 ## Recent changes
 
+- **2026-07-20 (later) — Résumé list items carry a persisted `id`; the four
+  reorderable lists key by it (ADR-0041, issue #19).** Education, experience,
+  projects and activities rendered with `key={i}`, and all four have move-up /
+  move-down / delete controls. React ties component state and *uncontrolled DOM
+  state* — focus, caret offset, autosized textarea height — to the slot, so
+  "Move down" swapped the data underneath but left the cursor and the grown
+  textarea sitting on the old position, now belonging to a different entry.
+  Neither cheaper key worked: rows are replaced by a fresh object on every
+  keystroke (`upd`), so object identity would remount the row mid-typing, and
+  content keys (`school + startDate`) collide across blank just-added rows. So
+  identity is now data: `id` is minted at every creation site (`add()` in
+  sections.jsx, the wizard appends, the PDF-parse builders) and backfilled once
+  on load by `normalizeResume`. **Activities needed a normalization pass built
+  from scratch** — it previously had only an `Array.isArray` guard, so it was the
+  one list with nowhere to backfill.
+  The field is free on the server: `validateResume` only checks array-ness and
+  length and passes unknown per-item fields through, and `templates.js` reads
+  named fields only — `generateLatex` output is byte-identical with and without
+  `id` across all 7 real templates, so no PDF changes. Bullets stay index-keyed
+  (no reorder control, out of scope). Verified in the browser against issue #19's
+  own repro, including the negative control: with `key={i}` restored, focus stayed
+  on the position and read back the *other* entry's value; with `key={item.id}`
+  focus, caret offset and both textarea heights travelled with the item. Ids
+  round-trip through the server and survive a reload.
+  **Note for whoever documented it:** `scripts/verify-web.sh` does not exist in
+  the tree — the entry below describes it, but no commit ever added it. The
+  battery was run by hand as its four parts.
+
+- **2026-07-20 — ESLint exists again; `scripts/verify-web.sh` is now the battery
+  (ADR-S-003).** The doctor's every-run "eslint skipped — no config" gap is
+  closed by `editor/eslint.config.js`, deliberately small: react-doctor stays the
+  deep scanner, and ESLint is here for the one thing an on-demand scan cannot
+  give you — rules-of-hooks in the editor as you type. That rule has already
+  caught a real crash in this codebase (`SkillsSec` calling useState inside a
+  conditional, so a résumé whose `skills` arrived as an array changed the hook
+  count between renders; PR #14). `eslint-plugin-react` is deliberately absent —
+  its peer range stops at eslint 9 and it overlaps react-doctor almost entirely.
+  Baseline is ~60 findings (21 errors) on existing code, mostly eslint 10's newer
+  rules (`preserve-caught-error` ×7, `no-case-declarations` ×6, plus 4
+  irregular-whitespace worth a look). So `verify-web.sh` runs eslint **advisory —
+  WARN, never FAIL**; gating on a pre-existing backlog would block every commit
+  and teach everyone to ignore the gate. Promote it to gating once the backlog is
+  cleared.
+  The battery itself (`scripts/verify-web.sh`) is build · `validate:catalog` ·
+  Playwright · react-doctor, and it is what the doctor now runs too, so both
+  sides measure the same thing. Two gotchas are encoded in it rather than
+  rediscovered: **a git worktree gets its own `node_modules`, and merging a
+  branch that changed dependencies does not reinstall them** — the script names
+  the missing packages and tells you to `npm ci`, which is exactly how the ios
+  worktree was silently missing `better-sqlite3` after the W1/W2 swap; and a dev
+  server holding **port 5173** makes every Playwright spec fail like a code
+  regression, so the script says so instead.
+  The react-doctor baseline is **46, not the 49** issue #13 recorded. Nothing
+  regressed — react-doctor is invoked unpinned (`@latest`), so the tool moved
+  under us. The score is also only machine-readable in the share URL (`?…&s=46`);
+  the human banner is boxed ANSI art. Treat 46 as a floor, not a target.
+
 - **2026-07-19 (later) — README rewritten; W3 foundation laid; W4 spiked and deferred.**
   README documented a system that no longer exists (Vercel serverless + Blob, no iOS
   app, no Azure, no Firestore, no contracts); rewritten around what actually runs,

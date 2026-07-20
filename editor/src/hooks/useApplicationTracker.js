@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { trackerApi } from '../api/client.js';
-import { isInternshipApplication } from '../utils/roleFilter.js';
+import {
+  addTombstone, nextTrackerRecord, normalizeTombstones, removeTombstone, tombstoneKeysFor,
+} from '../utils/trackerTruth.js';
 
 export const TRACKER_EVENT = 'resume-studio:application-tracker-change';
 
@@ -20,6 +22,7 @@ const STATUS_VALUES = new Set(APPLICATION_STATUSES.map(item => item.value));
 const LEGACY_STATUS_MAP = { offer: 'applied' };
 
 const EMPTY_TRACKER = {};
+const EMPTY_TOMBSTONES = [];
 const DEFAULT_PROFILE = 'mohamed_fuad';
 
 function normalizeProfileId(profileId) {
@@ -49,7 +52,10 @@ export function statusLabel(status, isJa = false) {
 // dashboard, applications view, radar, Gmail drain), and each mount used to issue
 // its own GET /api/tracker on load. Mutations keep the cache fresh via commit();
 // cross-mount state sync stays on TRACKER_EVENT.
-const trackerCache = new Map();    // profileId -> normalized tracker
+// The cached value is the whole tracker DOCUMENT — `{ tracker, tombstones }` —
+// because both live in one Firestore document and are written in one set (the
+// whole-map, single-write discipline in contracts/tracker-record.md).
+const trackerCache = new Map();    // profileId -> { tracker, tombstones }
 const trackerRequests = new Map(); // profileId -> in-flight promise
 
 async function loadTracker(profileId, { force = false } = {}) {
@@ -57,9 +63,12 @@ async function loadTracker(profileId, { force = false } = {}) {
   if (!force && trackerRequests.has(profileId)) return trackerRequests.get(profileId);
   const request = trackerApi.get(profileId)
     .then(parsed => {
-      const tracker = normalizeTracker(parsed);
-      trackerCache.set(profileId, tracker);
-      return tracker;
+      const loaded = {
+        tracker: normalizeTracker(parsed?.data),
+        tombstones: normalizeTombstones(parsed?.tombstones),
+      };
+      trackerCache.set(profileId, loaded);
+      return loaded;
     })
     .finally(() => { trackerRequests.delete(profileId); });
   trackerRequests.set(profileId, request);
@@ -68,21 +77,31 @@ async function loadTracker(profileId, { force = false } = {}) {
 
 export function useApplicationTracker(profileId) {
   const activeProfile = normalizeProfileId(profileId);
-  const [tracker, setTracker] = useState(() => trackerCache.get(activeProfile) || EMPTY_TRACKER);
+  const cached = trackerCache.get(activeProfile);
+  const [tracker, setTracker] = useState(() => cached?.tracker || EMPTY_TRACKER);
+  // Deleted (companyKey, roleKey) pairs — the Gmail drain must never re-create
+  // one (contracts/tracker-record.md "Tombstones" · ADR-S-004).
+  const [tombstones, setTombstones] = useState(() => cached?.tombstones || EMPTY_TOMBSTONES);
   const trackerRef = useRef(tracker);
+  const tombstonesRef = useRef(tombstones);
   const [loading, setLoading] = useState(() => !trackerCache.has(activeProfile));
   const [error, setError] = useState('');
 
-  const replaceTracker = useCallback(next => {
+  const replaceTracker = useCallback((next, nextTombstones) => {
     trackerRef.current = next;
     setTracker(next);
+    if (nextTombstones) {
+      tombstonesRef.current = nextTombstones;
+      setTombstones(nextTombstones);
+    }
   }, []);
 
   const refresh = useCallback(async ({ force = true } = {}) => {
     if (force || !trackerCache.has(activeProfile)) setLoading(true);
     try {
       setError('');
-      replaceTracker(await loadTracker(activeProfile, { force }));
+      const loaded = await loadTracker(activeProfile, { force });
+      replaceTracker(loaded.tracker, loaded.tombstones);
     } catch (fetchError) {
       setError(fetchError.message || 'Could not load application tracker');
     } finally {
@@ -96,14 +115,18 @@ export function useApplicationTracker(profileId) {
   // complete tracker, so collapsing the burst to its LAST snapshot is lossless.
   // The local cache + trackerRef update synchronously, so reads stay fresh; the
   // timer deliberately survives unmount so a pending save is never dropped.
+  //
+  // The tombstone list rides along in the SAME save: it lives beside the tracker
+  // map in one document, and a deletion that persisted the record removal but
+  // not its tombstone would be re-created by the next drain.
   const commitTimer = useRef(null);
-  const commit = useCallback(next => {
-    trackerCache.set(activeProfile, next);
+  const commit = useCallback((next, nextTombstones = tombstonesRef.current) => {
+    trackerCache.set(activeProfile, { tracker: next, tombstones: nextTombstones });
     if (commitTimer.current) clearTimeout(commitTimer.current);
     commitTimer.current = setTimeout(() => {
       commitTimer.current = null;
-      trackerApi.save(activeProfile, next)
-        .then(() => window.dispatchEvent(new CustomEvent(TRACKER_EVENT, { detail: { profileId: activeProfile, tracker: next } })))
+      trackerApi.save(activeProfile, next, nextTombstones)
+        .then(() => window.dispatchEvent(new CustomEvent(TRACKER_EVENT, { detail: { profileId: activeProfile, tracker: next, tombstones: nextTombstones } })))
         .catch(saveError => {
           setError(saveError.message || 'Could not save application tracker');
           refresh();
@@ -113,67 +136,58 @@ export function useApplicationTracker(profileId) {
 
   useEffect(() => {
     const sync = event => {
-      if (event.detail?.profileId === activeProfile) replaceTracker(normalizeTracker(event.detail.tracker));
+      if (event.detail?.profileId !== activeProfile) return;
+      replaceTracker(normalizeTracker(event.detail.tracker), normalizeTombstones(event.detail.tombstones));
     };
     window.addEventListener(TRACKER_EVENT, sync);
     return () => window.removeEventListener(TRACKER_EVENT, sync);
   }, [activeProfile, replaceTracker]);
 
   useEffect(() => {
-    replaceTracker(trackerCache.get(activeProfile) || EMPTY_TRACKER);
+    const entry = trackerCache.get(activeProfile);
+    replaceTracker(entry?.tracker || EMPTY_TRACKER, entry?.tombstones || EMPTY_TOMBSTONES);
     refresh({ force: false });
   }, [activeProfile, refresh, replaceTracker]);
 
-  const updateStatus = useCallback((internship, status) => {
+  /**
+   * Write a record's status, or DELETE it when `status` is falsy.
+   *
+   * `options.pin` — the USER chose this status by hand: the record is pinned and
+   *   a Gmail drain may never move its status again (ADR-S-004). Every in-app
+   *   status control passes it; the drain never does.
+   * `options.fromDrain` — this write comes from the Gmail drain. Against a
+   *   pinned record it degrades to detail enrichment only; the pin is enforced
+   *   inside `nextTrackerRecord`, so no caller can forget it.
+   * `options.lift` — `{ companyKey, roleKey }`: the drain established that the
+   *   owner RE-APPLIED to a tombstoned pair, so the tombstone is removed in the
+   *   same write that re-creates the record. The KEYS come from the caller, not
+   *   from the record: a role-less email writes `role: 'Application'` onto a
+   *   record whose tombstone is keyed `general`, and re-deriving them here would
+   *   leave the tombstone in place to block the row again on the next drain.
+   *
+   * A deletion writes a `{companyKey, roleKey, at}` tombstone, which is what
+   * stops the next drain re-creating the row the owner just removed.
+   */
+  const updateStatus = useCallback((internship, status, options = {}) => {
     const current = trackerRef.current;
     const next = { ...current };
+    let nextTombstones = tombstonesRef.current;
     if (!status) {
+      const removed = current[internship.id];
+      const { companyKey, roleKey } = tombstoneKeysFor(removed || internship);
+      // An un-keyable company (nothing survives normalization) cannot be
+      // tombstoned — `addTombstone` drops it rather than writing an entry that
+      // would match every other un-keyable record.
+      nextTombstones = addTombstone(nextTombstones, companyKey, roleKey, new Date().toISOString());
       delete next[internship.id];
     } else {
-      const prev = current[internship.id];
-      // Per-status event timestamps (from the Gmail email date; see useGmailInbox).
-      // Each is carried forward and only overwritten when a new value arrives.
-      const appliedAt = internship.appliedAt ?? prev?.appliedAt ?? null;
-      const rejectedAt = internship.rejectedAt ?? prev?.rejectedAt ?? null;
-      const interviewAt = internship.interviewAt ?? prev?.interviewAt ?? null;
-      const offerAt = internship.offerAt ?? prev?.offerAt ?? null;
-      const now = new Date().toISOString();
-      // updatedAt = this event's real date (Gmail) or now (in-app edit).
-      const updatedAt = internship.eventAt || now;
-      // createdAt = the EARLIEST known instant (first application, not the drain
-      // time) so "when applied" is accurate. ISO strings sort chronologically.
-      const createdAt = [prev?.createdAt, appliedAt, rejectedAt, interviewAt, offerAt, internship.eventAt]
-        .filter(Boolean).sort()[0] || now;
-      next[internship.id] = {
-        ...prev,
-        internshipId: internship.id,
-        company: internship.company,
-        role: internship.role,
-        location: internship.location,
-        deadline: internship.deadline || 'Not stated',
-        deadlineDate: internship.deadlineDate || null,
-        applyUrl: internship.url,
-        companyDomain: internship.companyDomain || '',
-        logoUrl: internship.logoUrl || '',
-        status,
-        // Provenance: 'web' (added in-app) vs 'gmail' (ingested from the inbox).
-        // A record keeps its origin once set; only a fresh Gmail action can stamp it.
-        source: internship.source || prev?.source || 'web',
-        sourceMeta: internship.sourceMeta || prev?.sourceMeta || null,
-        appliedAt, rejectedAt, interviewAt, offerAt,
-        // Reapplication cooldown (set by a Gmail rejection that states a wait
-        // window). Carried forward unless a new value arrives, so re-tracking a
-        // role doesn't wipe the company's stated cooldown.
-        reapplyAfter: internship.reapplyAfter ?? prev?.reapplyAfter ?? null,
-        reapplyNote: internship.reapplyNote ?? prev?.reapplyNote ?? '',
-        reapplyMonths: internship.reapplyMonths ?? prev?.reapplyMonths ?? null,
-        updatedAt,
-        createdAt,
-        milestones: Array.isArray(prev?.milestones) ? prev.milestones : [],
-      };
+      if (options.lift) {
+        nextTombstones = removeTombstone(nextTombstones, options.lift.companyKey, options.lift.roleKey);
+      }
+      next[internship.id] = nextTrackerRecord(current[internship.id], internship, status, options);
     }
-    replaceTracker(next);
-    commit(next);
+    replaceTracker(next, nextTombstones);
+    commit(next, nextTombstones);
   }, [commit, replaceTracker]);
 
   const statusFor = useCallback(id => tracker[id]?.status || '', [tracker]);
@@ -226,17 +240,12 @@ export function useApplicationTracker(profileId) {
     replaceTracker(next);
     commit(next);
   }, [commit, replaceTracker]);
-  // `records` is the app's list of internship applications, so freelance/gig
-  // records mis-ingested from Gmail (e.g. "language expert", "email analyst",
-  // "AI trainer") are filtered out HERE — every consumer (dashboard recent +
-  // pipeline, Applications view + its counts, calendar) then treats them as
-  // non-existent. The raw `tracker` object still holds them (nothing is
-  // deleted); `statusFor` reads `tracker` directly, so status writes for any id
-  // still work. Filter is conservative (see roleFilter) — never hides a real
-  // internship.
+  // `records` is every tracker record, in updated-at order. Nothing is hidden
+  // client-side: per ADR-S-002 internship detection is server-side and
+  // evidence-based, so junk in the list means fixing the classifier
+  // (`editor/server/gmail/classify.js`), not filtering names downstream.
   const records = useMemo(
     () => Object.values(tracker)
-      .filter(isInternshipApplication)
       .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')),
     [tracker],
   );
@@ -245,5 +254,5 @@ export function useApplicationTracker(profileId) {
     return acc;
   }, {}), [records]);
 
-  return { tracker, records, counts, statusFor, updateStatus, addMilestone, removeMilestone, loading, error, refresh };
+  return { tracker, tombstones, records, counts, statusFor, updateStatus, addMilestone, removeMilestone, loading, error, refresh };
 }
