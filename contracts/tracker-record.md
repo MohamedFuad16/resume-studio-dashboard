@@ -28,6 +28,7 @@ complete field set — or at minimum round-trip what they don't model.
 | `reapplyAfter` | `YYYY-MM-DD` | both | web | earliest reapply date; company-wide cooldown |
 | `reapplyMonths` | `{min, max}` | both | web | stated window |
 | `reapplyNote` | string | both | web | human phrasing, built from the formula in normalization.md |
+| `statusPinned` | bool | both | both | the USER set this status by hand — the drain must never change it. See "User truth outranks the pipeline" |
 
 ## The round-trip rule (binding on every client)
 
@@ -39,9 +40,49 @@ its saves silently erased `reapplyAfter`, `sourceMeta`, per-status stamps, and
 milestone `timeZone`/`createdAt` for every record. Any new client-side model
 must ship with passthrough from day one.
 
+## User truth outranks the pipeline (`statusPinned` + tombstones)
+
+Added 2026-07-20 (ADR-S-004). Until now the tracker was a **cache of classifier
+output**: whatever the owner did in the app, the next re-derive could undo. They
+deleted a role they had never applied to and a rescan re-created it; they knew
+they had been rejected and the record read "applied" until someone repaired the
+classifier and re-ran it. The only durable correction channel was telling a
+developer. That is the fault behind most of this pipeline's history, and no
+amount of classifier accuracy closes it — the classifier will never be perfect,
+and the owner always knows more than the mail says.
+
+**Pins.** Setting a status by hand in either client sets `statusPinned: true` on
+that record. A Gmail drain must then leave `status`, the per-status stamps and
+the milestones of that record alone. It may still fill in detail fields (url,
+location, deadline, logo) and must still round-trip everything. Clearing the pin
+is an explicit user action; a drain never clears it.
+
+A pinned record is also **treated as hand-added by the rebuild purge**, whatever
+its `source` says — a status the owner typed is theirs, and a purge that deletes
+it is the ADR-I-015 failure wearing a different hat.
+
+**Tombstones.** Deleting a record writes its `(companyKey, roleKey)` pair to a
+per-profile tombstone list, stored beside the tracker map:
+
+```
+users/{uid}/trackers/{profileId}.tombstones = [ { companyKey, roleKey, at } ]
+```
+
+Before creating ANY record, a drain checks the list and skips a tombstoned pair.
+Re-applying to that company and role is the one thing that lifts it: an `applied`
+action whose evidence is NEWER than the tombstone's `at` removes the tombstone
+and creates the record. So a deletion is permanent against re-derives, without
+making the company permanently un-trackable.
+
+Both clients implement this identically. As with per-role keying, if the two
+implementations must decide something this document does not state, write the
+decision here rather than into one client.
+
 ## Write discipline
 
 - Whole-map, single-write saves (one Firestore set / one POST per user action or
   drain) with rollback on failure — never per-record partial writes.
 - Status changes are **monotonic** during a Gmail drain (normalization.md);
   manual user edits may set anything.
+- A drain never writes `status` on a record with `statusPinned: true`, and never
+  creates a record whose `(companyKey, roleKey)` is tombstoned.

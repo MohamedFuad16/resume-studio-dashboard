@@ -160,8 +160,46 @@ struct RecordSheet: View {
         ) {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 8) {
-                    StatusChip(status: record.appStatus)
-                    if record.fromGmail {
+                    // Tap the status to correct it. The owner knows things the mail
+                    // does not say — that an interview ended in a rejection, that a
+                    // role was withdrawn — and before this the only way to fix a
+                    // wrong status was to ask a developer (ADR-S-004).
+                    Menu {
+                        ForEach(ApplicationStatus.allCases) { option in
+                            Button {
+                                Task { await store.setStatus(option, forRecord: record.id) }
+                            } label: {
+                                Label(option.label, systemImage: record.appStatus == option ? "checkmark" : "")
+                            }
+                        }
+                        if record.statusPinned == true {
+                            Divider()
+                            Button(String(localized: "Let Gmail update this again")) {
+                                Task { await store.unpinStatus(forRecord: record.id) }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            StatusChip(status: record.appStatus)
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(Palette.ink500)
+                        }
+                    }
+
+                    if record.statusPinned == true {
+                        // Says WHY Gmail stopped moving this row, so a stale pin is
+                        // discoverable rather than mysterious.
+                        HStack(spacing: 5) {
+                            Image(systemName: "hand.raised.fill").font(.system(size: 9))
+                            Text("Set by you")
+                        }
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Palette.ink500)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Palette.hairline, in: .rect(cornerRadius: 6, style: .continuous))
+                    } else if record.fromGmail {
                         HStack(spacing: 5) {
                             GmailMark(size: 12)
                             Text("From Gmail")

@@ -89,3 +89,44 @@ pull is running without the guard. Anything personal (the iMessage handle for
 `notify.sh`) belongs in the uncommitted `.claude/settings.local.json`; with the
 variable unset the notifier is a silent no-op, which is what the second device
 should see. → CLAUDE.md rule 7, DOCTOR.md
+
+## ADR-S-004 · 2026-07-20 · The tracker records user truth, not just classifier output
+
+Every data complaint this project has had traces to one property: **the tracker
+was a cache of classifier output.** The owner deleted a role they had never
+applied to and the next rescan re-created it. They knew they had been rejected by
+five companies and the records read "applied" until the classifier was repaired
+and re-run. Nothing they did in the app survived a re-derive, so their only
+correction channel was telling a developer in chat.
+
+Five fixes shipped against the symptoms — purge predicate, per-role keying,
+Japanese rejection register, bulk-mail handling, tracked-company carry-forward.
+Each was individually correct. None of them closed the complaint, because none of
+them addressed the missing channel. And no sixth one will: the classifier will
+never be perfect, and the owner always knows more than the mail says. Money
+Forward is the clean example — the interview and the rejection are the same
+application described with two different role strings, so per-role keying splits
+them and the stale interview survives. Every rule that merges those two also
+re-merges Rakuten's genuinely distinct TECH Camp applications, which is the bug
+per-role keying was introduced to fix. There is no role-string heuristic that
+separates them, and picking one just moves who discovers the error.
+
+Decision: the owner can overrule the pipeline, permanently.
+
+- **`statusPinned`** — a status set by hand is never touched by a drain again.
+  The drain may still enrich detail fields; it may not move the status, the
+  stamps or the milestones. A pinned record is treated as hand-added by the
+  rebuild purge whatever its `source` says, because a purge that deletes a status
+  the owner typed is ADR-I-015 in a different hat.
+- **Tombstones** — a deleted `(companyKey, roleKey)` is recorded per profile and
+  never re-created by a drain. Re-applying lifts it: an `applied` action with
+  evidence newer than the tombstone removes it, so deletion is permanent against
+  re-derives without making a company permanently un-trackable.
+
+The cost is honest and worth naming: the tracker can now disagree with the mail,
+and a pin can go stale if the owner pins a status and the situation later changes.
+That is the correct trade. A wrong record the owner can fix in one tap beats a
+right-in-principle record they must ask a developer to repair — and it converts an
+open-ended series of classifier guesses into a bounded, one-time correction.
+
+→ contracts/tracker-record.md "User truth outranks the pipeline"

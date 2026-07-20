@@ -285,6 +285,17 @@ struct AnyCodingKey: CodingKey {
     init?(intValue: Int) { nil }
 }
 
+/// A record the owner deleted. The drain must not re-create its (company, role)
+/// pair — deleting a row a classifier got wrong used to last exactly until the
+/// next rescan (contracts/tracker-record.md, ADR-S-004).
+struct Tombstone: Codable, Hashable, Sendable {
+    var companyKey: String
+    var roleKey: String
+    /// When the deletion happened. An `applied` action with evidence NEWER than
+    /// this lifts the tombstone, so re-applying to a company works normally.
+    var at: String
+}
+
 struct Milestone: Identifiable, Hashable, Sendable {
     var id: String
     var kind: String?
@@ -329,6 +340,10 @@ struct TrackerRecord: Identifiable, Hashable, Sendable {
     var logoUrl: String?
     var status: String?
     var source: String?
+    /// The USER set this status by hand — the drain must never move it again
+    /// (contracts/tracker-record.md, ADR-S-004). Also makes the record survive a
+    /// rebuild purge whatever `source` says: a status the owner typed is theirs.
+    var statusPinned: Bool?
     var updatedAt: String?
     var createdAt: String?
     var milestones: [Milestone]?
@@ -395,7 +410,7 @@ extension Milestone: Codable {
 extension TrackerRecord: Codable {
     private static let known: Set<String> = [
         "internshipId", "company", "role", "location", "deadline", "deadlineDate",
-        "applyUrl", "companyDomain", "logoUrl", "status", "source",
+        "applyUrl", "companyDomain", "logoUrl", "status", "source", "statusPinned",
         "updatedAt", "createdAt", "milestones",
     ]
 
@@ -411,6 +426,7 @@ extension TrackerRecord: Codable {
         companyDomain = try c.decodeIfPresent(String.self, forKey: .init("companyDomain"))
         logoUrl = try c.decodeIfPresent(String.self, forKey: .init("logoUrl"))
         status = try c.decodeIfPresent(String.self, forKey: .init("status"))
+        statusPinned = try c.decodeIfPresent(Bool.self, forKey: .init("statusPinned"))
         source = try c.decodeIfPresent(String.self, forKey: .init("source"))
         updatedAt = try c.decodeIfPresent(String.self, forKey: .init("updatedAt"))
         createdAt = try c.decodeIfPresent(String.self, forKey: .init("createdAt"))
@@ -434,6 +450,7 @@ extension TrackerRecord: Codable {
         try c.encodeIfPresent(companyDomain, forKey: .init("companyDomain"))
         try c.encodeIfPresent(logoUrl, forKey: .init("logoUrl"))
         try c.encodeIfPresent(status, forKey: .init("status"))
+        try c.encodeIfPresent(statusPinned, forKey: .init("statusPinned"))
         try c.encodeIfPresent(source, forKey: .init("source"))
         try c.encodeIfPresent(updatedAt, forKey: .init("updatedAt"))
         try c.encodeIfPresent(createdAt, forKey: .init("createdAt"))

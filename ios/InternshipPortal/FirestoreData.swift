@@ -55,15 +55,38 @@ struct FirestoreData {
         return out
     }
 
-    static func saveTracker(_ tracker: [String: TrackerRecord], uid: String, profile: String) async throws {
+    /// Deleted (company, role) pairs the drain must not re-create (ADR-S-004).
+    /// Stored beside the tracker map in the SAME document, because saveTracker
+    /// uses setData and would otherwise wipe a sibling field on every save.
+    static func fetchTombstones(uid: String, profile: String) async throws -> [Tombstone] {
+        let snapshot = try await db.collection("users").document(uid)
+            .collection("trackers").document(profile).getDocument()
+        guard let raw = snapshot.data()?["tombstones"] as? [[String: Any]] else { return [] }
+        return raw.compactMap { dict in
+            guard let data = try? JSONSerialization.data(withJSONObject: sanitize(dict)) else { return nil }
+            return try? JSONDecoder().decode(Tombstone.self, from: data)
+        }
+    }
+
+    static func saveTracker(
+        _ tracker: [String: TrackerRecord], tombstones: [Tombstone],
+        uid: String, profile: String
+    ) async throws {
         var payload: [String: Any] = [:]
         for (key, record) in tracker {
             let data = try JSONEncoder().encode(record)
             payload[key] = try JSONSerialization.jsonObject(with: data)
         }
+        // Written in the SAME setData as the tracker. A separate write would let
+        // a delete persist while its tombstone was lost to a failure, and the row
+        // would come back on the next drain.
+        let stones: [[String: Any]] = try tombstones.map {
+            let data = try JSONEncoder().encode($0)
+            return (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+        }
         try await db.collection("users").document(uid)
             .collection("trackers").document(profile)
-            .setData(["data": payload, "updatedAt": FieldValue.serverTimestamp()])
+            .setData(["data": payload, "tombstones": stones, "updatedAt": FieldValue.serverTimestamp()])
     }
 
     // MARK: - Profile identity

@@ -172,6 +172,11 @@ final class CatalogStore {
     /// check-and-set is atomic without a lock.
     var isSyncing = false
 
+    /// (company, role) pairs the owner deleted. The drain consults this before
+    /// creating ANY record, so a deletion outlives the next rescan (ADR-S-004).
+    /// KV-path sessions keep it in memory only — that path is signed-out demo use.
+    var tombstones: [Tombstone] = []
+
     /// Set by RootView from AuthService. nil = signed out → KV path.
     var uid: String?
     /// Which Firestore profile document the tracker lives in. Resolved on load.
@@ -344,6 +349,9 @@ final class CatalogStore {
                 toast = "No résumé profile in this account yet — open the web app once."
                 return tracker
             }
+            // Tombstones ride with the tracker: a drain that ran without them
+            // would happily re-create every row the owner has ever deleted.
+            tombstones = (try? await FirestoreData.fetchTombstones(uid: uid, profile: profile)) ?? []
             return try await FirestoreData.fetchTracker(uid: uid, profile: profile)
         } catch {
             // Keep what is already on screen. Returning [:] here made a transient
@@ -395,11 +403,25 @@ final class CatalogStore {
 
     /// Status change straight from a tracked record (Applications tab), where
     /// there may be no catalog entry behind it (Gmail-synthesised rows).
-    func setStatus(_ status: ApplicationStatus, forRecord id: String) async {
+    /// - Parameter pin: mark the status as the owner's, so no future drain moves
+    ///   it (ADR-S-004). True for anything the user taps; the drain calls this
+    ///   with false. Defaults to true because a hand set is the only caller that
+    ///   should ever reach here from the UI.
+    func setStatus(_ status: ApplicationStatus, forRecord id: String, pin: Bool = true) async {
         guard var record = tracker[id] else { return }
         let previous = tracker
         record.status = status.rawValue
+        if pin { record.statusPinned = true }
         record.updatedAt = ISO8601DateFormatter.flexible.string(from: .now)
+        tracker[id] = record
+        await persist(rollingBackTo: previous)
+    }
+
+    /// Hand the record back to Gmail. The next drain is free to move it again.
+    func unpinStatus(forRecord id: String) async {
+        guard var record = tracker[id], record.statusPinned == true else { return }
+        let previous = tracker
+        record.statusPinned = nil
         tracker[id] = record
         await persist(rollingBackTo: previous)
     }
@@ -409,10 +431,22 @@ final class CatalogStore {
     /// 5CA, micro1) leave the tracker: the server only filters NEW mail, and the
     /// web expects these to be removed by hand.
     func removeRecord(_ id: String) async {
-        guard tracker[id] != nil else { return }
+        guard let record = tracker[id] else { return }
         let previous = tracker
+        let previousStones = tombstones
         tracker[id] = nil
-        await persist(rollingBackTo: previous)
+        // Remember the deletion, not just perform it. Before this, removing a row
+        // the classifier got wrong lasted exactly until the next rescan re-derived
+        // it — the owner deleted Revolut repeatedly and it kept returning.
+        let stone = Tombstone(
+            companyKey: Self.companyKey(record.company),
+            roleKey: Self.roleKey(record.role),
+            at: ISO8601DateFormatter.flexible.string(from: .now)
+        )
+        if !tombstones.contains(where: { $0.companyKey == stone.companyKey && $0.roleKey == stone.roleKey }) {
+            tombstones.append(stone)
+        }
+        await persist(rollingBackTo: previous, tombstonesRollingBackTo: previousStones)
     }
 
     /// Add a milestone. Dedupes on id and on identical kind+date+time+title, the
@@ -467,7 +501,7 @@ final class CatalogStore {
     /// faithfully restored the fake interviews it had just removed.
     func writeTracker() async throws {
         if let uid, let profileID {
-            try await FirestoreData.saveTracker(tracker, uid: uid, profile: profileID)
+            try await FirestoreData.saveTracker(tracker, tombstones: tombstones, uid: uid, profile: profileID)
         } else if hasSession {
             throw TrackerStoreError.sessionNotReady   // never fall through to KV
         } else {
@@ -475,11 +509,15 @@ final class CatalogStore {
         }
     }
 
-    private func persist(rollingBackTo previous: [String: TrackerRecord]) async {
+    private func persist(
+        rollingBackTo previous: [String: TrackerRecord],
+        tombstonesRollingBackTo previousStones: [Tombstone]? = nil
+    ) async {
         do {
             try await writeTracker()
         } catch {
             tracker = previous   // never let the UI lie about what saved
+            if let previousStones { tombstones = previousStones }
             toast = "Couldn't save — check your connection."
         }
     }

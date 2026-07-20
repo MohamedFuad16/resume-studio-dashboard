@@ -147,6 +147,13 @@ extension CatalogStore {
     /// marker/suffix peeling, which is meaningless for a role. Empty folds to the
     /// sentinel `"general"`, which Rule 3 then resolves onto a live application
     /// instead of letting it mint a phantom row.
+    /// The id a Gmail-derived record gets when no catalog listing or existing
+    /// row supplies one. Shared so the tombstone check and the record builder can
+    /// never disagree about what a pair's id would be.
+    nonisolated static func syntheticID(company: String, role: String) -> String {
+        "gmail-\(company)-\(role)".replacingOccurrences(of: " ", with: "-")
+    }
+
     nonisolated static func roleKey(_ raw: String?) -> String {
         let folded = foldToKeptScalars(
             (raw ?? "").precomposedStringWithCompatibilityMapping.lowercased()
@@ -260,7 +267,12 @@ extension CatalogStore {
     /// The same test, reachable from the `nonisolated` key/resolution helpers
     /// (Rule 8 needs it inside `resolveRolelessRecord`).
     nonisolated static func isGmailDerived(_ record: TrackerRecord) -> Bool {
-        record.source == "gmail" || (record.internshipId ?? "").hasPrefix("gmail-")
+        // A pinned record is the owner's, whatever `source` says. Purging one
+        // would delete a status they typed by hand and Gmail cannot re-derive —
+        // ADR-I-015 wearing a different hat (contracts/tracker-record.md,
+        // ADR-S-004).
+        if record.statusPinned == true { return false }
+        return record.source == "gmail" || (record.internshipId ?? "").hasPrefix("gmail-")
     }
 
     func rebuildFromGmail(days: Int = 90) async -> Bool {
@@ -486,6 +498,27 @@ extension CatalogStore {
                 resolved = Self.resolveRolelessRecord(company: key, in: next)
                 if let resolved { role = Self.roleKey(resolved.record.role) }
             }
+            // ADR-S-004: a pair the owner deleted is not re-created. Only blocks
+            // CREATION — a record that still exists (they deleted a different role
+            // at the same company) updates normally.
+            //
+            // Re-applying lifts it: an `applied` whose email is NEWER than the
+            // deletion means the owner went back, so the tombstone has expired
+            // rather than been overruled. Anything else — a late rejection for the
+            // row they just threw away — stays buried.
+            if next[Self.syntheticID(company: key, role: role)] == nil, resolved == nil,
+               let stone = tombstones.first(where: { $0.companyKey == key && $0.roleKey == role }) {
+                let reapplied = status == .applied
+                    && (ISO8601DateFormatter.parse(action.receivedAt) ?? .distantPast)
+                        > (ISO8601DateFormatter.parse(stone.at) ?? .distantFuture)
+                if reapplied {
+                    tombstones.removeAll { $0.companyKey == key && $0.roleKey == role }
+                    log("tombstone lifted for \(key)|\(role) — reapplied")
+                } else {
+                    continue
+                }
+            }
+
             var (base, rank) = gmailBase(
                 for: action, companyKey: key, roleKey: role,
                 resolved: resolved, session: session, existing: next
@@ -563,6 +596,10 @@ extension CatalogStore {
                 // gmail. It must never CONVERT a hand-added row — that would make
                 // the next rebuild purge delete data Gmail cannot re-derive.
                 let drainOwnsRecord = existingRecord.map { isGmailDerived($0) } ?? true
+                // ADR-S-004: the owner said what this is. The mail does not get a
+                // vote any more. Detail below is still filled in — a pin is about
+                // the STATUS, not about refusing a logo or a posting URL.
+                let pinned = existingRecord?.statusPinned == true
                 var record = existingRecord ?? TrackerRecord()
                 record.internshipId = base.id
                 record.company = base.company
@@ -573,17 +610,19 @@ extension CatalogStore {
                 record.applyUrl = base.url
                 record.companyDomain = base.companyDomain
                 record.logoUrl = base.logoUrl
-                record.status = status.rawValue
-                if drainOwnsRecord { record.source = "gmail" }
-                // The EMAIL's date, never `now`. Stamping the clock made every
-                // ingested record read "applied 6 minutes ago" and dropped each
-                // one on today's calendar — for mail that arrived days earlier.
-                // Actions are applied oldest-first, so createdAt sticks at the
-                // first email (the application) while updatedAt tracks the latest
-                // (the rejection) — which is also what "Recent" should sort on.
-                let emailDate = action.receivedAt ?? ISO8601DateFormatter.flexible.string(from: .now)
-                record.updatedAt = emailDate
-                record.createdAt = record.createdAt ?? emailDate
+                if !pinned {
+                    record.status = status.rawValue
+                    if drainOwnsRecord { record.source = "gmail" }
+                    // The EMAIL's date, never `now`. Stamping the clock made every
+                    // ingested record read "applied 6 minutes ago" and dropped each
+                    // one on today's calendar — for mail that arrived days earlier.
+                    // Actions are applied oldest-first, so createdAt sticks at the
+                    // first email (the application) while updatedAt tracks the
+                    // latest (the rejection) — which is also what "Recent" sorts on.
+                    let emailDate = action.receivedAt ?? ISO8601DateFormatter.flexible.string(from: .now)
+                    record.updatedAt = emailDate
+                    record.createdAt = record.createdAt ?? emailDate
+                }
                 record.milestones = record.milestones ?? []
                 next[base.id] = record
                 touched += 1
@@ -633,9 +672,11 @@ extension CatalogStore {
                 next[base.id] = record
             }
 
-            // Interview date → calendar, deduped by message id.
+            // Interview date → calendar, deduped by message id. Never onto a
+            // pinned record: a stale interview appearing on the owner's calendar
+            // is precisely what pinning a rejection is meant to stop (ADR-S-004).
             if let date = action.interview?.date, date.count == 10,
-               var record = next[base.id] {
+               var record = next[base.id], record.statusPinned != true {
                 let milestone = Milestone(
                     id: "gmail-\(action.gmailMessageId ?? action.id)",
                     kind: "interview", date: date, time: action.interview?.time,
@@ -705,7 +746,7 @@ extension CatalogStore {
     ) -> (item: Internship, rank: Int?) {
         if let hit = session["\(key)|\(role)"] { return hit }
 
-        let syntheticId = "gmail-\(key)-\(role)".replacingOccurrences(of: " ", with: "-")
+        let syntheticId = Self.syntheticID(company: key, role: role)
 
         // Rule 3 already picked a record for a roleless action. Use THAT one —
         // re-scanning by folded roleKey can match a sibling row with the same
