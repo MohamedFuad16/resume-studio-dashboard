@@ -14,12 +14,14 @@ function normalizeCompanyName(value) {
 }
 
 export function appliedCompaniesForProfile(profileId, records = []) {
-  return new Set([
-    ...(PROFILE_APPLIED_COMPANIES[profileId] || []).map(normalizeCompanyName),
-    ...records
-      .filter(record => APPLIED_TYPE_STATUSES.has(record.status))
-      .map(record => normalizeCompanyName(record.company)),
-  ]);
+  const companies = new Set();
+  for (const name of PROFILE_APPLIED_COMPANIES[profileId] || []) {
+    companies.add(normalizeCompanyName(name));
+  }
+  for (const record of records) {
+    if (APPLIED_TYPE_STATUSES.has(record.status)) companies.add(normalizeCompanyName(record.company));
+  }
+  return companies;
 }
 
 export function appliedCompanyRank(item, appliedCompanies) {

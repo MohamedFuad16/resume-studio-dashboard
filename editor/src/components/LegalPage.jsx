@@ -12,6 +12,7 @@
 // have it reviewed before relying on it. See ADR-0029.
 import { useState } from 'react';
 import { I } from './ui.jsx';
+import { keyed } from '../utils/keyedList.js';
 
 // TODO(legal): replace these placeholders before this page goes public.
 const OPERATOR = 'Internship Portal';
@@ -234,10 +235,10 @@ const DOCS = { terms: TERMS, privacy: PRIVACY };
 
 // Renders **bold** spans in a paragraph — used for the lead-in on list-like items.
 function renderBold(text) {
-  return text.split(/(\*\*[^*]+\*\*)/g).map((chunk, i) =>
-    chunk.startsWith('**') && chunk.endsWith('**')
-      ? <strong key={i}>{chunk.slice(2, -2)}</strong>
-      : chunk
+  return keyed(text.split(/(\*\*[^*]+\*\*)/g)).map(entry =>
+    entry.value.startsWith('**') && entry.value.endsWith('**')
+      ? <strong key={entry.key}>{entry.value.slice(2, -2)}</strong>
+      : entry.value
   );
 }
 
@@ -278,8 +279,8 @@ export default function LegalPage({ doc }) {
           {content.sections.map(([heading, paras]) => (
             <section key={heading} className="legal-section">
               <h2 className="legal-h2">{heading}</h2>
-              {paras.map((p, i) => (
-                <p key={i} className="legal-p">{renderBold(p)}</p>
+              {keyed(paras).map(entry => (
+                <p key={entry.key} className="legal-p">{renderBold(entry.value)}</p>
               ))}
             </section>
           ))}

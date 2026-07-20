@@ -6,7 +6,7 @@ const DEFAULT_MODEL = 'openai/gpt-5-mini';
 const ENGINE_LABEL = 'OpenRouter LLM';
 let warnedNoKey = false;
 
-const clone = value => JSON.parse(JSON.stringify(value));
+const clone = value => structuredClone(value);
 
 function appendCsv(current, value) {
   const values = String(current || '').split(',').map(item => item.trim()).filter(Boolean);
@@ -80,7 +80,11 @@ function buildSummaryFromFacts(resume, language) {
   const frameworks = splitCsv(skills.frameworks).slice(0, 4);
   const tools = splitCsv(skills.tools).slice(0, 4);
   const languages = splitCsv(skills.languages).slice(0, 4);
-  const projectNames = projects.map(item => item.title || item.name).filter(Boolean);
+  const projectNames = [];
+  for (const item of projects) {
+    const title = item.title || item.name;
+    if (title) projectNames.push(title);
+  }
   const tech = [...new Set([...languages, ...frameworks, ...tools])].slice(0, 7);
 
   if (language === 'ja') {
@@ -121,7 +125,12 @@ function isConversationOnly(instruction) {
 }
 
 function buildConversationReply(resume, instruction, language) {
-  const projects = (resume.projects || []).map(item => item.title || item.name).filter(Boolean).slice(0, 4);
+  const projects = [];
+  for (const item of resume.projects || []) {
+    if (projects.length >= 4) break;
+    const title = item.title || item.name;
+    if (title) projects.push(title);
+  }
   const skills = resume.skills || {};
   const skillLine = [skills.languages, skills.frameworks, skills.tools].filter(Boolean).join(', ');
   const greeting = /^(hi|hello|hey|yo|こんにちは|こんばんは|おはよう|やあ)/i.test(instruction.trim());

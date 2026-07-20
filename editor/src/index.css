@@ -848,6 +848,10 @@ html, body, #root {
   z-index: 9999;
 }
 .toast {
+  /* .toast is a <button> now (click-to-dismiss must be keyboard-reachable) —
+     neutralise UA button styling it doesn't already override. */
+  font: inherit;
+  text-align: left;
   display: flex;
   align-items: center;
   gap: 8px;

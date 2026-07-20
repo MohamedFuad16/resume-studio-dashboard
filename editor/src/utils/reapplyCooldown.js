@@ -72,13 +72,17 @@ export const sessionKeyFor = (companyKey, role) => `${companyKey}|${role}`;
  * that also varied with the browser's zone, so the phone and the browser stamped
  * different `reapplyAfter` dates for the same rejection.
  */
+// Built once — the Tokyo civil-date reader for addMonths (constructing an
+// Intl.DateTimeFormat per call is the expensive part).
+const TOKYO_PARTS = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
+});
+
 export function addMonths(instant, months) {
   const date = instant instanceof Date ? instant : new Date(instant);
   if (Number.isNaN(date.getTime())) return null;
   // The email's civil Y-M-D in Tokyo — the clock the contract mandates.
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(date);
+  const parts = TOKYO_PARTS.formatToParts(date);
   const val = type => Number(parts.find(part => part.type === type).value);
   const total = (val('month') - 1) + Number(months || 0); // 0-based month index
   const year = val('year') + Math.floor(total / 12);

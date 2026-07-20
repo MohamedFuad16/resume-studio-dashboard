@@ -108,8 +108,9 @@ function extractText(payload) {
   while (stack.length) {
     const part = stack.shift();
     const mime = part.mimeType || '';
-    if (mime === 'text/plain' && part.body?.data) plain += decodeBody(part.body.data) + '\n';
-    else if (mime === 'text/html' && part.body?.data) html += decodeBody(part.body.data) + '\n';
+    const data = part.body?.data;
+    if (mime === 'text/plain' && data) plain += decodeBody(data) + '\n';
+    else if (mime === 'text/html' && data) html += decodeBody(data) + '\n';
     if (part.parts) stack.push(...part.parts);
   }
   const text = plain || html.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ');

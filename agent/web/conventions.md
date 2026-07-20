@@ -22,10 +22,10 @@
 - Web E2E tests → `editor/tests/e2e/*.spec.ts` (Playwright).
 - LaTeX sources → `en/` and `ja/` (`NN_name.tex`); compiled PDFs → `output/`.
 - LaTeX tests → `tests/` (Python). Build script → `build_all.sh` (root).
-- Knowledge base → `agent/` (this folder). Do not edit legacy `.agents/`, `.workflow/`,
-  `graphify-out/`, `graphify_root`.
+- Knowledge base → `agent/web/` (this folder).
 
 ## Git / safety
-- Never commit secrets (`.env.local`, Blob tokens) — see `agent/secrets.md`.
-- After changes: update `agent/state.md` + `agent/decisions.md`, refresh
-  `agent/graph/` when module structure changes.
+- Never commit secrets (`.env.local`, API keys, OAuth client secrets) — see
+  `agent/web/secrets.md`.
+- After changes: update `agent/web/state.md` + `agent/web/decisions.md`, refresh
+  `agent/web/graph/` when module structure changes.

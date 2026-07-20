@@ -23,32 +23,32 @@ import React, { useEffect, useId, useRef, useState } from 'react';
  * @param {(dateString: string) => void} props.onConfirm — receives the chosen date(+time).
  * @param {() => void} props.onCancel — called on cancel / backdrop / Escape.
  */
+const MODAL_COPY = {
+  en: {
+    title: 'Add interview date',
+    forLabel: 'For',
+    date: 'Interview date',
+    time: 'Time (optional)',
+    cancel: 'Cancel',
+    confirm: 'Confirm',
+  },
+  ja: {
+    title: '面接日を追加',
+    forLabel: '対象',
+    date: '面接日',
+    time: '時刻（任意）',
+    cancel: 'キャンセル',
+    confirm: '確定',
+  },
+};
+
 function InterviewDateModal({ open, applicationLabel, initialDate, isJa, onConfirm, onCancel }) {
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const dateRef = useRef(null);
   const titleId = useId();
   const labelId = useId();
-
-  const copy = {
-    en: {
-      title: 'Add interview date',
-      forLabel: 'For',
-      date: 'Interview date',
-      time: 'Time (optional)',
-      cancel: 'Cancel',
-      confirm: 'Confirm',
-    },
-    ja: {
-      title: '面接日を追加',
-      forLabel: '対象',
-      date: '面接日',
-      time: '時刻（任意）',
-      cancel: 'キャンセル',
-      confirm: '確定',
-    },
-  };
-  const t = isJa ? copy.ja : copy.en;
+  const t = isJa ? MODAL_COPY.ja : MODAL_COPY.en;
 
   // Sync local state from `initialDate` and move focus to the date field on open.
   useEffect(() => {

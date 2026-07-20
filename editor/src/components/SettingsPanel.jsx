@@ -298,7 +298,7 @@ export default function SettingsPanel({
       </section>
 
       {confirmMode && (
-        <div className="modal-overlay" onClick={closeConfirm}>
+        <div className="modal-overlay" role="presentation" onClick={closeConfirm}>
           <div className="modal-card" onClick={e => e.stopPropagation()}>
             <div className="modal-hd">
               <h3>{confirmMode === 'account' ? t.deleteAccount : t.deleteProfile}</h3>

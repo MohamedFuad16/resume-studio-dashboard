@@ -55,9 +55,11 @@ export function publicStatus(conn) {
 // Every profile that has a connection — the cron loop iterates these.
 export async function listConnectedProfiles(store) {
   const all = await store.listJson('gmail:').catch(() => ({}));
-  return Object.entries(all || {})
-    .filter(([, conn]) => conn?.refreshTokenEnc)
-    .map(([key]) => key.replace(/^gmail:/, ''));
+  const profiles = [];
+  for (const [key, conn] of Object.entries(all || {})) {
+    if (conn?.refreshTokenEnc) profiles.push(key.replace(/^gmail:/, ''));
+  }
+  return profiles;
 }
 
 // ── Pending-action queue (client drains → Firestore) ─────────────────
@@ -68,7 +70,10 @@ export async function getQueue(store, profile) {
 export async function pushQueue(store, profile, actions) {
   if (!actions.length) return;
   const existing = await getQueue(store, profile);
-  const seen = new Set(existing.map(a => a.dedupeKey).filter(Boolean));
+  const seen = new Set();
+  for (const action of existing) {
+    if (action.dedupeKey) seen.add(action.dedupeKey);
+  }
   const fresh = actions.filter(a => !a.dedupeKey || !seen.has(a.dedupeKey));
   if (fresh.length) await store.setJson(queueKey(profile), [...existing, ...fresh]);
 }
