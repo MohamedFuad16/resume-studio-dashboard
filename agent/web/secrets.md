@@ -5,7 +5,10 @@ No secrets are committed in source. Configuration is environment-variable driven
 ## Where config / secret values live
 - `editor/.env.local` — local dev env (git-ignored). Real values go here.
 - `editor/.vercel/.env.preview.local` — Vercel-pulled preview env (git-ignored).
-- Vercel project settings (dashboard) — production env vars + Blob store binding.
+- Vercel project settings (dashboard) — client-side env vars (`VITE_*`) only; the
+  origin is static (ADR-0040), so no server secrets live there.
+- Azure Container App `portal-compile-jp` — server env vars + secrets
+  (`az containerapp secret set` / `--set-env-vars`).
 - `editor/vercel.json`, `editor/.vercel/project.json` — deploy config (no secrets).
 
 ## Environment variables (consumed in code)
@@ -23,9 +26,9 @@ to the OS tmpdir — must be real local disk, not the SMB mount).
 
 Configuration (not secret, but environment-specific):
 - `PORT` (default `5005`) — Express port (`server/index.js`).
-- `RESUME_STUDIO_DATA_DIR` (default `server/.data`) — local SQLite dir.
-- `RESUME_STUDIO_DB_BLOB_KEY` (default `resume-studio/resume-studio.sqlite`) — Blob key
-  (internal id; user-facing name is Internship Portal).
+- `RESUME_STUDIO_DATA_DIR` (default `server/.data`) — durable SQLite snapshot dir
+  (`/data` mount in prod); `RESUME_STUDIO_DB_WORKDIR` — live working-copy dir
+  (see Retired note above for why it must be local disk).
 - `TECTONIC_PATH` (default `/opt/homebrew/bin/tectonic`) — LaTeX engine path.
 - `OPENROUTER_API_KEY` — OpenRouter API key for AI resume chat and live internship
   research (`server/resume-chat.js`, `server/internship-research.js`). **Secret.**
@@ -61,7 +64,7 @@ Configuration (not secret, but environment-specific):
 - `VITE_OWNER_EMAILS` (comma-sep, default `flashxjapan@gmail.com`) — accounts seeded from the
   `mohamed_fuad` sample on first login (client-direct Firestore migration, ADR-0015). Not secret.
 - Per-user data now lives in Firestore: `users/{uid}/{profiles,trackers,applications}/{profileId}`
-  (see `src/data/firestoreData.js`). The `/api/*` KV/Blob path is retained only for the
+  (see `src/data/firestoreData.js`). The `/api/*` KV path is retained only for the
   no-auth/E2E case. Export endpoints gained POST variants that take the résumé in the body.
 - **Committed Firebase config** (no secrets): `editor/firebase.json`, `editor/.firebaserc`,
   `editor/firestore.rules`, `editor/firestore.indexes.json`. CLI artifacts (`.firebase/`,

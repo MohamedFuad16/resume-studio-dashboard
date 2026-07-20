@@ -39,6 +39,15 @@ Every entry: date · who · what changed · what the OTHER side must do.
   `.claude/settings.local.json` for iMessage alerts; unset, the notifier is a
   silent no-op. Nothing about API routes, payloads, or Firestore paths changed.
 
+- **2026-07-20 · doctor (owner-directed) · Résumé section items now carry a
+  persisted `id`.** Education/experience/projects/activities entries gain a
+  stable `id` (uuid, backfilled on load in `App.jsx#normalizeResume`, created at
+  every add/import site) so React list keys track the ITEM across reorder/delete
+  (issue #19). The résumé shape is not formally contract-bound, but iOS reads
+  profile docs from the same Firestore collection: **iOS: nothing to change** as
+  long as unknown résumé fields are round-tripped (rule 4); LaTeX generation and
+  server validation ignore the field.
+
 - **2026-07-19 · web · Storage engine swapped; Vercel is static-only (ADR-0040).**
   The server now runs native SQLite (working copy + snapshot to the mount) instead
   of sql.js, and the Vercel origin no longer serves `/api` at all. **iOS: nothing

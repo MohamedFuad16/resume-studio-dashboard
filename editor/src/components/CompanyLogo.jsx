@@ -120,12 +120,23 @@ function companyLogoUrls(item) {
 }
 
 export function CompanyLogo({ item, size = 'md' }) {
+  // Depend on the exact fields companyLogoUrls reads — `item` itself is a fresh
+  // object on most parent renders, so it would defeat the memo.
+  const { company, companyDomain, logoUrl, url } = item;
   const sources = useMemo(
-    () => companyLogoUrls(item),
-    [item.company, item.companyDomain, item.logoUrl, item.url],
+    () => companyLogoUrls({ company, companyDomain, logoUrl, url }),
+    [company, companyDomain, logoUrl, url],
   );
   const sourceKey = sources.join('|');
   const [sourceIndex, setSourceIndex] = useState(0);
+  // Restart the fallback chain when the source list itself changes — adjusted
+  // DURING render (React's "information from previous renders" pattern), not in
+  // an effect: the effect version painted one frame of the stale logo first.
+  const [prevSourceKey, setPrevSourceKey] = useState(sourceKey);
+  if (prevSourceKey !== sourceKey) {
+    setPrevSourceKey(sourceKey);
+    setSourceIndex(0);
+  }
   const filledBrand = FILLED_BRAND_LOGOS[item.company];
   const initials = item.company
     .split(/\s+/)
@@ -134,8 +145,6 @@ export function CompanyLogo({ item, size = 'md' }) {
     .replace(/[^A-Z0-9]/gi, '')
     .slice(0, 2)
     .toUpperCase();
-
-  useEffect(() => setSourceIndex(0), [sourceKey]);
 
   const src = sources[sourceIndex];
   if (!src) {

@@ -47,6 +47,16 @@ function escJa(str) {
 // ══════════════════════════════════════════════════════════════════
 // EN 01 — Jake's Clean
 // ══════════════════════════════════════════════════════════════════
+// One-pass filter+render+join over a résumé section (avoids the double
+// iteration of .filter().map().join() at every call site).
+function renderEntries(items, keep, render, separator = '\n') {
+  const out = [];
+  for (const entry of items || []) {
+    if (keep(entry)) out.push(render(entry));
+  }
+  return out.join(separator);
+}
+
 function genEn01(r) {
   const p = r.personal;
   const edu = r.education.map(e => `
@@ -519,7 +529,8 @@ function buildJapaneseTimeline(r) {
     rows.push({ det: '\\hfill \\textbf{職\\quad 歴} \\hfill' });
     const events = [];
     let hasCurrentRole = false;
-    japaneseExperience.filter((experience) => experience.companyJa || experience.company).forEach((experience) => {
+    for (const experience of japaneseExperience) {
+      if (!(experience.companyJa || experience.company)) continue;
       const company = escJa(experience.companyJa || experience.company);
       const start = parseDateJa(experience.startDate);
       events.push({ yr: start.yr, mo: start.mo, order: 1, det: `${company} 入社` });
@@ -529,7 +540,7 @@ function buildJapaneseTimeline(r) {
         const end = parseDateJa(experience.endDate);
         if (end.yr) events.push({ yr: end.yr, mo: end.mo, order: 0, det: `${company} 退社` });
       }
-    });
+    }
     events.sort((a, b) => {
       const keyA = Number(a.yr || 0) * 100 + Number(a.mo || 0);
       const keyB = Number(b.yr || 0) * 100 + Number(b.mo || 0);
@@ -575,7 +586,7 @@ function genJa01(r, options = {}) {
     return startJa || endJa || '';
   };
 
-  const edu = (r.education || []).filter(e => e.institutionJa || e.institution).map(e => {
+  const edu = renderEntries(r.education, e => e.institutionJa || e.institution, e => {
     const bullets = japaneseBullets(e);
     return `
     \\resumeSubheading
@@ -585,9 +596,9 @@ function genJa01(r, options = {}) {
       \\resumeItemListStart
         ${bullets.map(b => `\\resumeItem{${escJa(b)}}`).join('\n        ')}
       \\resumeItemListEnd` : '');
-  }).join('\n');
+  });
 
-  const exp = (j.experience || r.experience || []).filter(e => e.companyJa || e.company).map(e => {
+  const exp = renderEntries(j.experience || r.experience, e => e.companyJa || e.company, e => {
     const bullets = japaneseBullets(e);
     return `
     \\resumeSubheading
@@ -597,9 +608,9 @@ function genJa01(r, options = {}) {
       \\resumeItemListStart
         ${bullets.map(b => `\\resumeItem{${escJa(b)}}`).join('\n        ')}
       \\resumeItemListEnd` : '');
-  }).join('\n');
+  });
 
-  const proj = (r.projects || []).filter(pr => pr.title).map(pr => {
+  const proj = renderEntries(r.projects, pr => pr.title, pr => {
     const bullets = japaneseBullets(pr);
     return `
       \\resumeProjectHeading
@@ -608,9 +619,9 @@ function genJa01(r, options = {}) {
           \\resumeItemListStart
             ${bullets.map(b => `\\resumeItem{${escJa(b)}}`).join('\n            ')}
           \\resumeItemListEnd` : '');
-  }).join('\n');
+  });
 
-  const acts = (r.activities || []).filter(a => a.titleJa || a.title).map(a => {
+  const acts = renderEntries(r.activities, a => a.titleJa || a.title, a => {
     const bullets = japaneseBullets(a);
     return `
     \\resumeSubheading
@@ -620,7 +631,7 @@ function genJa01(r, options = {}) {
       \\resumeItemListStart
         ${bullets.map(b => `\\resumeItem{${escJa(b)}}`).join('\n        ')}
       \\resumeItemListEnd` : '');
-  }).join('\n');
+  });
 
   const langText = (j.languages && j.languages.length ? j.languages : [s.spoken || '']).filter(Boolean).map(escJa).join('　／　');
   const concepts = escJa(js.concepts || s.concepts || '');
@@ -854,9 +865,9 @@ function genJa03(r) {
     rightEntry(escJa(p2.title), formatMonthJa(p2.year), escJa(p2.tech), japaneseBullets(p2).slice(0, 2))
   ).join('\n');
 
-  const expList = (j.experience || r.experience || []).filter(e => e.companyJa || e.company).map(e =>
+  const expList = renderEntries(j.experience || r.experience, e => e.companyJa || e.company, e =>
     rightEntry(escJa(e.companyJa || e.company), `${formatMonthJa(e.startDate)} － ${formatMonthJa(e.endDate)}`, escJa(e.roleJa || e.role || ''), japaneseBullets(e).slice(0, 1))
-  ).join('\n');
+  );
 
   const actList = r.activities.map(a =>
     rightEntry(escJa(a.titleJa || a.title), `${formatMonthJa(a.startDate)} － ${formatMonthJa(a.endDate)}`, escJa(a.orgJa || a.org || ''), japaneseBullets(a).slice(0, 1))

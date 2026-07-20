@@ -19,13 +19,16 @@ const slugify = value => String(value || '')
   .replace(/^-|-$/g, '')
   .slice(0, 52) || 'company';
 
+// Built once — Intl.DateTimeFormat construction is expensive.
+const TOKYO_YMD = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Tokyo',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
 function todayInTokyo() {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
+  return TOKYO_YMD.format(new Date());
 }
 
 function safeUrl(value) {
@@ -292,10 +295,13 @@ Evidence rules:
     throw new Error(`Live research agent failed: ${error.message}`);
   }
   const officialCompany = fallbackCompanyName(parsed.company || company);
-  const normalizedResults = (Array.isArray(parsed.results) ? parsed.results : [])
-    .map((result, index) => normalizeResult(officialCompany, result, index, verifiedDate))
-    .filter(Boolean)
-    .slice(0, 8);
+  // One pass, capped at 8 keepers.
+  const normalizedResults = [];
+  const rawResults = Array.isArray(parsed.results) ? parsed.results : [];
+  for (let index = 0; index < rawResults.length && normalizedResults.length < 8; index++) {
+    const normalized = normalizeResult(officialCompany, rawResults[index], index, verifiedDate);
+    if (normalized) normalizedResults.push(normalized);
+  }
 
   // Verify every candidate posting is a live page before accepting it.
   const linkTimeoutMs = Number(process.env.INTERNSHIP_RESEARCH_LINK_TIMEOUT_MS || 8000);

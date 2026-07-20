@@ -1,6 +1,12 @@
 import React from 'react';
 import { Sec, Inp, Txta, Bullets, I, TagInput, SuggestInput, MonthInput } from './ui.jsx';
 import { prepareProfilePhoto } from '../utils/imageUpload.js';
+import { newItemId } from '../utils/helpers.js';
+import {
+  INSTITUTIONS_EN, INSTITUTIONS_JA, DEGREES_EN, DEGREES_JA,
+  COMPANIES_EN, COMPANIES_JA, ROLES_EN, ROLES_JA,
+  LOCATIONS, YEARS, LANGS, TECH_SUGGESTIONS, FRAMEWORKS, TOOLS, CONCEPTS, SPOKEN,
+} from '../constants/resumeOptions.js';
 
 function GithubMark() {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .7a11.5 11.5 0 0 0-3.64 22.41c.58.11.79-.25.79-.56v-2.22c-3.23.7-3.91-1.37-3.91-1.37-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.71.08-.71 1.17.08 1.78 1.2 1.78 1.2 1.04 1.78 2.72 1.27 3.39.97.1-.75.41-1.27.74-1.56-2.58-.29-5.29-1.29-5.29-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.47.11-3.05 0 0 .97-.31 3.16 1.18a10.9 10.9 0 0 1 5.76 0c2.2-1.49 3.16-1.18 3.16-1.18.63 1.58.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.4-2.72 5.38-5.3 5.67.42.36.79 1.07.79 2.16v3.21c0 .31.21.68.8.56A11.5 11.5 0 0 0 12 .7Z" /></svg>;
@@ -330,7 +336,7 @@ export function EducationSec({ data, onChange, isJa }) {
   // Single merged update so multi-field edits don't stomp each other via stale `data`
   // closures (fixes the degree/institution "snap-back" bug — see report / ADR).
   const upd = (i, patch) => onChange(data.map((e, x) => x === i ? { ...e, ...patch } : e));
-  const add = () => onChange([...data, { school: '', schoolJa: '', institution: '', institutionJa: '', location: '', degree: '', degreeJa: '', startDate: '', endDate: '', bullets: [] }]);
+  const add = () => onChange([...data, { id: newItemId(), school: '', schoolJa: '', institution: '', institutionJa: '', location: '', degree: '', degreeJa: '', startDate: '', endDate: '', bullets: [] }]);
   const del = i => onChange(data.filter((_, x) => x !== i));
   const move = (i, dir) => {
     const nextIdx = i + dir;
@@ -349,7 +355,7 @@ export function EducationSec({ data, onChange, isJa }) {
           ? (e.schoolJa || e.school || e.institutionJa || `学校 ${i + 1}`)
           : (e.school || e.institution || `School ${i + 1}`);
         return (
-          <div key={i} className="item">
+          <div key={e.id} className="item">
             <ItemHeader label={itemLabel} index={i} total={data.length} onMove={move} onDelete={del} kind="education" isJa={isJa} />
             <div className="flds">
               {isJa ? (
@@ -394,7 +400,7 @@ export function ExperienceSec({ data, onChange, isJa }) {
   const set = (i, k, v) => onChange(data.map((e, x) => x === i ? { ...e, [k]: v } : e));
   // Single merged update (see EducationSec) — avoids the stale-closure double-set bug.
   const upd = (i, patch) => onChange(data.map((e, x) => x === i ? { ...e, ...patch } : e));
-  const add = () => onChange([...data, { company: '', companyJa: '', role: '', roleJa: '', location: '', startDate: '', endDate: '', description: '', bullets: [] }]);
+  const add = () => onChange([...data, { id: newItemId(), company: '', companyJa: '', role: '', roleJa: '', location: '', startDate: '', endDate: '', description: '', bullets: [] }]);
   const del = i => onChange(data.filter((_, x) => x !== i));
   const move = (i, dir) => {
     const nextIdx = i + dir;
@@ -413,7 +419,7 @@ export function ExperienceSec({ data, onChange, isJa }) {
           ? (e.companyJa || e.company || `企業 ${i + 1}`)
           : (e.company || `Company ${i + 1}`);
         return (
-          <div key={i} className="item">
+          <div key={e.id} className="item">
             <ItemHeader label={itemLabel} index={i} total={data.length} onMove={move} onDelete={del} kind="experience" isJa={isJa} />
             <div className="flds">
               {isJa ? (
@@ -466,7 +472,7 @@ export function ProjectsSec({ data, onChange, isJa }) {
   const set = (i, k, v) => onChange(data.map((e, x) => x === i ? { ...e, [k]: v } : e));
   // Single merged update (see EducationSec) — avoids the stale-closure double-set bug.
   const upd = (i, patch) => onChange(data.map((e, x) => x === i ? { ...e, ...patch } : e));
-  const add = () => onChange([...data, { title: '', name: '', tech: '', role: '', year: '', bullets: [] }]);
+  const add = () => onChange([...data, { id: newItemId(), title: '', name: '', tech: '', role: '', year: '', bullets: [] }]);
   const del = i => onChange(data.filter((_, x) => x !== i));
   const move = (i, dir) => {
     const nextIdx = i + dir;
@@ -485,7 +491,7 @@ export function ProjectsSec({ data, onChange, isJa }) {
           ? (p.name || p.title || `プロジェクト ${i + 1}`)
           : (p.title || `Project ${i + 1}`);
         return (
-          <div key={i} className="item">
+          <div key={p.id} className="item">
             <ItemHeader label={itemLabel} index={i} total={data.length} onMove={move} onDelete={del} kind="project" isJa={isJa} />
             <div className="flds">
               {isJa ? (
@@ -520,7 +526,7 @@ export function ProjectsSec({ data, onChange, isJa }) {
 /* ── Activities ─────────────────────────────────────────── */
 export function ActivitiesSec({ data, onChange, isJa }) {
   const set = (i, k, v) => onChange(data.map((e, x) => x === i ? { ...e, [k]: v } : e));
-  const add = () => onChange([...data, { title: '', org: '', location: '', startDate: '', endDate: '', bullets: [] }]);
+  const add = () => onChange([...data, { id: newItemId(), title: '', org: '', location: '', startDate: '', endDate: '', bullets: [] }]);
   const del = i => onChange(data.filter((_, x) => x !== i));
   const move = (i, dir) => {
     const nextIdx = i + dir;
@@ -539,7 +545,7 @@ export function ActivitiesSec({ data, onChange, isJa }) {
           ? (a.title || `活動・資格 ${i + 1}`)
           : (a.title || `Activity ${i + 1}`);
         return (
-          <div key={i} className="item">
+          <div key={a.id} className="item">
             <ItemHeader label={itemLabel} index={i} total={data.length} onMove={move} onDelete={del} kind="activity" isJa={isJa} />
             <div className="flds">
               {isJa ? (
@@ -582,272 +588,6 @@ export function ActivitiesSec({ data, onChange, isJa }) {
 /* ── Suggestions lists ──────────────────────────────────── */
 // Curated ~50 institutions: Japan's top national/private universities followed by
 // globally top-ranked schools. INSTITUTIONS_EN / INSTITUTIONS_JA are kept index-parallel.
-export const INSTITUTIONS_EN = [
-  "Tokai University",
-  "The University of Tokyo",
-  "Kyoto University",
-  "Osaka University",
-  "Tohoku University",
-  "Nagoya University",
-  "Hokkaido University",
-  "Kyushu University",
-  "Tokyo Institute of Technology",
-  "University of Tsukuba",
-  "Kobe University",
-  "Hitotsubashi University",
-  "Waseda University",
-  "Keio University",
-  "Sophia University",
-  "Tokyo Metropolitan University",
-  "Tokyo University of Science",
-  "Tokyo University of Foreign Studies",
-  "Tokyo University of Agriculture and Technology",
-  "Tokyo Medical and Dental University",
-  "Ochanomizu University",
-  "Gakushuin University",
-  "Meiji University",
-  "Aoyama Gakuin University",
-  "Rikkyo University",
-  "Chuo University",
-  "Hosei University",
-  "Nihon University",
-  "Toyo University",
-  "Komazawa University",
-  "Senshu University",
-  "Seikei University",
-  "Seijo University",
-  "Musashi University",
-  "Tokyo Denki University",
-  "Tokyo City University",
-  "Shibaura Institute of Technology",
-  "Kogakuin University",
-  "Tokyo Polytechnic University",
-  "Digital Hollywood University",
-  "Massachusetts Institute of Technology (MIT)",
-  "Stanford University",
-  "Harvard University",
-  "California Institute of Technology (Caltech)",
-  "University of California, Berkeley",
-  "Carnegie Mellon University",
-  "University of Oxford",
-  "University of Cambridge",
-  "ETH Zurich",
-  "National University of Singapore",
-  "Tsinghua University",
-  "Nanyang Technological University"
-];
-
-export const INSTITUTIONS_JA = [
-  "東海大学",
-  "東京大学",
-  "京都大学",
-  "大阪大学",
-  "東北大学",
-  "名古屋大学",
-  "北海道大学",
-  "九州大学",
-  "東京工業大学",
-  "筑波大学",
-  "神戸大学",
-  "一橋大学",
-  "早稲田大学",
-  "慶應義塾大学",
-  "上智大学",
-  "東京都立大学",
-  "東京理科大学",
-  "東京外国語大学",
-  "東京農工大学",
-  "東京医科歯科大学",
-  "お茶の水女子大学",
-  "学習院大学",
-  "明治大学",
-  "青山学院大学",
-  "立教大学",
-  "中央大学",
-  "法政大学",
-  "日本大学",
-  "東洋大学",
-  "駒澤大学",
-  "専修大学",
-  "成蹊大学",
-  "成城大学",
-  "武蔵大学",
-  "東京電機大学",
-  "東京都市大学",
-  "芝浦工業大学",
-  "工学院大学",
-  "東京工芸大学",
-  "デジタルハリウッド大学",
-  "マサチューセッツ工科大学（MIT）",
-  "スタンフォード大学",
-  "ハーバード大学",
-  "カリフォルニア工科大学（Caltech）",
-  "カリフォルニア大学バークレー校",
-  "カーネギーメロン大学",
-  "オックスフォード大学",
-  "ケンブリッジ大学",
-  "チューリッヒ工科大学（ETH）",
-  "シンガポール国立大学",
-  "清華大学",
-  "南洋理工大学"
-];
-
-export const DEGREES_EN = [
-  "Bachelor of Science",
-  "Bachelor of Engineering",
-  "Bachelor of Arts",
-  "Master of Science",
-  "Master of Engineering",
-  "Master of Business Administration (MBA)",
-  "Doctor of Philosophy (PhD)",
-  "Associate Degree",
-  "High School Diploma"
-];
-
-export const DEGREES_JA = [
-  "学士（理学）",
-  "学士（工学）",
-  "学士（情報科学）",
-  "修士（理学）",
-  "修士（工学）",
-  "博士（理学）",
-  "博士（工学）",
-  "高等部卒業"
-];
-
-export const COMPANIES_EN = [
-  "Altius Link (formerly KDDI Evolva)",
-  "Japan Airlines",
-  "Hotel SUI Akasaka",
-  "Google",
-  "Microsoft",
-  "Amazon Japan",
-  "Apple Japan",
-  "Meta Japan",
-  "LINEヤフー",
-  "Sony",
-  "Toyota",
-  "Honda",
-  "Nissan",
-  "Hitachi",
-  "Fujitsu",
-  "NEC",
-  "NTT DATA",
-  "Recruit",
-  "CyberAgent",
-  "DeNA",
-  "SoftBank",
-  "Rakuten",
-  "Mercari"
-];
-
-export const COMPANIES_JA = [
-  "アルティウスリンク株式会社",
-  "日本航空株式会社",
-  "ホテルSUI赤坂",
-  "グーグル合同会社",
-  "日本マイクロソフト株式会社",
-  "アマゾンジャパン合同会社",
-  "Apple Japan合同会社",
-  "Meta Japan株式会社",
-  "LINEヤフー株式会社",
-  "ソニーグループ株式会社",
-  "トヨタ自動車株式会社",
-  "本田技研工業株式会社",
-  "日産自動車株式会社",
-  "株式会社日立製作所",
-  "富士通株式会社",
-  "日本電気株式会社",
-  "株式会社NTTデータ",
-  "株式会社リクルート",
-  "株式会社サイバーエージェント",
-  "株式会社ディー・エヌ・エー",
-  "ソフトバンク株式会社",
-  "楽天グループ株式会社",
-  "株式会社メルカリ"
-];
-
-export const ROLES_EN = [
-  "Software Engineer",
-  "Frontend Developer",
-  "Backend Developer",
-  "Full Stack Developer",
-  "Mobile App Developer",
-  "iOS Developer",
-  "Android Developer",
-  "Data Scientist",
-  "Machine Learning Engineer",
-  "UI/UX Designer",
-  "Product Manager",
-  "Product Designer",
-  "QA Engineer",
-  "DevOps Engineer",
-  "Cloud Engineer",
-  "Security Engineer",
-  "Data Analyst",
-  "Technical Support Specialist",
-  "Customer Success Associate",
-  "Translation Specialist",
-  "Research Assistant",
-  "English Teacher",
-  "Front Desk Associate",
-  "Intern"
-];
-
-export const ROLES_JA = [
-  "ソフトウェアエンジニア",
-  "フロントエンドエンジニア",
-  "バックエンドエンジニア",
-  "フルスタックエンジニア",
-  "モバイルアプリエンジニア",
-  "iOSデベロッパー",
-  "データサイエンティスト",
-  "機械学習エンジニア",
-  "UI/UXデザイナー",
-  "プロダクトマネージャー",
-  "プロダクトデザイナー",
-  "QAエンジニア",
-  "DevOpsエンジニア",
-  "クラウドエンジニア",
-  "セキュリティエンジニア",
-  "データアナリスト",
-  "テクニカルサポート",
-  "カスタマーサクセス",
-  "翻訳スペシャリスト",
-  "研究アシスタント",
-  "英語講師",
-  "フロントアソシエイト",
-  "インターン"
-];
-
-export const LOCATIONS = [
-  "Tokyo, Japan",
-  "Kanagawa, Japan",
-  "Osaka, Japan",
-  "Kyoto, Japan",
-  "Remote",
-  "Hybrid",
-  "San Francisco, CA",
-  "New York, NY"
-];
-
-export const YEARS = [
-  "2026",
-  "2025",
-  "2024",
-  "2023",
-  "2022",
-  "2021",
-  "2020"
-];
-
-/* ── Skills ─────────────────────────────────────────────── */
-export const LANGS = ["JavaScript", "TypeScript", "Python", "HTML", "CSS", "C", "C++", "Java", "Swift", "Go", "Rust", "Ruby", "PHP", "SQL", "Shell", "Kotlin", "Dart", "MATLAB", "R", "Scala", "Haskell", "Perl"];
-export const TECH_SUGGESTIONS = ["React", "Node.js", "Express", "Next.js", "Vue", "Angular", "Django", "Flask", "FastAPI", "Spring Boot", "Ruby on Rails", "ASP.NET", "Laravel", "SwiftUI", "AppKit", "Tailwind CSS", "Bootstrap", "jQuery", "TensorFlow", "PyTorch", "NumPy", "Pandas", ...LANGS];
-export const FRAMEWORKS = ["React", "Node.js", "Express", "Next.js", "Vue", "Angular", "Django", "Flask", "FastAPI", "Spring Boot", "Ruby on Rails", "ASP.NET", "Laravel", "SwiftUI", "AppKit", "Tailwind CSS", "Bootstrap", "jQuery", "TensorFlow", "PyTorch", "NumPy", "Pandas"];
-export const TOOLS = ["Git", "GitHub", "GitLab", "Docker", "Kubernetes", "AWS", "Google Cloud", "Azure", "Vercel", "Netlify", "Firebase", "Heroku", "PostgreSQL", "MySQL", "SQLite", "MongoDB", "Redis", "Oracle", "DynamoDB", "VS Code", "Webpack", "Vite", "npm", "yarn"];
-export const CONCEPTS = ["RESTful APIs", "GraphQL", "OOP", "Functional Programming", "Data Structures", "Algorithms", "System Design", "Microservices", "CI/CD", "Agile", "Scrum", "TDD", "Unit Testing", "E2E Testing", "DevOps", "WebRTC", "PWA", "Responsive Design", "MVC", "Serverless"];
-export const SPOKEN = ["English (Native)", "English (Professional)", "English (Conversational)", "Japanese (Native)", "Japanese (Business)", "Japanese (JLPT N1)", "Japanese (JLPT N2)", "Japanese (JLPT N3)", "Spanish", "French", "German", "Chinese", "Korean", "Tamil", "Hindi", "Arabic"];
 
 export function SkillsSec({ data, onChange, isJa }) {
   // Hook must run on every render: `data` can be a flat array (PDF-import wizard

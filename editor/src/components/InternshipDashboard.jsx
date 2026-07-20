@@ -26,6 +26,7 @@ import InterviewDateModal from './InterviewDateModal.jsx';
 import { displayCompany, displayRole, displayValue, internshipDetails, splitLanguageRequirement } from '../utils/internshipDisplay.js';
 import { appliedCompaniesForProfile, appliedCompanyRank, compareCompanyAwareMatch } from '../utils/internshipRanking.js';
 import { resolveTechIcon } from '../utils/techIcons.js';
+import { keyed } from '../utils/keyedList.js';
 import { companyCooldownMap, cooldownForCompany, cooldownLabel } from '../utils/reapplyCooldown.js';
 
 const DESKTOP_PAGE_SIZE = 14;
@@ -392,7 +393,7 @@ export const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEd
       <CompanyLogo item={item} size="lg" />
       <div className="intern-detail-title">
         <strong>{companyName}</strong>
-        <p className="intern-role-stack"><span>{roleLead}</span>{roleDetails.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</p>
+        <p className="intern-role-stack"><span>{roleLead}</span>{keyed(roleDetails).map(entry => <span key={entry.key}>{entry.value}</span>)}</p>
       </div>
       <label className="intern-status-control intern-status-head">
         <select value={status} onChange={event => onStatus(item, event.target.value)} aria-label={t.status}>
@@ -410,9 +411,9 @@ export const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEd
     </div>
 
     <div className="intern-detail-meta" aria-label={isJa ? '募集条件' : 'Internship facts'}>
-      {locationParts.map((part, index) => <span className="intern-meta-token" key={`${part}-${index}`}>{index === 0 ? <MapPin size={13} /> : null}{part}</span>)}
-      {languageParts.map((part, index) => <span className="intern-meta-token language" key={`${part}-${index}`}><b>{index === 0 ? 'EN' : 'JA'}</b>{part}</span>)}
-      {durationParts.map((part, index) => <span className="intern-meta-token" key={`${part}-${index}`}>{index === 0 ? <CalendarClock size={13} /> : null}{part}</span>)}
+      {keyed(locationParts).map((entry, index) => <span className="intern-meta-token" key={entry.key}>{index === 0 ? <MapPin size={13} /> : null}{entry.value}</span>)}
+      {keyed(languageParts).map((entry, index) => <span className="intern-meta-token language" key={entry.key}><b>{index === 0 ? 'EN' : 'JA'}</b>{entry.value}</span>)}
+      {keyed(durationParts).map((entry, index) => <span className="intern-meta-token" key={entry.key}>{index === 0 ? <CalendarClock size={13} /> : null}{entry.value}</span>)}
     </div>
 
     {cooldown && (
@@ -437,7 +438,7 @@ export const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEd
         <h3>{t.fitHeading}</h3>
         <p className="intern-fit-note">{fitNoteDisplay(item, isJa)}</p>
         <ul className="intern-reasons">
-          {(item.reasons || []).map((reason, index) => <li key={`${reason}-${index}`}><span><Check size={13} /></span>{reasonDisplay(reason, isJa)}</li>)}
+          {keyed(item.reasons).map(entry => <li key={entry.key}><span><Check size={13} /></span>{reasonDisplay(entry.value, isJa)}</li>)}
         </ul>
       </section>
     )}
@@ -446,12 +447,12 @@ export const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEd
       <section className="intern-detail-section">
         <h3>{t.techStack}</h3>
         <div className="intern-chip-list">
-          {details.techStack.map((tech, index) => {
-            const icon = resolveTechIcon(tech);
+          {keyed(details.techStack).map(entry => {
+            const icon = resolveTechIcon(entry.value);
             return (
-              <span key={`${tech}-${index}`}>
+              <span key={entry.key}>
                 <img src={icon.src} alt="" loading="lazy" onError={event => { event.currentTarget.src = icon.fallbackSrc; }} />
-                {displayValue(tech, isJa)}
+                {displayValue(entry.value, isJa)}
               </span>
             );
           })}
@@ -463,7 +464,7 @@ export const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEd
       <section className="intern-detail-section intern-eligibility">
         <h3>{t.eligibility}</h3>
         <ul className="intern-check-list">
-          {eligibility.map((entry, index) => <li key={`${entry}-${index}`}><ShieldCheck size={15} />{displayValue(entry, isJa)}</li>)}
+          {keyed(eligibility).map(entry => <li key={entry.key}><ShieldCheck size={15} />{displayValue(entry.value, isJa)}</li>)}
         </ul>
       </section>
     )}
@@ -471,7 +472,7 @@ export const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEd
     <section className="intern-detail-section">
       <h3>{t.process}</h3>
       <ol className="intern-process-list">
-        {process.map((step, index) => <li key={`${step}-${index}`}>{displayValue(step, isJa)}</li>)}
+        {keyed(process).map(entry => <li key={entry.key}>{displayValue(entry.value, isJa)}</li>)}
       </ol>
     </section>
 
@@ -517,7 +518,7 @@ function CompanyResearchPanel({ company, t, isJa, job, results, error, onStart, 
         <div>
           <h3>{t.liveSearchTitle(company)}</h3>
           <p data-testid="company-research-status">{showPrompt ? t.liveSearchSub : searching ? phaseMsg : missingKey ? t.liveKeyMissing : error ? `${t.liveError} ${error}` : t.liveDone(results.length)}</p>
-          {searching && phase >= 2 && <p style={{ fontSize: '11px', color: 'var(--t3)', marginTop: '2px' }}>{t.researchSlow}</p>}
+          {searching && phase >= 2 && <p style={{ fontSize: '12px', color: 'var(--t3)', marginTop: '2px' }}>{t.researchSlow}</p>}
         </div>
         {missingKey ? (
           <button type="button" className="company-research-cta" data-testid="company-research-add-key" onClick={onOpenSettings}>
@@ -601,7 +602,13 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
     [activeProfile, records],
   );
   const regions = REGION_FILTERS;
-  const tracks = useMemo(() => ['All', ...new Set(visibleCatalog.map(item => item.track).filter(Boolean))], [visibleCatalog]);
+  const tracks = useMemo(() => {
+    const seen = new Set();
+    for (const item of visibleCatalog) {
+      if (item.track) seen.add(item.track);
+    }
+    return ['All', ...seen];
+  }, [visibleCatalog]);
   // Derive from the VISIBLE set (not raw tracker records) so the Saved button count
   // always equals the number of rows the Saved filter renders. A saved role that was
   // retired from the catalog is not in visibleCatalog, so it is excluded from both. BUG-007.
@@ -619,11 +626,12 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
   const latestVerifiedDate = useMemo(() => {
     // "checked <date>" = the newest of any listing's verifiedDate and the
     // catalog-wide liveness sweep (meta.lastCheckedDate from auto-refresh).
-    const dates = catalog
-      .map(item => item.verifiedDate)
-      .filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date || ''))
-      .sort();
-    const newestVerified = dates.at(-1) || meta.researchDate;
+    let newestVerified = '';
+    for (const item of catalog) {
+      const date = item.verifiedDate;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(date || '') && date > newestVerified) newestVerified = date;
+    }
+    newestVerified = newestVerified || meta.researchDate;
     const lastChecked = meta.lastCheckedDate || '';
     return lastChecked > newestVerified ? lastChecked : newestVerified;
   }, [catalog, meta.researchDate, meta.lastCheckedDate]);
@@ -675,19 +683,27 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
   }, [visibleCatalog, query, region, track, language, deadlineFilter, sort, savedOnly, statusFor, appliedCompanies]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
+  // Filter changes restart pagination, and a shrunken result set clamps the
+  // page — both adjusted DURING render (React's previous-render-info pattern)
+  // instead of post-paint effects, so there is never a frame on a ghost page.
+  const filterKey = JSON.stringify([query, region, track, language, deadlineFilter, sort, savedOnly]);
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (prevFilterKey !== filterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(1);
+  }
+  const effectivePage = Math.min(page, pageCount);
+  // A selection that fell out of the visible set stays cleared (it must not
+  // reappear if a later filter re-includes the item).
+  if (selectedId && !filtered.some(item => item.id === selectedId)) setSelectedId('');
+  const pageItems = filtered.slice((effectivePage - 1) * pageSize, effectivePage * pageSize);
   const selected = selectedId ? catalog.find(item => item.id === selectedId) : null;
 
-  useEffect(() => { setPage(1); }, [query, region, track, language, deadlineFilter, sort, savedOnly]);
   useEffect(() => {
     const syncPageSize = () => setPageSize(window.innerWidth <= 860 ? MOBILE_PAGE_SIZE : DESKTOP_PAGE_SIZE);
     window.addEventListener('resize', syncPageSize);
     return () => window.removeEventListener('resize', syncPageSize);
   }, []);
-  useEffect(() => { if (page > pageCount) setPage(pageCount); }, [page, pageCount]);
-  useEffect(() => {
-    if (selectedId && !filtered.some(item => item.id === selectedId)) setSelectedId('');
-  }, [filtered, selectedId]);
   useEffect(() => {
     if (!selectedId) return undefined;
     const closeOnEscape = event => { if (event.key === 'Escape') setSelectedId(''); };
@@ -772,12 +788,16 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
     return () => window.clearInterval(timer);
   }, [researchJob?.status, t]);
 
+  // The debounce below reads the CURRENT research starter through a ref, so the
+  // timer effect's deps stay the three values that actually schedule it.
+  const startResearchRef = useRef(() => {});
+  useEffect(() => { startResearchRef.current = startCompanyResearch; });
   useEffect(() => {
     const key = companyQuery.toLowerCase();
     // Auto-search only companies NOT already in the catalog (avoid auto-spending on
     // catalog companies — the panel still offers a manual "Search official sources").
     if (!canLiveSearchCompany || hasCatalogTextMatch || autoResearchStarted.current.has(key)) return undefined;
-    const timer = window.setTimeout(() => startCompanyResearch(companyQuery, { auto: true }), 1100);
+    const timer = window.setTimeout(() => startResearchRef.current(companyQuery, { auto: true }), 1100);
     return () => window.clearTimeout(timer);
   }, [canLiveSearchCompany, hasCatalogTextMatch, companyQuery]);
 
@@ -825,8 +845,8 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
   };
 
   const hasFilters = Boolean(query || region !== 'All' || track !== 'All' || language !== 'All' || deadlineFilter !== 'All' || savedOnly);
-  const start = filtered.length ? (page - 1) * pageSize + 1 : 0;
-  const end = Math.min(page * pageSize, filtered.length);
+  const start = filtered.length ? (effectivePage - 1) * pageSize + 1 : 0;
+  const end = Math.min(effectivePage * pageSize, filtered.length);
 
   return (
     <main className={`internship-radar ${isJa ? 'ja' : 'en'}`}>
@@ -904,12 +924,12 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
                       }
                     }}
                   >
-                    <span className="intern-rank">{(page - 1) * pageSize + index + 1}</span>
-                    <span className="intern-company-cell"><CompanyLogo item={item} /><button type="button" className="intern-company-trigger" onClick={() => setSelectedId(item.id)} aria-label={`${displayCompany(item, isJa)}: ${isJa ? '詳細を開く' : 'Open internship details'}`}><strong>{displayCompany(item, isJa)}</strong><small className="intern-role-stack"><span>{roleLead}</span>{roleDetails.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</small></button></span>
+                    <span className="intern-rank">{(effectivePage - 1) * pageSize + index + 1}</span>
+                    <span className="intern-company-cell"><CompanyLogo item={item} /><button type="button" className="intern-company-trigger" onClick={() => setSelectedId(item.id)} aria-label={`${displayCompany(item, isJa)}: ${isJa ? '詳細を開く' : 'Open internship details'}`}><strong>{displayCompany(item, isJa)}</strong><small className="intern-role-stack"><span>{roleLead}</span>{keyed(roleDetails).map(entry => <span key={entry.key}>{entry.value}</span>)}</small></button></span>
                     <span className="intern-match"><strong>{item.score}%</strong><small>{item.priority ? t.priority : t.matchLabel(item.score)}</small></span>
-                    <span className="intern-location" data-label={t.location}><span className="intern-location-stack">{locationParts.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</span></span>
-                    <span className="intern-language" data-label={t.language}><span className="intern-language-stack">{languageParts.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</span></span>
-                    <span className="intern-duration" data-label={t.duration}><span className="intern-duration-stack">{durationParts.map((part, i) => <span key={`${part}-${i}`}>{part}</span>)}</span></span>
+                    <span className="intern-location" data-label={t.location}><span className="intern-location-stack">{keyed(locationParts).map(entry => <span key={entry.key}>{entry.value}</span>)}</span></span>
+                    <span className="intern-language" data-label={t.language}><span className="intern-language-stack">{keyed(languageParts).map(entry => <span key={entry.key}>{entry.value}</span>)}</span></span>
+                    <span className="intern-duration" data-label={t.duration}><span className="intern-duration-stack">{keyed(durationParts).map(entry => <span key={entry.key}>{entry.value}</span>)}</span></span>
                     <span className={`intern-deadline ${deadlineClass(item)}`} data-label={t.deadline}>{formatDeadline(item.deadline, isJa)}</span>
                     <select className={`intern-row-status ${status || 'untracked'}`} value={status} onClick={event => event.stopPropagation()} onChange={event => handleStatusSelect(item, event.target.value)} aria-label={`${t.status}: ${displayCompany(item, isJa)}`}><option value="">{t.track}</option>{APPLICATION_STATUSES.map(option => <option key={option.value} value={option.value}>{statusLabel(option.value, isJa)}</option>)}</select>
                     {cooldown
@@ -921,7 +941,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
               })}
             </div>
             {!pageItems.length ? <div className="intern-empty"><Search size={22} /><strong>{t.noMatches}</strong><span>{t.noMatchesSub}</span><button type="button" onClick={clearFilters}>{t.reset}</button></div> : null}
-            <footer className="intern-pagination"><span>{t.showing(start, end, filtered.length)}</span><div><button type="button" onClick={() => setPage(value => Math.max(1, value - 1))} disabled={page === 1} aria-label={t.previousPage}><ChevronLeft size={16} /></button><span>{t.page(page, pageCount)}</span><button type="button" onClick={() => setPage(value => Math.min(pageCount, value + 1))} disabled={page === pageCount} aria-label={t.nextPage}><ChevronRight size={16} /></button></div></footer>
+            <footer className="intern-pagination"><span>{t.showing(start, end, filtered.length)}</span><div><button type="button" onClick={() => setPage(Math.max(1, effectivePage - 1))} disabled={effectivePage === 1} aria-label={t.previousPage}><ChevronLeft size={16} /></button><span>{t.page(effectivePage, pageCount)}</span><button type="button" onClick={() => setPage(Math.min(pageCount, effectivePage + 1))} disabled={effectivePage === pageCount} aria-label={t.nextPage}><ChevronRight size={16} /></button></div></footer>
           </div>
         </div>
         {selected ? (
