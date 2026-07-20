@@ -166,9 +166,10 @@ async function main() {
     console.log(`Pass 2 — deadlines: ${staleRisk.length} stale-risk listing(s) (budget left: ${Math.max(0, MAX_LLM_CALLS - llmCalls)} calls)`);
     const results = await mapPool(staleRisk, LLM_CONCURRENCY, async item => ({ id: item.id, patch: await checkDeadline(item) }));
     for (const r of results) {
-      if (r.patch) {
-        deadlinePatches[r.id] = { deadline: r.patch.deadline, deadlineDate: r.patch.deadlineDate, verifiedDate: r.patch.verifiedDate, note: r.patch.note };
-        console.log(`  ↻ DEADLINE ${r.id} → ${r.patch.deadline}${r.patch.deadlineDate ? ` (${r.patch.deadlineDate})` : ''}`);
+      const { patch } = r;
+      if (patch) {
+        deadlinePatches[r.id] = { deadline: patch.deadline, deadlineDate: patch.deadlineDate, verifiedDate: patch.verifiedDate, note: patch.note };
+        console.log(`  ↻ DEADLINE ${r.id} → ${patch.deadline}${patch.deadlineDate ? ` (${patch.deadlineDate})` : ''}`);
       }
     }
   } else {
