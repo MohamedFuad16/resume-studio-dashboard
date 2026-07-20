@@ -350,11 +350,14 @@ async function initPersistentStore() {
       try {
         const files = await fs.readdir(PROFILES_DIR);
         // Each profile file migrates to its own key — independent, run together.
-        await Promise.all(files.filter(f => f.endsWith('.json')).map(async file => {
+        const migrations = [];
+        for (const file of files) {
+          if (!file.endsWith('.json')) continue;
           const id = file.replace(/\.json$/, '');
-          const raw = await fs.readFile(path.join(PROFILES_DIR, file), 'utf8');
-          await store.setJson(profileKey(id), JSON.parse(raw));
-        }));
+          migrations.push(fs.readFile(path.join(PROFILES_DIR, file), 'utf8')
+            .then(raw => store.setJson(profileKey(id), JSON.parse(raw))));
+        }
+        await Promise.all(migrations);
       } catch (error) {
         if (error.code !== 'ENOENT') console.error('Could not migrate profile files:', error.message);
       }

@@ -44,10 +44,6 @@ export const internshipApi = {
   researchStatus: jobId => requestJson(`/api/internships/research-company/${encodeURIComponent(jobId)}`),
 };
 
-export const applicationApi = {
-  list: profile => (firestoreEnabled() ? fsData.listApplications(profile) : requestJson(`/api/applications?${profilePath(profile)}`)),
-  create: (profile, application) => (firestoreEnabled() ? fsData.createApplication(profile, application) : requestJson(`/api/applications?${profilePath(profile)}`, { method: 'POST', body: application })),
-};
 
 // Per-user AI settings (OpenRouter key + model slugs). Stored in Firestore when signed
 // in; falls back to localStorage for the no-auth path (no server round-trip needed —

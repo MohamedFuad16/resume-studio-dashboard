@@ -518,7 +518,7 @@ function CompanyResearchPanel({ company, t, isJa, job, results, error, onStart, 
         <div>
           <h3>{t.liveSearchTitle(company)}</h3>
           <p data-testid="company-research-status">{showPrompt ? t.liveSearchSub : searching ? phaseMsg : missingKey ? t.liveKeyMissing : error ? `${t.liveError} ${error}` : t.liveDone(results.length)}</p>
-          {searching && phase >= 2 && <p style={{ fontSize: '11px', color: 'var(--t3)', marginTop: '2px' }}>{t.researchSlow}</p>}
+          {searching && phase >= 2 && <p style={{ fontSize: '12px', color: 'var(--t3)', marginTop: '2px' }}>{t.researchSlow}</p>}
         </div>
         {missingKey ? (
           <button type="button" className="company-research-cta" data-testid="company-research-add-key" onClick={onOpenSettings}>
@@ -788,12 +788,16 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
     return () => window.clearInterval(timer);
   }, [researchJob?.status, t]);
 
+  // The debounce below reads the CURRENT research starter through a ref, so the
+  // timer effect's deps stay the three values that actually schedule it.
+  const startResearchRef = useRef(() => {});
+  useEffect(() => { startResearchRef.current = startCompanyResearch; });
   useEffect(() => {
     const key = companyQuery.toLowerCase();
     // Auto-search only companies NOT already in the catalog (avoid auto-spending on
     // catalog companies — the panel still offers a manual "Search official sources").
     if (!canLiveSearchCompany || hasCatalogTextMatch || autoResearchStarted.current.has(key)) return undefined;
-    const timer = window.setTimeout(() => startCompanyResearch(companyQuery, { auto: true }), 1100);
+    const timer = window.setTimeout(() => startResearchRef.current(companyQuery, { auto: true }), 1100);
     return () => window.clearTimeout(timer);
   }, [canLiveSearchCompany, hasCatalogTextMatch, companyQuery]);
 

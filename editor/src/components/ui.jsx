@@ -2,8 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { newItemId } from '../utils/helpers.js';
 
 /* ── Micro icon set ─────────────────────────────────────── */
-export const I = ({ n, s = 14, style }) => {
-  const d = {
+const ICON_PATHS = {
     menu:   <><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></>,
     user:   <><circle cx="12" cy="8" r="3.5"/><path d="M4 20c0-3.5 3.6-6 8-6s8 2.5 8 6"/></>,
     edu:    <><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></>,
@@ -29,25 +28,32 @@ export const I = ({ n, s = 14, style }) => {
     brain:  <><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></>,
     sun:    <><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></>,
     moon:   <><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></>,
-  };
-  return (
-    <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={style}>
-      {d[n]}
-    </svg>
-  );
 };
+
+export const I = ({ n, s = 14, style }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={style}>
+    {ICON_PATHS[n]}
+  </svg>
+);
 
 /* ── Toast ──────────────────────────────────────────────── */
 export function Toasts({ list, dismiss }) {
   return (
     <div className="toast-tray">
       {list.map(t => (
-        <div key={t.id} className={`toast ${t.type}`} onClick={() => dismiss(t.id)} data-testid={t.testId || (t.type === 'error' ? 'download-error-toast' : undefined)}>
+        <button
+          key={t.id}
+          type="button"
+          className={`toast ${t.type}`}
+          aria-label={`${t.message} — dismiss`}
+          onClick={() => dismiss(t.id)}
+          data-testid={t.testId || (t.type === 'error' ? 'download-error-toast' : undefined)}
+        >
           <I n={t.type === 'success' ? 'check' : t.type === 'error' ? 'x' : 'file'} s={12}
             style={{ color: t.type === 'success' ? 'var(--green)' : t.type === 'error' ? 'var(--err)' : 'var(--blue)', flexShrink: 0 }} />
           {t.message}
-        </div>
+        </button>
       ))}
     </div>
   );
@@ -104,7 +110,14 @@ export function Sec({ icon, label, count, children, open: init = false, testId, 
   return (
     <div className="sec">
       {!hideHeader && (
-        <div className="sec-hd" onClick={() => setOpen(o => !o)}>
+        <div
+          className="sec-hd"
+          role="button"
+          tabIndex={0}
+          aria-expanded={open}
+          onClick={() => setOpen(o => !o)}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o); } }}
+        >
           <span className="sec-icon"><I n={icon} s={13} /></span>
           <h2 className="sec-name" data-testid={testId} style={{ fontSize: '14px', fontWeight: '600', margin: 0 }}>{label}</h2>
           {count !== undefined && <span className="sec-badge">{count}</span>}
@@ -132,20 +145,21 @@ export function Inp({ label, value, onChange, placeholder, type = 'text', ...pro
    on every value change, and on input. Brand-new behavior → inline height is set
    imperatively; the namespaced `.autosize-textarea` class hides the scrollbar/resize
    handle (see CSS SPEC). A min-height floor is supplied by the caller. */
+const autoResize = el => {
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = `${el.scrollHeight}px`;
+};
+
 function AutoTextarea({ value, onChange, className = '', style, ...props }) {
   const ref = useRef(null);
-  const resize = el => {
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
-  };
-  useEffect(() => { resize(ref.current); }, [value]);
+  useEffect(() => { autoResize(ref.current); }, [value]);
   return (
     <textarea
       ref={ref}
       className={`autosize-textarea ${className}`.trim()}
       value={value || ''}
-      onChange={e => { onChange(e.target.value); resize(e.target); }}
+      onChange={e => { onChange(e.target.value); autoResize(e.target); }}
       style={style}
       {...props}
     />
@@ -220,6 +234,7 @@ export function MonthInput({ label, value, onChange, ongoingMode, isJa = false, 
         <input
           className="fi month-input"
           type="month"
+          aria-label={label || 'Month'}
           value={monthVal}
           placeholder={placeholder || ''}
           disabled={ongoingMode === 'present' && ongoingOn}
@@ -284,6 +299,7 @@ export function TagInput({ label, value, onChange, placeholder, suggestions = []
   const [open, setOpen] = useState(false);
   const ref = useRef();
   const inputRef = useRef();
+  const inputId = React.useId();
 
 
 
@@ -341,9 +357,11 @@ export function TagInput({ label, value, onChange, placeholder, suggestions = []
   return (
     <div className="f tag-inp-container tag-multiselect" ref={ref}>
       {label && <Lbl t={label} />}
-      <div
+      {/* A label, not a click handler: clicking anywhere in the box natively
+          focuses the input (which opens the dropdown via onFocus). */}
+      <label
         className={`tag-inp-box tag-ms-box ${open ? 'focus' : ''}`}
-        onClick={() => { setOpen(true); inputRef.current?.focus(); }}
+        htmlFor={inputId}
       >
         <div className="tag-pills tag-ms-pills">
           {tags.map((tag, i) => (
@@ -356,6 +374,7 @@ export function TagInput({ label, value, onChange, placeholder, suggestions = []
           ))}
           <input
             ref={inputRef}
+            id={inputId}
             type="text"
             className="tag-inp-field tag-ms-field"
             value={query}
@@ -374,16 +393,16 @@ export function TagInput({ label, value, onChange, placeholder, suggestions = []
         >
           <I n="chev" s={12} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
         </button>
-      </div>
+      </label>
       {open && (filteredSuggestions.length > 0 || (query.trim() && !tags.some(t => t.toLowerCase() === query.trim().toLowerCase()))) && (
-        <div className="tag-dropdown tag-ms-dropdown">
+        <div className="tag-dropdown tag-ms-dropdown" role="listbox" aria-label={label || 'Suggestions'}>
           {visibleSuggestions.map(s => (
-            <div key={s} className="tag-dropdown-item" onClick={() => addTag(s)}>
+            <div key={s} className="tag-dropdown-item" role="option" aria-selected={false} tabIndex={-1} onClick={() => addTag(s)}>
               {s}
             </div>
           ))}
           {query.trim() && !filteredSuggestions.some(s => s.toLowerCase() === query.trim().toLowerCase()) && !tags.some(t => t.toLowerCase() === query.trim().toLowerCase()) && (
-            <div className="tag-dropdown-item tag-dropdown-add" onClick={() => addTag(query)}>
+            <div className="tag-dropdown-item tag-dropdown-add" role="option" aria-selected={false} tabIndex={-1} onClick={() => addTag(query)}>
               Add &ldquo;{query}&rdquo;
             </div>
           )}
@@ -436,9 +455,9 @@ export function SuggestInput({ label, value, onChange, placeholder, suggestions 
         </button>
       </div>
       {open && filtered.length > 0 && (
-        <div className="tag-dropdown suggest-dropdown">
+        <div className="tag-dropdown suggest-dropdown" role="listbox" aria-label={label || 'Suggestions'}>
           {filtered.map(s => (
-            <div key={s} className="tag-dropdown-item" onClick={() => { onChange(s); setOpen(false); }}>
+            <div key={s} className="tag-dropdown-item" role="option" aria-selected={false} tabIndex={-1} onClick={() => { onChange(s); setOpen(false); }}>
               {s}
             </div>
           ))}

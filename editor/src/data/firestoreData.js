@@ -124,37 +124,6 @@ export async function saveTracker(id, tracker) {
 }
 
 // ── applications (whole array per profile; cover letter built server-side) ──
-export async function listApplications(id) {
-  const snap = await getDoc(appsDoc(id));
-  return snap.exists() ? (snap.data().items || []) : [];
-}
-
-export async function createApplication(id, application) {
-  const resume = await getProfile(id);
-  const built = await serverJson('/api/cover-letter', {
-    method: 'POST',
-    body: JSON.stringify({ resume, ...application }),
-  });
-  const record = {
-    fileName: built.fileName,
-    company: application.company,
-    jobTitle: application.jobTitle,
-    dateLogged: new Date().toISOString().slice(0, 10),
-    status: 'Applied / Logged via Web UI',
-    jobDescription: application.jobDescription,
-    notes: application.notes,
-    coverLetter: built.coverLetter,
-  };
-  const existing = await listApplications(id);
-  const next = [record, ...existing.filter(item => item.fileName !== record.fileName)];
-  await setDoc(appsDoc(id), { items: next, updatedAt: serverTimestamp() });
-  return { success: true, ...record };
-}
-
-// ── per-user settings (AI keys + models) ─────────────────────────
-// Stored at users/{uid}/settings/app. The OpenRouter key lives here (secured by the
-// owner-only rules) and is sent with research/chat requests (Phase 3), since the
-// server has no Admin SDK to read Firestore.
 export async function getSettings() {
   const snap = await getDoc(settingsDoc());
   return snap.exists() ? snap.data() : {};

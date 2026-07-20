@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import './index.css';
 import { apiUrl, profileApi, requestJson } from './api/client.js';
 import { debounce, newItemId, TEMPLATES } from './utils/helpers.js';
@@ -39,6 +39,10 @@ let _tid = 0;
 const HEURISTIC_LANGS = new Set(['javascript', 'typescript', 'python', 'java', 'c++', 'c#', 'rust', 'go', 'ruby', 'php', 'swift', 'kotlin', 'sql', 'html', 'css', 'bash', 'shell']);
 const HEURISTIC_FWKS = new Set(['react', 'node', 'express', 'next', 'vue', 'angular', 'svelte', 'django', 'flask', 'spring', 'laravel', 'tailwind', 'bootstrap']);
 const HEURISTIC_TOOLS = new Set(['git', 'docker', 'kubernetes', 'aws', 'gcp', 'azure', 'sqlite', 'mysql', 'postgresql', 'mongodb', 'redis', 'firebase', 'vite', 'webpack', 'npm', 'yarn']);
+
+// Shared style for the wizard's four "+ add bullet" buttons (hoisted: a fresh
+// object per render defeats React's style diffing; 12px keeps it readable).
+const WIZARD_ADD_BULLET_STYLE = { marginTop: '6px', fontSize: '12px', color: 'var(--b-focus)', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 };
 
 // URL ↔ active-profile helpers (pure window access — no component state).
 const getUrlProfile = () => {
@@ -557,7 +561,7 @@ export default function App() {
 
   // ── Profile management states & helpers ──────────────────
   const [profiles, setProfiles] = useState([]);
-  const [activeProfile, setActiveProfile] = useState(getUrlProfile());
+  const [activeProfile, setActiveProfile] = useState(getUrlProfile);
   // Same source the dashboard's "N roles tracked" pipeline reads, so the sidebar
   // badge can never disagree with the number shown on the page.
   const {
@@ -592,7 +596,7 @@ export default function App() {
   }, [toast]);
 
   // ── Auto-save ────────────────────────────────────────────
-  const saveData = useCallback(debounce(async (data, profileId) => {
+  const saveData = useMemo(() => debounce(async (data, profileId) => {
     setSave('saving');
     try {
       await profileApi.save(profileId, data);
@@ -775,16 +779,20 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Subscribe once; the handler reads the CURRENT profile/switcher through a
+  // ref so back/forward always acts on fresh state without re-subscribing.
+  const popStateRef = useRef(() => {});
   useEffect(() => {
-    const handlePopState = () => {
+    popStateRef.current = () => {
       const id = getUrlProfile();
-      if (id !== activeProfile) {
-        handleSwitchProfile(id, true);
-      }
+      if (id !== activeProfile) handleSwitchProfile(id, true);
     };
+  });
+  useEffect(() => {
+    const handlePopState = () => popStateRef.current();
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [activeProfile, template, compile]);
+  }, []);
 
   // Compile lazily: the PDF preview is only visible in the Editor view, so
   // compiling from the dashboard (where the app lands) wasted a full LaTeX run
@@ -1338,9 +1346,9 @@ export default function App() {
                 {typeof wizardStep === 'number' && (
                   <div className="wizard-progress-bar-container" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div className="wizard-progress-track" style={{ width: '120px', height: '6px', background: 'var(--b0)', borderRadius: '3px', overflow: 'hidden' }}>
-                      <div className="wizard-progress-fill" style={{ width: `${(wizardStep / 8) * 100}%`, height: '100%', background: 'var(--b-focus)', borderRadius: '3px', transition: 'width 0.2s' }} />
+                      <div className="wizard-progress-fill" style={{ width: '100%', height: '100%', background: 'var(--b-focus)', borderRadius: '3px', transform: `scaleX(${wizardStep / 8})`, transformOrigin: 'left', transition: 'transform 0.2s' }} />
                     </div>
-                    <span className="wizard-progress-text" style={{ fontSize: '10.5px', color: 'var(--t3)' }}>Step {wizardStep} of 8</span>
+                    <span className="wizard-progress-text" style={{ fontSize: '12px', color: 'var(--t3)' }}>Step {wizardStep} of 8</span>
                   </div>
                 )}
               </div>
@@ -1542,7 +1550,7 @@ export default function App() {
                             <div key={edu.id ?? edu.institution} className="wizard-item-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--card)', border: '1px solid var(--b0)', borderRadius: '8px' }}>
                               <div className="wic-info">
                                 <h5 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: '600' }}>{edu.institution || 'Unnamed Institution'}</h5>
-                                <p style={{ margin: 0, fontSize: '11.5px', color: 'var(--t3)' }}>{edu.degree || 'No Degree Specified'} ({edu.startDate || 'N/A'} - {edu.endDate || 'N/A'})</p>
+                                <p style={{ margin: 0, fontSize: '12px', color: 'var(--t3)' }}>{edu.degree || 'No Degree Specified'} ({edu.startDate || 'N/A'} - {edu.endDate || 'N/A'})</p>
                               </div>
                               <div className="wic-actions" style={{ display: 'flex', gap: '6px' }}>
                                 <button type="button" className="btn btn-sm" onClick={() => setEditingIndex(idx)}>Edit</button>
@@ -1662,7 +1670,7 @@ export default function App() {
                               </div>
                             ))}
                           </div>
-                          <button type="button" className="btn-add-bullet" style={{ marginTop: '6px', fontSize: '11px', color: 'var(--b-focus)', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }} onClick={() => {
+                          <button type="button" className="btn-add-bullet" style={WIZARD_ADD_BULLET_STYLE} onClick={() => {
                             const newList = [...wizardData.education];
                             newList[editingIndex].bullets = [...(newList[editingIndex].bullets || []), ''];
                             setWizardData({...wizardData, education: newList});
@@ -1715,7 +1723,7 @@ export default function App() {
                             <div key={exp.id ?? exp.company} className="wizard-item-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--card)', border: '1px solid var(--b0)', borderRadius: '8px' }}>
                               <div className="wic-info">
                                 <h5 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: '600' }}>{exp.company || 'Unnamed Company'}</h5>
-                                <p style={{ margin: 0, fontSize: '11.5px', color: 'var(--t3)' }}>{exp.role || 'No Role Specified'} ({exp.startDate || 'N/A'} - {exp.endDate || 'N/A'})</p>
+                                <p style={{ margin: 0, fontSize: '12px', color: 'var(--t3)' }}>{exp.role || 'No Role Specified'} ({exp.startDate || 'N/A'} - {exp.endDate || 'N/A'})</p>
                               </div>
                               <div className="wic-actions" style={{ display: 'flex', gap: '6px' }}>
                                 <button type="button" className="btn btn-sm" onClick={() => setEditingIndex(idx)}>Edit</button>
@@ -1835,7 +1843,7 @@ export default function App() {
                               </div>
                             ))}
                           </div>
-                          <button type="button" className="btn-add-bullet" style={{ marginTop: '6px', fontSize: '11px', color: 'var(--b-focus)', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }} onClick={() => {
+                          <button type="button" className="btn-add-bullet" style={WIZARD_ADD_BULLET_STYLE} onClick={() => {
                             const newList = [...wizardData.experience];
                             newList[editingIndex].bullets = [...(newList[editingIndex].bullets || []), ''];
                             setWizardData({...wizardData, experience: newList});
@@ -1888,7 +1896,7 @@ export default function App() {
                             <div key={proj.id ?? proj.title} className="wizard-item-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--card)', border: '1px solid var(--b0)', borderRadius: '8px' }}>
                               <div className="wic-info">
                                 <h5 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: '600' }}>{proj.title || 'Unnamed Project'}</h5>
-                                <p style={{ margin: 0, fontSize: '11.5px', color: 'var(--t3)' }}>{proj.tech || 'No Stack Specified'} ({proj.year || 'N/A'})</p>
+                                <p style={{ margin: 0, fontSize: '12px', color: 'var(--t3)' }}>{proj.tech || 'No Stack Specified'} ({proj.year || 'N/A'})</p>
                               </div>
                               <div className="wic-actions" style={{ display: 'flex', gap: '6px' }}>
                                 <button type="button" className="btn btn-sm" onClick={() => setEditingIndex(idx)}>Edit</button>
@@ -1963,7 +1971,7 @@ export default function App() {
                               </div>
                             ))}
                           </div>
-                          <button type="button" className="btn-add-bullet" style={{ marginTop: '6px', fontSize: '11px', color: 'var(--b-focus)', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }} onClick={() => {
+                          <button type="button" className="btn-add-bullet" style={WIZARD_ADD_BULLET_STYLE} onClick={() => {
                             const newList = [...wizardData.projects];
                             newList[editingIndex].bullets = [...(newList[editingIndex].bullets || []), ''];
                             setWizardData({...wizardData, projects: newList});
@@ -2065,7 +2073,7 @@ export default function App() {
                             <div key={act.id ?? act.title} className="wizard-item-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--card)', border: '1px solid var(--b0)', borderRadius: '8px' }}>
                               <div className="wic-info">
                                 <h5 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: '600' }}>{act.title || 'Unnamed Activity'}</h5>
-                                <p style={{ margin: 0, fontSize: '11.5px', color: 'var(--t3)' }}>{act.org || 'No Organization'} ({act.startDate || 'N/A'} - {act.endDate || 'N/A'})</p>
+                                <p style={{ margin: 0, fontSize: '12px', color: 'var(--t3)' }}>{act.org || 'No Organization'} ({act.startDate || 'N/A'} - {act.endDate || 'N/A'})</p>
                               </div>
                               <div className="wic-actions" style={{ display: 'flex', gap: '6px' }}>
                                 <button type="button" className="btn btn-sm" onClick={() => setEditingIndex(idx)}>Edit</button>
@@ -2152,7 +2160,7 @@ export default function App() {
                               </div>
                             ))}
                           </div>
-                          <button type="button" className="btn-add-bullet" style={{ marginTop: '6px', fontSize: '11px', color: 'var(--b-focus)', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }} onClick={() => {
+                          <button type="button" className="btn-add-bullet" style={WIZARD_ADD_BULLET_STYLE} onClick={() => {
                             const newList = [...wizardData.activities];
                             newList[editingIndex].bullets = [...(newList[editingIndex].bullets || []), ''];
                             setWizardData({...wizardData, activities: newList});
