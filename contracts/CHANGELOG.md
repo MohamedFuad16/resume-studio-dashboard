@@ -2,6 +2,32 @@
 
 Every entry: date · who · what changed · what the OTHER side must do.
 
+- **2026-07-20 · both · Tracker records are keyed by COMPANY + ROLE, not company
+  (SPEC-per-role-keying.md).** The drain kept one record per company, so repeated
+  applications to one firm collapsed into a single row that then lied about its
+  status: five Rakuten applications became one row reading "rejected" while three
+  were still live, and HENNGE's rejection + application + **interview** became one
+  row reading "rejected". Records are now `(companyKey, roleKey)`; synthetic ids
+  are `gmail-<companyKey>-<roleKey>`. A rejection email usually omits the role, so
+  a roleless action resolves to the company's most recently updated non-terminal
+  DRAIN-OWNED record (never a hand-added one) instead of spawning a phantom row.
+  Company keys now NFKC-normalize first — full-width Latin (`Ｓｋｙ株式会社`) folded
+  to an empty key and the company was dropped silently, interview included.
+  Company matching is exact-key equality over sorted collections; the old two-way
+  substring test over unordered iteration merged firms whose keys nest and
+  returned a different record between runs on identical input.
+  **Both clients implement the SAME spec — `contracts/SPEC-per-role-keying.md` is
+  the authority and is now tracked.** Web: `useGmailInbox.js` + `reapplyCooldown.js`
+  (commit 1f1250c). iOS: `GmailDrain.swift` (commit 4bc962b). Rules 6–8 were added
+  after review caught three defects: string-compared timestamps across mixed
+  offsets, a tie-break that read a randomly-generated id, and a path that could
+  stamp `source=gmail` onto a hand-added row and get it purged. **If you touch the
+  drain, read the spec first — divergence here corrupts shared user data and
+  neither client's own tests catch it.**
+  Existing rows keyed `gmail-<company>` do not match the new ids and want a
+  re-derive from the Gmail queue; do it FETCH-FIRST, never purge-then-refetch
+  (ADR-I-015).
+
 - **2026-07-20 · repo · Agentic toolkit checked in — `.claude/` + `scripts/`
   (ADR-S-003).** Four subagents, four skills, four hooks, and two verification
   batteries (`scripts/verify-web.sh`, `scripts/verify-ios.sh`) now live in the
