@@ -158,12 +158,14 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
     }
   };
 
+  // A hand-picked status PINS the record — the Gmail drain may enrich its
+  // details afterwards but never move its status again (ADR-S-004).
   const onStatusChange = (item, value) => {
     if (value === 'interview') {
       setInterviewPending(item);
       return;
     }
-    updateStatus(item, value);
+    updateStatus(item, value, { pin: true });
   };
 
   const onApply = item => {
@@ -182,7 +184,7 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
     const item = interviewPending;
     if (!item) return;
     const [date, time = ''] = String(value || '').trim().split(/[ T]/);
-    updateStatus(item, 'interview');
+    updateStatus(item, 'interview', { pin: true });
     if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       addMilestone(item.id, { kind: 'interview', date, time: time || null });
     }

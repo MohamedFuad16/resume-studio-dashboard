@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Bookmark, CalendarClock, CircleSlash, FilePenLine, Inbox, Send } from 'lucide-react';
+import { ArrowRight, Bookmark, CalendarClock, CircleSlash, FilePenLine, Inbox, Pin, Send } from 'lucide-react';
 import { APPLICATION_STATUSES, statusLabel, useApplicationTracker } from '../hooks/useApplicationTracker.js';
 import { useInternshipCatalog } from '../hooks/useInternshipCatalog.js';
 import { CompanyLogo } from './CompanyLogo.jsx';
@@ -64,15 +64,19 @@ export default function ApplicationsView({ isJa, activeProfile, onOpenRadar, onO
     [records, filter],
   );
 
+  // Picking a status here is the owner overruling the pipeline, so the write is
+  // PINNED: no Gmail drain may move that status again (ADR-S-004). Choosing
+  // "Not applied" deletes the record and tombstones its (company, role) pair, so
+  // a re-derive cannot resurrect it either.
   const onStatusChange = (item, value) => {
     if (value === 'interview') { setInterviewPending(item); return; }
-    updateStatus(item, value);
+    updateStatus(item, value, { pin: true });
   };
   const onInterviewConfirm = value => {
     const item = interviewPending;
     if (!item) return;
     const [date, time = ''] = String(value || '').trim().split(/[ T]/);
-    updateStatus(item, 'interview');
+    updateStatus(item, 'interview', { pin: true });
     if (/^\d{4}-\d{2}-\d{2}$/.test(date)) addMilestone(item.id, { kind: 'interview', date, time: time || null });
     setInterviewPending(null);
   };
@@ -127,7 +131,7 @@ export default function ApplicationsView({ isJa, activeProfile, onOpenRadar, onO
           const cooldown = cooldownForCompany(cooldownMap, record.company);
           return (
             <article className="application-row" key={record.internshipId}>
-              <span className="application-company"><CompanyLogo item={item} /><button type="button" className="application-company-trigger" onClick={() => setSelectedItem(item)} aria-label={isJa ? `${displayCompany(item, isJa)}の詳細を開く` : `Open details for ${displayCompany(item, isJa)}`}><b>{displayCompany(item, isJa)}{record.source === 'gmail' && <span className="src-gmail" title={isJa ? 'Gmailから追加' : 'Added from Gmail'}><GmailMark size={12} /></span>}</b><small>{displayRole(item.role || record.role, isJa)}{cooldown ? <span className="application-cooldown-tag"><CalendarClock size={11} />{cooldownLabel(cooldown, isJa)}</span> : null}</small></button></span>
+              <span className="application-company"><CompanyLogo item={item} /><button type="button" className="application-company-trigger" onClick={() => setSelectedItem(item)} aria-label={isJa ? `${displayCompany(item, isJa)}の詳細を開く` : `Open details for ${displayCompany(item, isJa)}`}><b>{displayCompany(item, isJa)}{record.source === 'gmail' && <span className="src-gmail" title={isJa ? 'Gmailから追加' : 'Added from Gmail'}><GmailMark size={12} /></span>}{record.statusPinned && <span className="src-pinned" title={isJa ? '手動で設定した状況 — Gmailの同期で変更されません' : 'Status set by you — Gmail sync will not change it'}><Pin size={12} /></span>}</b><small>{displayRole(item.role || record.role, isJa)}{cooldown ? <span className="application-cooldown-tag"><CalendarClock size={11} />{cooldownLabel(cooldown, isJa)}</span> : null}</small></button></span>
               <span>{displayValue(record.location, isJa)}</span>
               <span className="application-deadline">{formatDisplayDeadline(record.deadline, isJa)}</span>
               <select value={record.status} onChange={event => onStatusChange(item, event.target.value)} aria-label={isJa ? `${record.company}の応募状況` : `Status for ${record.company}`}>

@@ -32,9 +32,31 @@ export const profileApi = {
   remove: profile => (firestoreEnabled() ? fsData.removeProfile(profile) : requestJson(`/api/profiles/${encodeURIComponent(profile)}`, { method: 'DELETE' })),
 };
 
+// The tracker travels as a DOCUMENT — `{ data, tombstones }` — because the
+// deleted-pair tombstone list lives beside the map and is written with it
+// (contracts/tracker-record.md "Tombstones").
+//
+// Firestore stores both fields in one document. The legacy KV route
+// (`/api/tracker`) carries only the map: its body shape is a shared contract
+// that iOS's Firestore path never touches, and widening it would be a server
+// contract change for a path that exists only for no-auth local dev and the E2E
+// suite. So on that path tombstones persist in localStorage, per profile — the
+// same fallback shape `settingsApi` already uses. It never reaches another
+// client, so the two implementations cannot diverge over it.
+const LS_TOMBSTONES_KEY = profile => `internship-portal:tombstones:${profile}`;
+function localTombstones(profile) {
+  try { return JSON.parse(localStorage.getItem(LS_TOMBSTONES_KEY(profile)) || '[]'); } catch { return []; }
+}
 export const trackerApi = {
-  get: profile => (firestoreEnabled() ? fsData.getTracker(profile) : requestJson(`/api/tracker?${profilePath(profile)}`)),
-  save: (profile, tracker) => (firestoreEnabled() ? fsData.saveTracker(profile, tracker) : requestJson(`/api/tracker?${profilePath(profile)}`, { method: 'POST', body: tracker })),
+  get: profile => (firestoreEnabled()
+    ? fsData.getTracker(profile)
+    : requestJson(`/api/tracker?${profilePath(profile)}`)
+      .then(data => ({ data, tombstones: localTombstones(profile) }))),
+  save: (profile, tracker, tombstones = []) => {
+    if (firestoreEnabled()) return fsData.saveTracker(profile, tracker, tombstones);
+    try { localStorage.setItem(LS_TOMBSTONES_KEY(profile), JSON.stringify(tombstones || [])); } catch { /* ignore */ }
+    return requestJson(`/api/tracker?${profilePath(profile)}`, { method: 'POST', body: tracker });
+  },
 };
 
 export const internshipApi = {

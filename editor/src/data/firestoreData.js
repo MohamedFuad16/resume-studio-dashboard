@@ -113,13 +113,28 @@ export async function removeAllUserData() {
 }
 
 // ── tracker (whole-blob per profile) ──────────────────────────────
+// The document holds BOTH the tracker map and the per-profile tombstone list —
+// deleted (companyKey, roleKey) pairs a Gmail drain must never re-create:
+//
+//   users/{uid}/trackers/{profileId} { data: <tracker map>, tombstones: [...] }
+//
+// The path is fixed by contracts/tracker-record.md ("User truth outranks the
+// pipeline") and iOS reads the same document, so the field name is load-bearing.
+// One `setDoc` writes both: a deletion that persisted the record removal but not
+// its tombstone would be undone by the next drain.
 export async function getTracker(id) {
   const snap = await getDoc(trackerDoc(id));
-  return snap.exists() ? (snap.data().data || {}) : {};
+  if (!snap.exists()) return { data: {}, tombstones: [] };
+  const doc = snap.data();
+  return { data: doc.data || {}, tombstones: Array.isArray(doc.tombstones) ? doc.tombstones : [] };
 }
 
-export async function saveTracker(id, tracker) {
-  await setDoc(trackerDoc(id), { data: tracker || {}, updatedAt: serverTimestamp() });
+export async function saveTracker(id, tracker, tombstones = []) {
+  await setDoc(trackerDoc(id), {
+    data: tracker || {},
+    tombstones: Array.isArray(tombstones) ? tombstones : [],
+    updatedAt: serverTimestamp(),
+  });
   return { ok: true };
 }
 

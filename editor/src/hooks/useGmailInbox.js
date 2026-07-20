@@ -5,6 +5,9 @@ import { useInternshipCatalog } from './useInternshipCatalog.js';
 import {
   addMonths, normalizeCompany, roleKey, gmailRecordId, sessionKeyFor, GENERAL_ROLE,
 } from '../utils/reapplyCooldown.js';
+import {
+  drainOwns, instantOf, isPinned, tombstoneGate,
+} from '../utils/trackerTruth.js';
 
 const POLL_MS = 90000;
 const KIND_TO_STATUS = { applied: 'applied', rejected: 'rejected', interview: 'interview', offer: 'applied' };
@@ -32,37 +35,15 @@ const byId = (items, idOf) => (items || []).toSorted((a, b) => compareIds(String
 // the stable identity — see `trackerKey` below.
 const byTrackerKey = entries => (entries || []).toSorted((a, b) => compareIds(String(a[0]), String(b[0])));
 
-/**
- * §6 — `updatedAt` is compared as an INSTANT, never as a string.
- *
- * Records carry whatever the writing client stamped: iOS writes
- * `ISO8601DateFormatter.flexible` output (`+09:00`), the drain writes
- * `action.receivedAt` straight off the wire (UTC `Z`). Lexicographically
- * `2026-07-19T23:00:00+09:00` sorts AFTER `2026-07-19T15:30:00Z` even though it
- * is the EARLIER instant — so a string compare lands a role-less rejection on
- * the wrong application, marking a dead one rejected twice while the live one
- * still reads "applied". Silent, and exactly what §3 exists to prevent.
- *
- * An unparseable stamp becomes the EPOCH (oldest), never a string fallback: an
- * unreadable value must not be able to outrank a real one.
- */
-const instantOf = value => {
-  const t = Date.parse(String(value ?? ''));
-  return Number.isNaN(t) ? 0 : t;
-};
+// §6 — `updatedAt` is compared as an INSTANT, never as a string; and §8 — the
+// records the DRAIN owns (role-less resolution never captures a hand-added row,
+// and `source` is never rewritten on one). Both live in trackerTruth.js, shared
+// with the tracker store so the pin/tombstone rules and the drain read the same
+// definitions. See that module for why an unparseable stamp becomes the epoch.
 
-/**
- * §8 — records the DRAIN owns. Rule 3 hunts for any record of the company and
- * the caller then stamps it `source: 'gmail'`; applied to a row the user typed
- * by hand that flips it to Gmail-derived, and the next rebuild purge deletes a
- * row Gmail cannot re-derive. So role-less resolution only ever considers
- * drain-owned records, and `source` is never rewritten on the rest.
- */
-const drainOwns = (trackerKey, record) =>
-  record?.source === 'gmail' || String(trackerKey || '').startsWith('gmail-');
-
-// Stable empty seed for the entries ref (see useGmailInbox).
+// Stable empty seeds for the refs the drain reads (see useGmailInbox).
 const EMPTY_ENTRIES = [];
+const EMPTY_TOMBSTONES = [];
 
 // Most recently updated candidate; on an equal `updatedAt` the LOWEST TRACKER
 // KEY wins (§7). The tie-break is the tracker dictionary key — stable, and
@@ -103,6 +84,11 @@ const baseFromRecord = (trackerKey, record) => ({
   _status: record.status,
   _updatedAt: record.updatedAt || '',
   _owned: drainOwns(trackerKey, record),
+  // The OWNER set this status by hand — the drain may enrich its details but
+  // must never move its status, stamps or milestones (ADR-S-004). The guard is
+  // enforced again inside the tracker store, so this flag only decides what the
+  // drain bothers to do (chiefly: skip the interview milestone).
+  _pinned: isPinned(record),
 });
 
 /**
@@ -162,7 +148,7 @@ function resolveRolelessTarget(companyKey, session, entries) {
 export function useGmailInbox(profile) {
   // The tracker OBJECT, not the flattened `records` array: §7 tie-breaks on the
   // tracker dictionary KEY, and only the object carries it.
-  const { tracker, updateStatus, addMilestone } = useApplicationTracker(profile);
+  const { tracker, tombstones, updateStatus, addMilestone } = useApplicationTracker(profile);
   const { catalog } = useInternshipCatalog();
   const [justApplied, setJustApplied] = useState([]);
   // Seeded by the effect below, not by an initializer: an eager
@@ -174,8 +160,10 @@ export function useGmailInbox(profile) {
   // Keep the latest values for the async drain without retriggering it. Written
   // in an effect (not during render): React may replay/discard render work, and
   // the drain only reads these after commit anyway.
+  const tombstonesRef = useRef(EMPTY_TOMBSTONES);
   useEffect(() => { entriesRef.current = Object.entries(tracker || {}); }, [tracker]);
   useEffect(() => { catalogRef.current = catalog; }, [catalog]);
+  useEffect(() => { tombstonesRef.current = tombstones || EMPTY_TOMBSTONES; }, [tombstones]);
 
   const applyAction = useCallback((action, session) => {
     const status = KIND_TO_STATUS[action.kind];
@@ -204,12 +192,27 @@ export function useGmailInbox(profile) {
       // role-less email in the same drain lands on the same record.
       if (target) { key = target.key; base = target.base; session.set(key, base); }
     }
+    let lift = null;
     if (!base) {
       // §4 — EXACT companyKey equality, never a substring test (substrings merge
       // genuinely different companies whose keys nest), over a collection sorted
       // by id so repeated runs over the same data resolve identically.
       const existing = byTrackerKey(entriesRef.current)
         .find(([, r]) => norm(r.company) === companyNeedle && roleKey(r.role) === actionRole);
+      if (!existing) {
+        // TOMBSTONES (ADR-S-004) — this branch is about to CREATE a record, so
+        // it is exactly where the deleted-pair list is consulted. The owner
+        // deleted this (company, role); a re-derive must not resurrect it. Only
+        // re-applying lifts it: an `applied` action with evidence NEWER than the
+        // tombstone. `lift` is passed to the write below so the tombstone
+        // removal and the re-creation land in ONE save.
+        const gate = tombstoneGate(tombstonesRef.current, companyNeedle, actionRole, action);
+        if (gate === 'skip') return null;
+        // Carry the GATED keys to the write: a role-less action stores
+        // `role: 'Application'` on the record while its tombstone is keyed
+        // `general`, so re-deriving the pair at write time would miss it.
+        if (gate === 'lift') lift = { companyKey: companyNeedle, roleKey: actionRole };
+      }
       // A role-carrying action NEVER fuzzy-matches another role ("TECH Camp" vs
       // "TECH Camp 2026" are different applications) — it creates the record if
       // absent. The catalog listing must match BOTH keys for the same reason:
@@ -243,8 +246,13 @@ export function useGmailInbox(profile) {
 
     // Don't downgrade a terminal outcome (a rejection already applied this drain
     // wins over a later-processed application). Interview milestones still land.
+    //
+    // A PINNED record short-circuits all of it: the owner's status stands, and
+    // the session copy keeps it too, so a later role-less action in the same
+    // drain orders candidates on the owner's truth rather than on a status this
+    // drain pretended to set (ADR-S-004).
     const rank = STATUS_RANK[status] ?? 0;
-    const shouldSetStatus = base._rank == null || rank >= base._rank;
+    const shouldSetStatus = !base._pinned && (base._rank == null || rank >= base._rank);
     if (shouldSetStatus) { base._rank = rank; base._status = status; }
     const persistStatus = base._status || status;
     // The real email date for this event → per-status timestamp, so "when
@@ -257,7 +265,7 @@ export function useGmailInbox(profile) {
     // Compared as INSTANTS (§6) — `eventAt` is always UTC `Z` while a stored
     // `updatedAt` may carry `+09:00`, and a string compare gets the order wrong.
     if (eventAt && instantOf(eventAt) > instantOf(base._updatedAt)) base._updatedAt = eventAt;
-    const { _rank, _status, _updatedAt, _owned, ...cleanBase } = base;
+    const { _rank, _status, _updatedAt, _owned, _pinned, ...cleanBase } = base;
     const stampKey = { applied: 'appliedAt', rejected: 'rejectedAt', interview: 'interviewAt', offer: 'offerAt' }[action.kind];
     // §8 — `source` is stamped ONLY on a record the drain created. Rewriting it
     // on a hand-added row would mark it Gmail-derived, and the next rebuild
@@ -286,8 +294,16 @@ export function useGmailInbox(profile) {
     // Always persist — even when this email doesn't advance the status, its
     // timestamp (e.g. an application email arriving after the record is already
     // rejected, during a backfill) must still be recorded on the record.
-    if (persistStatus) updateStatus(internship, persistStatus);
-    if (action.interview?.date) {
+    //
+    // `fromDrain` is what makes the pin binding: against a pinned record the
+    // store degrades this write to detail enrichment only — no status, no
+    // stamps, no eventAt, no milestones — while still round-tripping the rest.
+    // `lift` removes the tombstone this action just earned the right to lift, in
+    // the same save that re-creates the record.
+    if (persistStatus) updateStatus(internship, persistStatus, { fromDrain: true, lift });
+    // A pinned record's milestones are the owner's too — a drained interview
+    // must not appear on a record whose status they set by hand.
+    if (!_pinned && action.interview?.date) {
       addMilestone(internship.id, { id: `gmail-${action.gmailMessageId}`, kind: 'interview', date: action.interview.date, time: action.interview.time || null, title: `Interview — ${action.company}` });
     }
     return { id: internship.id, company: action.company, kind: shouldSetStatus ? action.kind : null };
