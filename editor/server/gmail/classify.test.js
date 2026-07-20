@@ -19,6 +19,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveKind, internshipEvidenceHolds, isBulkMail } from './classify.js';
+import { admitsCarriedDecision, provesInternshipApplication, companyKey } from './sync.js';
 
 // ── The four defects of 2026-07-20 ──────────────────────────────────────────
 
@@ -245,6 +246,105 @@ test('the JA rejections that were dropped genuinely carry no internship evidence
     internshipEvidenceHolds('新卒通年インターン', `${ABEJA_CONFIRMATION.subject} ${ABEJA_CONFIRMATION.body}`),
     true,
   );
+});
+
+// ── The carry-forward: a decision admitted on a PRIOR application ───────────
+//
+// The gate that ABEJA and AICE actually failed. Their rejections are correctly
+// read as rejections (above) and still carry no internship evidence (above), so
+// something else has to admit them — or the tracker stays frozen at "applied".
+//
+// That something is the server's OWN memory: the set of companies for which
+// this profile has already had an internship `applied`/`offer` queued, stored
+// on the connection record beside processedMessageIds. It is never a read of
+// the owner's tracker — that lives in client-direct Firestore and the server
+// holds no user data (CLAUDE.md rule 4). The previous implementation read a
+// `tracker:{profile}` KV key that is always empty in production, which is why
+// carriedInternship was 0 on every live run.
+
+// The verdicts the classifier produces for the two mails, reduced to the fields
+// the gate reads. `isInternship` is post-quote-check: false on both rejections
+// (proved by the evidence test above), true on the confirmation.
+const APPLIED_VERDICT = { kind: 'applied', company: '株式会社ABEJA', isInternship: true };
+const REJECTION_VERDICT = { kind: 'rejected', company: '株式会社ABEJA', isInternship: false };
+
+test('a decision with no internship evidence is admitted after a prior application', () => {
+  const seen = new Set();
+  // Cold: nothing has ever been applied to. The rejection must still drop.
+  assert.equal(admitsCarriedDecision(REJECTION_VERDICT, seen), false);
+
+  // The application confirmation goes through — it carries real, quoted
+  // internship evidence — and the server remembers the company.
+  assert.equal(provesInternshipApplication(APPLIED_VERDICT), true);
+  seen.add(companyKey(APPLIED_VERDICT.company));
+
+  // Now the very same rejection is admitted, on the earlier mail's evidence.
+  assert.equal(admitsCarriedDecision(REJECTION_VERDICT, seen), true);
+});
+
+test('a company never seen applying to an internship is still dropped', () => {
+  // The gig rejections the evidence gate exists to refuse. Nothing about the
+  // carry-forward may let these in.
+  const seen = new Set([companyKey('AICE株式会社')]);
+  for (const company of ['micro1', 'Turing', '5CA']) {
+    assert.equal(admitsCarriedDecision({ kind: 'rejected', company, isInternship: false }, seen), false);
+  }
+});
+
+test('the carry-forward matches EXACT keys, never substrings', () => {
+  // SPEC-per-role-keying §4. A substring test would admit a rejection from
+  // "AICE Robotics" (or from "AI") on the strength of an AICE application.
+  const seen = new Set([companyKey('AICE株式会社')]);
+  assert.equal(admitsCarriedDecision({ kind: 'rejected', company: 'AICE', isInternship: false }, seen), true);
+  for (const impostor of ['AICE Robotics', 'AI', 'AICE Holdings', 'MyAICE']) {
+    assert.equal(
+      admitsCarriedDecision({ kind: 'rejected', company: impostor, isInternship: false }, seen),
+      false,
+      `admitted on a substring match: ${impostor}`,
+    );
+  }
+});
+
+test('corporate-suffix forms of one company share a key', () => {
+  // 株式会社enechain and enechain are the SAME company and must not produce two
+  // records — nor two entries in the remembered set.
+  assert.equal(companyKey('株式会社enechain'), companyKey('enechain'));
+  assert.equal(companyKey('株式会社カナリー'), companyKey('カナリー'));
+  // …and a purely-Japanese name must never normalize to '' (an empty key would
+  // match everything, or nothing, depending on the caller).
+  assert.notEqual(companyKey('株式会社カナリー'), '');
+});
+
+test('only a proven internship application teaches the set', () => {
+  // The set can never be self-fulfilling: a decision admitted BY the gate has
+  // isInternship=false and so adds nothing back.
+  assert.equal(provesInternshipApplication(REJECTION_VERDICT), false);
+  assert.equal(provesInternshipApplication({ kind: 'applied', company: 'X', isInternship: false }), false);
+  assert.equal(provesInternshipApplication({ kind: 'interview', company: 'X', isInternship: true }), false);
+  assert.equal(provesInternshipApplication({ kind: 'applied', company: '', isInternship: true }), false);
+  assert.equal(provesInternshipApplication({ kind: 'offer', company: 'X', isInternship: true }), true);
+});
+
+test('an application admits a rejection processed later in the SAME run', () => {
+  // The fresh-backfill case: no persisted set at all, both mails in one scan.
+  // sync.js processes oldest-first so the confirmation is seen first; this is
+  // that sequence, and it is the reason ABEJA/AICE recover on a 90-day backfill.
+  const seen = new Set(); // nothing persisted
+  const run = [APPLIED_VERDICT, REJECTION_VERDICT]; // oldest → newest
+  const admitted = [];
+  for (const verdict of run) {
+    if (verdict.isInternship || admitsCarriedDecision(verdict, seen)) {
+      admitted.push(verdict.kind);
+      if (provesInternshipApplication(verdict)) seen.add(companyKey(verdict.company));
+    }
+  }
+  assert.deepEqual(admitted, ['applied', 'rejected']);
+
+  // …and reversed (newest-first, the order Gmail returns) it does NOT work —
+  // which is what makes the .reverse() in sync.js load-bearing rather than
+  // cosmetic. If this ever passes, the ordering guarantee has been lost.
+  const seenReversed = new Set();
+  assert.equal(admitsCarriedDecision(REJECTION_VERDICT, seenReversed), false);
 });
 
 // ── The bulk-mail guard is untouched ────────────────────────────────────────

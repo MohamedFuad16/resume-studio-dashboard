@@ -10,6 +10,10 @@ import { buildSeedCatalog } from '../seeds/catalog.js';
 const MIN_CONFIDENCE = Number(process.env.GMAIL_MIN_CONFIDENCE || 0.6);
 const MAX_MESSAGES_PER_SYNC = Number(process.env.GMAIL_MAX_MESSAGES_PER_SYNC || 25);
 const PROCESSED_CAP = 500;
+// Same shape and the same reason as PROCESSED_CAP: the connection record is a
+// KV blob and must not grow without bound. Insertion-ordered, so slice(-CAP)
+// keeps the most recently seen companies.
+const INTERNSHIP_COMPANY_CAP = 500;
 let counter = 0;
 
 // Backfill uses a keyword search (EN + JA) so application mail surfaces regardless
@@ -59,15 +63,42 @@ const isResolvableCompany = (names, company) => {
   return Boolean(needle) && names.some(n => n.includes(needle) || needle.includes(n));
 };
 
-// Every company the tracker already holds a record for, normalized.
-async function trackedCompanyNames(store, profile) {
-  const tracker = await store.getJson(`tracker:${profile}`, {}).catch(() => ({}));
-  return new Set(Object.values(tracker && typeof tracker === 'object' ? tracker : {})
-    .map(rec => norm(rec?.company)).filter(Boolean));
+// A DECISION about an application we have already seen. See the gate below.
+export const DECISION_KINDS = new Set(['rejected', 'interview', 'offer']);
+
+// The canonical company key used by the two gates below. Exported so the tests
+// can assert on the same function the sync uses.
+export const companyKey = norm;
+
+// Does queueing this verdict PROVE, on the mail's own words, that the owner
+// applied to an internship at this company? Only a proven-internship
+// application or offer counts: `isInternship` has already survived the quote
+// check in classify.js, so this can never be self-fulfilling — a decision
+// admitted by the gate below has isInternship=false and adds nothing.
+export function provesInternshipApplication(verdict) {
+  return Boolean(verdict?.isInternship && verdict?.company)
+    && (verdict.kind === 'applied' || verdict.kind === 'offer');
 }
 
-// A DECISION about an application already in the tracker. See the gate below.
-const DECISION_KINDS = new Set(['rejected', 'interview', 'offer']);
+// The gate. A decision (rejected/interview/offer) about a company for which
+// THIS profile has previously emitted an internship application is admitted
+// even though the decision mail itself carries no internship evidence.
+//
+// `internshipCompanies` is a Set of canonical company keys the SERVER has
+// itself queued an internship `applied`/`offer` for — never a read of the
+// owner's tracker. The tracker is client-direct Firestore (`users/{uid}/
+// trackers/{profileId}`) and the server deliberately holds no user data
+// (CLAUDE.md rule 4, contracts/README.md "the one data rule"); the old
+// `tracker:{profile}` KV read was of a store that is essentially always empty,
+// which is why carriedInternship was 0 on every run.
+//
+// Matched on EXACT normalized company equality, never a substring test
+// (SPEC-per-role-keying §4).
+export function admitsCarriedDecision(verdict, internshipCompanies) {
+  if (!DECISION_KINDS.has(verdict?.kind) || !verdict?.company) return false;
+  const key = companyKey(verdict.company);
+  return Boolean(key) && internshipCompanies.has(key);
+}
 
 export async function syncProfile(store, profile, opts = {}) {
   const conn = await getConnection(store, profile);
@@ -107,7 +138,14 @@ export async function syncProfile(store, profile, opts = {}) {
   const processed = new Set(conn.processedMessageIds || []);
   // Backfill is a deliberate one-time rescan: ignore the processed list (the
   // queue dedupes by message:kind), so a scan that ran misconfigured can rerun.
-  const fresh = (backfillDays > 0 ? messageIds : messageIds.filter(id => !processed.has(id))).slice(0, cap);
+  // Gmail lists newest-first, and the cap must keep the most RECENT messages —
+  // but the carry-forward below needs the application confirmation to be seen
+  // BEFORE the decision it admits. So cap first, then reverse: oldest-first
+  // processing, same window of mail. (Queue order is irrelevant to the client,
+  // which sorts by receivedAt before applying — normalization.md §4.)
+  const fresh = (backfillDays > 0 ? messageIds : messageIds.filter(id => !processed.has(id)))
+    .slice(0, cap)
+    .reverse();
 
   const actions = [];
   // Why messages were dropped, as COUNTS ONLY — no subjects, no senders, no quotes.
@@ -121,7 +159,13 @@ export async function syncProfile(store, profile, opts = {}) {
   let carriedInternship = 0;
   const enrichedByCompany = new Map();
   let resolvableNames = null; // loaded lazily on the first enrichment candidate
-  let trackedNames = null;    // loaded lazily on the first decision without evidence
+  // Every company this profile has EVER had an internship application queued
+  // for, seeded from the connection record so it survives restarts, and added
+  // to as this run goes so an application can admit a decision processed later
+  // in the SAME run (the fresh-backfill case: both mails arrive together).
+  const internshipCompanies = new Set(
+    (Array.isArray(conn.internshipCompanies) ? conn.internshipCompanies : []).filter(Boolean),
+  );
   for (const id of fresh) {
     let message;
     try { message = await getMessage(token, id); } catch { processed.add(id); dropped.fetchFailed++; continue; }
@@ -148,17 +192,17 @@ export async function syncProfile(store, profile, opts = {}) {
     // notInternship and the tracker sat frozen at "applied" — the application
     // confirmation had been ingested, its outcome never was.
     //
-    // Their internship-ness was already PROVEN, by the confirmation mail that
-    // created the record (「＜新卒通年インターン＞…応募が完了しました」). So a
-    // decision about a company the tracker already holds is admitted on that
-    // earlier evidence. This does not loosen the gate: a company the owner never
-    // applied to as an internship still has no record, so a gig rejection is
-    // dropped exactly as before. Matched on EXACT normalized company equality,
-    // never a substring test (SPEC-per-role-keying §4).
+    // Their internship-ness was already PROVEN, by the confirmation mail this
+    // very server queued (「＜新卒通年インターン＞…応募が完了しました」). So a
+    // decision about a company this profile has already applied to as an
+    // internship is admitted on that earlier evidence — remembered server-side
+    // (see admitsCarriedDecision), not read out of the owner's Firestore.
+    //
+    // This does not loosen the gate: a company never seen applying to an
+    // internship is not in the set, so a gig rejection is dropped exactly as
+    // before.
     if (!verdict.isInternship) {
-      if (!DECISION_KINDS.has(verdict.kind) || !verdict.company) { dropped.notInternship++; continue; }
-      if (!trackedNames) trackedNames = await trackedCompanyNames(store, profile);
-      if (!trackedNames.has(norm(verdict.company))) { dropped.notInternship++; continue; }
+      if (!admitsCarriedDecision(verdict, internshipCompanies)) { dropped.notInternship++; continue; }
       carriedInternship++;
     }
     if (verdict.confidence < MIN_CONFIDENCE) { dropped.lowConfidence++; continue; }
@@ -177,6 +221,16 @@ export async function syncProfile(store, profile, opts = {}) {
         enrichedByCompany.set(key, isResolvableCompany(resolvableNames, verdict.company) ? null : await enrichCompany(verdict.company, verdict.role));
       }
       enrichment = enrichedByCompany.get(key);
+    }
+
+    // Remember, for this profile, that this company is one the owner applied to
+    // as an internship — the only thing that ever opens the gate above. Recorded
+    // here, next to the push, so what the server REMEMBERS is exactly what it
+    // QUEUED. Re-adding moves the key to the end of the insertion order, so the
+    // cap below evicts the least recently seen company first.
+    if (provesInternshipApplication(verdict)) {
+      const key = companyKey(verdict.company);
+      if (key) { internshipCompanies.delete(key); internshipCompanies.add(key); }
     }
 
     actions.push({
@@ -209,6 +263,7 @@ export async function syncProfile(store, profile, opts = {}) {
     lastSyncAt: new Date().toISOString(),
     lastError: null,
     processedMessageIds: [...processed].slice(-PROCESSED_CAP),
+    internshipCompanies: [...internshipCompanies].slice(-INTERNSHIP_COMPANY_CAP),
   });
 
   // A backfill outlives the request that starts it (the gateway gives up at 240s),
