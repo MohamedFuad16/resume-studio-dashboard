@@ -27,26 +27,70 @@ const norm = normalizeCompany;
 // `<`, and a locale-aware collation would disagree with it on the non-ASCII ids
 // a Japanese company name produces.
 const compareIds = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
-const byId = (items, idOf) => [...(items || [])].sort((a, b) => compareIds(String(idOf(a)), String(idOf(b))));
+const byId = (items, idOf) => (items || []).toSorted((a, b) => compareIds(String(idOf(a)), String(idOf(b))));
+// Tracker entries `[key, record]` in deterministic key order (§4/§7). The KEY is
+// the stable identity — see `trackerKey` below.
+const byTrackerKey = entries => (entries || []).toSorted((a, b) => compareIds(String(a[0]), String(b[0])));
 
-// Most recently updated candidate; on an equal `updatedAt` the LOWEST record id
-// wins. The tie-break lives in the comparator rather than relying on sort
-// stability — neither Swift's sort nor every JS engine documents it (§4, and the
-// 2026-07-20 parity bulletin).
+/**
+ * §6 — `updatedAt` is compared as an INSTANT, never as a string.
+ *
+ * Records carry whatever the writing client stamped: iOS writes
+ * `ISO8601DateFormatter.flexible` output (`+09:00`), the drain writes
+ * `action.receivedAt` straight off the wire (UTC `Z`). Lexicographically
+ * `2026-07-19T23:00:00+09:00` sorts AFTER `2026-07-19T15:30:00Z` even though it
+ * is the EARLIER instant — so a string compare lands a role-less rejection on
+ * the wrong application, marking a dead one rejected twice while the live one
+ * still reads "applied". Silent, and exactly what §3 exists to prevent.
+ *
+ * An unparseable stamp becomes the EPOCH (oldest), never a string fallback: an
+ * unreadable value must not be able to outrank a real one.
+ */
+const instantOf = value => {
+  const t = Date.parse(String(value ?? ''));
+  return Number.isNaN(t) ? 0 : t;
+};
+
+/**
+ * §8 — records the DRAIN owns. Rule 3 hunts for any record of the company and
+ * the caller then stamps it `source: 'gmail'`; applied to a row the user typed
+ * by hand that flips it to Gmail-derived, and the next rebuild purge deletes a
+ * row Gmail cannot re-derive. So role-less resolution only ever considers
+ * drain-owned records, and `source` is never rewritten on the rest.
+ */
+const drainOwns = (trackerKey, record) =>
+  record?.source === 'gmail' || String(trackerKey || '').startsWith('gmail-');
+
+// Stable empty seed for the entries ref (see useGmailInbox).
+const EMPTY_ENTRIES = [];
+
+// Most recently updated candidate; on an equal `updatedAt` the LOWEST TRACKER
+// KEY wins (§7). The tie-break is the tracker dictionary key — stable, and
+// already the sort key — never a derived `record.id`: iOS builds that as
+// `internshipId ?? UUID().uuidString`, so a record stored without
+// `internshipId` yields a FRESH id on every evaluation, making this comparator
+// non-deterministic inside the very function §4 exists to make deterministic.
+// The tie-break lives in the comparator rather than relying on sort stability —
+// neither Swift's sort nor every JS engine documents it.
 const mostRecent = candidates =>
   candidates.reduce((best, c) => {
     if (!best) return c;
-    const at = String(c.updatedAt || '');
-    const bt = String(best.updatedAt || '');
+    const at = instantOf(c.updatedAt);
+    const bt = instantOf(best.updatedAt);
     if (at !== bt) return at > bt ? c : best;
-    return compareIds(String(c.base.id), String(best.base.id)) < 0 ? c : best;
+    return compareIds(c.trackerKey, best.trackerKey) < 0 ? c : best;
   }, null);
 
 // A tracker record → the internship base the drain mutates. `_rank`/`_status`
 // carry the record's current status so it is never downgraded, `_updatedAt` is
-// what §3 orders candidates by.
-const baseFromRecord = record => ({
-  id: record.internshipId,
+// what §3 orders candidates by, `_owned` is §8's provenance guard.
+//
+// `id` falls back to the TRACKER KEY: `updateStatus` writes back to
+// `next[internship.id]`, and a record stored without `internshipId` would
+// otherwise be written to `next[undefined]` — the same missing-backfill defect
+// §7 names on iOS.
+const baseFromRecord = (trackerKey, record) => ({
+  id: record.internshipId || trackerKey,
   company: record.company,
   role: record.role,
   location: record.location,
@@ -58,6 +102,7 @@ const baseFromRecord = record => ({
   _rank: STATUS_RANK[record.status] ?? 0,
   _status: record.status,
   _updatedAt: record.updatedAt || '',
+  _owned: drainOwns(trackerKey, record),
 });
 
 /**
@@ -66,34 +111,45 @@ const baseFromRecord = record => ({
  * forward"), and creating a `<company>-general` row for it would sit a phantom
  * beside the real application.
  *
- * Candidates = every record for this company, whether created earlier in THIS
- * drain (session) or already in the tracker; the session wins on id collision
- * because it holds the fresher status. Sorted by id, so ties resolve identically
- * on every run.
+ * Candidates = every DRAIN-OWNED record for this company (§8), whether created
+ * earlier in THIS drain (session) or already in the tracker; the session wins on
+ * key collision because it holds the fresher status. Sorted by tracker key, so
+ * ties resolve identically on every run.
+ *
+ * A hand-added record is NOT a candidate: capturing it would stamp it
+ * `source: 'gmail'` and hand it to the next rebuild purge to delete (§8). If a
+ * company's only record was typed by hand we fall through and create
+ * `<company>-general` beside it instead.
  *
  *   1. exactly one record  → that one
  *   2. several             → the most recently updated NON-terminal one
  *   3. all terminal        → the most recently updated one
  *   4. none                → null (the caller creates `<company>-general`)
  */
-function resolveRolelessTarget(companyKey, session, records) {
+function resolveRolelessTarget(companyKey, session, entries) {
   const prefix = `${companyKey}|`;
-  const seen = new Map(); // record id -> { key, base, status, updatedAt }
+  const seen = new Map(); // tracker key -> { key, trackerKey, base, status, updatedAt }
   for (const [sessionKey, base] of session) {
     if (!sessionKey.startsWith(prefix)) continue;
-    seen.set(base.id, { key: sessionKey, base, status: base._status, updatedAt: base._updatedAt || '' });
+    // Session bases are drain-created or already §8-checked by the branch that
+    // put them there, so they need no further ownership test.
+    const trackerKey = String(base.id);
+    seen.set(trackerKey, { key: sessionKey, trackerKey, base, status: base._status, updatedAt: base._updatedAt || '' });
   }
-  for (const record of records || []) {
+  for (const [rawKey, record] of entries || []) {
     if (norm(record.company) !== companyKey) continue;
-    if (seen.has(record.internshipId)) continue; // the session copy is fresher
-    seen.set(record.internshipId, {
+    if (!drainOwns(rawKey, record)) continue; // §8 — never capture a hand-added row
+    const trackerKey = String(rawKey);
+    if (seen.has(trackerKey)) continue; // the session copy is fresher
+    seen.set(trackerKey, {
       key: sessionKeyFor(companyKey, roleKey(record.role)),
-      base: baseFromRecord(record),
+      trackerKey,
+      base: baseFromRecord(trackerKey, record),
       status: record.status,
       updatedAt: record.updatedAt || '',
     });
   }
-  const candidates = byId([...seen.values()], c => c.base.id);
+  const candidates = byId([...seen.values()], c => c.trackerKey);
   if (candidates.length === 0) return null;
   if (candidates.length === 1) return candidates[0];
   const inFlight = candidates.filter(c => !TERMINAL_STATUSES.has(c.status));
@@ -104,16 +160,21 @@ function resolveRolelessTarget(companyKey, session, records) {
 // calendar. Runs full-auto: on load and on an interval while the tab is open, it
 // syncs the inbox, applies each action, and acks it. Mount ONCE (in App).
 export function useGmailInbox(profile) {
-  const { records, updateStatus, addMilestone } = useApplicationTracker(profile);
+  // The tracker OBJECT, not the flattened `records` array: §7 tie-breaks on the
+  // tracker dictionary KEY, and only the object carries it.
+  const { tracker, updateStatus, addMilestone } = useApplicationTracker(profile);
   const { catalog } = useInternshipCatalog();
   const [justApplied, setJustApplied] = useState([]);
-  const recordsRef = useRef(records);
+  // Seeded by the effect below, not by an initializer: an eager
+  // `useRef(Object.entries(...))` rebuilds and discards the array on every
+  // render. The effect runs on mount, long before the drain's 1.5s timer.
+  const entriesRef = useRef(EMPTY_ENTRIES);
   const catalogRef = useRef(catalog);
   const busy = useRef(false);
   // Keep the latest values for the async drain without retriggering it. Written
   // in an effect (not during render): React may replay/discard render work, and
   // the drain only reads these after commit anyway.
-  useEffect(() => { recordsRef.current = records; }, [records]);
+  useEffect(() => { entriesRef.current = Object.entries(tracker || {}); }, [tracker]);
   useEffect(() => { catalogRef.current = catalog; }, [catalog]);
 
   const applyAction = useCallback((action, session) => {
@@ -138,7 +199,7 @@ export function useGmailInbox(profile) {
       // §3 — an action carrying no role must NOT spawn a phantom
       // "<company>-general" row beside the real one. Resolve it onto an existing
       // record for the same company instead, preferring one still in flight.
-      const target = resolveRolelessTarget(companyNeedle, session, recordsRef.current);
+      const target = resolveRolelessTarget(companyNeedle, session, entriesRef.current);
       // Bind the resolved record under ITS OWN (company, role) key, so a second
       // role-less email in the same drain lands on the same record.
       if (target) { key = target.key; base = target.base; session.set(key, base); }
@@ -147,8 +208,8 @@ export function useGmailInbox(profile) {
       // §4 — EXACT companyKey equality, never a substring test (substrings merge
       // genuinely different companies whose keys nest), over a collection sorted
       // by id so repeated runs over the same data resolve identically.
-      const existing = byId(recordsRef.current, r => r.internshipId)
-        .find(r => norm(r.company) === companyNeedle && roleKey(r.role) === actionRole);
+      const existing = byTrackerKey(entriesRef.current)
+        .find(([, r]) => norm(r.company) === companyNeedle && roleKey(r.role) === actionRole);
       // A role-carrying action NEVER fuzzy-matches another role ("TECH Camp" vs
       // "TECH Camp 2026" are different applications) — it creates the record if
       // absent. The catalog listing must match BOTH keys for the same reason:
@@ -159,11 +220,14 @@ export function useGmailInbox(profile) {
       const catItem = existing
         ? null
         : byId(catalogRef.current, i => i.id).find(i => norm(i.company) === companyNeedle && roleKey(i.role) === actionRole);
+      // A base the drain CREATES (catalog listing or synthetic gmail- id) is
+      // drain-owned; one read back from an existing record inherits that
+      // record's provenance, so a hand-added row keeps `source: 'web'` (§8).
       base = existing
-        ? baseFromRecord(existing)
+        ? baseFromRecord(existing[0], existing[1])
         : catItem
-          ? { id: catItem.id, company: catItem.company, role: catItem.role, location: catItem.location, deadline: catItem.deadline, deadlineDate: catItem.deadlineDate, url: catItem.url, companyDomain: catItem.companyDomain, logoUrl: catItem.logoUrl }
-          : { id: gmailRecordId(action.company, action.role), company: action.company, role: action.role || 'Application', location: action.enrichment?.location || '', deadline: action.enrichment?.deadline || 'Not stated', deadlineDate: action.enrichment?.deadlineDate || null, url: action.enrichment?.url || '' };
+          ? { id: catItem.id, company: catItem.company, role: catItem.role, location: catItem.location, deadline: catItem.deadline, deadlineDate: catItem.deadlineDate, url: catItem.url, companyDomain: catItem.companyDomain, logoUrl: catItem.logoUrl, _owned: true }
+          : { id: gmailRecordId(action.company, action.role), company: action.company, role: action.role || 'Application', location: action.enrichment?.location || '', deadline: action.enrichment?.deadline || 'Not stated', deadlineDate: action.enrichment?.deadlineDate || null, url: action.enrichment?.url || '', _owned: true };
       // Statuses are monotonic across drains too: a record already at
       // "interview" can't be pulled back to "applied" by a re-classified email.
       session.set(key, base);
@@ -190,10 +254,17 @@ export function useGmailInbox(profile) {
     // Keep the session copy's updatedAt in step with what updateStatus will
     // persist, so a role-less action later in this drain orders candidates on
     // the same values §3 would read back from the tracker.
-    if (eventAt && eventAt > String(base._updatedAt || '')) base._updatedAt = eventAt;
-    const { _rank, _status, _updatedAt, ...cleanBase } = base;
+    // Compared as INSTANTS (§6) — `eventAt` is always UTC `Z` while a stored
+    // `updatedAt` may carry `+09:00`, and a string compare gets the order wrong.
+    if (eventAt && instantOf(eventAt) > instantOf(base._updatedAt)) base._updatedAt = eventAt;
+    const { _rank, _status, _updatedAt, _owned, ...cleanBase } = base;
     const stampKey = { applied: 'appliedAt', rejected: 'rejectedAt', interview: 'interviewAt', offer: 'offerAt' }[action.kind];
-    const internship = { ...cleanBase, source: 'gmail', sourceMeta: { gmailMessageId: action.gmailMessageId, receivedAt: action.receivedAt, subject: action.subject } };
+    // §8 — `source` is stamped ONLY on a record the drain created. Rewriting it
+    // on a hand-added row would mark it Gmail-derived, and the next rebuild
+    // purge would delete a row Gmail cannot re-derive. `updateStatus` carries
+    // `prev.source` forward when the field is absent.
+    const internship = { ...cleanBase, sourceMeta: { gmailMessageId: action.gmailMessageId, receivedAt: action.receivedAt, subject: action.subject } };
+    if (_owned) internship.source = 'gmail';
     if (eventAt) {
       internship.eventAt = eventAt;
       if (stampKey) internship[stampKey] = eventAt;

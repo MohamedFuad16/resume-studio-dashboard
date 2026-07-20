@@ -59,6 +59,16 @@ const isResolvableCompany = (names, company) => {
   return Boolean(needle) && names.some(n => n.includes(needle) || needle.includes(n));
 };
 
+// Every company the tracker already holds a record for, normalized.
+async function trackedCompanyNames(store, profile) {
+  const tracker = await store.getJson(`tracker:${profile}`, {}).catch(() => ({}));
+  return new Set(Object.values(tracker && typeof tracker === 'object' ? tracker : {})
+    .map(rec => norm(rec?.company)).filter(Boolean));
+}
+
+// A DECISION about an application already in the tracker. See the gate below.
+const DECISION_KINDS = new Set(['rejected', 'interview', 'offer']);
+
 export async function syncProfile(store, profile, opts = {}) {
   const conn = await getConnection(store, profile);
   if (!conn?.refreshTokenEnc) return { skipped: 'not-connected' };
@@ -105,8 +115,13 @@ export async function syncProfile(store, profile, opts = {}) {
   // and a broken one look identical from outside, and the difference decides
   // whether the inbox is clean or the ingest is dead.
   const dropped = { fetchFailed: 0, bulkMail: 0, classifierFailed: 0, notApplication: 0, notInternship: 0, lowConfidence: 0, noCompany: 0 };
+  // Decisions admitted on a prior tracked application rather than on their own
+  // internship evidence (see the gate below). Not a drop — counted separately so
+  // the telemetry still balances: listed → fresh → queued + dropped.
+  let carriedInternship = 0;
   const enrichedByCompany = new Map();
   let resolvableNames = null; // loaded lazily on the first enrichment candidate
+  let trackedNames = null;    // loaded lazily on the first decision without evidence
   for (const id of fresh) {
     let message;
     try { message = await getMessage(token, id); } catch { processed.add(id); dropped.fetchFailed++; continue; }
@@ -122,7 +137,30 @@ export async function syncProfile(store, profile, opts = {}) {
     // Internships only: freelance/gig/annotation/part-time applications (e.g. an
     // LLM-trainer gig or an AI-interview support role) never reach the tracker.
     if (!verdict.isApplicationRelated) { dropped.notApplication++; continue; }
-    if (!verdict.isInternship) { dropped.notInternship++; continue; }
+    // Internships only — the evidence gate (classify.js) requires a quoted
+    // internship term from the mail itself, and it stays exactly as strict.
+    //
+    // But a DECISION mail frequently contains no internship word anywhere. The
+    // owner's ABEJA rejection is 「厳正なる選考の結果、誠に残念ながら今回は貴意に
+    // 添いかねることとなりました」 and its AICE counterpart is the same shape:
+    // correct, complete rejections of real internship applications that name no
+    // program, no role and no 「インターン」. Both were dropped here as
+    // notInternship and the tracker sat frozen at "applied" — the application
+    // confirmation had been ingested, its outcome never was.
+    //
+    // Their internship-ness was already PROVEN, by the confirmation mail that
+    // created the record (「＜新卒通年インターン＞…応募が完了しました」). So a
+    // decision about a company the tracker already holds is admitted on that
+    // earlier evidence. This does not loosen the gate: a company the owner never
+    // applied to as an internship still has no record, so a gig rejection is
+    // dropped exactly as before. Matched on EXACT normalized company equality,
+    // never a substring test (SPEC-per-role-keying §4).
+    if (!verdict.isInternship) {
+      if (!DECISION_KINDS.has(verdict.kind) || !verdict.company) { dropped.notInternship++; continue; }
+      if (!trackedNames) trackedNames = await trackedCompanyNames(store, profile);
+      if (!trackedNames.has(norm(verdict.company))) { dropped.notInternship++; continue; }
+      carriedInternship++;
+    }
     if (verdict.confidence < MIN_CONFIDENCE) { dropped.lowConfidence++; continue; }
     if (!verdict.company) { dropped.noCompany++; continue; }
 
@@ -178,8 +216,8 @@ export async function syncProfile(store, profile, opts = {}) {
   // only, never mail content: this is someone's inbox.
   console.log(
     `gmail-sync[${profile}] listed=${messageIds.length} fresh=${fresh.length} ` +
-    `queued=${actions.length} dropped=${JSON.stringify(dropped)}`
+    `queued=${actions.length} carriedInternship=${carriedInternship} dropped=${JSON.stringify(dropped)}`
   );
 
-  return { scanned: fresh.length, actions: actions.length, dropped };
+  return { scanned: fresh.length, actions: actions.length, carriedInternship, dropped };
 }

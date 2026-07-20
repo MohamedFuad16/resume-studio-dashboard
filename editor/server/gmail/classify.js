@@ -109,6 +109,160 @@ export function internshipEvidenceHolds(evidence, haystack) {
   return fold(haystack).includes(quote);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Deterministic phrase evidence for `kind` (2026-07-20).
+//
+// The model could not read Japanese rejections. Verified against the owner's
+// real inbox: 「【株式会社ABEJA】選考結果のご連絡」 and 「ご応募のお礼【AICE株式会社】」
+// were rejections that never reached the tracker, and Ｓｋｙ株式会社's
+// 「＜選考結果のご連絡＞」 was queued as an INTERVIEW. The owner had no interviews
+// anywhere at the time.
+//
+// The failure is one of REGISTER, not of vocabulary. An English rejection says
+// "unfortunately" and "we will not be moving forward". A Japanese one never
+// states the decision directly — it says the company cannot "meet your wishes":
+//
+//   厳正なる選考の結果、誠に残念ながら今回は貴意に添いかねることとなりました
+//   残念ながらご希望に沿えない結果となりました
+//   今回のサマーインターンへの参加は見送らせていただくことになりました
+//
+// None of those contain a word that translates as "reject". A model tuned on
+// English rejection cues reads them as neutral, or — because 選考 ("selection")
+// is right there — as a selection STEP, i.e. an interview.
+//
+// So the model's `kind` is now overridden by verified phrase evidence wherever
+// such evidence exists. Deterministic, testable, and cheap; the model keeps the
+// cases the phrase tables say nothing about.
+//
+// Deliberately NOT keyed on senders or company names — the owner's standing rule.
+// These are phrases of the LANGUAGE: every Japanese company's ATS writes them,
+// and the tables need no maintenance when the owner applies somewhere new.
+//
+// Phrases are stored FOLDED (see fold) so they survive the same punctuation
+// stripping the haystack gets — 「貴意に添いかね」 loses its brackets, "we're"
+// becomes "we re", 「ご応募・選考」 loses its interpunct.
+
+// A decision has been made and it is NEGATIVE. Highest precedence: a rejection
+// is terminal and none of these phrases has a non-rejecting reading.
+const REJECTION_PHRASES = [
+  // ── Japanese. The polite indirect register, in its common inflections.
+  '貴意に添いかね', '貴意に沿いかね',        // "cannot meet your esteemed wishes" (ABEJA, カナリー)
+  'ご希望に沿えない', 'ご希望に添えない',      // "cannot meet your hopes" (AICE)
+  'ご希望に沿えず', 'ご希望に添えず',
+  'ご期待に沿えない', 'ご期待に添えない',      // "cannot meet your expectations"
+  'ご期待に沿えず', 'ご期待に添えず',
+  '見送らせていただ',                        // "we will refrain from proceeding" (enechain)
+  '採用を見送', 'お見送り',
+  '不合格',
+  'ご縁がなかった', '縁がなかった',
+  '通過されませんでした', '通過となりませんでした',
+  '採用を見合わせ',
+  // ── English. Conservative and high-precision; each states the decision.
+  'we regret to inform',
+  'not to move forward with your application',
+  'we will not be moving forward',
+  'move forward with another candidate',
+  'move forward with other candidates',
+  'we have decided not to proceed',
+  'were not selected', 'have not been selected', 'not selected for',
+  'unable to offer you',
+  'will not be progressing',
+  'decided not to move forward',
+].map(fold);
+
+// The subject announces a RESULT. 「選考結果」 means a decision has been made and
+// is very often a rejection — it is NOT an interview invitation, which is the
+// reading that put Ｓｋｙ株式会社 in the tracker as an interview.
+//
+// Checked against the SUBJECT only, deliberately. 「書類選考の結果、ぜひ面接にて…」
+// ("as a result of the document screening, we'd love to interview you") is a real
+// invitation and says 選考の結果 in its BODY — reading the body here would flip a
+// genuine interview to a rejection.
+const DECISION_NOTICE_SUBJECT = [
+  '選考結果', '選考の結果', '審査結果', '選考結果のご連絡',
+  'application results', 'application result',
+  'selection result', 'result of your application',
+].map(fold);
+
+// Evidence that a selection STEP was actually invited or scheduled. Required
+// before `interview` is allowed to stand.
+//
+// Note what is absent: a bare "coding test" / "coding challenge". HENNGE's
+// admission challenge IS the application — "Thank you for applying… Please
+// proceed to the coding test by registering from the link below" — and reading
+// that as an interview is where the phantom interview action came from. A test
+// only counts as a step past "applied" when the mail also INVITES or SCHEDULES
+// it, or carries a date the model could extract.
+const INTERVIEW_INVITATION_PHRASES = [
+  // ── Japanese.
+  '面接', '面談',
+  '日程調整', '日程候補', 'ご都合のよい', 'ご都合の良い',
+  '次の選考', '一次選考', '二次選考', '最終選考', '次選考',
+  '選考にお進み', '選考のご案内',
+  // ── English.
+  'interview',
+  'invite you to', 'invites you to', 'invited you to', 'would like to invite',
+  'schedule a', 'scheduling a', 'book a time', 'pick a time', 'select a time',
+  'next round', 'next stage', 'next step in the selection',
+].map(fold);
+
+// An offer is its own terminal outcome and must not be dragged to `rejected` by
+// a decision-notice subject.
+const OFFER_PHRASES = ['内定', '採用が決定', 'pleased to offer', 'happy to offer', 'offer of employment'].map(fold);
+
+const firstMatch = (phrases, folded) => phrases.find(p => p && folded.includes(p)) || '';
+
+/**
+ * Override the model's `kind` with verified phrase evidence from the email.
+ *
+ * `subject` and `body` are the email's own text — every returned `evidence`
+ * string is a phrase this function has just confirmed is present in it, so the
+ * grounding guarantee that governs `internshipEvidence` holds here too: the
+ * classifier never asserts a status the mail does not say.
+ *
+ * Precedence:
+ *   1. a rejection phrase anywhere       → rejected
+ *   2. a result-announcing SUBJECT, with no invitation evidence and no offer
+ *                                        → rejected
+ *   3. `interview` with no invitation evidence and no extracted date
+ *                                        → applied (demoted, never dropped)
+ *   otherwise the model's kind stands.
+ *
+ * (1) and (2) read the BODY as well as the subject, which is what fixes the
+ * AICE shape: 「ご応募のお礼」 ("thank you for applying") reads as an
+ * acknowledgement, and only the body carries 「ご希望に沿えない」.
+ *
+ * @returns {{kind: string, evidence: string, rule: string}}
+ */
+export function resolveKind({ kind, subject, body, hasInterviewDate = false }) {
+  // An offer stands on its own; nothing below should be able to demote it.
+  if (kind === 'offer') return { kind, evidence: '', rule: 'model' };
+
+  const foldedSubject = fold(subject);
+  const foldedAll = fold(`${subject || ''} ${body || ''}`);
+
+  const rejection = firstMatch(REJECTION_PHRASES, foldedAll);
+  if (rejection) return { kind: 'rejected', evidence: rejection, rule: 'rejection-phrase' };
+
+  const invitation = firstMatch(INTERVIEW_INVITATION_PHRASES, foldedAll);
+  const offer = firstMatch(OFFER_PHRASES, foldedAll);
+
+  const decision = firstMatch(DECISION_NOTICE_SUBJECT, foldedSubject);
+  if (decision && !invitation && !offer) {
+    // A result announced with no invitation and no offer. Ｓｋｙ株式会社 posts the
+    // verdict to a candidate portal and the mail only says 「マイページに記載して
+    // おります」 — the mail is still, unambiguously, a decision, and it is not an
+    // invitation to anything.
+    return { kind: 'rejected', evidence: decision, rule: 'decision-notice' };
+  }
+
+  if (kind === 'interview' && !invitation && !hasInterviewDate) {
+    return { kind: 'applied', evidence: '', rule: 'interview-unsupported' };
+  }
+
+  return { kind, evidence: '', rule: 'model' };
+}
+
 // Returns null on any failure (never throws the sync). Shape:
 // { isApplicationRelated, kind, company, role, interview:{date,time}|null, confidence }
 export async function classifyMessage(message) {
@@ -135,9 +289,18 @@ export async function classifyMessage(message) {
     `- "interview": ANY selection step past "applied" — an interview invite/schedule, OR a coding test / online / ` +
     `technical assessment (e.g. Codility, HackerRank, "invites you to a test") / screening / 選考・コーディングテスト・Webテスト. ` +
     `Extract a date/time into "interview" if one is present (a coding-test deadline counts).\n` +
-    `- "rejected": rejection / "not selected" / "selection result" that declines / 不合格・お見送り.\n` +
+    `- "rejected": a rejection. JAPANESE REJECTIONS ARE INDIRECT and never say "unfortunately" the way ` +
+    `English ones do — they say the company cannot meet your wishes. ALL of these mean rejected: ` +
+    `「貴意に添いかねる」「ご希望に沿えない」「ご期待に添えない」「今回は見送らせていただきます」「不合格」「お見送り」「ご縁がなかった」.\n` +
     `- "offer": an offer / 内定.\n` +
     `- "other": application-related but none of the above.\n` +
+    `READ THE BODY, NOT JUST THE SUBJECT. A Japanese rejection is routinely sent under a polite ` +
+    `acknowledgement subject — 「ご応募のお礼」 / 「ご応募ありがとうございます」 ("thank you for applying") ` +
+    `— with the decision stated only in the body. Classify from whichever part carries the decision.\n` +
+    `「選考結果」/「選考の結果」 in a SUBJECT means a decision has been made. That is NOT an interview ` +
+    `invitation, and it is most often a rejection — even when the mail only points you at a portal ` +
+    `(「選考結果はマイページに記載しております」). Only call it "interview" when the mail actually invites or ` +
+    `schedules a further step (面接・面談・日程調整, or an explicit invitation).\n` +
     `reapplyMonths: ONLY for a "rejected" email that states how long to WAIT before reapplying ` +
     `(e.g. "please apply again after 9-12 months", "you may reapply in 6 months", "再度のご応募は12ヶ月後以降"). ` +
     `Set {"min":9,"max":12} for a "9-12 months" range, {"min":6,"max":6} for a single "6 months". ` +
@@ -157,10 +320,22 @@ export async function classifyMessage(message) {
     );
     const parsed = parseJson(resp.choices?.[0]?.message?.content);
     if (!parsed) return null;
-    const kind = VALID_KINDS.has(parsed.kind) ? parsed.kind : 'other';
-    const interview = parsed.interview && /^\d{4}-\d{2}-\d{2}$/.test(parsed.interview.date || '')
+    const modelKind = VALID_KINDS.has(parsed.kind) ? parsed.kind : 'other';
+    let interview = parsed.interview && /^\d{4}-\d{2}-\d{2}$/.test(parsed.interview.date || '')
       ? { date: parsed.interview.date, time: /^\d{2}:\d{2}$/.test(parsed.interview.time || '') ? parsed.interview.time : null }
       : null;
+    // The prompt above tells the model how Japanese rejections read; this is the
+    // check that makes it falsifiable. Verified phrase evidence from the email
+    // itself wins over the model's guess — see resolveKind.
+    const body = message.text || message.snippet || '';
+    const verdictKind = resolveKind({
+      kind: modelKind, subject: message.subject, body, hasInterviewDate: Boolean(interview),
+    });
+    const kind = verdictKind.kind;
+    // A demoted or rejected verdict must not leave an interview date behind: the
+    // client turns one into a calendar milestone, and a rejection with a phantom
+    // interview on the calendar is the HENNGE defect in another shape.
+    if (kind !== 'interview') interview = null;
     // Reapply window only meaningful for rejections. Clamp to a sane 1-36 month
     // range and ensure max ≥ min, so a hallucinated value can't block forever.
     let reapplyMonths = null;
@@ -174,13 +349,17 @@ export async function classifyMessage(message) {
     const role = String(parsed.role || '').slice(0, 160).trim();
     // Ground the claim in the email's own words. The model proposes; the quote
     // check disposes — see internshipEvidenceHolds.
-    const haystack = `${message.subject || ''} ${message.text || message.snippet || ''}`;
+    const haystack = `${message.subject || ''} ${body}`;
     const proven = internshipEvidenceHolds(parsed.internshipEvidence, haystack);
     return {
       isApplicationRelated: Boolean(parsed.isApplicationRelated),
       isInternship: Boolean(parsed.isInternship) && proven,
       internshipEvidence: proven ? String(parsed.internshipEvidence).slice(0, 120) : '',
       kind,
+      // Which rule decided `kind`, and the phrase that proved it. Server-side
+      // only (never queued): the action shape is a client contract.
+      kindRule: verdictKind.rule,
+      kindEvidence: verdictKind.evidence,
       company,
       role,
       interview,

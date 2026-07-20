@@ -14,6 +14,7 @@
     "validate:catalog:links": "node server/validate-catalog.js --links",
     "refresh:catalog": "node server/refresh-catalog.js",
     "audit:catalog:llm": "node server/audit-catalog-llm.js",
+    "test:classify": "node --test server/gmail/*.test.js",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "lint": "eslint src server"
