@@ -2,6 +2,18 @@
 
 Every entry: date · who · what changed · what the OTHER side must do.
 
+- **2026-07-20 · web · Résumé list items now carry an `id` (ADR-0041).** Every
+  item in `resume.education`, `resume.experience`, `resume.projects` and
+  `resume.activities` gains a persisted `id` (UUID string), backfilled onto
+  existing résumés the first time the web editor loads them. It exists purely to
+  give the editor's reorderable lists a stable React key; nothing derives meaning
+  from it. **iOS: round-trip it, don't drop it** (CLAUDE.md rule 4). iOS reads
+  only `resume.personal` and never writes résumés, so this is a heads-up rather
+  than a work item — but if that ever changes, a write that strips `id` would
+  make the web editor re-mint ids and lose focus on the next reorder. The server
+  needed no change: `validateResume` passes unknown per-item fields through, and
+  LaTeX generation reads named fields only (output verified byte-identical).
+
 - **2026-07-19 · web · Storage engine swapped; Vercel is static-only (ADR-0040).**
   The server now runs native SQLite (working copy + snapshot to the mount) instead
   of sql.js, and the Vercel origin no longer serves `/api` at all. **iOS: nothing

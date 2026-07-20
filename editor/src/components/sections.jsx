@@ -1,6 +1,7 @@
 import React from 'react';
 import { Sec, Inp, Txta, Bullets, I, TagInput, SuggestInput, MonthInput } from './ui.jsx';
 import { prepareProfilePhoto } from '../utils/imageUpload.js';
+import { newItemId } from '../utils/itemIds.js';
 
 function GithubMark() {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .7a11.5 11.5 0 0 0-3.64 22.41c.58.11.79-.25.79-.56v-2.22c-3.23.7-3.91-1.37-3.91-1.37-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.71.08-.71 1.17.08 1.78 1.2 1.78 1.2 1.04 1.78 2.72 1.27 3.39.97.1-.75.41-1.27.74-1.56-2.58-.29-5.29-1.29-5.29-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.47.11-3.05 0 0 .97-.31 3.16 1.18a10.9 10.9 0 0 1 5.76 0c2.2-1.49 3.16-1.18 3.16-1.18.63 1.58.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.4-2.72 5.38-5.3 5.67.42.36.79 1.07.79 2.16v3.21c0 .31.21.68.8.56A11.5 11.5 0 0 0 12 .7Z" /></svg>;
@@ -330,7 +331,7 @@ export function EducationSec({ data, onChange, isJa }) {
   // Single merged update so multi-field edits don't stomp each other via stale `data`
   // closures (fixes the degree/institution "snap-back" bug — see report / ADR).
   const upd = (i, patch) => onChange(data.map((e, x) => x === i ? { ...e, ...patch } : e));
-  const add = () => onChange([...data, { school: '', schoolJa: '', institution: '', institutionJa: '', location: '', degree: '', degreeJa: '', startDate: '', endDate: '', bullets: [] }]);
+  const add = () => onChange([...data, { id: newItemId(), school: '', schoolJa: '', institution: '', institutionJa: '', location: '', degree: '', degreeJa: '', startDate: '', endDate: '', bullets: [] }]);
   const del = i => onChange(data.filter((_, x) => x !== i));
   const move = (i, dir) => {
     const nextIdx = i + dir;
@@ -349,7 +350,7 @@ export function EducationSec({ data, onChange, isJa }) {
           ? (e.schoolJa || e.school || e.institutionJa || `学校 ${i + 1}`)
           : (e.school || e.institution || `School ${i + 1}`);
         return (
-          <div key={i} className="item">
+          <div key={e.id} className="item">
             <ItemHeader label={itemLabel} index={i} total={data.length} onMove={move} onDelete={del} kind="education" isJa={isJa} />
             <div className="flds">
               {isJa ? (
@@ -394,7 +395,7 @@ export function ExperienceSec({ data, onChange, isJa }) {
   const set = (i, k, v) => onChange(data.map((e, x) => x === i ? { ...e, [k]: v } : e));
   // Single merged update (see EducationSec) — avoids the stale-closure double-set bug.
   const upd = (i, patch) => onChange(data.map((e, x) => x === i ? { ...e, ...patch } : e));
-  const add = () => onChange([...data, { company: '', companyJa: '', role: '', roleJa: '', location: '', startDate: '', endDate: '', description: '', bullets: [] }]);
+  const add = () => onChange([...data, { id: newItemId(), company: '', companyJa: '', role: '', roleJa: '', location: '', startDate: '', endDate: '', description: '', bullets: [] }]);
   const del = i => onChange(data.filter((_, x) => x !== i));
   const move = (i, dir) => {
     const nextIdx = i + dir;
@@ -413,7 +414,7 @@ export function ExperienceSec({ data, onChange, isJa }) {
           ? (e.companyJa || e.company || `企業 ${i + 1}`)
           : (e.company || `Company ${i + 1}`);
         return (
-          <div key={i} className="item">
+          <div key={e.id} className="item">
             <ItemHeader label={itemLabel} index={i} total={data.length} onMove={move} onDelete={del} kind="experience" isJa={isJa} />
             <div className="flds">
               {isJa ? (
@@ -466,7 +467,7 @@ export function ProjectsSec({ data, onChange, isJa }) {
   const set = (i, k, v) => onChange(data.map((e, x) => x === i ? { ...e, [k]: v } : e));
   // Single merged update (see EducationSec) — avoids the stale-closure double-set bug.
   const upd = (i, patch) => onChange(data.map((e, x) => x === i ? { ...e, ...patch } : e));
-  const add = () => onChange([...data, { title: '', name: '', tech: '', role: '', year: '', bullets: [] }]);
+  const add = () => onChange([...data, { id: newItemId(), title: '', name: '', tech: '', role: '', year: '', bullets: [] }]);
   const del = i => onChange(data.filter((_, x) => x !== i));
   const move = (i, dir) => {
     const nextIdx = i + dir;
@@ -485,7 +486,7 @@ export function ProjectsSec({ data, onChange, isJa }) {
           ? (p.name || p.title || `プロジェクト ${i + 1}`)
           : (p.title || `Project ${i + 1}`);
         return (
-          <div key={i} className="item">
+          <div key={p.id} className="item">
             <ItemHeader label={itemLabel} index={i} total={data.length} onMove={move} onDelete={del} kind="project" isJa={isJa} />
             <div className="flds">
               {isJa ? (
@@ -520,7 +521,7 @@ export function ProjectsSec({ data, onChange, isJa }) {
 /* ── Activities ─────────────────────────────────────────── */
 export function ActivitiesSec({ data, onChange, isJa }) {
   const set = (i, k, v) => onChange(data.map((e, x) => x === i ? { ...e, [k]: v } : e));
-  const add = () => onChange([...data, { title: '', org: '', location: '', startDate: '', endDate: '', bullets: [] }]);
+  const add = () => onChange([...data, { id: newItemId(), title: '', org: '', location: '', startDate: '', endDate: '', bullets: [] }]);
   const del = i => onChange(data.filter((_, x) => x !== i));
   const move = (i, dir) => {
     const nextIdx = i + dir;
@@ -539,7 +540,7 @@ export function ActivitiesSec({ data, onChange, isJa }) {
           ? (a.title || `活動・資格 ${i + 1}`)
           : (a.title || `Activity ${i + 1}`);
         return (
-          <div key={i} className="item">
+          <div key={a.id} className="item">
             <ItemHeader label={itemLabel} index={i} total={data.length} onMove={move} onDelete={del} kind="activity" isJa={isJa} />
             <div className="flds">
               {isJa ? (

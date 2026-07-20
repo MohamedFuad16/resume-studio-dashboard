@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './index.css';
 import { apiUrl, applicationApi, profileApi, requestJson } from './api/client.js';
 import { debounce, TEMPLATES } from './utils/helpers.js';
+import { newItemId, ensureListIds } from './utils/itemIds.js';
 import { I, Toasts, ExportMenu, TagInput, SuggestInput } from './components/ui.jsx';
 import { InternshipDashboard } from './components/InternshipDashboard.jsx';
 import { ProfileDashboard } from './components/ProfileDashboard.jsx';
@@ -187,6 +188,7 @@ function parseResumeTextHeuristically(text) {
           
           if (isEdu) {
             currentEntry = {
+              id: newItemId(),
               institution: name,
               institutionJa: '',
               location: parts[1] || 'Tokyo, Japan',
@@ -198,6 +200,7 @@ function parseResumeTextHeuristically(text) {
             };
           } else {
             currentEntry = {
+              id: newItemId(),
               company: name,
               companyJa: '',
               role: parts[2] || 'Specialist',
@@ -239,6 +242,7 @@ function parseResumeTextHeuristically(text) {
           if (currentEntry) projs.push(currentEntry);
           const parts = line.split(/[|·•\t()]/).map(p => p.trim());
           currentEntry = {
+            id: newItemId(),
             title: parts[0] || '',
             tech: parts[1] || '',
             year: dateMatch ? dateMatch[0] : '2025',
@@ -387,6 +391,8 @@ function normalizeResume(data) {
 
       return {
         ...e,
+        // Stable identity for the reorderable list keys — backfilled once, then persisted.
+        id: e.id || newItemId(),
         institution: inst,
         institutionJa: instJa,
         school: inst,
@@ -417,6 +423,7 @@ function normalizeResume(data) {
 
       return {
         ...e,
+        id: e.id || newItemId(),
         company: comp,
         companyJa: compJa,
         role: role,
@@ -443,6 +450,7 @@ function normalizeResume(data) {
 
       return {
         ...p,
+        id: p.id || newItemId(),
         title: title,
         name: title,
         tech: tech,
@@ -461,9 +469,9 @@ function normalizeResume(data) {
     r.skills = { languages: '', frameworks: '', tools: '', concepts: '', spoken: '' };
   }
 
-  if (!Array.isArray(r.activities)) {
-    r.activities = [];
-  }
+  // Activities had no normalization pass at all, only an empty-array guard. It still
+  // needs one so its rows get the same stable ids as the other three lists.
+  r.activities = ensureListIds(r.activities);
 
   return r;
 }
@@ -1673,7 +1681,7 @@ export default function App() {
                       <div className="wizard-list-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                         <p className="wizard-help-text" style={{ margin: 0 }}>Add your universities, colleges, or high schools.</p>
                         <button type="button" className="btn btn-sm" style={{ padding: '5px 10px', background: 'var(--b-focus)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }} onClick={() => {
-                          const newList = [...(wizardData.education || []), { institution: '', institutionJa: '', location: '', degree: '', degreeJa: '', startDate: '', endDate: '', bullets: [] }];
+                          const newList = [...(wizardData.education || []), { id: newItemId(), institution: '', institutionJa: '', location: '', degree: '', degreeJa: '', startDate: '', endDate: '', bullets: [] }];
                           setWizardData({...wizardData, education: newList});
                           setEditingIndex(newList.length - 1);
                         }}>+ Add School</button>
@@ -1684,7 +1692,7 @@ export default function App() {
                           <div className="wizard-list-empty" style={{ textAlign: 'center', padding: '20px', background: 'var(--card)', borderRadius: '6px', color: 'var(--t3)', border: '1px dashed var(--b1)' }}>No education entries added yet.</div>
                         ) : (
                           wizardData.education.map((edu, idx) => (
-                            <div key={idx} className="wizard-item-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--card)', border: '1px solid var(--b0)', borderRadius: '8px' }}>
+                            <div key={edu.id} className="wizard-item-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--card)', border: '1px solid var(--b0)', borderRadius: '8px' }}>
                               <div className="wic-info">
                                 <h5 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: '600' }}>{edu.institution || 'Unnamed Institution'}</h5>
                                 <p style={{ margin: 0, fontSize: '11.5px', color: 'var(--t3)' }}>{edu.degree || 'No Degree Specified'} ({edu.startDate || 'N/A'} - {edu.endDate || 'N/A'})</p>
@@ -1846,7 +1854,7 @@ export default function App() {
                       <div className="wizard-list-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                         <p className="wizard-help-text" style={{ margin: 0 }}>Add your past or current jobs/internships.</p>
                         <button type="button" className="btn btn-sm" style={{ padding: '5px 10px', background: 'var(--b-focus)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }} onClick={() => {
-                          const newList = [...(wizardData.experience || []), { company: '', companyJa: '', role: '', roleJa: '', location: '', startDate: '', endDate: '', bullets: [] }];
+                          const newList = [...(wizardData.experience || []), { id: newItemId(), company: '', companyJa: '', role: '', roleJa: '', location: '', startDate: '', endDate: '', bullets: [] }];
                           setWizardData({...wizardData, experience: newList});
                           setEditingIndex(newList.length - 1);
                         }}>+ Add Job</button>
@@ -1857,7 +1865,7 @@ export default function App() {
                           <div className="wizard-list-empty" style={{ textAlign: 'center', padding: '20px', background: 'var(--card)', borderRadius: '6px', color: 'var(--t3)', border: '1px dashed var(--b1)' }}>No experience entries added yet.</div>
                         ) : (
                           wizardData.experience.map((exp, idx) => (
-                            <div key={idx} className="wizard-item-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--card)', border: '1px solid var(--b0)', borderRadius: '8px' }}>
+                            <div key={exp.id} className="wizard-item-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--card)', border: '1px solid var(--b0)', borderRadius: '8px' }}>
                               <div className="wic-info">
                                 <h5 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: '600' }}>{exp.company || 'Unnamed Company'}</h5>
                                 <p style={{ margin: 0, fontSize: '11.5px', color: 'var(--t3)' }}>{exp.role || 'No Role Specified'} ({exp.startDate || 'N/A'} - {exp.endDate || 'N/A'})</p>
@@ -2019,7 +2027,7 @@ export default function App() {
                       <div className="wizard-list-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                         <p className="wizard-help-text" style={{ margin: 0 }}>Add academic or personal software/hardware projects.</p>
                         <button type="button" className="btn btn-sm" style={{ padding: '5px 10px', background: 'var(--b-focus)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }} onClick={() => {
-                          const newList = [...(wizardData.projects || []), { title: '', tech: '', year: '', bullets: [] }];
+                          const newList = [...(wizardData.projects || []), { id: newItemId(), title: '', tech: '', year: '', bullets: [] }];
                           setWizardData({...wizardData, projects: newList});
                           setEditingIndex(newList.length - 1);
                         }}>+ Add Project</button>
@@ -2030,7 +2038,7 @@ export default function App() {
                           <div className="wizard-list-empty" style={{ textAlign: 'center', padding: '20px', background: 'var(--card)', borderRadius: '6px', color: 'var(--t3)', border: '1px dashed var(--b1)' }}>No projects added yet.</div>
                         ) : (
                           wizardData.projects.map((proj, idx) => (
-                            <div key={idx} className="wizard-item-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--card)', border: '1px solid var(--b0)', borderRadius: '8px' }}>
+                            <div key={proj.id} className="wizard-item-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--card)', border: '1px solid var(--b0)', borderRadius: '8px' }}>
                               <div className="wic-info">
                                 <h5 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: '600' }}>{proj.title || 'Unnamed Project'}</h5>
                                 <p style={{ margin: 0, fontSize: '11.5px', color: 'var(--t3)' }}>{proj.tech || 'No Stack Specified'} ({proj.year || 'N/A'})</p>
@@ -2196,7 +2204,7 @@ export default function App() {
                       <div className="wizard-list-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                         <p className="wizard-help-text" style={{ margin: 0 }}>Add professional associations, certifications, or awards.</p>
                         <button type="button" className="btn btn-sm" style={{ padding: '5px 10px', background: 'var(--b-focus)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }} onClick={() => {
-                          const newList = [...(wizardData.activities || []), { title: '', org: '', location: '', startDate: '', endDate: '', bullets: [] }];
+                          const newList = [...(wizardData.activities || []), { id: newItemId(), title: '', org: '', location: '', startDate: '', endDate: '', bullets: [] }];
                           setWizardData({...wizardData, activities: newList});
                           setEditingIndex(newList.length - 1);
                         }}>+ Add Activity</button>
@@ -2207,7 +2215,7 @@ export default function App() {
                           <div className="wizard-list-empty" style={{ textAlign: 'center', padding: '20px', background: 'var(--card)', borderRadius: '6px', color: 'var(--t3)', border: '1px dashed var(--b1)' }}>No activities added yet.</div>
                         ) : (
                           wizardData.activities.map((act, idx) => (
-                            <div key={idx} className="wizard-item-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--card)', border: '1px solid var(--b0)', borderRadius: '8px' }}>
+                            <div key={act.id} className="wizard-item-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--card)', border: '1px solid var(--b0)', borderRadius: '8px' }}>
                               <div className="wic-info">
                                 <h5 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: '600' }}>{act.title || 'Unnamed Activity'}</h5>
                                 <p style={{ margin: 0, fontSize: '11.5px', color: 'var(--t3)' }}>{act.org || 'No Organization'} ({act.startDate || 'N/A'} - {act.endDate || 'N/A'})</p>

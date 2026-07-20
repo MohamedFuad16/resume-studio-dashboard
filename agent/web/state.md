@@ -18,6 +18,34 @@ dated entries below for history.)
 
 ## Recent changes
 
+- **2026-07-20 (later) — Résumé list items carry a persisted `id`; the four
+  reorderable lists key by it (ADR-0041, issue #19).** Education, experience,
+  projects and activities rendered with `key={i}`, and all four have move-up /
+  move-down / delete controls. React ties component state and *uncontrolled DOM
+  state* — focus, caret offset, autosized textarea height — to the slot, so
+  "Move down" swapped the data underneath but left the cursor and the grown
+  textarea sitting on the old position, now belonging to a different entry.
+  Neither cheaper key worked: rows are replaced by a fresh object on every
+  keystroke (`upd`), so object identity would remount the row mid-typing, and
+  content keys (`school + startDate`) collide across blank just-added rows. So
+  identity is now data: `id` is minted at every creation site (`add()` in
+  sections.jsx, the wizard appends, the PDF-parse builders) and backfilled once
+  on load by `normalizeResume`. **Activities needed a normalization pass built
+  from scratch** — it previously had only an `Array.isArray` guard, so it was the
+  one list with nowhere to backfill.
+  The field is free on the server: `validateResume` only checks array-ness and
+  length and passes unknown per-item fields through, and `templates.js` reads
+  named fields only — `generateLatex` output is byte-identical with and without
+  `id` across all 7 real templates, so no PDF changes. Bullets stay index-keyed
+  (no reorder control, out of scope). Verified in the browser against issue #19's
+  own repro, including the negative control: with `key={i}` restored, focus stayed
+  on the position and read back the *other* entry's value; with `key={item.id}`
+  focus, caret offset and both textarea heights travelled with the item. Ids
+  round-trip through the server and survive a reload.
+  **Note for whoever documented it:** `scripts/verify-web.sh` does not exist in
+  the tree — the entry below describes it, but no commit ever added it. The
+  battery was run by hand as its four parts.
+
 - **2026-07-20 — ESLint exists again; `scripts/verify-web.sh` is now the battery
   (ADR-S-003).** The doctor's every-run "eslint skipped — no config" gap is
   closed by `editor/eslint.config.js`, deliberately small: react-doctor stays the
