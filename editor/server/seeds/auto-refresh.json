@@ -1,6 +1,14 @@
 {
-  "updatedAt": "2026-07-18",
+  "updatedAt": "2026-07-19",
   "retired": [
+    {
+      "id": "global-040",
+      "company": "Cloudflare",
+      "role": "Technical Support Engineer Intern (July to December 2026)",
+      "retiredAt": "2026-07-19",
+      "reason": "apply URL HTTP-dead · model: unknown",
+      "evidenceUrl": "https://internship.sg/internships/technical-support-engineer-intern-july-to-december-2026-cloudflare-1778652096746-0"
+    },
     {
       "id": "global-066",
       "company": "Rocket Lab USA",
@@ -18,5 +26,216 @@
       "evidenceUrl": "https://job-boards.greenhouse.io/harbingermotors/jobs/5164341007"
     }
   ],
-  "deadlinePatches": {}
+  "deadlinePatches": {
+    "rakuten-techcamp-ai-applications-2026": {
+      "deadline": "2026-07-31 09:00 JST",
+      "deadlineDate": "2026-07-31",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "rakuten-techcamp-cloud-applications-2026": {
+      "deadline": "2026-07-31 09:00 JST",
+      "deadlineDate": "2026-07-31",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "rakuten-techcamp-ai-engineer-2026": {
+      "deadline": "2026-07-31 09:00 JST",
+      "deadlineDate": "2026-07-31",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "rakuten-techcamp-marketing-cloud-2026": {
+      "deadline": "July 31, 2026 9:00 AM JST",
+      "deadlineDate": "2026-07-31",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "rakuten-techcamp-payment-applications-2026": {
+      "deadline": "July 31st (Fri) 9:00 AM (JST)",
+      "deadlineDate": "2026-07-31",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "rakuten-techcamp-infra-cloud-services-2026": {
+      "deadline": "July 31st (Fri) 9:00 AM (JST)",
+      "deadlineDate": "2026-07-31",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "rakuten-techcamp-data-ai-2026": {
+      "deadline": "2026-07-31 09:00 JST",
+      "deadlineDate": "2026-07-31",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "rakuten-techcamp-infra-services-2026": {
+      "deadline": "2026-07-31 09:00 JST",
+      "deadlineDate": "2026-07-31",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "rakuten-techcamp-corporate-apps-2026": {
+      "deadline": "2026-07-31 09:00 JST",
+      "deadlineDate": "2026-07-31",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "rakuten-techcamp-membership-apps-2026": {
+      "deadline": "July 31, 2026 9:00 AM JST",
+      "deadlineDate": "2026-07-31",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "rakuten-techcamp-software-qa-2026": {
+      "deadline": "July 31, 2026, 9:00 AM JST",
+      "deadlineDate": "2026-07-31",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "rakuten-techcamp-corporate-pm-2026": {
+      "deadline": "2026-07-31 09:00 JST",
+      "deadlineDate": "2026-07-31",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "rakuten-techcamp-membership-pm-2026": {
+      "deadline": "2026-07-31 09:00 JST",
+      "deadlineDate": "2026-07-31",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "rakuten-techcamp-membership-ml-2026": {
+      "deadline": "July 31st (Fri) 9:00 AM (JST)",
+      "deadlineDate": "2026-07-31",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "rakuten-techcamp-global-ads-apps-2026": {
+      "deadline": "2026-07-31 09:00 JST",
+      "deadlineDate": "2026-07-31",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "rakuten-techcamp-global-ads-producer-2026": {
+      "deadline": "July 31st (Fri) 9:00 AM (JST)",
+      "deadlineDate": "2026-07-31",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "global-001": {
+      "deadline": "June 30, 2026",
+      "deadlineDate": "2026-06-30",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "global-019": {
+      "deadline": "Until 2026-07-10",
+      "deadlineDate": "2026-07-10",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "global-015": {
+      "deadline": "June 9, 2026",
+      "deadlineDate": "2026-06-09",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "global-046": {
+      "deadline": "August 6, 2026",
+      "deadlineDate": "2026-08-06",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "global-061": {
+      "deadline": "Applications for this job will be accepted at least until May 31, 2026",
+      "deadlineDate": "2026-05-31",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "global-070": {
+      "deadline": "Opportunity expired",
+      "deadlineDate": "2026-06-30",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "global-072": {
+      "deadline": "2026-07-30",
+      "deadlineDate": "2026-07-30",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "global-082": {
+      "deadline": "End of day on June 15, 2026",
+      "deadlineDate": "2026-06-15",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "global-030": {
+      "deadline": "06/28/2026",
+      "deadlineDate": "2026-06-28",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "global-031": {
+      "deadline": "06/28/2026",
+      "deadlineDate": "2026-06-28",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "global-033": {
+      "deadline": "Until 8/10/2026",
+      "deadlineDate": "2026-08-10",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "global-045": {
+      "deadline": "07/05/2026",
+      "deadlineDate": "2026-07-05",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "global-048": {
+      "deadline": "Until August 1, 2026",
+      "deadlineDate": "2026-08-01",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "global-059": {
+      "deadline": "07/15/2026",
+      "deadlineDate": "2026-07-15",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "global-073": {
+      "deadline": "Until 2026-07-30",
+      "deadlineDate": "2026-07-30",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "global-077": {
+      "deadline": "28 Feb 2026",
+      "deadlineDate": "2026-02-28",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "global-079": {
+      "deadline": "Until 2026-08-08",
+      "deadlineDate": "2026-08-08",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "global-080": {
+      "deadline": "Until 2026-08-08",
+      "deadlineDate": "2026-08-08",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    },
+    "global-094": {
+      "deadline": "Sunday, October 19th, 2025, at 11:59pm PST",
+      "deadlineDate": "2025-10-19",
+      "verifiedDate": "2026-07-19",
+      "note": "auto-refresh 2026-07-19"
+    }
+  }
 }
