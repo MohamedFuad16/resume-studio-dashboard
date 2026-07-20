@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-07-19",
+  "updatedAt": "2026-07-20",
   "retired": [
     {
       "id": "global-040",
@@ -236,6 +236,84 @@
       "deadlineDate": "2025-10-19",
       "verifiedDate": "2026-07-19",
       "note": "auto-refresh 2026-07-19"
+    },
+    "hennge-gip-frontend-2026": {
+      "deadline": "No official deadline",
+      "deadlineDate": null,
+      "verifiedDate": "2026-07-20",
+      "note": "auto-refresh 2026-07-20"
+    },
+    "nvidia-graphics-tegra-intern-2026": {
+      "deadline": "No longer accepting applications",
+      "deadlineDate": null,
+      "verifiedDate": "2026-07-20",
+      "note": "auto-refresh 2026-07-20"
+    },
+    "global-018": {
+      "deadline": "Until 2026-07-10",
+      "deadlineDate": "2026-07-10",
+      "verifiedDate": "2026-07-20",
+      "note": "auto-refresh 2026-07-20"
+    },
+    "global-021": {
+      "deadline": "Until 7/9/2026",
+      "deadlineDate": "2026-07-09",
+      "verifiedDate": "2026-07-20",
+      "note": "auto-refresh 2026-07-20"
+    },
+    "global-022": {
+      "deadline": "Until 8/8/2026",
+      "deadlineDate": "2026-08-08",
+      "verifiedDate": "2026-07-20",
+      "note": "auto-refresh 2026-07-20"
+    },
+    "global-081": {
+      "deadline": "October 31, 2025",
+      "deadlineDate": "2025-10-31",
+      "verifiedDate": "2026-07-20",
+      "note": "auto-refresh 2026-07-20"
+    },
+    "global-051": {
+      "deadline": "2026-08-10",
+      "deadlineDate": "2026-08-10",
+      "verifiedDate": "2026-07-20",
+      "note": "auto-refresh 2026-07-20"
+    },
+    "global-042": {
+      "deadline": "No longer accepting applications",
+      "deadlineDate": null,
+      "verifiedDate": "2026-07-20",
+      "note": "auto-refresh 2026-07-20"
+    },
+    "global-065": {
+      "deadline": "Until 2026-08-07",
+      "deadlineDate": "2026-08-07",
+      "verifiedDate": "2026-07-20",
+      "note": "auto-refresh 2026-07-20"
+    },
+    "global-085": {
+      "deadline": "Until 2026-08-16",
+      "deadlineDate": "2026-08-16",
+      "verifiedDate": "2026-07-20",
+      "note": "auto-refresh 2026-07-20"
+    },
+    "global-086": {
+      "deadline": "Until 8/11/2026",
+      "deadlineDate": "2026-08-11",
+      "verifiedDate": "2026-07-20",
+      "note": "auto-refresh 2026-07-20"
+    },
+    "global-095": {
+      "deadline": "Sunday, June 21st, 2026, at 11:59pm PDT",
+      "deadlineDate": "2026-06-21",
+      "verifiedDate": "2026-07-20",
+      "note": "auto-refresh 2026-07-20"
+    },
+    "global-089": {
+      "deadline": "Until 8/8/2026",
+      "deadlineDate": "2026-08-08",
+      "verifiedDate": "2026-07-20",
+      "note": "auto-refresh 2026-07-20"
     }
   }
 }
