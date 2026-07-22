@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-07-20",
+  "updatedAt": "2026-07-22",
   "retired": [
     {
       "id": "global-040",
@@ -314,6 +314,66 @@
       "deadlineDate": "2026-08-08",
       "verifiedDate": "2026-07-20",
       "note": "auto-refresh 2026-07-20"
+    },
+    "tenstorrent-meti-risc-v-internship-2026": {
+      "deadline": "The official posting does not state a deadline, and the related METI internship application period is already closed on ",
+      "deadlineDate": "2026-06-30",
+      "verifiedDate": "2026-07-22",
+      "note": "auto-refresh 2026-07-22"
+    },
+    "global-020": {
+      "deadline": "Apply before 14/11/2025, 05:00",
+      "deadlineDate": "2025-11-14",
+      "verifiedDate": "2026-07-22",
+      "note": "auto-refresh 2026-07-22"
+    },
+    "global-016": {
+      "deadline": "Apply before 2025-10-31",
+      "deadlineDate": "2025-10-31",
+      "verifiedDate": "2026-07-22",
+      "note": "auto-refresh 2026-07-22"
+    },
+    "global-075": {
+      "deadline": "August 11, 2026",
+      "deadlineDate": "2026-08-11",
+      "verifiedDate": "2026-07-22",
+      "note": "auto-refresh 2026-07-22"
+    },
+    "global-050": {
+      "deadline": "Until 2026-07-31",
+      "deadlineDate": "2026-07-31",
+      "verifiedDate": "2026-07-22",
+      "note": "auto-refresh 2026-07-22"
+    },
+    "global-083": {
+      "deadline": "Opportunity expired; no current application deadline listed",
+      "deadlineDate": null,
+      "verifiedDate": "2026-07-22",
+      "note": "auto-refresh 2026-07-22"
+    },
+    "global-088": {
+      "deadline": "2026-08-02",
+      "deadlineDate": "2026-08-02",
+      "verifiedDate": "2026-07-22",
+      "note": "auto-refresh 2026-07-22"
+    },
+    "global-096": {
+      "deadline": "Expired; the only specific deadline found in search results is 6 Mar 2026 on a third-party listing, and the posting is m",
+      "deadlineDate": "2026-03-06",
+      "verifiedDate": "2026-07-22",
+      "note": "auto-refresh 2026-07-22"
+    },
+    "global-097": {
+      "deadline": "Expired; official listing on MIT CAPD shows the job listing expired on 2026-05-29.",
+      "deadlineDate": "2026-05-29",
+      "verifiedDate": "2026-07-22",
+      "note": "auto-refresh 2026-07-22"
+    },
+    "gree-software-engineer-intern-2026": {
+      "deadline": "2026-06-28 23:59 JST",
+      "deadlineDate": "2026-06-28",
+      "verifiedDate": "2026-07-22",
+      "note": "auto-refresh 2026-07-22"
     }
   }
 }
