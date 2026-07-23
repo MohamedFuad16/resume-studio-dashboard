@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-07-22",
+  "updatedAt": "2026-07-23",
   "retired": [
     {
       "id": "global-040",
@@ -16,6 +16,14 @@
       "retiredAt": "2026-07-18",
       "reason": "apply URL HTTP-dead · model: no",
       "evidenceUrl": "https://job-boards.greenhouse.io/rocketlab/jobs/7736776003"
+    },
+    {
+      "id": "global-082",
+      "company": "Kinaxis",
+      "role": "Software Development Co-op/Intern - C++",
+      "retiredAt": "2026-07-23",
+      "reason": "apply URL HTTP-dead · model: no",
+      "evidenceUrl": "https://careers-kinaxis.icims.com/jobs/34764/co-op-intern-software-development---c++/job"
     },
     {
       "id": "global-091",
@@ -208,10 +216,10 @@
       "note": "auto-refresh 2026-07-19"
     },
     "global-073": {
-      "deadline": "Until 2026-07-30",
-      "deadlineDate": "2026-07-30",
-      "verifiedDate": "2026-07-19",
-      "note": "auto-refresh 2026-07-19"
+      "deadline": "Until 2026-08-17",
+      "deadlineDate": "2026-08-17",
+      "verifiedDate": "2026-07-23",
+      "note": "auto-refresh 2026-07-23"
     },
     "global-077": {
       "deadline": "28 Feb 2026",
@@ -374,6 +382,66 @@
       "deadlineDate": "2026-06-28",
       "verifiedDate": "2026-07-22",
       "note": "auto-refresh 2026-07-22"
+    },
+    "global-035": {
+      "deadline": "Apply before Jul 24, 2026",
+      "deadlineDate": "2026-07-24",
+      "verifiedDate": "2026-07-23",
+      "note": "auto-refresh 2026-07-23"
+    },
+    "global-064": {
+      "deadline": "Not stated on the official job posting; Nokia’s student pages say internship/co-op deadlines are typically on the job po",
+      "deadlineDate": "2025-11-14",
+      "verifiedDate": "2026-07-23",
+      "note": "auto-refresh 2026-07-23"
+    },
+    "global-041": {
+      "deadline": "2026-08-15",
+      "deadlineDate": "2026-08-15",
+      "verifiedDate": "2026-07-23",
+      "note": "auto-refresh 2026-07-23"
+    },
+    "global-007": {
+      "deadline": "2026-07-29",
+      "deadlineDate": "2026-07-29",
+      "verifiedDate": "2026-07-23",
+      "note": "auto-refresh 2026-07-23"
+    },
+    "global-029": {
+      "deadline": "No longer available on ABB’s official careers page; the posting appears closed.",
+      "deadlineDate": null,
+      "verifiedDate": "2026-07-23",
+      "note": "auto-refresh 2026-07-23"
+    },
+    "global-076": {
+      "deadline": "The posting is filled; no current application deadline is listed on the official Baker Hughes job page.",
+      "deadlineDate": null,
+      "verifiedDate": "2026-07-23",
+      "note": "auto-refresh 2026-07-23"
+    },
+    "global-069": {
+      "deadline": "Apply by 9 Jan 2026",
+      "deadlineDate": "2026-01-09",
+      "verifiedDate": "2026-07-23",
+      "note": "auto-refresh 2026-07-23"
+    },
+    "global-087": {
+      "deadline": "The official Hitachi international recruiting page says applications are accepted twice a month, with deadlines on the 1",
+      "deadlineDate": "2027-01-31",
+      "verifiedDate": "2026-07-23",
+      "note": "auto-refresh 2026-07-23"
+    },
+    "abeja-platform-software-engineer-intern-2026": {
+      "deadline": "2025-12-31",
+      "deadlineDate": "2025-12-31",
+      "verifiedDate": "2026-07-23",
+      "note": "auto-refresh 2026-07-23"
+    },
+    "hacobu-software-engineer-intern-2026": {
+      "deadline": "2026-08-31 00:00 JST",
+      "deadlineDate": "2026-08-31",
+      "verifiedDate": "2026-07-23",
+      "note": "auto-refresh 2026-07-23"
     }
   }
 }
