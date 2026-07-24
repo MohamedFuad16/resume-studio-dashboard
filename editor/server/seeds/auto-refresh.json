@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-07-23",
+  "updatedAt": "2026-07-24",
   "retired": [
     {
       "id": "global-040",
@@ -8,6 +8,14 @@
       "retiredAt": "2026-07-19",
       "reason": "apply URL HTTP-dead · model: unknown",
       "evidenceUrl": "https://internship.sg/internships/technical-support-engineer-intern-july-to-december-2026-cloudflare-1778652096746-0"
+    },
+    {
+      "id": "global-061",
+      "company": "NVIDIA",
+      "role": "Software Performance at Scale Intern",
+      "retiredAt": "2026-07-24",
+      "reason": "apply URL HTTP-dead · model: no",
+      "evidenceUrl": "https://www.linkedin.com/jobs/view/software-performance-at-scale-intern-fall-2026-at-nvidia-4418862751"
     },
     {
       "id": "global-066",
@@ -36,28 +44,28 @@
   ],
   "deadlinePatches": {
     "rakuten-techcamp-ai-applications-2026": {
-      "deadline": "2026-07-31 09:00 JST",
-      "deadlineDate": "2026-07-31",
-      "verifiedDate": "2026-07-19",
-      "note": "auto-refresh 2026-07-19"
+      "deadline": "June 30, 2026 9:00 AM JST",
+      "deadlineDate": "2026-06-30",
+      "verifiedDate": "2026-07-24",
+      "note": "auto-refresh 2026-07-24"
     },
     "rakuten-techcamp-cloud-applications-2026": {
-      "deadline": "2026-07-31 09:00 JST",
-      "deadlineDate": "2026-07-31",
-      "verifiedDate": "2026-07-19",
-      "note": "auto-refresh 2026-07-19"
+      "deadline": "June 30, 2026 at 9:00 AM JST",
+      "deadlineDate": "2026-06-30",
+      "verifiedDate": "2026-07-24",
+      "note": "auto-refresh 2026-07-24"
     },
     "rakuten-techcamp-ai-engineer-2026": {
-      "deadline": "2026-07-31 09:00 JST",
-      "deadlineDate": "2026-07-31",
-      "verifiedDate": "2026-07-19",
-      "note": "auto-refresh 2026-07-19"
+      "deadline": "Applications are listed as open for the 3rd round until 2026-06-30 9:00 AM JST, and the page warns it may close earlier ",
+      "deadlineDate": "2026-06-30",
+      "verifiedDate": "2026-07-24",
+      "note": "auto-refresh 2026-07-24"
     },
     "rakuten-techcamp-marketing-cloud-2026": {
-      "deadline": "July 31, 2026 9:00 AM JST",
-      "deadlineDate": "2026-07-31",
-      "verifiedDate": "2026-07-19",
-      "note": "auto-refresh 2026-07-19"
+      "deadline": "June 30, 2026 9:00 AM JST",
+      "deadlineDate": "2026-06-30",
+      "verifiedDate": "2026-07-24",
+      "note": "auto-refresh 2026-07-24"
     },
     "rakuten-techcamp-payment-applications-2026": {
       "deadline": "July 31st (Fri) 9:00 AM (JST)",
@@ -72,22 +80,22 @@
       "note": "auto-refresh 2026-07-19"
     },
     "rakuten-techcamp-data-ai-2026": {
-      "deadline": "2026-07-31 09:00 JST",
-      "deadlineDate": "2026-07-31",
-      "verifiedDate": "2026-07-19",
-      "note": "auto-refresh 2026-07-19"
+      "deadline": "2026-06-30 09:00 JST",
+      "deadlineDate": "2026-06-30",
+      "verifiedDate": "2026-07-24",
+      "note": "auto-refresh 2026-07-24"
     },
     "rakuten-techcamp-infra-services-2026": {
-      "deadline": "2026-07-31 09:00 JST",
-      "deadlineDate": "2026-07-31",
-      "verifiedDate": "2026-07-19",
-      "note": "auto-refresh 2026-07-19"
+      "deadline": "June 30, 2026 at 9:00 AM JST",
+      "deadlineDate": "2026-06-30",
+      "verifiedDate": "2026-07-24",
+      "note": "auto-refresh 2026-07-24"
     },
     "rakuten-techcamp-corporate-apps-2026": {
-      "deadline": "2026-07-31 09:00 JST",
-      "deadlineDate": "2026-07-31",
-      "verifiedDate": "2026-07-19",
-      "note": "auto-refresh 2026-07-19"
+      "deadline": "2026-06-30 09:00 JST",
+      "deadlineDate": "2026-06-30",
+      "verifiedDate": "2026-07-24",
+      "note": "auto-refresh 2026-07-24"
     },
     "rakuten-techcamp-membership-apps-2026": {
       "deadline": "July 31, 2026 9:00 AM JST",
@@ -96,40 +104,40 @@
       "note": "auto-refresh 2026-07-19"
     },
     "rakuten-techcamp-software-qa-2026": {
-      "deadline": "July 31, 2026, 9:00 AM JST",
-      "deadlineDate": "2026-07-31",
-      "verifiedDate": "2026-07-19",
-      "note": "auto-refresh 2026-07-19"
+      "deadline": "June 30, 2026, 9:00 AM JST",
+      "deadlineDate": "2026-06-30",
+      "verifiedDate": "2026-07-24",
+      "note": "auto-refresh 2026-07-24"
     },
     "rakuten-techcamp-corporate-pm-2026": {
-      "deadline": "2026-07-31 09:00 JST",
-      "deadlineDate": "2026-07-31",
-      "verifiedDate": "2026-07-19",
-      "note": "auto-refresh 2026-07-19"
+      "deadline": "Applications are now closed; official page shows the last application period ended June 30, 2026 at 9:00 AM JST.",
+      "deadlineDate": "2026-06-30",
+      "verifiedDate": "2026-07-24",
+      "note": "auto-refresh 2026-07-24"
     },
     "rakuten-techcamp-membership-pm-2026": {
-      "deadline": "2026-07-31 09:00 JST",
-      "deadlineDate": "2026-07-31",
-      "verifiedDate": "2026-07-19",
-      "note": "auto-refresh 2026-07-19"
+      "deadline": "2026-06-30 09:00 JST",
+      "deadlineDate": "2026-06-30",
+      "verifiedDate": "2026-07-24",
+      "note": "auto-refresh 2026-07-24"
     },
     "rakuten-techcamp-membership-ml-2026": {
-      "deadline": "July 31st (Fri) 9:00 AM (JST)",
-      "deadlineDate": "2026-07-31",
-      "verifiedDate": "2026-07-19",
-      "note": "auto-refresh 2026-07-19"
+      "deadline": "June 30, 2026 9:00 AM JST",
+      "deadlineDate": "2026-06-30",
+      "verifiedDate": "2026-07-24",
+      "note": "auto-refresh 2026-07-24"
     },
     "rakuten-techcamp-global-ads-apps-2026": {
-      "deadline": "2026-07-31 09:00 JST",
-      "deadlineDate": "2026-07-31",
-      "verifiedDate": "2026-07-19",
-      "note": "auto-refresh 2026-07-19"
+      "deadline": "2026-06-30 09:00 JST",
+      "deadlineDate": "2026-06-30",
+      "verifiedDate": "2026-07-24",
+      "note": "auto-refresh 2026-07-24"
     },
     "rakuten-techcamp-global-ads-producer-2026": {
-      "deadline": "July 31st (Fri) 9:00 AM (JST)",
-      "deadlineDate": "2026-07-31",
-      "verifiedDate": "2026-07-19",
-      "note": "auto-refresh 2026-07-19"
+      "deadline": "June 30, 2026, 9:00 AM (JST)",
+      "deadlineDate": "2026-06-30",
+      "verifiedDate": "2026-07-24",
+      "note": "auto-refresh 2026-07-24"
     },
     "global-001": {
       "deadline": "June 30, 2026",
@@ -348,10 +356,10 @@
       "note": "auto-refresh 2026-07-22"
     },
     "global-050": {
-      "deadline": "Until 2026-07-31",
-      "deadlineDate": "2026-07-31",
-      "verifiedDate": "2026-07-22",
-      "note": "auto-refresh 2026-07-22"
+      "deadline": "Until 2026-08-10",
+      "deadlineDate": "2026-08-10",
+      "verifiedDate": "2026-07-24",
+      "note": "auto-refresh 2026-07-24"
     },
     "global-083": {
       "deadline": "Opportunity expired; no current application deadline listed",
@@ -442,6 +450,54 @@
       "deadlineDate": "2026-08-31",
       "verifiedDate": "2026-07-23",
       "note": "auto-refresh 2026-07-23"
+    },
+    "global-005": {
+      "deadline": "Until 8/8/2026",
+      "deadlineDate": "2026-08-08",
+      "verifiedDate": "2026-07-24",
+      "note": "auto-refresh 2026-07-24"
+    },
+    "global-011": {
+      "deadline": "Until 7/30/2026",
+      "deadlineDate": "2026-07-30",
+      "verifiedDate": "2026-07-24",
+      "note": "auto-refresh 2026-07-24"
+    },
+    "global-092": {
+      "deadline": "Apply by 15 Apr 2026",
+      "deadlineDate": "2026-04-15",
+      "verifiedDate": "2026-07-24",
+      "note": "auto-refresh 2026-07-24"
+    },
+    "global-098": {
+      "deadline": "No current official deadline found in the provided sources; the accessible official MTA internship pages do not list a d",
+      "deadlineDate": "2026-03-27",
+      "verifiedDate": "2026-07-24",
+      "note": "auto-refresh 2026-07-24"
+    },
+    "mirrativ-android-kotlin-intern-2028": {
+      "deadline": "Open until filled",
+      "deadlineDate": null,
+      "verifiedDate": "2026-07-24",
+      "note": "auto-refresh 2026-07-24"
+    },
+    "sansan-software-engineer-intern-2026": {
+      "deadline": "2025-06-30",
+      "deadlineDate": "2025-06-30",
+      "verifiedDate": "2026-07-24",
+      "note": "auto-refresh 2026-07-24"
+    },
+    "cyberagent-software-engineer-intern-2026": {
+      "deadline": "募集終了（2026-05-17 23:59）",
+      "deadlineDate": "2026-05-17",
+      "verifiedDate": "2026-07-24",
+      "note": "auto-refresh 2026-07-24"
+    },
+    "dena-software-engineer-intern-2026": {
+      "deadline": "インターンシップ参加希望のエントリー締切は「2026年6月14日（日）23:59まで」です。",
+      "deadlineDate": "2026-06-14",
+      "verifiedDate": "2026-07-24",
+      "note": "auto-refresh 2026-07-24"
     }
   }
 }
