@@ -19,6 +19,12 @@ on:
   pull_request:
     paths:
       - 'editor/**'
+      # The daily bot PR touches ONLY the machine-owned overlay, which the refresh job
+      # has already re-validated before opening the PR. Its pull_request run just sat in
+      # action_required (bot runs need manual approval), producing a failure-looking
+      # notification every day. Human PRs touching anything else still validate, and the
+      # post-merge push run still covers this file.
+      - '!editor/server/seeds/auto-refresh.json'
   # Daily self-healing refresh (06:00 UTC).
   schedule:
     - cron: '0 6 * * *'
