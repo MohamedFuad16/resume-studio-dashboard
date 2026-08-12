@@ -2,15 +2,22 @@
 
 Every entry: date · who · what changed · what the OTHER side must do.
 
+- **2026-08-12 · both · Final production host: `https://api.mohamedfuad.com`
+  (custom domain over the same EC2 backend).** The owner mapped their IONOS
+  domain hours after the move below; Caddy serves both the domain and the
+  `3-112-141-17.nip.io` fallback. Both client configs now use the domain —
+  it survives an Elastic-IP change with a DNS edit instead of two commits.
+  The Azure resource groups were deleted the same day, so the old Azure host
+  no longer exists: **any installed iOS build older than this entry is broken
+  until updated.** Redirect URI on the domain authorized in Google Console.
+
 - **2026-08-12 · both · Production base URL moved: Azure Container App → AWS
-  EC2 (`https://3-112-141-17.nip.io`).** Same server image (`portal-compile:
-  48fdcd6`), same routes and shapes — only the host changed. Web side is done:
-  Vercel `VITE_API_BASE_URL` updated + redeployed. iOS side: `PortalAPIBaseURL`
-  in `ios/project.yml` and the `API.swift` fallback updated in this commit —
-  **shipped builds still point at Azure, so the Azure Container App must stay
-  up until an updated build is installed.** Gmail OAuth callback moved with the
-  host; the redirect URI `https://3-112-141-17.nip.io/api/integrations/gmail/
-  callback` must be authorized in Google Cloud Console (owner action).
+  EC2 (initially `https://3-112-141-17.nip.io`, superseded same day by the
+  entry above).** Same server image (`portal-compile:48fdcd6`), same routes
+  and shapes — only the host changed. Web: Vercel `VITE_API_BASE_URL` updated
+  + redeployed. iOS: `PortalAPIBaseURL` in `ios/project.yml` and the
+  `API.swift` fallback. Gmail OAuth callback moved with the host and was
+  authorized in Google Cloud Console (owner action).
 
 - **2026-07-20 · iOS · REQUEST to web — company facts in the research payload.**
   iOS now has a company page (tap an orb in Companies → it expands into

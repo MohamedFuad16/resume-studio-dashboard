@@ -45,7 +45,7 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>PortalAPIBaseURL</key>
-	<string>https://3-112-141-17.nip.io</string>
+	<string>https://api.mohamedfuad.com</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>

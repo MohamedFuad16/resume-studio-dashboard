@@ -22,7 +22,7 @@ inbox (80 scanned → 20 real internships queued, 23 non-internships dropped).
 ## Recent changes
 - **2026-08-12 — Backend host repointed to AWS (`PortalAPIBaseURL`):** the
   production server moved from the Azure Container App to Docker on EC2 Tokyo
-  (`https://3-112-141-17.nip.io`, Elastic-IP-bound nip.io name, Caddy TLS).
+  (`https://api.mohamedfuad.com`, Elastic-IP-bound nip.io name, Caddy TLS).
   Same image and API surface — config-only change: `ios/project.yml` Info.plist
   value + the `API.swift` fallback, plus `contracts/api.md` Base URLs and a
   `contracts/CHANGELOG.md` entry. Shipped builds keep working against Azure

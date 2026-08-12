@@ -5,11 +5,12 @@ Server implementation: `editor/server/index.js` (web-owned). iOS call sites:
 
 ## Base URLs
 
-- Production (both clients): `https://3-112-141-17.nip.io`
-  - Docker on AWS EC2 `i-09677306125d4b7ba` (Tokyo) behind Caddy; the nip.io
-    name is bound to Elastic IP 3.112.141.17 and only changes if that IP is
-    released. Data lives on the instance at `/srv/resumedata` (mounted as
-    `/data`). Migrated off Azure Container Apps 2026-08-12.
+- Production (both clients): `https://api.mohamedfuad.com`
+  - Docker on AWS EC2 `i-09677306125d4b7ba` (Tokyo, t3.micro) behind Caddy.
+    The domain is an IONOS A record on Elastic IP 3.112.141.17;
+    `https://3-112-141-17.nip.io` is served as a fallback host. Data lives on
+    the instance at `/srv/resumedata` (mounted as `/data`). Migrated off
+    Azure Container Apps 2026-08-12; Azure was decommissioned the same day.
   - iOS reads it from Info.plist key `PortalAPIBaseURL` (set in `ios/project.yml`);
     the web reads `VITE_API_BASE_URL`. **If the backend host ever moves,
     both configs must change — neither client hardcodes it in code.**

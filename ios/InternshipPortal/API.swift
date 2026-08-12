@@ -30,7 +30,7 @@ struct PortalAPI {
            let url = URL(string: raw), url.scheme != nil {
             return url
         }
-        return URL(string: "https://3-112-141-17.nip.io")!
+        return URL(string: "https://api.mohamedfuad.com")!
     }()
 
     static let profile = "mohamed_fuad"
