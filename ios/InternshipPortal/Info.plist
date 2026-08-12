@@ -45,7 +45,7 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>PortalAPIBaseURL</key>
-	<string>https://portal-compile-jp.redgrass-10389803.japaneast.azurecontainerapps.io</string>
+	<string>https://3-112-141-17.nip.io</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>

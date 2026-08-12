@@ -1,5 +1,5 @@
-// Client for the production backend (Azure Container App portal-compile-jp, Japan
-// East — the same instance the web app calls).
+// Client for the production backend (Docker on AWS EC2 in Tokyo — the same
+// instance the web app calls; moved off Azure Container Apps 2026-08).
 //
 // SCOPE NOTE: these endpoints are the server's KV path, keyed by profile id. The
 // web app's signed-in users keep their data in Firestore instead; until the
@@ -21,16 +21,16 @@ enum APIError: LocalizedError {
 }
 
 struct PortalAPI {
-    /// From Info.plist (`PortalAPIBaseURL`, set in project.yml), because the Azure
-    /// hostname is web-team infrastructure: if they recreate the container app the
-    /// random suffix changes, and a URL baked into code would brick every shipped
-    /// build. Config makes that a one-line bump. Contract: contracts/api.md.
+    /// From Info.plist (`PortalAPIBaseURL`, set in project.yml), because the
+    /// hostname is web-team infrastructure: if they move the backend host, a URL
+    /// baked into code would brick every shipped build. Config makes that a
+    /// one-line bump. Contract: contracts/api.md.
     static let baseURL: URL = {
         if let raw = Bundle.main.object(forInfoDictionaryKey: "PortalAPIBaseURL") as? String,
            let url = URL(string: raw), url.scheme != nil {
             return url
         }
-        return URL(string: "https://portal-compile-jp.redgrass-10389803.japaneast.azurecontainerapps.io")!
+        return URL(string: "https://3-112-141-17.nip.io")!
     }()
 
     static let profile = "mohamed_fuad"

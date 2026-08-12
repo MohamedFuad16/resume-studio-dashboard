@@ -2,6 +2,16 @@
 
 Every entry: date · who · what changed · what the OTHER side must do.
 
+- **2026-08-12 · both · Production base URL moved: Azure Container App → AWS
+  EC2 (`https://3-112-141-17.nip.io`).** Same server image (`portal-compile:
+  48fdcd6`), same routes and shapes — only the host changed. Web side is done:
+  Vercel `VITE_API_BASE_URL` updated + redeployed. iOS side: `PortalAPIBaseURL`
+  in `ios/project.yml` and the `API.swift` fallback updated in this commit —
+  **shipped builds still point at Azure, so the Azure Container App must stay
+  up until an updated build is installed.** Gmail OAuth callback moved with the
+  host; the redirect URI `https://3-112-141-17.nip.io/api/integrations/gmail/
+  callback` must be authorized in Google Cloud Console (owner action).
+
 - **2026-07-20 · iOS · REQUEST to web — company facts in the research payload.**
   iOS now has a company page (tap an orb in Companies → it expands into
   `CompanyDetailView`) that shows real stats: catalog popularity, listings, the
