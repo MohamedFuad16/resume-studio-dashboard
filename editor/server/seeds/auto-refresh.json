@@ -1,6 +1,14 @@
 {
-  "updatedAt": "2026-07-25",
+  "updatedAt": "2026-09-05",
   "retired": [
+    {
+      "id": "canary-software-engineer-intern-2026",
+      "company": "Canary",
+      "role": "Software Engineer Internship",
+      "retiredAt": "2026-09-05",
+      "reason": "apply URL HTTP-dead · model: unknown",
+      "evidenceUrl": "https://herp.careers/careers/companies/canaryinc/jobs/wHhhshJ3nef8"
+    },
     {
       "id": "chanel-enterprise-architecture-intern-2026",
       "company": "CHANEL",
@@ -8,6 +16,30 @@
       "retiredAt": "2026-07-25",
       "reason": "apply URL HTTP-dead · model: unknown",
       "evidenceUrl": "https://cc.wd3.myworkdayjobs.com/en-US/chanelcareers/job/Tokyo/Intern--Unfilled-_JOBREQ00112350"
+    },
+    {
+      "id": "global-001",
+      "company": "SpaceX",
+      "role": "Fall 2026 Software Engineering Internship/Co-op",
+      "retiredAt": "2026-09-05",
+      "reason": "apply URL HTTP-dead · model: unknown",
+      "evidenceUrl": "https://job-boards.greenhouse.io/spacex/jobs/8403219002?gh_jid=8403219002"
+    },
+    {
+      "id": "global-005",
+      "company": "Scale AI",
+      "role": "AI Builder Intern",
+      "retiredAt": "2026-09-05",
+      "reason": "apply URL HTTP-dead · model: unknown",
+      "evidenceUrl": "https://job-boards.greenhouse.io/scaleai/jobs/4703343005"
+    },
+    {
+      "id": "global-014",
+      "company": "Gemini",
+      "role": "Software Engineer Intern",
+      "retiredAt": "2026-09-05",
+      "reason": "apply URL HTTP-dead · model: unknown",
+      "evidenceUrl": "https://www.gemini.com/careers"
     },
     {
       "id": "global-040",
@@ -18,12 +50,52 @@
       "evidenceUrl": "https://internship.sg/internships/technical-support-engineer-intern-july-to-december-2026-cloudflare-1778652096746-0"
     },
     {
+      "id": "global-046",
+      "company": "Verkada",
+      "role": "Technical Support Engineering Intern - Fall 2026",
+      "retiredAt": "2026-09-05",
+      "reason": "apply URL HTTP-dead · model: no",
+      "evidenceUrl": "https://www.internships.com/c/verkada"
+    },
+    {
+      "id": "global-050",
+      "company": "Magnet Forensics",
+      "role": "Software Developer Co-op",
+      "retiredAt": "2026-09-05",
+      "reason": "apply URL HTTP-dead · model: no",
+      "evidenceUrl": "https://jobs.lever.co/magnetforensics?commitment=Co-op"
+    },
+    {
       "id": "global-066",
       "company": "Rocket Lab USA",
       "role": "Software Intern",
       "retiredAt": "2026-07-18",
       "reason": "apply URL HTTP-dead · model: no",
       "evidenceUrl": "https://job-boards.greenhouse.io/rocketlab/jobs/7736776003"
+    },
+    {
+      "id": "global-067",
+      "company": "Scale AI",
+      "role": "Technical Advisor Specialist (Part-Time Internship)",
+      "retiredAt": "2026-09-05",
+      "reason": "apply URL HTTP-dead · model: unknown",
+      "evidenceUrl": "https://job-boards.greenhouse.io/scaleai/jobs/4611533005"
+    },
+    {
+      "id": "global-070",
+      "company": "SpaceX",
+      "role": "Fall 2026 Business Operations Internship/Co-op",
+      "retiredAt": "2026-09-05",
+      "reason": "apply URL HTTP-dead · model: unknown",
+      "evidenceUrl": "http://job-boards.greenhouse.io/spacex/jobs/8403205002?gh_jid=8403205002"
+    },
+    {
+      "id": "global-072",
+      "company": "Apera AI",
+      "role": "Software Developer Co-op - C++",
+      "retiredAt": "2026-09-05",
+      "reason": "apply URL HTTP-dead · model: unknown",
+      "evidenceUrl": "https://job-boards.greenhouse.io/aperaaiinc/jobs/5151788007"
     },
     {
       "id": "global-082",
@@ -40,6 +112,46 @@
       "retiredAt": "2026-07-16",
       "reason": "apply URL HTTP-dead · model: unknown",
       "evidenceUrl": "https://job-boards.greenhouse.io/harbingermotors/jobs/5164341007"
+    },
+    {
+      "id": "global-097",
+      "company": "Integra FEC",
+      "role": "Data Analyst Intern",
+      "retiredAt": "2026-09-05",
+      "reason": "apply URL HTTP-dead · model: unknown",
+      "evidenceUrl": "https://job-boards.greenhouse.io/integrainterns"
+    },
+    {
+      "id": "global-100",
+      "company": "Formlabs",
+      "role": "Hardware Systems Integration Intern",
+      "retiredAt": "2026-09-05",
+      "reason": "apply URL HTTP-dead · model: no",
+      "evidenceUrl": "https://careers.formlabs.com/job/7927471/apply/"
+    },
+    {
+      "id": "ispace-ground-systems-intern-2026",
+      "company": "ispace",
+      "role": "Ground Systems / Testing Infrastructure Intern",
+      "retiredAt": "2026-09-05",
+      "reason": "apply URL HTTP-dead · model: no",
+      "evidenceUrl": "https://jp.indeed.com/viewjob?jk=4072354fec29b160"
+    },
+    {
+      "id": "t2-summer-internship-autonomous-driving-2026",
+      "company": "T2",
+      "role": "2026 Summer Internship - Autonomous Driving Engineering Tracks",
+      "retiredAt": "2026-09-05",
+      "reason": "apply URL HTTP-dead · model: no",
+      "evidenceUrl": "https://herp.careers/v1/t2auto/8QPse9MhkGtM"
+    },
+    {
+      "id": "unerry-software-engineer-intern-2026",
+      "company": "unerry",
+      "role": "Long-Term Software Engineer Internship",
+      "retiredAt": "2026-09-05",
+      "reason": "apply URL HTTP-dead · model: unknown",
+      "evidenceUrl": "https://hrmos.co/pages/unerry/jobs/6ro0009"
     }
   ],
   "deadlinePatches": {
@@ -50,16 +162,16 @@
       "note": "auto-refresh 2026-07-25"
     },
     "rakuten-techcamp-cloud-applications-2026": {
-      "deadline": "June 30, 2026, 9:00 AM JST",
-      "deadlineDate": "2026-06-30",
-      "verifiedDate": "2026-07-25",
-      "note": "auto-refresh 2026-07-25"
+      "deadline": "Applications for this internship are now closed.",
+      "deadlineDate": null,
+      "verifiedDate": "2026-09-05",
+      "note": "auto-refresh 2026-09-05"
     },
     "rakuten-techcamp-ai-engineer-2026": {
-      "deadline": "2026-06-30 09:00 JST",
+      "deadline": "Applications are now closed.",
       "deadlineDate": "2026-06-30",
-      "verifiedDate": "2026-07-25",
-      "note": "auto-refresh 2026-07-25"
+      "verifiedDate": "2026-09-05",
+      "note": "auto-refresh 2026-09-05"
     },
     "rakuten-techcamp-marketing-cloud-2026": {
       "deadline": "June 30, 2026 9:00 AM JST",
@@ -86,10 +198,10 @@
       "note": "auto-refresh 2026-07-25"
     },
     "rakuten-techcamp-infra-services-2026": {
-      "deadline": "2026-06-30 09:00 JST",
-      "deadlineDate": "2026-06-30",
-      "verifiedDate": "2026-07-25",
-      "note": "auto-refresh 2026-07-25"
+      "deadline": "Applications for this internship are now closed.",
+      "deadlineDate": null,
+      "verifiedDate": "2026-09-05",
+      "note": "auto-refresh 2026-09-05"
     },
     "rakuten-techcamp-corporate-apps-2026": {
       "deadline": "2026-06-30 09:00 JST",
@@ -152,10 +264,10 @@
       "note": "auto-refresh 2026-07-19"
     },
     "global-015": {
-      "deadline": "June 9, 2026",
-      "deadlineDate": "2026-06-09",
-      "verifiedDate": "2026-07-19",
-      "note": "auto-refresh 2026-07-19"
+      "deadline": "No longer accepting applications",
+      "deadlineDate": null,
+      "verifiedDate": "2026-09-05",
+      "note": "auto-refresh 2026-09-05"
     },
     "global-046": {
       "deadline": "August 6, 2026",
@@ -164,10 +276,10 @@
       "note": "auto-refresh 2026-07-19"
     },
     "global-061": {
-      "deadline": "Applications for this job will be accepted at least until May 31, 2026",
-      "deadlineDate": "2026-05-31",
-      "verifiedDate": "2026-07-19",
-      "note": "auto-refresh 2026-07-19"
+      "deadline": "No longer accepting applications",
+      "deadlineDate": "2026-09-01",
+      "verifiedDate": "2026-09-05",
+      "note": "auto-refresh 2026-09-05"
     },
     "global-070": {
       "deadline": "Opportunity expired",
@@ -492,6 +604,24 @@
       "deadlineDate": "2026-07-03",
       "verifiedDate": "2026-07-25",
       "note": "auto-refresh 2026-07-25"
+    },
+    "mercari-software-engineer-2028": {
+      "deadline": "June 30, 2026, 23:59 JST",
+      "deadlineDate": "2026-06-30",
+      "verifiedDate": "2026-09-05",
+      "note": "auto-refresh 2026-09-05"
+    },
+    "global-062": {
+      "deadline": "Until 2026-09-23",
+      "deadlineDate": "2026-09-23",
+      "verifiedDate": "2026-09-05",
+      "note": "auto-refresh 2026-09-05"
+    },
+    "global-093": {
+      "deadline": "September 28, 2026",
+      "deadlineDate": "2026-09-28",
+      "verifiedDate": "2026-09-05",
+      "note": "auto-refresh 2026-09-05"
     }
   }
 }
