@@ -1,6 +1,14 @@
 {
-  "updatedAt": "2026-07-25",
+  "updatedAt": "2026-09-12",
   "retired": [
+    {
+      "id": "canary-software-engineer-intern-2026",
+      "company": "Canary",
+      "role": "Software Engineer Internship",
+      "retiredAt": "2026-09-12",
+      "reason": "apply URL HTTP-dead · model: unconfirmed",
+      "evidenceUrl": "https://herp.careers/careers/companies/canaryinc/jobs/wHhhshJ3nef8"
+    },
     {
       "id": "chanel-enterprise-architecture-intern-2026",
       "company": "CHANEL",
@@ -8,6 +16,38 @@
       "retiredAt": "2026-07-25",
       "reason": "apply URL HTTP-dead · model: unknown",
       "evidenceUrl": "https://cc.wd3.myworkdayjobs.com/en-US/chanelcareers/job/Tokyo/Intern--Unfilled-_JOBREQ00112350"
+    },
+    {
+      "id": "franky-mori-software-engineer-intern-2026",
+      "company": "franky",
+      "role": "Mori Software Engineer Long-Term Internship",
+      "retiredAt": "2026-09-12",
+      "reason": "apply URL HTTP-dead · model: unconfirmed",
+      "evidenceUrl": "https://herp.careers/careers/companies/franky/jobs/NOviGaf7HfKs"
+    },
+    {
+      "id": "global-001",
+      "company": "SpaceX",
+      "role": "Fall 2026 Software Engineering Internship/Co-op",
+      "retiredAt": "2026-09-12",
+      "reason": "apply URL HTTP-dead · model: unconfirmed",
+      "evidenceUrl": "https://boards.greenhouse.io/spacex/jobs/8403219002?gh_jid=8403219002"
+    },
+    {
+      "id": "global-005",
+      "company": "Scale AI",
+      "role": "AI Builder Intern",
+      "retiredAt": "2026-09-12",
+      "reason": "apply URL HTTP-dead · model: unconfirmed",
+      "evidenceUrl": "https://job-boards.greenhouse.io/scaleai/jobs/4703343005"
+    },
+    {
+      "id": "global-014",
+      "company": "Gemini",
+      "role": "Software Engineer Intern",
+      "retiredAt": "2026-09-12",
+      "reason": "apply URL HTTP-dead · model: unconfirmed",
+      "evidenceUrl": "https://boards.greenhouse.io/embed/job_app?for=gemini&token=7875125&gh_jid=7875125"
     },
     {
       "id": "global-040",
@@ -18,12 +58,76 @@
       "evidenceUrl": "https://internship.sg/internships/technical-support-engineer-intern-july-to-december-2026-cloudflare-1778652096746-0"
     },
     {
+      "id": "global-041",
+      "company": "Astranis",
+      "role": "Software Engineer-Backend Intern",
+      "retiredAt": "2026-09-12",
+      "reason": "apply URL HTTP-dead · model: unconfirmed",
+      "evidenceUrl": "https://job-boards.greenhouse.io/astranis/jobs/4681183006"
+    },
+    {
+      "id": "global-046",
+      "company": "Verkada",
+      "role": "Technical Support Engineering Intern - Fall 2026",
+      "retiredAt": "2026-09-12",
+      "reason": "apply URL HTTP-dead · model: unconfirmed",
+      "evidenceUrl": "https://job-boards.greenhouse.io/verkada/jobs/5017082007"
+    },
+    {
+      "id": "global-050",
+      "company": "Magnet Forensics",
+      "role": "Software Developer Co-op",
+      "retiredAt": "2026-09-12",
+      "reason": "apply URL HTTP-dead · model: unconfirmed",
+      "evidenceUrl": "https://jobs.lever.co/magnetforensics/d393ab82-448a-4dc2-87d0-a00981a55785/apply"
+    },
+    {
+      "id": "global-051",
+      "company": "Magnet Forensics",
+      "role": "Software Developer Co-op",
+      "retiredAt": "2026-09-12",
+      "reason": "apply URL HTTP-dead · model: unconfirmed",
+      "evidenceUrl": "https://jobs.lever.co/magnetforensics/b9fdce72-4c58-46bb-b7e2-b4bdc90390e5/apply"
+    },
+    {
       "id": "global-066",
       "company": "Rocket Lab USA",
       "role": "Software Intern",
       "retiredAt": "2026-07-18",
       "reason": "apply URL HTTP-dead · model: no",
       "evidenceUrl": "https://job-boards.greenhouse.io/rocketlab/jobs/7736776003"
+    },
+    {
+      "id": "global-067",
+      "company": "Scale AI",
+      "role": "Technical Advisor Specialist (Part-Time Internship)",
+      "retiredAt": "2026-09-12",
+      "reason": "apply URL HTTP-dead · model: unconfirmed",
+      "evidenceUrl": "https://job-boards.greenhouse.io/scaleai/jobs/4611533005"
+    },
+    {
+      "id": "global-070",
+      "company": "SpaceX",
+      "role": "Fall 2026 Business Operations Internship/Co-op",
+      "retiredAt": "2026-09-12",
+      "reason": "apply URL HTTP-dead · model: unconfirmed",
+      "evidenceUrl": "https://boards.greenhouse.io/spacex/jobs/8403205002?gh_jid=8403205002"
+    },
+    {
+      "id": "global-072",
+      "company": "Apera AI",
+      "role": "Software Developer Co-op - C++",
+      "retiredAt": "2026-09-12",
+      "reason": "apply URL HTTP-dead · model: unconfirmed",
+      "evidenceUrl": "https://job-boards.greenhouse.io/aperaaiinc/jobs/5151788007"
+    },
+    {
+      "id": "global-075",
+      "company": "Together AI",
+      "role": "Systems Research Engineer Intern - GPU Programming",
+      "retiredAt": "2026-09-12",
+      "reason": "apply URL HTTP-dead · model: unconfirmed",
+      "evidenceUrl": "https://job-boards.greenhouse.io/togetherai/jobs/5157559007"
     },
     {
       "id": "global-082",
@@ -34,12 +138,68 @@
       "evidenceUrl": "https://careers-kinaxis.icims.com/jobs/34764/co-op-intern-software-development---c++/job"
     },
     {
+      "id": "global-089",
+      "company": "Altom Transport",
+      "role": "Software Development Intern",
+      "retiredAt": "2026-09-12",
+      "reason": "apply URL HTTP-dead · model: unconfirmed",
+      "evidenceUrl": "https://apply.workable.com/altom-transport/j/8536165C7B/apply"
+    },
+    {
       "id": "global-091",
       "company": "Harbinger Motors",
       "role": "Production Data Analytics Intern",
       "retiredAt": "2026-07-16",
       "reason": "apply URL HTTP-dead · model: unknown",
       "evidenceUrl": "https://job-boards.greenhouse.io/harbingermotors/jobs/5164341007"
+    },
+    {
+      "id": "global-097",
+      "company": "Integra FEC",
+      "role": "Data Analyst Intern",
+      "retiredAt": "2026-09-12",
+      "reason": "apply URL HTTP-dead · model: unconfirmed",
+      "evidenceUrl": "https://job-boards.greenhouse.io/integrainterns/jobs/5134523008"
+    },
+    {
+      "id": "global-100",
+      "company": "Formlabs",
+      "role": "Hardware Systems Integration Intern",
+      "retiredAt": "2026-09-12",
+      "reason": "apply URL HTTP-dead · model: unconfirmed",
+      "evidenceUrl": "https://careers.formlabs.com/job/7927471/apply/?gh_jid=7927471"
+    },
+    {
+      "id": "ispace-ground-systems-intern-2026",
+      "company": "ispace",
+      "role": "Ground Systems / Testing Infrastructure Intern",
+      "retiredAt": "2026-09-12",
+      "reason": "apply URL HTTP-dead · model: unconfirmed",
+      "evidenceUrl": "https://jobs.lever.co/ispace-inc/4e510a34-b3ac-45c0-9c5b-bc77cba8ab79"
+    },
+    {
+      "id": "t2-summer-internship-autonomous-driving-2026",
+      "company": "T2",
+      "role": "2026 Summer Internship - Autonomous Driving Engineering Tracks",
+      "retiredAt": "2026-09-12",
+      "reason": "apply URL HTTP-dead · model: unconfirmed",
+      "evidenceUrl": "https://herp.careers/v1/t2auto/8QPse9MhkGtM"
+    },
+    {
+      "id": "tenstorrent-meti-risc-v-internship-2026",
+      "company": "Tenstorrent",
+      "role": "METI Internship Program - RISC V Course",
+      "retiredAt": "2026-09-12",
+      "reason": "apply URL HTTP-dead · model: unconfirmed",
+      "evidenceUrl": "https://job-boards.greenhouse.io/tenstorrentunlisted/jobs/4998825007"
+    },
+    {
+      "id": "unerry-software-engineer-intern-2026",
+      "company": "unerry",
+      "role": "Long-Term Software Engineer Internship",
+      "retiredAt": "2026-09-12",
+      "reason": "apply URL HTTP-dead · model: unconfirmed",
+      "evidenceUrl": "https://hrmos.co/pages/unerry/jobs/6ro0009"
     }
   ],
   "deadlinePatches": {
