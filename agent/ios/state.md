@@ -20,6 +20,21 @@ Known-good production facts: server `portal-compile-jp` (japaneast) runs image
 inbox (80 scanned → 20 real internships queued, 23 non-internships dropped).
 
 ## Recent changes
+- **2026-09-24 — Sync-now marks user-triggered scans (`manual=1`); Settings row
+  points at the web's new PDF upload (ADR-I-016).** Web added a per-profile pause
+  on automatic Gmail scans and widened the backfill cap (contracts/CHANGELOG.md,
+  same date): once that ships, an automatic scan returns
+  `{skipped: 'ai-paused'}` while the owner has paused, and only a request
+  carrying `&manual=1` still runs. `PortalAPI.gmailSyncNow` gained a `manual`
+  parameter (default `false`); `rebuildFromGmail()` and the two Settings buttons
+  ("Sync now" / "Rescan last 90 days" in `GmailSettingsView`) pass `manual: true`,
+  load/foreground drains pass nothing and stay automatic. Also: web removed its
+  résumé editor (LaTeX compile, wizard) in favor of a browser-side PDF upload
+  that is parsed client-side and never stored (never an iOS route, so no contract
+  changed) — the Settings row that used to read "Résumé editor / LaTeX editing
+  stays on the desktop" now reads "Résumé PDF / Upload it in the web app's
+  Profile page" (+ JA strings). `bash scripts/verify-ios.sh` passes.
+
 - **2026-08-12 — Backend host repointed to AWS (`PortalAPIBaseURL`):** the
   production server moved from the Azure Container App to Docker on EC2 Tokyo
   (`https://api.mohamedfuad.com`, Elastic-IP-bound nip.io name, Caddy TLS).
