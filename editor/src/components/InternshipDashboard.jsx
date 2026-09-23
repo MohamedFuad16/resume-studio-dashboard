@@ -75,7 +75,7 @@ const copy = {
   en: {
     title: 'Japan-first internship matches',
     verified: (total, target, date) => `${total} verified live roles · target top ${target} · checked ${date}`,
-    tune: 'Tune my resume',
+    tune: 'Update my résumé',
     tokyo: 'Tokyo matches',
     japan: 'Japan total',
     english: 'English-first',
@@ -157,7 +157,7 @@ const copy = {
   ja: {
     title: '日本優先インターン検索',
     verified: (total, target, date) => `${total}件の確認済み募集 · 目標上位${target}件 · 確認日 ${date}`,
-    tune: '履歴書を調整',
+    tune: '履歴書を更新',
     tokyo: '東京の募集',
     japan: '日本の募集',
     english: '英語中心',
@@ -377,7 +377,7 @@ const isJapanBased = item => item.region === 'Japan'
 const isRemoteRole = item => /remote|リモート/i.test(`${item.location || ''} ${item.workMode || ''}`);
 // Exported so the Applications view and the dashboard's Recent applications can
 // open the same detail drawer when a company row is clicked.
-export const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEditor, cooldown = null, isJa = false }) => {
+export const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenProfile, cooldown = null, isJa = false }) => {
   const t = copy[isJa ? 'ja' : 'en'];
   const details = internshipDetails(item);
   const companyName = displayCompany(item, isJa);
@@ -495,7 +495,7 @@ export const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenEd
           {copy[isJa ? 'ja' : 'en'].applyNow} <ExternalLink size={15} />
         </a>
       ) : null}
-      <button type="button" className="intern-save-large" onClick={onOpenEditor}>{t.tune} <ArrowUpRight size={15} /></button>
+      <button type="button" className="intern-save-large" onClick={onOpenProfile}>{t.tune} <ArrowUpRight size={15} /></button>
     </div>
   </aside>
   );
@@ -560,7 +560,7 @@ function CompanyResearchPanel({ company, t, isJa, job, results, error, onStart, 
 
 const REGION_FILTERS = ['All', 'Japan', 'Remote', 'Global'];
 
-export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, activeProfile, resume }) {
+export function InternshipDashboard({ isJa, onOpenProfile, onOpenSettings, activeProfile, resume }) {
   const t = isJa ? copy.ja : copy.en;
   const { records, statusFor, updateStatus, addMilestone } = useApplicationTracker(activeProfile);
   const { catalog, meta, refresh: refreshCatalog } = useInternshipCatalog();
@@ -864,7 +864,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
         <div><Star size={20} /><strong>{dynamicStats.japan}</strong><span>{t.japan}</span></div>
         <div><Globe2 size={20} /><strong>{dynamicStats.englishFirst}</strong><span>{t.english}</span></div>
         <div><BriefcaseBusiness size={20} /><strong>{records.length}</strong><span>{t.tracked}</span></div>
-        <button type="button" onClick={onOpenEditor}>{t.tune} <ArrowUpRight size={17} /></button>
+        <button type="button" onClick={onOpenProfile}>{t.tune} <ArrowUpRight size={17} /></button>
       </section>
 
       <section className="intern-workspace">
@@ -951,7 +951,7 @@ export function InternshipDashboard({ isJa, onOpenEditor, onOpenSettings, active
         </div>
         {selected ? (
           <div className="intern-detail-backdrop" role="presentation" onClick={event => { if (event.target === event.currentTarget) setSelectedId(''); }}>
-            <DetailPanel item={selected} status={statusFor(selected.id)} onStatus={handleStatusSelect} onApply={onApply} onClose={() => setSelectedId('')} onOpenEditor={onOpenEditor} cooldown={cooldownForCompany(cooldownMap, selected.company)} isJa={isJa} />
+            <DetailPanel item={selected} status={statusFor(selected.id)} onStatus={handleStatusSelect} onApply={onApply} onClose={() => setSelectedId('')} onOpenProfile={onOpenProfile} cooldown={cooldownForCompany(cooldownMap, selected.company)} isJa={isJa} />
           </div>
         ) : null}
       </section>

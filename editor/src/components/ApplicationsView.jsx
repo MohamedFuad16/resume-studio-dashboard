@@ -6,6 +6,8 @@ import { CompanyLogo } from './CompanyLogo.jsx';
 import GmailMark from './GmailMark.jsx';
 import { DetailPanel } from './InternshipDashboard.jsx';
 import InterviewDateModal from './InterviewDateModal.jsx';
+import PeriodPicker from './PeriodPicker.jsx';
+import { filterRecordsByPeriod, useActivityPeriod } from '../hooks/useActivityPeriod.js';
 import { displayCompany, displayRole, displayValue, formatDisplayDeadline } from '../utils/internshipDisplay.js';
 import { companyCooldownMap, cooldownForCompany, cooldownLabel } from '../utils/reapplyCooldown.js';
 
@@ -30,6 +32,8 @@ const copy = {
     notApplied: 'Not applied',
     empty: 'No applications yet',
     emptySub: 'Track a role from Internship Radar and it will show up here.',
+    emptyPeriod: 'Nothing in this period',
+    emptyPeriodSub: 'Widen the period above to see older applications.',
     explore: 'Browse internships',
     countLabel: n => `${n} ${n === 1 ? 'application' : 'applications'}`,
   },
@@ -45,19 +49,29 @@ const copy = {
     notApplied: '未応募',
     empty: 'まだ応募はありません',
     emptySub: 'インターン検索から応募を管理するとここに表示されます。',
+    emptyPeriod: 'この期間の応募はありません',
+    emptyPeriodSub: '上の表示期間を広げると、以前の応募も表示されます。',
     explore: 'インターンを見る',
     countLabel: n => `${n}件の応募`,
   },
 };
 
-export default function ApplicationsView({ isJa, activeProfile, onOpenRadar, onOpenEditor }) {
+export default function ApplicationsView({ isJa, activeProfile, onOpenRadar, onOpenProfile }) {
   const t = isJa ? copy.ja : copy.en;
-  const { records, counts, statusFor, updateStatus, addMilestone } = useApplicationTracker(activeProfile);
+  const { records: allRecords, statusFor, updateStatus, addMilestone } = useApplicationTracker(activeProfile);
+  const { period } = useActivityPeriod();
+  const records = useMemo(() => filterRecordsByPeriod(allRecords, period), [allRecords, period]);
+  const counts = useMemo(() => {
+    const next = {};
+    for (const record of records) next[record.status] = (next[record.status] || 0) + 1;
+    return next;
+  }, [records]);
   const { catalog } = useInternshipCatalog();
   const [filter, setFilter] = useState('all');
   const [interviewPending, setInterviewPending] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
-  const cooldownMap = useMemo(() => companyCooldownMap(records), [records]);
+  // Cooldowns come from every record: a rejection older than the period still binds.
+  const cooldownMap = useMemo(() => companyCooldownMap(allRecords), [allRecords]);
 
   const visible = useMemo(
     () => (filter === 'all' ? records : records.filter(record => record.status === filter)),
@@ -98,7 +112,10 @@ export default function ApplicationsView({ isJa, activeProfile, onOpenRadar, onO
     <main className="applications-view">
       <div className="section-heading applications-head">
         <div><h2>{t.title}</h2><p>{t.subtitle}</p></div>
-        <span className="applications-count">{t.countLabel(records.length)}</span>
+        <div className="applications-head-meta">
+          <PeriodPicker isJa={isJa} />
+          <span className="applications-count">{t.countLabel(records.length)}</span>
+        </div>
       </div>
 
       <div className="applications-tabs" role="tablist" aria-label={t.title}>
@@ -142,7 +159,11 @@ export default function ApplicationsView({ isJa, activeProfile, onOpenRadar, onO
             </article>
           );
         }) : (
-          <div className="application-empty"><span className="application-empty-icon" aria-hidden="true"><Inbox size={20} /></span><b>{t.empty}</b><span>{t.emptySub}</span><button type="button" onClick={onOpenRadar}>{t.explore}</button></div>
+          allRecords.length && !records.length ? (
+            <div className="application-empty"><span className="application-empty-icon" aria-hidden="true"><Inbox size={20} /></span><b>{t.emptyPeriod}</b><span>{t.emptyPeriodSub}</span></div>
+          ) : (
+            <div className="application-empty"><span className="application-empty-icon" aria-hidden="true"><Inbox size={20} /></span><b>{t.empty}</b><span>{t.emptySub}</span><button type="button" onClick={onOpenRadar}>{t.explore}</button></div>
+          )
         )}
       </div>
 
@@ -154,7 +175,7 @@ export default function ApplicationsView({ isJa, activeProfile, onOpenRadar, onO
             onStatus={onStatusChange}
             onApply={onApply}
             onClose={() => setSelectedItem(null)}
-            onOpenEditor={onOpenEditor}
+            onOpenProfile={onOpenProfile}
             cooldown={cooldownForCompany(cooldownMap, selectedItem.company)}
             isJa={isJa}
           />

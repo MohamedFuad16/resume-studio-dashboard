@@ -916,3 +916,77 @@ unchanged after a reload. Battery: `vite build` clean, Playwright 5/5,
 react-doctor 47 (baseline 46 — the eight remaining `no-array-index-as-key`
 findings are read-only display lists plus the bullets component), eslint 60
 findings (unchanged, all pre-existing).
+
+
+## ADR-0042 · 2026-09-24 · Résumé editor removed; PDF parsed in the browser, file not stored
+
+The owner's instruction: the editor was "heavy and not needed." It carried a
+server-side LaTeX pipeline (Tectonic, CJK fonts baked into the Docker image),
+an 8-step wizard, seven templates, and every export path but JSON — all of it
+maintained for a feature nobody was using to produce an actual application.
+
+Decision: delete the editor view, the wizard, sections.jsx, resumeOptions.js,
+the form primitives, and the server routes that only the editor called
+(/api/compile, /api/compiled/*, /api/export/*, /api/chat/edit,
+/api/cover-letter, /api/applications, templates.js, resume-chat.js, the seed
+PDFs). Tectonic and the Noto CJK fonts leave the Dockerfile, so the image no
+longer carries a LaTeX toolchain for a feature that no longer exists.
+
+In its place, ResumeUpload.jsx + utils/resumePdf.js parse an uploaded résumé
+PDF into the résumé JSON entirely client-side (pdf.js from cdnjs) and merge it
+non-destructively into whatever is already stored: a parsed item that matches
+an existing one by company, school or title only fills that entry's blank
+fields; an unmatched item is appended; skills and summary fill only when
+empty. The PDF bytes are never sent to the server and never stored — parse-only,
+by the owner's explicit choice, so there is no résumé-file storage question to
+answer later. A blank profile's first sign-in shows the upload prompt where the
+wizard used to be.
+
+Consequences: the app has no live PDF preview or compile of any kind — a
+résumé's presentation now comes entirely from whatever the user already had in
+their uploaded PDF, not from an in-app template. index.css shrank from 8,304 to
+~4,545 lines with the editor's rules removed; a computed-style comparison
+across six views showed no visual diff elsewhere, and the gzipped bundle
+shrank (app JS 93.3→75.8 KB, CSS 30.8→20.5 KB). The first parser cut invented
+values for fields it couldn't read ("Tokyo, Japan", "Specialist", "Present",
+"2025") and the first merge overwrote real data with those inventions on
+upload; both are fixed, as described in the 2026-09-24 state.md entry. Track B
+(the static en/ja LaTeX résumés compiled by build_all.sh) is a separate
+pipeline and is untouched.
+
+## ADR-0043 · 2026-09-24 · Automatic Gmail scans can be paused per profile; the server keeps owner settings on write-back
+
+Every automatic Gmail scan — the 5-minute loop and any backfill — runs the
+search and audit models on the owner's own OpenRouter credits, whether or not
+anyone is looking at the app. There was no way to stop it short of
+disconnecting Gmail entirely, which also throws away the connection and the
+queue.
+
+Decision: a per-profile aiPaused flag, stored beside the Gmail connection.
+POST /api/integrations/gmail/automation sets it and returns the status object;
+GET .../status now carries it. syncProfile checks it before doing any model
+work: paused and not opts.manual returns {skipped: 'ai-paused'} immediately,
+so the loop and an unmanual sync-now both no-op cheaply. A request carrying
+&manual=1 always runs — an owner pressing "Sync now" should not be blocked by
+their own pause. backfill is raised from a 180-day cap to 730: the
+80-message-per-scan cap already bounds the cost per call, so a wider window
+costs nothing extra in model spend, only in how far back a single scan can
+look.
+
+saveConnection had a real race against this: a sync reads the connection at
+the start of a (possibly long) scan and writes the whole object back at the
+end, including its in-memory copy of settings. A Pause clicked mid-scan set
+aiPaused in storage, then the scan's write-back silently overwrote it with the
+stale unpaused value it started with — the flag would appear to work and then
+revert itself minutes later with no error anywhere. Fixed by having
+saveConnection re-read the current settings and keep them regardless of what
+the caller passed, and by having setRefreshToken (the reconnect path) let
+existing settings win over the defaults a fresh OAuth round carries.
+
+Consequences: pausing is honest — it actually stops model spend, not just the
+UI polling for updates — and survives a scan that was already in flight when
+the owner clicked it. The queue still drains normally while paused (pending
+actions already classified are not held back). iOS must send &manual=1 only
+from an explicit user action (rebuild/rescan), and must expect
+{skipped: 'ai-paused'} from its automatic load/foreground sync-now once this
+ships to prod — see contracts/CHANGELOG.md.

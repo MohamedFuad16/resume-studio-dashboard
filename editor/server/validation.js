@@ -176,16 +176,6 @@ export function validateInternship(value) {
   };
 }
 
-export function validateApplication(value) {
-  if (!isRecord(value)) throw new RequestValidationError('Application must be an object.');
-  return {
-    company: cleanString(value.company, 'Company', 200, true),
-    jobTitle: cleanString(value.jobTitle, 'Job title', 300, true),
-    jobDescription: cleanString(value.jobDescription, 'Job description', 20_000, true),
-    notes: cleanString(value.notes, 'Notes', 10_000),
-  };
-}
-
 export function sendRequestError(res, error) {
   const status = error instanceof RequestValidationError ? error.status : 500;
   res.status(status).json({ error: status === 500 ? 'Internal server error.' : error.message });

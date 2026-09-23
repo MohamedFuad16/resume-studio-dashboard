@@ -1,53 +1,30 @@
-# Compile backend for the Internship Portal.
+# API server for the Internship Portal: internship catalog, company research, Gmail
+# ingest, and the no-auth tracker/profile fallback. The Vite client is hosted
+# separately and calls this service via VITE_API_BASE_URL.
 #
-# Runs the existing Node/Express server WITH Tectonic (LaTeX) + Japanese fonts, so the
-# résumé PDF preview reflects LIVE edits in production (Vercel's serverless runtime
-# cannot run Tectonic). Deploy to a container host (Render / Railway / Fly); the Vercel
-# frontend calls this service via VITE_API_BASE_URL. See docs/compile-backend.md.
-# amd64: Tectonic publishes prebuilt x86_64-linux binaries (no aarch64-gnu build), and
-# container hosts (Render / Azure Container Apps) run x86_64. Cloud builders (ACR, Render)
-# are already amd64; when building locally on an arm64 Mac, pass `--platform linux/amd64`
-# on the CLI. (An inline `FROM --platform=…` breaks ACR's Dockerfile dependency scanner.)
-# Debian trixie (glibc 2.41): the Tectonic 0.16.9 prebuilt needs glibc ≥ 2.38 (bookworm
-# ships 2.36, too old).
+# There is no LaTeX here any more: the résumé editor and its server-side PDF compile
+# were removed (users upload a PDF, parsed in the browser), so Tectonic and the CJK
+# fonts left the image.
+#
+# Build for amd64 (the EC2 host); on an arm64 Mac pass `--platform linux/amd64`.
 FROM node:22-trixie-slim
 
-# LaTeX runtime libs, fontconfig, and Japanese fonts (Noto Serif/Sans CJK JP) that the
-# JA templates use on Linux (RESUME_FONT_PROFILE=linux swaps Hiragino → Noto).
 # python3/make/g++ are for better-sqlite3: it ships prebuilt binaries for
 # linux-x64 and normally uses them, but if a prebuild is ever unavailable for the
 # runtime's ABI, node-gyp compiles from source — and without a toolchain present
 # that turns into a FAILED image build rather than a slow one.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates curl fontconfig \
-      fonts-noto-cjk fonts-noto-core \
-      libssl3 libfontconfig1 libgraphite2-3 libharfbuzz0b libicu76 \
+      ca-certificates \
       python3 make g++ \
-  && fc-cache -f \
   && rm -rf /var/lib/apt/lists/*
 
-# Tectonic — the official install script fetches the right prebuilt binary.
-RUN curl --proto '=https' --tlsv1.2 -fsSL https://drop-sh.fullyjustified.net | sh \
-  && mv tectonic /usr/local/bin/tectonic \
-  && chmod +x /usr/local/bin/tectonic \
-  && tectonic --version
-
 ENV NODE_ENV=production \
-    RESUME_FONT_PROFILE=linux \
-    TECTONIC_PATH=/usr/local/bin/tectonic \
-    TECTONIC_CACHE_DIR=/app/.cache/tectonic \
     PORT=8080
 
 WORKDIR /app
 COPY editor/package*.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
 COPY editor/ ./
-
-# Warm the Tectonic bundle cache at build time so the first production compile is fast
-# (downloads the LaTeX packages the templates need). Non-fatal if it can't reach the net.
-RUN mkdir -p /app/.cache/tectonic \
-  && printf '%s' '\documentclass[a4paper,11pt]{article}\usepackage{fontspec}\usepackage{xeCJK}\usepackage{geometry}\usepackage{titlesec}\usepackage{enumitem}\setCJKmainfont{Noto Serif CJK JP}\setmainfont{Noto Sans}\begin{document}\section{ウォームアップ}Warm-up 日本語.\end{document}' > /tmp/warm.tex \
-  && (tectonic /tmp/warm.tex -r 0 --outdir /tmp && echo "warm-up OK") || echo "warm-up compile skipped (non-fatal)"
 
 EXPOSE 8080
 CMD ["node", "server/index.js"]

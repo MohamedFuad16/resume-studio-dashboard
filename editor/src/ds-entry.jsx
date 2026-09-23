@@ -19,26 +19,7 @@
 export {
   I,
   Toasts,
-  ExportMenu,
-  Sec,
-  Lbl,
-  Inp,
-  Txta,
-  MonthInput,
-  Bullets,
-  TagInput,
-  SuggestInput,
 } from './components/ui.jsx';
 
 export { CompanyLogo } from './components/CompanyLogo.jsx';
 export { default as InterviewDateModal } from './components/InterviewDateModal.jsx';
-
-// Résumé form sections — composed from the primitives above.
-export {
-  PersonalSec,
-  SummarySec,
-  EducationSec,
-  ExperienceSec,
-  ProjectsSec,
-  ActivitiesSec,
-} from './components/sections.jsx';

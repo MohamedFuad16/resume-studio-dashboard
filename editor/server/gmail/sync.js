@@ -103,6 +103,8 @@ export function admitsCarriedDecision(verdict, internshipCompanies) {
 export async function syncProfile(store, profile, opts = {}) {
   const conn = await getConnection(store, profile);
   if (!conn?.refreshTokenEnc) return { skipped: 'not-connected' };
+  // Paused: only an explicit owner-triggered scan (opts.manual) may spend tokens.
+  if (conn.settings?.aiPaused === true && !opts.manual) return { skipped: 'ai-paused' };
   if (!llmAvailable()) return { skipped: 'no-llm-key' };
 
   let token;

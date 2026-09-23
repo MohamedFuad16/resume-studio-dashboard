@@ -2,6 +2,32 @@
 
 Every entry: date · who · what changed · what the OTHER side must do.
 
+- **2026-09-24 · web · The résumé editor and its editor-only server routes are
+  gone (ADR-0042); iOS sends `&manual=1` on user-triggered scans.** The résumé
+  editor (LaTeX compile, wizard, templates) was removed at the owner's request,
+  replaced by a browser-side PDF upload that is parsed client-side and never
+  stored. The routes that existed only to serve the editor are deleted:
+  `/api/compile`, `/api/compiled/*`, `/api/export/*`, `/api/chat/edit`,
+  `/api/cover-letter`, `/api/applications`. **iOS never called any of these** (its
+  contract is the 9 routes in `api.md`), so this is a heads-up, not a work item.
+  Separately, `GmailDrain.swift`'s `gmailSyncNow(profile:backfillDays:manual:)` now
+  sends `&manual=1` from `rebuildFromGmail()` and the Settings "Sync now"/"Rescan"
+  buttons, per the `aiPaused` entry below — load/foreground drains stay automatic
+  and unmarked. No record or action shape changed on either side.
+
+- **2026-09-24 · web (server) · Automatic Gmail scans can be paused per profile;
+  backfill window widened to 730 days.** Every automatic scan runs the search and
+  audit models on the owner's OpenRouter credits, including when nobody is looking.
+  New `POST /api/integrations/gmail/automation?profile=` with body
+  `{aiPaused: boolean}` returns the status object. `GET .../status` now carries
+  `aiPaused`. While paused, `sync-now` without `&manual=1` returns
+  `{skipped: 'ai-paused'}`, and so does the server's 5-minute loop. `&manual=1`
+  marks an owner-triggered scan and always runs. `backfill` is now capped at 730
+  (was 180); the 80-message cap is unchanged, so a wider window costs no more model
+  calls. **iOS must:** expect `{skipped: 'ai-paused'}` from its load/foreground
+  `sync-now` (the pending queue still drains normally), and send `&manual=1` only
+  from an explicit user action. No record or action shape changed.
+
 - **2026-07-20 · both · The owner can overrule the pipeline: `statusPinned` +
   tombstones (ADR-S-004).** The tracker was a cache of classifier output — the
   owner deleted a wrong row and the next rescan re-created it; they knew they were

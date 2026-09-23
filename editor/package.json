@@ -1,7 +1,7 @@
 {
   "name": "resume-editor",
   "version": "1.0.0",
-  "description": "Internship Portal — bilingual internship tracker and résumé editor with LaTeX compilation",
+  "description": "Internship Portal — bilingual internship tracker with résumé PDF import",
   "main": "server/index.js",
   "type": "module",
   "scripts": {

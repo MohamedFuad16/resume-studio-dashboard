@@ -6,7 +6,7 @@
 // Inter body copy, pill controls. Bilingual (EN/JA).
 //
 // IMPORTANT — the copy below is a drafted starting point written to match what
-// this app actually does (Firebase Auth + Firestore storage, Vercel hosting,
+// this app actually does (Firebase Auth + Firestore storage, Vercel + AWS hosting,
 // résumé content sent to OpenRouter when AI features are used, no analytics). It
 // has NOT been reviewed by a lawyer. Fill in the placeholders directly below and
 // have it reviewed before relying on it. See ADR-0029.
@@ -18,7 +18,7 @@ import { keyed } from '../utils/keyedList.js';
 const OPERATOR = 'Internship Portal';
 const CONTACT_EMAIL = 'support@example.com';
 const JURISDICTION = { en: 'Japan', ja: '日本' };
-const LAST_UPDATED = { en: '15 July 2026', ja: '2026年7月15日' };
+const LAST_UPDATED = { en: '24 September 2026', ja: '2026年9月24日' };
 
 const UI = {
   en: { back: 'Back to sign in', updated: `Last updated ${LAST_UPDATED.en}` },
@@ -37,12 +37,12 @@ const TERMS = {
       ]],
       ['Your content', [
         'You keep ownership of everything you put into the Service — your résumé and profile details, the internships you track, your notes, deadlines, and application history. It is yours, not ours.',
-        'You give us permission to store, process, and display that content for the single purpose of operating the Service for you. That includes compiling your résumé into a PDF, and — only when you use an AI feature — sending the relevant content to our AI provider so it can generate a response.',
+        'You give us permission to store, process, and display that content for the single purpose of operating the Service for you. That includes reading the text of a résumé PDF you upload (in your browser; the file itself is not stored), and — only when you use an AI feature — sending the relevant content to our AI provider so it can generate a response.',
         'We do not sell your content, and we do not share it with other users.',
         'You are responsible for the content you add, including making sure you have the right to use it and that it is accurate.',
       ]],
       ['AI features', [
-        'The Service includes AI features: an assistant that helps edit your résumé, and internship research that searches the web for openings at a company you name.',
+        'The Service includes AI features: internship research that searches the web for openings at a company you name, and, if you connect Gmail, automatic sorting of application emails (confirmations, replies, interview invites) into your tracker.',
         'AI output can be wrong, incomplete, or out of date. Treat it as a draft and check it before you rely on it. In particular, always confirm an internship’s details — deadlines, eligibility, whether it is still open — on the employer’s own official site before applying.',
         'The AI features are not career, legal, immigration, visa, or employment advice.',
       ]],
@@ -91,12 +91,12 @@ const TERMS = {
       ]],
       ['お客様のコンテンツ', [
         'レジュメ・プロフィール情報、管理中のインターン情報、メモ、締切、応募履歴など、本サービスに入力された内容の権利はすべてお客様に帰属します。',
-        '当方は、本サービスをお客様に提供する目的に限り、当該コンテンツを保存・処理・表示します。これにはレジュメのPDF生成、および（AI機能をご利用の場合に限り）応答生成のために関連コンテンツをAI提供事業者へ送信することが含まれます。',
+        '当方は、本サービスをお客様に提供する目的に限り、当該コンテンツを保存・処理・表示します。これにはアップロードされたレジュメPDFのテキスト読み取り（ブラウザ内で処理し、ファイル自体は保存しません）、および（AI機能をご利用の場合に限り）応答生成のために関連コンテンツをAI提供事業者へ送信することが含まれます。',
         'お客様のコンテンツを販売することはなく、他の利用者と共有することもありません。',
         '入力内容については、利用する権利を有していること、および内容が正確であることを含め、お客様が責任を負います。',
       ]],
       ['AI機能', [
-        '本サービスには、レジュメ編集を支援するAIアシスタント、および指定された企業の募集情報をウェブ検索するインターンリサーチ機能が含まれます。',
+        '本サービスには、指定された企業の募集情報をウェブ検索するインターンリサーチ機能、およびGmailを連携した場合に応募関連メール（応募確認・返信・面接案内）をトラッカーへ自動で振り分ける機能が含まれます。',
         'AIの出力は誤り・不完全・古い情報を含む場合があります。下書きとして扱い、依拠する前に必ずご確認ください。特にインターンの締切・応募資格・募集状況などの詳細は、応募前に必ず採用企業の公式サイトでご確認ください。',
         'AI機能は、キャリア・法務・出入国・ビザ・雇用に関する助言ではありません。',
       ]],
@@ -148,12 +148,12 @@ const PRIVACY = {
         '**On your device.** We store your language and theme preferences in your browser’s local storage. That is all — we do not currently run analytics, advertising, or third-party tracking.',
       ]],
       ['Why we use it', [
-        'To give you an account and keep it secure; to store and show your résumé, tracker, and applications; to compile your résumé into a PDF; to power the AI assistant and internship research when you use them; and to fix problems with the Service.',
+        'To give you an account and keep it secure; to store and show your résumé, tracker, and applications; to read the text of a résumé PDF you upload (in your browser; the file itself is not stored); to run internship research when you use it and to sort application emails into your tracker when Gmail is connected; and to fix problems with the Service.',
       ]],
       ['Who processes your data', [
         '**Google (Firebase).** Handles sign-in and stores your account and app data (Firestore). Access rules are set so that only your signed-in account can read or write your data.',
-        '**Our hosting provider (Vercel).** Runs the site and its server functions, and stores generated files.',
-        '**OpenRouter (AI features only).** When you use the AI assistant, the relevant content — which can include your résumé — is sent to OpenRouter to generate a response. When you use internship research, the company name you enter is used to search the web. If you do not use these features, nothing is sent. OpenRouter routes requests to upstream model providers under its own terms and privacy policy; please read those if this matters to you.',
+        '**Our hosting providers (Vercel and Amazon Web Services).** Vercel serves the website; Amazon Web Services (Tokyo region) runs the server that handles internship research and Gmail, and stores the Gmail connection and pending results.',
+        '**OpenRouter (AI features only).** When you use internship research, the company name you enter and a short summary of your résumé (your first education entry, project titles and technologies, and skills) are sent to OpenRouter to search the web and rank the openings. When Gmail is connected and automatic scans are on, or when you start a scan, each new email in your mailbox (except most newsletters and bulk mail) is sent to OpenRouter with its sender, subject and the first 3,500 characters of its text, so the model can decide whether it is about an application. The model sees the email before it decides, so this can include mail that turns out to be personal. For emails about an application, the company name is also used to search the web for its careers page. You can pause automatic scans in Settings, or disconnect Gmail to stop them entirely. If you do not use these features, nothing is sent. OpenRouter routes requests to upstream model providers under its own terms and privacy policy; please read those if this matters to you.',
       ]],
       ['What we do not do', [
         'We do not sell your personal information or your résumé. We do not share it with other users, and we do not share it with employers — applying to an internship is something you do yourself, on the employer’s own site.',
@@ -194,12 +194,12 @@ const PRIVACY = {
         '**お客様の端末上。** 言語およびテーマの設定をブラウザのローカルストレージに保存します。保存するのはこれのみで、現在アクセス解析・広告・第三者トラッキングは使用していません。',
       ]],
       ['利用目的', [
-        'アカウントの提供と安全な維持、レジュメ・トラッカー・応募情報の保存および表示、レジュメのPDF生成、ご利用時のAIアシスタントおよびインターンリサーチの提供、ならびに不具合の修正のために利用します。',
+        'アカウントの提供と安全な維持、レジュメ・トラッカー・応募情報の保存および表示、アップロードされたレジュメPDFのテキスト読み取り（ブラウザ内で処理し、ファイル自体は保存しません）、ご利用時のインターンリサーチの提供、Gmail連携時の応募メールの振り分け、ならびに不具合の修正のために利用します。',
       ]],
       ['データを取り扱う事業者', [
         '**Google（Firebase）。** サインインの処理、ならびにアカウントおよびアプリデータの保存（Firestore）。アクセスルールにより、サインイン中のご本人のアカウントのみが読み書きできます。',
-        '**ホスティング事業者（Vercel）。** サイトおよびサーバー機能の稼働、生成ファイルの保存。',
-        '**OpenRouter（AI機能利用時のみ）。** AIアシスタントのご利用時、レジュメを含みうる関連コンテンツが応答生成のためOpenRouterへ送信されます。インターンリサーチのご利用時は、入力された企業名がウェブ検索に使用されます。これらの機能を利用されない場合、送信は行われません。OpenRouterは自社の規約およびプライバシーポリシーに基づき上流のモデル提供事業者へリクエストを中継します。ご懸念がある場合はそれらもご確認ください。',
+        '**ホスティング事業者（VercelおよびAmazon Web Services）。** Vercelはウェブサイトを配信し、Amazon Web Services（東京リージョン）はインターンリサーチとGmail連携を処理するサーバーを稼働させ、Gmail連携情報と処理待ちの結果を保存します。',
+        '**OpenRouter（AI機能利用時のみ）。** インターンリサーチのご利用時、入力された企業名とレジュメの概要（最初の学歴、プロジェクト名と使用技術、スキル）が、ウェブ検索と募集情報の順位付けのためOpenRouterへ送信されます。Gmail連携中に自動スキャンが有効な場合、またはスキャンを実行した場合、メールボックスに届いた新着メール（ニュースレター等の一斉配信メールの大半を除く）の差出人・件名・本文の先頭3,500文字が、応募関連かどうかを判定するためOpenRouterへ送信されます。判定はモデルがメールを受け取った後に行われるため、結果的に個人的なメールが含まれる場合があります。応募関連と判定されたメールについては、企業の採用ページを探すため企業名がウェブ検索に使用されます。自動スキャンは設定から一時停止でき、Gmail連携を解除すると完全に停止します。これらの機能を利用されない場合、送信は行われません。OpenRouterは自社の規約およびプライバシーポリシーに基づき上流のモデル提供事業者へリクエストを中継します。ご懸念がある場合はそれらもご確認ください。',
       ]],
       ['行わないこと', [
         'お客様の個人情報およびレジュメを販売することはありません。他の利用者と共有することはなく、採用企業へ提供することもありません。インターンへの応募は、採用企業の公式サイト上でお客様ご自身が行うものです。',

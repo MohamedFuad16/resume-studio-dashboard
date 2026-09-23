@@ -16,14 +16,21 @@ export async function getConnection(store, profile) {
   return store.getJson(connKey(profile), null);
 }
 
+// Owner settings (aiPaused, autoApply) are written only by setAiPaused and
+// setRefreshToken. A sync writes back the connection it read minutes earlier, so
+// it must not carry its stale copy of settings: a Pause clicked mid-scan would
+// be silently reverted and the loop would keep spending model credits.
 export async function saveConnection(store, profile, conn) {
-  await store.setJson(connKey(profile), conn);
-  return conn;
+  const current = await getConnection(store, profile);
+  const next = current?.settings ? { ...conn, settings: current.settings } : conn;
+  await store.setJson(connKey(profile), next);
+  return next;
 }
 
 export async function setRefreshToken(store, profile, patch, refreshToken) {
   const existing = (await getConnection(store, profile)) || {};
-  const conn = { ...existing, ...patch };
+  // A reconnect passes default settings; the owner's existing choices win.
+  const conn = { ...existing, ...patch, settings: { ...(patch.settings || {}), ...(existing.settings || {}) } };
   if (refreshToken) conn.refreshTokenEnc = encrypt(refreshToken);
   await store.setJson(connKey(profile), conn);
   return conn;
@@ -49,7 +56,19 @@ export function publicStatus(conn) {
     lastSyncAt: conn.lastSyncAt || null,
     lastError: conn.lastError || null,
     autoApply: conn.settings?.autoApply !== false,
+    aiPaused: conn.settings?.aiPaused === true,
   };
+}
+
+// Pause/resume the automatic scans (5-minute loop + client polling). Every scan
+// runs the search and audit models on the owner's OpenRouter bill, so a pause
+// has to stop them server-side, not just hide them in one client.
+export async function setAiPaused(store, profile, paused) {
+  const conn = await getConnection(store, profile);
+  if (!conn) return null;
+  conn.settings = { ...(conn.settings || {}), aiPaused: Boolean(paused) };
+  await store.setJson(connKey(profile), conn);
+  return conn;
 }
 
 // Every profile that has a connection — the cron loop iterates these.

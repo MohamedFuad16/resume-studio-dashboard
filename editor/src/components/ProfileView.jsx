@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ArrowRight, FilePenLine, FileText, GraduationCap, Mail, MapPin, Phone, Sparkles, Upload, X } from 'lucide-react';
+import { ArrowRight, FilePenLine, FileText, GraduationCap, Mail, MapPin, Phone, Sparkles, X } from 'lucide-react';
+import ResumeUpload from './ResumeUpload.jsx';
 import { displayValue } from '../utils/internshipDisplay.js';
 
 // Pure helper (module scope — no props/state): a comma-list string → trimmed items.
@@ -14,9 +15,8 @@ const copy = {
     education: 'Education', experience: 'Experience', skills: 'Skills', summary: 'Summary',
     skillLanguages: 'Languages', skillFrameworks: 'Frameworks & libraries', skillTools: 'Tools & platforms', skillOther: 'Other',
     resumes: 'Résumés & CVs',
-    resumesSub: 'The résumé the app manages for you. File storage for extra CVs is coming soon.',
-    openEditor: 'Open in Editor', activeResume: 'Active résumé',
-    uploadSoon: 'Upload CV — coming soon',
+    resumesSub: 'Upload your résumé PDF to fill in the details above. The app reads the text and does not keep the file.',
+    activeResume: 'Active résumé',
     none: 'Not set',
     present: 'Present',
     edit: 'Edit profile',
@@ -35,9 +35,8 @@ const copy = {
     education: '学歴', experience: '職歴', skills: 'スキル', summary: '概要',
     skillLanguages: '言語', skillFrameworks: 'フレームワーク・ライブラリ', skillTools: 'ツール・プラットフォーム', skillOther: 'その他',
     resumes: '履歴書・CV',
-    resumesSub: 'アプリが管理する履歴書です。追加のCVファイル保存は近日対応予定です。',
-    openEditor: 'エディタで開く', activeResume: '現在の履歴書',
-    uploadSoon: 'CVをアップロード — 近日対応',
+    resumesSub: '履歴書PDFをアップロードすると、上の情報が自動で入力されます。ファイル自体は保存しません。',
+    activeResume: '現在の履歴書',
     none: '未設定',
     present: '現在',
     edit: 'プロフィールを編集',
@@ -63,7 +62,7 @@ function InfoRow({ icon, label, value, href }) {
   );
 }
 
-export default function ProfileView({ resume, isJa, onOpenEditor, onSavePersonal }) {
+export default function ProfileView({ resume, isJa, onSavePersonal, onResumeParsed, onUploadError }) {
   const t = isJa ? copy.ja : copy.en;
   const p = resume.personal || {};
 
@@ -253,11 +252,8 @@ export default function ProfileView({ resume, isJa, onOpenEditor, onSavePersonal
             <div className="profile-resume-item">
               <span className="profile-resume-icon" aria-hidden="true"><FileText size={17} /></span>
               <span><b>{t.activeResume}</b><small>{name}</small></span>
-              <button type="button" className="profile-resume-open" onClick={onOpenEditor}>{t.openEditor} <ArrowRight size={13} /></button>
             </div>
-            <button type="button" className="profile-resume-upload" disabled title={t.uploadSoon}>
-              <Upload size={15} /> {t.uploadSoon}
-            </button>
+            <ResumeUpload isJa={isJa} onParsed={onResumeParsed} onError={onUploadError} className="profile-resume-upload" />
           </div>
         </section>
       </div>
