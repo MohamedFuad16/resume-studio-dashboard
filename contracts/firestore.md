@@ -41,5 +41,5 @@ in that plist are identifiers, not secrets; security is the Firestore rules).
 ## KV fallback
 
 Signed-out / E2E only: tracker at `/api/tracker?profile=` on the server's
-sql.js KV (Azure Files-persisted). Production users are signed in — Firestore
+SQLite KV on the EC2 host's disk (`/srv/resumedata`, mounted as `/data`). Production users are signed in — Firestore
 is the real path.

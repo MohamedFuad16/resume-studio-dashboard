@@ -14,12 +14,16 @@ Server implementation: `editor/server/index.js` (web-owned). iOS call sites:
   - iOS reads it from Info.plist key `PortalAPIBaseURL` (set in `ios/project.yml`);
     the web reads `VITE_API_BASE_URL`. **If the backend host ever moves,
     both configs must change — neither client hardcodes it in code.**
-- The old Azure host (`portal-compile-jp.redgrass-10389803.japaneast
-  .azurecontainerapps.io`) keeps serving until the Container App is
-  decommissioned — shipped iOS builds depend on it until an update with the
-  new host is out. The westus2 `portal-compile` app was never the live one.
+- The old Azure hosts (`portal-compile-jp.redgrass-10389803.japaneast
+  .azurecontainerapps.io` and the westus2 `portal-compile`) were deleted on
+  2026-08-12 and no longer answer (checked 2026-09-24: no response). An iOS
+  build installed before the 2026-08-12 host change cannot reach the server
+  at all; the fix is installing a current build, not reviving Azure.
 
-## The endpoints iOS calls (9 of the server's ~30)
+## Endpoints the clients depend on (12 of the server's 23 routes)
+
+iOS calls every row except `automation`, which only the web's Settings uses.
+The web calls all of them.
 
 | Method + path | Purpose | Notes both sides must honor |
 |---|---|---|
@@ -30,9 +34,11 @@ Server implementation: `editor/server/index.js` (web-owned). iOS call sites:
 | `GET /api/integrations/gmail/auth-url?profile=` | begin OAuth | Consent completes in the browser; the server keeps the token. Clients only poll status afterwards. |
 | `POST /api/integrations/gmail/disconnect?profile=` | disconnect | |
 | `POST /api/integrations/gmail/automation?profile=` body `{aiPaused}` | pause/resume automatic scans | Returns the status object. 404 when not connected. |
-| `POST /api/integrations/gmail/sync-now?profile=&backfill=N&manual=1` | trigger a scan | `backfill` capped at 730 server-side. While `aiPaused`, only `manual=1` scans; others return `{skipped:'ai-paused'}`. A backfill outlives the request — Azure's gateway 504s at 240s while the server keeps scanning, so clients fire-and-poll rather than await. Result readable only in container logs (`gmail-sync[profile] listed= fresh= queued= dropped=`). |
+| `POST /api/integrations/gmail/sync-now?profile=&backfill=N&manual=1` | trigger a scan | `backfill` capped at 730 server-side. While `aiPaused`, only `manual=1` scans; others return `{skipped:'ai-paused'}`. A backfill can run for minutes, longer than any client waits (iOS gives up after 45s), and the server keeps scanning after the client disconnects, so clients fire-and-poll `pending` rather than await. Result readable only in container logs (`gmail-sync[profile] listed= fresh= queued= dropped=`). |
 | `GET /api/integrations/gmail/pending?profile=` | read the queue | `{actions: [GmailAction]}` — shape in gmail-action.md. |
 | `POST /api/integrations/gmail/ack` body `{ids}` | remove applied actions | |
+| `POST /api/internships/research-company` body `{company, profile?, resume?, apiKey?, searchModel?}` | start live company research | 202 `{jobId, company, status:'researching'}`; a job for the same company from the last 15 minutes is returned as-is (202 while researching, 200 when complete). `company` must be 2 to 80 characters (400 otherwise). Without `resume` the server reads the profile. Runs on `apiKey` when given, else the server's `OPENROUTER_API_KEY`. |
+| `GET /api/internships/research-company/:jobId` | poll research | `{status: 'researching' \| 'complete' \| 'error', ...}`; 404 after a server restart (jobs live in memory). iOS decodes the result in `CompanyDetailView.swift`. |
 
 `?profile=` is the **server KV profile key**; by convention it equals the
 Firestore profile document id (see firestore.md). Default `mohamed_fuad`.

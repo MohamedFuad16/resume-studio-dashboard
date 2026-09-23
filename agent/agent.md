@@ -6,7 +6,7 @@ Route by what you're working on:
 | Working on | Tree | Go to |
 |---|---|---|
 | **iOS app** | `ios/` | [`agent/ios/agent.md`](ios/agent.md) |
-| **Web app / server / LaTeX pipeline** | `editor/`, `Dockerfile`, `docs/`, `en/`, `ja/` | [`agent/web/agent.md`](web/agent.md) |
+| **Web app / server / local LaTeX résumé build** (`build_all.sh`; the in-app editor was removed, ADR-0042) | `editor/`, `Dockerfile`, `docs/`, `en/`, `ja/` | [`agent/web/agent.md`](web/agent.md) |
 | **Anything both clients depend on** (API routes, tracker/Gmail shapes, Firestore, normalization) | `contracts/` | [`contracts/README.md`](../contracts/README.md) |
 | **Engineering memory system** | external | [`ai-brain-platform`](https://github.com/MohamedFuad16/ai-brain-platform) |
 

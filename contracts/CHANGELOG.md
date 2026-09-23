@@ -2,6 +2,15 @@
 
 Every entry: date · who · what changed · what the OTHER side must do.
 
+- **2026-09-24 · both · Docs only: contracts caught up with EC2 and the
+  editor removal.** `api.md` still said the Azure host "keeps serving" for
+  old iOS builds, though Azure was deleted on 2026-08-12. It blamed backfill
+  timeouts on Azure's gateway, and its endpoint table missed the two
+  `research-company` routes iOS calls in `CompanyDetailView.swift`. The
+  table is now "12 of 23 routes" and marks `automation` as web-only.
+  `firestore.md` no longer calls the KV fallback Azure-persisted. No route,
+  shape or behaviour changed. **Neither side has to do anything.**
+
 - **2026-09-24 · web · The résumé editor and its editor-only server routes are
   gone (ADR-0042); iOS sends `&manual=1` on user-triggered scans.** The résumé
   editor (LaTeX compile, wizard, templates) was removed at the owner's request,
