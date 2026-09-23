@@ -3,20 +3,87 @@
 ## Current state summary
 Two-track résumé project. **Track A — Internship Portal** (`editor/`): React 18 + Vite
 client and an ESM Node/Express server with a better-sqlite3 KV store (local working
-copy + snapshot to the durable path per write, ADR-0040; prod durability = the Azure
-Files mount `/data`), Tectonic-based LaTeX compile, an internship radar/tracker, an
-application calendar, a Gmail→tracker ingest pipeline, and an AI application
-assistant (OpenRouter). Signed-in users' data lives client-direct in Firestore
-`users/{uid}/**` (project `resume-841f9`, owner-only rules); the server KV holds
-only the shared catalog, the Gmail queue, and the no-auth/E2E path. Prod topology:
-Vercel serves the static client (portal.mohamedfuad.com); ALL `/api` runs on Azure
-Container Apps `portal-compile-jp` (japaneast) via `VITE_API_BASE_URL`. **Track B**:
-static LaTeX résumés (`en/`, `ja/`) compiled by `build_all.sh` to `output/`.
+copy + snapshot to the durable path per write, ADR-0040), an internship radar/tracker,
+an application calendar, a Gmail→tracker ingest pipeline (pausable per profile,
+ADR-0043), and live company research (OpenRouter). There is no résumé editor and no
+LaTeX/Tectonic compile any more (ADR-0042, 2026-09-24): a résumé comes in as a
+browser-parsed PDF upload, merged non-destructively into the stored résumé JSON, and
+the PDF itself is never kept. Signed-in users' data lives client-direct in Firestore
+`users/{uid}/**` (project `resume-841f9`, owner-only rules); the server KV holds only
+the shared catalog, the Gmail queue, and the no-auth/E2E path. Prod topology: Vercel
+serves the static client (portal.mohamedfuad.com); ALL `/api` runs on a Docker
+container on EC2 (`api.mohamedfuad.com`) via `VITE_API_BASE_URL`. **Track B**: static
+LaTeX résumés (`en/`, `ja/`) compiled by `build_all.sh` to `output/` — a separate
+pipeline, untouched by ADR-0042.
 (The 2026-07-03 overhaul-plan status that used to sit here described the
 feat/firebase-auth-firestore rollout, long since merged and deployed — see the
 dated entries below for history.)
 
 ## Recent changes
+
+- **2026-09-24 — Résumé editor removed; PDF upload replaces it (ADR-0042). Gmail
+  scans can be paused per profile (ADR-0043). Shared activity-period filter added.
+  Uncommitted; new server build NOT deployed.**
+  **(1) Editor removed, owner's call ("heavy and not needed").** Deleted the editor
+  view, LaTeX compile/preview, all exports except JSON, the 8-step wizard,
+  `sections.jsx`, `resumeOptions.js`, the form primitives, and server-side
+  `/api/compile`, `/api/compiled/*`, `/api/export/*`, `/api/chat/edit`,
+  `/api/cover-letter`, `/api/applications`, `templates.js`, `resume-chat.js`, and the
+  seed PDFs. The Dockerfile drops Tectonic and the CJK fonts. In its place:
+  `ResumeUpload.jsx` + `utils/resumePdf.js` parse an uploaded PDF (pdf.js from
+  cdnjs) into the résumé JSON entirely in the browser; the PDF itself is never sent
+  to the server or stored — parse-only was the owner's explicit choice. A blank
+  profile's first sign-in shows the upload prompt instead of the old wizard.
+  `index.css` fell from 8,304 to ~4,545 lines; a computed-style comparison across six
+  views showed zero diffs, and the gzip bundle shrank (app JS 93.3→75.8 KB, CSS
+  30.8→20.5 KB). A first cut of the PDF parser invented values for blank fields
+  ("Tokyo, Japan", "Specialist", "Present", "2025") and overwrote real résumé data on
+  upload — fixed by making the merge additive: a parsed item matching a stored one
+  (by company/school/title) only fills that entry's blank fields, an unmatched item
+  is appended, and skills/summary fill only when empty (`node --test
+  src/utils/resumePdf.test.js`, 3/3).
+  **(2) Automatic Gmail scans can be paused per profile (contracts/CHANGELOG.md,
+  ADR-0043).** Every automatic scan burns the owner's OpenRouter credits whether or
+  not anyone is looking, so `POST /api/integrations/gmail/automation` sets a stored
+  `aiPaused` flag that gates both the server's 5-minute loop and `sync-now`; only a
+  request carrying `&manual=1` runs while paused. `backfill` is capped at 730 days
+  (was 180) since the 80-message-per-scan cap already bounds the cost. The web
+  Gmail card gained Pause/Resume and a "scan the last N days" control. First cut had
+  a real race: `saveConnection` writes back the whole connection object it read
+  minutes earlier, so a Pause clicked mid-scan was silently reverted the moment that
+  scan's write-back landed. Fixed by having `saveConnection` and `setRefreshToken`
+  keep the currently-stored `settings` rather than the caller's stale copy.
+  **(3) Shared activity-period filter.** A new "Last [N] [weeks|months|years]"
+  control (default 2 weeks, max 2 years) filters the Dashboard stats/donut/trend/
+  recent list, Applications, and the sidebar badge together, keyed by each record's
+  latest event stamp (falling back to `updatedAt` only when a record has no event
+  stamp at all — otherwise a record's rejection reply months ago kept looking
+  "recent" forever because `addMilestone` always bumps `updatedAt`). Trend chart is
+  weekly for ≤12 weeks, monthly beyond that.
+  **(4) Legal copy (EN+JA) updated** to drop the removed assistant/PDF-compile
+  language and disclose what the app actually does now: live company research and
+  Gmail classification. Last-updated stamped 24 Sep 2026.
+  **Production, unchanged by this session's code:** the EC2 container
+  (`api.mohamedfuad.com`, image `portal-compile:48fdcd6`) was recreated today with
+  `GMAIL_SYNC_DISABLED=1` in `/etc/portal-compile.env` (backup
+  `/etc/portal-compile.env.bak-20260924`) to kill the 5-minute loop while the pause
+  flag didn't exist yet in prod. The code in this entry is not deployed; the env var
+  is the only live change.
+  **Verification status (updated later on 2026-09-24):** two `code-reviewer`
+  passes. The first found the pause race, the destructive upload merge, a
+  backfill shrunk to 14 days, a manual scan dropped while a drain was busy,
+  stale recency in the period filter, the sidebar badge ignoring the period,
+  and copy nits. The second found activities duplicating on re-upload, a legacy
+  array of skills being replaced, "Languages: ..." lines parsed as headings, a
+  backfill that could re-run on every load after a gateway timeout, month
+  buckets missing a month, and a privacy policy that understated which emails
+  reach OpenRouter. All are fixed, each with a unit test where it is logic.
+  After the last fix: `scripts/verify-web.sh` PASS (build, catalog, Playwright
+  5/5, react-doctor 51 vs baseline 46, 7 pre-existing eslint findings),
+  node:test 10 + 32 + 11 pass, and the owner's real two-page résumé PDF still
+  parses fully (name, phone, links, 2 schools, 7/7 projects, skills, summary).
+  The legal page (EN and JA) now states that automatic scans send each new
+  email's sender, subject and first 3,500 characters to OpenRouter.
 
 - **2026-07-20 (later) — Résumé list items carry a persisted `id`; the four
   reorderable lists key by it (ADR-0041, issue #19).** Education, experience,

@@ -10,6 +10,9 @@ import { test, expect } from '@playwright/test';
  * purely on spec drift, so the file was removed. Only the two language-toggle
  * behaviours that exercised the real shell survived; they are preserved below
  * alongside a few structural navigation checks. See agent/tests.md.
+ *
+ * The résumé editor was removed on 2026-09-24 (ADR-0042): the Profile view's
+ * PDF upload replaced it, so these checks assert the editor is gone.
  */
 test.describe('Internship Portal — app shell', () => {
   test.beforeEach(async ({ page }) => {
@@ -21,7 +24,7 @@ test.describe('Internship Portal — app shell', () => {
     await expect(page.getByTestId('language-toggle-ja')).toBeVisible();
     await expect(page.locator('.side-nav-btn', { hasText: 'Dashboard' })).toBeVisible();
     await expect(page.locator('.side-nav-btn', { hasText: 'Internship Radar' })).toBeVisible();
-    await expect(page.locator('.side-nav-btn', { hasText: 'Editor' })).toBeVisible();
+    await expect(page.locator('.side-nav-btn', { hasText: 'Editor' })).toHaveCount(0);
   });
 
   test('language switcher updates the active language indicator', async ({ page }) => {
@@ -41,28 +44,25 @@ test.describe('Internship Portal — app shell', () => {
     await expect(page.getByTestId('current-language-indicator')).toHaveText('EN');
   });
 
-  test('primary navigation switches between dashboard, radar, and editor', async ({ page }) => {
+  test('primary navigation switches between dashboard, radar, and profile', async ({ page }) => {
     // Radar view exposes the internship search field.
     await page.locator('.side-nav-btn', { hasText: 'Internship Radar' }).click();
     const search = page.getByPlaceholder('Search company, role, or keyword');
     await expect(search).toBeVisible();
 
-    // Editor view exposes the résumé template picker.
-    await page.locator('.side-nav-btn', { hasText: 'Editor' }).click();
-    await expect(page.locator('[data-testid^="template-"]').first()).toBeVisible();
+    // Profile view offers the résumé PDF upload that replaced the editor.
+    await page.locator('.side-nav-btn', { hasText: 'Profile' }).click();
+    await expect(page.getByRole('button', { name: 'Upload résumé PDF' })).toBeVisible();
 
     // Back to the dashboard hides the radar search field again.
     await page.locator('.side-nav-btn', { hasText: 'Dashboard' }).click();
     await expect(search).toHaveCount(0);
   });
 
-  test('first Japanese template is Jake’s clean Japanese resume', async ({ page }) => {
-    await page.getByTestId('language-toggle-ja').click();
-    await page.locator('.side-nav-btn', { hasText: 'エディタ' }).click();
-
-    const jakesCleanJa = page.getByTestId('template-jakes-clean-ja');
-    await expect(jakesCleanJa).toBeVisible();
-    await expect(jakesCleanJa).toHaveText("Jake's Clean 日本語");
-    await expect(jakesCleanJa).toHaveAttribute('aria-selected', 'true');
+  test('the activity period is shared between Dashboard and Applications', async ({ page }) => {
+    await page.getByRole('combobox', { name: 'Unit' }).first().selectOption('months');
+    await page.locator('.side-nav-btn', { hasText: 'Applications' }).click();
+    await expect(page.getByRole('combobox', { name: 'Unit' })).toHaveValue('months');
+    await expect(page.getByRole('combobox', { name: 'Number' })).toHaveValue('2');
   });
 });

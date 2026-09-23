@@ -57,7 +57,7 @@ const COPY = {
 };
 
 // Decorative sidebar for the art-pane mock. Rows mirror the app's real surfaces
-// (nav tabs + tracker/calendar/assistant) so the preview isn't inventing screens.
+// (nav tabs + tracker/calendar) so the preview isn't inventing screens.
 const MOCK_NAV = {
   en: {
     search: 'New application',
@@ -69,8 +69,6 @@ const MOCK_NAV = {
       ['radar', 'Internship Radar'],
       ['work', 'Applications'],
       ['edu', 'Calendar'],
-      ['file', 'Editor'],
-      ['ai', 'AI assistant'],
       ['user', 'Profile'],
     ],
   },
@@ -84,8 +82,6 @@ const MOCK_NAV = {
       ['radar', 'インターン検索'],
       ['work', '応募管理'],
       ['edu', 'カレンダー'],
-      ['file', 'エディタ'],
-      ['ai', 'AIアシスタント'],
       ['user', 'プロフィール'],
     ],
   },

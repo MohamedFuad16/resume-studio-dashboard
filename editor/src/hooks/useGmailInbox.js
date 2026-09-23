@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { requestJson } from '../api/client.js';
 import { useApplicationTracker } from './useApplicationTracker.js';
 import { useInternshipCatalog } from './useInternshipCatalog.js';
+import { periodDays, useActivityPeriod } from './useActivityPeriod.js';
 import {
   addMonths, normalizeCompany, roleKey, gmailRecordId, sessionKeyFor, GENERAL_ROLE,
 } from '../utils/reapplyCooldown.js';
@@ -10,6 +11,8 @@ import {
 } from '../utils/trackerTruth.js';
 
 const POLL_MS = 90000;
+// Settings' "Scan emails for this period" button fires this; the hook owns the drain.
+export const GMAIL_SCAN_EVENT = 'resume-studio:gmail-scan';
 const KIND_TO_STATUS = { applied: 'applied', rejected: 'rejected', interview: 'interview', offer: 'applied' };
 // Status precedence within one drain: a terminal outcome (rejected) must not be
 // overwritten by an earlier application/interview email for the same company.
@@ -309,18 +312,34 @@ export function useGmailInbox(profile) {
     return { id: internship.id, company: action.company, kind: shouldSetStatus ? action.kind : null };
   }, [updateStatus, addMilestone]);
 
-  const drain = useCallback(async ({ backfillDays = 0 } = {}) => {
-    if (busy.current) return;
+  // A manual scan clicked while an automatic drain is still waiting on the
+  // server runs as soon as that drain finishes, instead of being dropped.
+  const pendingManual = useRef(null);
+  const drain = useCallback(async ({ backfillDays = 0, manual = false } = {}) => {
+    if (busy.current) {
+      if (manual) pendingManual.current = { backfillDays, manual };
+      return false;
+    }
     busy.current = true;
+    let scanned = false;
     try {
       const status = await requestJson(`/api/integrations/gmail/status?profile=${encodeURIComponent(profile)}`).catch(() => null);
-      if (!status?.connected) return;
+      if (!status?.connected) return false;
+      // Paused: automatic polls still drain what is already queued (no model
+      // calls) but never ask the server to scan. Only the Settings button does.
+      const scan = manual || !status.aiPaused;
       // A backfill re-scans older mail (ignoring the processed list) so existing
       // records get re-stamped with accurate applied/rejected dates.
-      const syncUrl = `/api/integrations/gmail/sync-now?profile=${encodeURIComponent(profile)}${backfillDays > 0 ? `&backfill=${backfillDays}` : ''}`;
-      await requestJson(syncUrl, { method: 'POST' }).catch(() => null);
+      const syncUrl = `/api/integrations/gmail/sync-now?profile=${encodeURIComponent(profile)}${backfillDays > 0 ? `&backfill=${backfillDays}` : ''}${manual ? '&manual=1' : ''}`;
+      if (scan) {
+        // `{skipped: ...}` (paused, reauth, no key) is not a scan. A failed
+        // request still counts: a backfill outlives the gateway timeout and keeps
+        // running server-side, so retrying it on every load would re-spend credits.
+        const result = await requestJson(syncUrl, { method: 'POST' }).catch(() => null);
+        scanned = !result?.skipped;
+      }
       const { actions } = await requestJson(`/api/integrations/gmail/pending?profile=${encodeURIComponent(profile)}`).catch(() => ({ actions: [] }));
-      if (!actions?.length) return;
+      if (!actions?.length) return scanned;
 
       // Oldest-first so the latest email's status wins (application → then
       // rejection = rejected), sharing one session map for company convergence.
@@ -339,8 +358,25 @@ export function useGmailInbox(profile) {
       if (appliedById.size) setJustApplied([...appliedById.values()]);
     } finally {
       busy.current = false;
+      const next = pendingManual.current;
+      pendingManual.current = null;
+      if (next) setTimeout(() => drainRef.current(next).catch(() => {}), 0);
     }
+    return scanned;
   }, [profile, applyAction]);
+  const drainRef = useRef(drain);
+  drainRef.current = drain;
+
+  const { period } = useActivityPeriod();
+  const periodRef = useRef(period);
+  periodRef.current = period;
+
+  useEffect(() => {
+    if (!profile) return undefined;
+    const onScan = () => drain({ backfillDays: periodDays(periodRef.current), manual: true }).catch(() => false);
+    window.addEventListener(GMAIL_SCAN_EVENT, onScan);
+    return () => window.removeEventListener(GMAIL_SCAN_EVENT, onScan);
+  }, [profile, drain]);
 
   useEffect(() => {
     if (!profile) return undefined;
@@ -351,12 +387,14 @@ export function useGmailInbox(profile) {
     try { needsBackfill = !localStorage.getItem(BACKFILL_FLAG); } catch { /* ignore */ }
     const t = setTimeout(() => {
       if (needsBackfill) {
-        drain({ backfillDays: 180 }).finally(() => { try { localStorage.setItem(BACKFILL_FLAG, '1'); } catch { /* ignore */ } });
+        // Fixed 180 days, not the display period: this re-stamps dates on every
+        // existing record. Only marked done once a scan actually ran (not paused).
+        drain({ backfillDays: 180 }).then(scanned => { if (scanned) try { localStorage.setItem(BACKFILL_FLAG, '1'); } catch { /* ignore */ } }).catch(() => {});
       } else {
-        drain();
+        drain().catch(() => {});
       }
     }, 1500);
-    const iv = setInterval(() => drain(), POLL_MS);
+    const iv = setInterval(() => drain().catch(() => {}), POLL_MS);
     return () => { clearTimeout(t); clearInterval(iv); };
   }, [profile, drain]);
 

@@ -5,9 +5,7 @@ import { LogOut } from 'lucide-react';
 // Sidebar-footer account menu. With Firebase auth one account == one user, so there
 // is no profile switching and no "+ New": the avatar shows the signed-in email and
 // signs you out. Settings used to live here too, but it is a sidebar view now.
-// `onNew` (the create-profile wizard) is kept as an optional prop for the
-// no-auth/local path but is NOT surfaced here. (Export name kept as
-// ProfileSwitcher so App wiring is unchanged.)
+// (Export name kept as ProfileSwitcher so App wiring is unchanged.)
 export function ProfileSwitcher({
   profiles = [],
   activeId,

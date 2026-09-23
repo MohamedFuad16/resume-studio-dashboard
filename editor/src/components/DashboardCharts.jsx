@@ -40,27 +40,48 @@ const smoothPath = points => {
   return d;
 };
 
-export function ApplicationTrendChart({ records, isJa }) {
+export function ApplicationTrendChart({ records, isJa, days = 180 }) {
   const svgRef = useRef(null);
   const locale = isJa ? 'ja-JP' : 'en-US';
+  // Periods up to 12 weeks bucket by week (Monday start); longer ones by month.
   const months = useMemo(() => {
-    const fmt = new Intl.DateTimeFormat(locale, { month: 'short' });
     const now = new Date();
-    const list = Array.from({ length: 6 }, (_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
-      return { key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, label: fmt.format(d), count: 0 };
-    });
+    let list;
+    let keyOf;
+    if (days <= 84) {
+      const fmt = new Intl.DateTimeFormat(locale, { month: 'numeric', day: 'numeric' });
+      const weekStart = d => { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
+      keyOf = d => weekStart(d).toISOString().slice(0, 10);
+      const thisWeek = weekStart(now);
+      // Every Monday-start week the window touches: 14 days from a Wednesday spans 3.
+      const firstWeek = weekStart(new Date(now.getTime() - days * 86400000));
+      const count = Math.max(2, Math.round((thisWeek - firstWeek) / (7 * 86400000)) + 1);
+      list = Array.from({ length: count }, (_, i) => {
+        const d = new Date(thisWeek); d.setDate(d.getDate() - 7 * (count - 1 - i));
+        return { key: keyOf(d), label: fmt.format(d), count: 0 };
+      });
+    } else {
+      const fmt = new Intl.DateTimeFormat(locale, days > 365 ? { month: 'short', year: '2-digit' } : { month: 'short' });
+      keyOf = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      // Every calendar month the window touches: 90 days from mid-month spans 4.
+      const first = new Date(now.getTime() - days * 86400000);
+      const touched = (now.getFullYear() - first.getFullYear()) * 12 + (now.getMonth() - first.getMonth()) + 1;
+      const count = Math.min(24, Math.max(2, touched));
+      list = Array.from({ length: count }, (_, i) => {
+        const d = new Date(now.getFullYear(), now.getMonth() - (count - 1 - i), 1);
+        return { key: keyOf(d), label: fmt.format(d), count: 0 };
+      });
+    }
     const byKey = new Map(list.map(m => [m.key, m]));
     for (const record of records) {
       if (!APPLICATION_STATUSES_SET.has(record.status)) continue;
       const date = recordInstant(record);
       if (!date) continue;
-      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      const bucket = byKey.get(key);
+      const bucket = byKey.get(keyOf(date));
       if (bucket) bucket.count += 1;
     }
     return list;
-  }, [records, locale]);
+  }, [records, locale, days]);
 
   const max = Math.max(1, ...months.map(m => m.count));
   const peakIndex = months.reduce((best, m, i) => (m.count > months[best].count ? i : best), 0);

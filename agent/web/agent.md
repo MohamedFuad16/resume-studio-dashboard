@@ -6,9 +6,11 @@ Bilingual (EN/JA) résumé project: the React + Node "Internship Portal" web app
 
 **Stack:** React 18 + Vite, Node/Express (ESM), better-sqlite3 (local working copy
 + snapshot to the durable mount, ADR-0040), Firebase Auth + client-direct Firestore
-(per-user data), Tectonic/XeLaTeX, Playwright, Tailwind. Deployed as a static Vite
-client on Vercel + the full API on Azure Container Apps (`portal-compile-jp`,
-japaneast — compile/Gmail/catalog; the Vercel origin serves NO `/api`).
+(per-user data), a browser-side PDF parser (pdf.js) for résumé import, Playwright,
+Tailwind. There is no LaTeX/Tectonic compile in this app any more — the résumé
+editor was removed (ADR-0042, 2026-09-24). Deployed as a static Vite client on
+Vercel + the full API on a Docker container on EC2 (`api.mohamedfuad.com`;
+Gmail/catalog/research; the Vercel origin serves NO `/api`).
 
 > This is the WEB team's knowledge base. iOS lives in `agent/ios/`; anything both
 > clients depend on is contract-bound in `contracts/` — read `contracts/README.md`

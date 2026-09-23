@@ -18,6 +18,8 @@ import { CompanyLogo } from './CompanyLogo.jsx';
 import { DetailPanel } from './InternshipDashboard.jsx';
 import InterviewDateModal from './InterviewDateModal.jsx';
 import { ApplicationTrendChart, StatusBreakdownDonut } from './DashboardCharts.jsx';
+import PeriodPicker from './PeriodPicker.jsx';
+import { filterRecordsByPeriod, useActivityPeriod } from '../hooks/useActivityPeriod.js';
 import { displayCompany, displayRole, displayValue, formatDisplayDeadline } from '../utils/internshipDisplay.js';
 import { prepareProfilePhoto } from '../utils/imageUpload.js';
 import { appliedCompaniesForProfile, compareCompanyAwareMatch } from '../utils/internshipRanking.js';
@@ -66,13 +68,13 @@ const copy = {
     explore: 'Explore Tokyo roles',
     projects: 'Projects',
     projectsSub: 'Your strongest proof of shipped engineering work.',
-    editProjects: 'Edit projects',
+    editProjects: 'Update from résumé',
     viewProject: 'Open GitHub project',
     tokyo: 'Tokyo opportunities',
     tokyoSub: 'Highest-priority matches nearby.',
     viewJapan: 'View all Japan matches',
     trend: 'Application trend',
-    trendSub: 'Applications sent per month.',
+    trendSub: 'Applications sent in the selected period.',
     breakdown: 'Status breakdown',
   },
   ja: {
@@ -95,13 +97,13 @@ const copy = {
     explore: '東京の募集を見る',
     projects: 'プロジェクト',
     projectsSub: '実装経験を示す主要な成果物です。',
-    editProjects: 'プロジェクトを編集',
+    editProjects: '履歴書から更新',
     viewProject: 'GitHubで開く',
     tokyo: '東京の注目募集',
     tokyoSub: '近くで優先度の高い募集です。',
     viewJapan: '日本の募集をすべて見る',
     trend: '応募の推移',
-    trendSub: '月ごとの応募数です。',
+    trendSub: '選択した期間の応募数です。',
     breakdown: '状況の内訳',
   },
 };
@@ -114,11 +116,20 @@ function LinkedinMark() {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.45 20.45h-3.56v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.34V8.98h3.42v1.57h.05c.47-.9 1.64-1.85 3.37-1.85 3.61 0 4.27 2.37 4.27 5.46v6.29ZM5.32 7.41a2.07 2.07 0 1 1 0-4.13 2.07 2.07 0 0 1 0 4.13ZM7.1 20.45H3.54V8.98H7.1v11.47Z" /></svg>;
 }
 
-export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeChange, isJa, activeProfile }) {
+export function ProfileDashboard({ resume, onOpenRadar, onOpenProfile, onResumeChange, isJa, activeProfile }) {
   const t = isJa ? copy.ja : copy.en;
   const fileRef = useRef(null);
   const [interviewPending, setInterviewPending] = useState(null);
-  const { records, counts, statusFor, updateStatus, addMilestone } = useApplicationTracker(activeProfile);
+  const { records: allRecords, statusFor, updateStatus, addMilestone } = useApplicationTracker(activeProfile);
+  // Stats, chart and Recent follow the period; Tokyo matches and cooldowns use
+  // every record, since an older application still shapes both.
+  const { period, days } = useActivityPeriod();
+  const records = useMemo(() => filterRecordsByPeriod(allRecords, period), [allRecords, period]);
+  const counts = useMemo(() => {
+    const next = {};
+    for (const record of records) next[record.status] = (next[record.status] || 0) + 1;
+    return next;
+  }, [records]);
   const { catalog } = useInternshipCatalog();
   const [selectedItem, setSelectedItem] = useState(null);
   const recent = useMemo(
@@ -126,13 +137,13 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
     [records],
   );
   const tokyoMatches = useMemo(() => {
-    const appliedCompanies = appliedCompaniesForProfile(activeProfile, records);
+    const appliedCompanies = appliedCompaniesForProfile(activeProfile, allRecords);
     return catalog
       .filter(item => /Tokyo|東京/i.test(item.location))
       .sort((a, b) => compareCompanyAwareMatch(a, b, appliedCompanies))
       .slice(0, 4);
-  }, [activeProfile, catalog, records]);
-  const cooldownMap = useMemo(() => companyCooldownMap(records), [records]);
+  }, [activeProfile, catalog, allRecords]);
+  const cooldownMap = useMemo(() => companyCooldownMap(allRecords), [allRecords]);
   const name = isJa
     ? (resume.personal?.nameJa || resume.personal?.nameEn || '名前未設定')
     : (resume.personal?.nameEn || resume.personal?.nameJa || 'Name not set');
@@ -221,7 +232,7 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
       </section>
 
       <section className="pipeline-strip" aria-label={t.pipeline}>
-        <div className="pipeline-title"><BriefcaseBusiness size={19} /><span><b>{t.pipeline}</b><small>{t.rolesTracked(records.length)}</small></span></div>
+        <div className="pipeline-title"><BriefcaseBusiness size={19} /><span><b>{t.pipeline}</b><small>{t.rolesTracked(records.length)}</small></span><PeriodPicker isJa={isJa} /></div>
         {APPLICATION_STATUSES.map(item => {
           const Icon = STATUS_ICONS[item.value];
           return <div className={`pipeline-stat ${item.value}`} key={item.value}><Icon size={17} /><span><strong>{counts[item.value] || 0}</strong><small>{statusLabel(item.value, isJa)}</small></span></div>;
@@ -231,7 +242,7 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
       <section className="dashboard-analytics">
         <div className="analytics-card analytics-trend">
           <div className="analytics-heading"><h2>{t.trend}</h2><p>{t.trendSub}</p></div>
-          <ApplicationTrendChart records={records} isJa={isJa} />
+          <ApplicationTrendChart records={records} days={days} isJa={isJa} />
         </div>
         <div className="analytics-card analytics-tokyo">
           <div className="analytics-heading analytics-heading-row">
@@ -276,7 +287,7 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
             )}
           </div>
 
-          <div className="section-heading project-heading"><div><h2>{t.projects}</h2><p>{t.projectsSub}</p></div><button type="button" onClick={onOpenEditor}>{t.editProjects} <FilePenLine size={14} /></button></div>
+          <div className="section-heading project-heading"><div><h2>{t.projects}</h2><p>{t.projectsSub}</p></div><button type="button" onClick={onOpenProfile}>{t.editProjects} <FilePenLine size={14} /></button></div>
           <div className="project-grid">
             {projects.map(project => (
               <a className="project-card" key={project.title} href={project.link} target="_blank" rel="noreferrer" aria-label={`${t.viewProject}: ${project.title}`} aria-disabled={project.link ? undefined : true} onClick={project.link ? undefined : event => event.preventDefault()}>
@@ -305,7 +316,7 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenEditor, onResumeCh
             onStatus={onStatusChange}
             onApply={onApply}
             onClose={() => setSelectedItem(null)}
-            onOpenEditor={onOpenEditor}
+            onOpenProfile={onOpenProfile}
             cooldown={cooldownForCompany(cooldownMap, selectedItem.company)}
             isJa={isJa}
           />

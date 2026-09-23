@@ -1,15 +1,10 @@
 import './load-env.js';
 import express from 'express';
 import cors from 'cors';
-import { execFile } from 'child_process';
-import { randomUUID, createHash } from 'crypto';
-import { promisify } from 'util';
+import { randomUUID } from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
-import os from 'os';
 import { fileURLToPath } from 'url';
-import { generateLatex } from './templates.js';
-import { runResumeChat } from './resume-chat.js';
 import { researchCompanyInternships } from './internship-research.js';
 import { createStore } from './storage.js';
 import {
@@ -26,7 +21,6 @@ import { encAvailable } from './gmail/crypto.js';
 import { syncProfile } from './gmail/sync.js';
 import {
   sendRequestError,
-  validateApplication,
   validateInternship,
   validateInternshipId,
   validateProfileId,
@@ -34,20 +28,16 @@ import {
   validateTracker,
 } from './validation.js';
 
-const execFileAsync = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const RESUME_ROOT = path.resolve(__dirname, '../../');
 const DATA_FILE = path.join(RESUME_ROOT, 'editor', 'resume.json');
 const PROFILES_DIR = path.join(__dirname, 'profiles');
 const CUSTOM_INTERNSHIPS_FILE = path.join(__dirname, 'custom-internships.json');
-const APPLICATIONS_DIR = path.join(__dirname, 'applications');
 const DATA_DIR = process.env.RESUME_STUDIO_DATA_DIR || path.join(__dirname, '.data');
-const TECTONIC = process.env.TECTONIC_PATH || '/opt/homebrew/bin/tectonic';
 const store = createStore({ localDbPath: path.join(DATA_DIR, 'resume-studio.sqlite') });
 const internshipResearchJobs = new Map();
 const internshipResearchByCompany = new Map();
 const RESEARCH_CACHE_MS = 15 * 60 * 1000;
-const VALID_TEMPLATES = new Set(['en_01', 'en_02', 'en_03', 'en_04', 'ja_01', 'ja_02', 'ja_03']);
 
 // Primary profile used as the read/write fallback everywhere a profile id is omitted.
 const DEFAULT_PROFILE_ID = process.env.RESUME_DEFAULT_PROFILE_ID || 'mohamed_fuad';
@@ -246,98 +236,16 @@ async function purgeRetiredProfiles() {
   ]));
 }
 
-// Live LaTeX compilation cannot run on Vercel (no Tectonic binary), so the PDF
-// preview there falls back to the prebaked `resume_<template>.pdf` files, cached in
-// the KV store. A template redesign would otherwise leave a STALE PDF cached in the
-// Blob. We namespace the cache key by a VERSION rather than deleting: bumping the
-// version means the new key is empty, so the next read serves the fresh deployed
-// prebaked file and re-caches under the new key. This is concurrency-safe on Vercel's
-// whole-DB-snapshot Blob store (a delete can be clobbered by a stale instance's
-// write; an orphaned old key simply never gets read). Bump on any template change.
-const COMPILED_CACHE_VERSION = '2026-07-03-jakes-clean-ja';
-const compiledKey = template => `compiled:${COMPILED_CACHE_VERSION}:${template}`;
-
 async function deleteProfile(profileId) {
   const id = validateProfileId(profileId);
   await store.deleteKey(profileKey(id));
   await store.deleteKey(trackerKey(id));
-  await store.deleteKey(applicationsKey(id));
+  await store.deleteKey(applicationsKey(id)); // legacy cover-letter log, if any
   if (!process.env.VERCEL) {
     await fs.unlink(path.join(PROFILES_DIR, `${id}.json`)).catch(error => {
       if (error.code !== 'ENOENT') throw error;
     });
   }
-}
-
-async function materializeResumePhoto(resume, tmpDir) {
-  const dataUrl = resume?.personal?.photoDataUrl || resume?.personalInfo?.photoDataUrl || '';
-  const match = String(dataUrl).match(/^data:image\/(png|jpe?g|webp);base64,([A-Za-z0-9+/=\s]+)$/i);
-  if (!match) return null;
-  const mime = match[1].toLowerCase();
-  const bytes = Buffer.from(match[2].replace(/\s/g, ''), 'base64');
-  if (!bytes.length || bytes.length > 6 * 1024 * 1024) return null;
-  const sourceExt = mime === 'jpeg' ? 'jpg' : mime;
-  const sourcePath = path.join(tmpDir, `resume-photo.${sourceExt}`);
-  await fs.writeFile(sourcePath, bytes);
-  if (sourceExt !== 'webp') return sourcePath;
-  const pngPath = path.join(tmpDir, 'resume-photo.png');
-  try {
-    await execFileAsync('/usr/bin/sips', ['-s', 'format', 'png', sourcePath, '--out', pngPath]);
-    return pngPath;
-  } catch {
-    return null;
-  }
-}
-
-async function persistCompiledPdf(template, pdfData, { mirrorLocal = !process.env.VERCEL, hash = '' } = {}) {
-  await store.setJson(compiledKey(template), {
-    contentType: 'application/pdf',
-    base64: pdfData.toString('base64'),
-    hash,
-    updatedAt: new Date().toISOString(),
-  });
-
-  if (mirrorLocal) {
-    const publicPdfPath = path.join(PUBLIC_DIR, `resume_${template}.pdf`);
-    await fs.writeFile(publicPdfPath, pdfData);
-  }
-}
-
-// The hash of the last successfully compiled document per template (template +
-// generated LaTeX, which folds in the résumé and the photo). A repeat compile of
-// identical content returns the stored PDF and skips Tectonic entirely.
-async function compiledPdfHash(template) {
-  const stored = await store.getJson(compiledKey(template), null);
-  return stored?.hash || '';
-}
-// Hash the INPUT (template + résumé JSON, which includes the photo data URL) —
-// stable across compiles, unlike the generated LaTeX whose photo path is a fresh
-// tmp dir each run (which would defeat the cache for photo templates).
-const documentHash = (template, resume) => createHash('sha1').update(`${template}\n${JSON.stringify(resume)}`).digest('hex');
-
-async function readCompiledPdf(template) {
-  const stored = await store.getJson(compiledKey(template), null);
-  if (stored?.base64) {
-    return {
-      contentType: stored.contentType || 'application/pdf',
-      data: Buffer.from(stored.base64, 'base64'),
-      source: 'store',
-    };
-  }
-  const fallbackPaths = [
-    path.join(PUBLIC_DIR, `resume_${template}.pdf`),
-    path.join(__dirname, 'seed-pdfs', `resume_${template}.pdf`),
-  ];
-  for (const pdfPath of fallbackPaths) {
-    try {
-      const data = await fs.readFile(pdfPath);
-      await persistCompiledPdf(template, data, { mirrorLocal: false });
-      return { contentType: 'application/pdf', data, source: 'seed' };
-    } catch {
-      // Try the next fallback path.
-    }
-  }
-  return null;
 }
 
 // ── Initialize durable store and migrate existing local JSON data ───
@@ -414,9 +322,6 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-const PUBLIC_DIR = path.join(__dirname, 'public');
-fs.mkdir(PUBLIC_DIR, { recursive: true }).catch(() => {});
-app.use('/public', express.static(PUBLIC_DIR));
 
 
 // Reports whether writes actually survive a restart, by checking the filesystem
@@ -595,9 +500,26 @@ app.post('/api/integrations/gmail/sync-now', async (req, res) => {
   try {
     setNoStore(res);
     const profile = validateProfileId(req.query.profile || 'mohamed_fuad');
-    const backfill = Math.min(Number(req.query.backfill) || 0, 180);
-    const result = await syncProfile(store, profile, backfill > 0 ? { backfillDays: backfill } : {});
+    // Up to two years: the client's period picker goes to "2 years". The scan
+    // still stops at 80 messages, so a wider window costs no more model calls.
+    const backfill = Math.min(Number(req.query.backfill) || 0, 730);
+    const manual = req.query.manual === '1';
+    const result = await syncProfile(store, profile, { ...(backfill > 0 ? { backfillDays: backfill } : {}), manual });
     res.json({ ok: true, ...result });
+  } catch (error) {
+    sendRequestError(res, error);
+  }
+});
+
+// Pause or resume automatic scans for a profile. Body: { aiPaused: boolean }.
+app.post('/api/integrations/gmail/automation', async (req, res) => {
+  try {
+    setNoStore(res);
+    const profile = validateProfileId(req.query.profile || 'mohamed_fuad');
+    if (typeof req.body?.aiPaused !== 'boolean') return res.status(400).json({ error: 'aiPaused must be a boolean.' });
+    const conn = await gmailStore.setAiPaused(store, profile, req.body.aiPaused);
+    if (!conn) return res.status(404).json({ error: 'Gmail is not connected for this profile.' });
+    res.json(gmailStore.publicStatus(conn));
   } catch (error) {
     sendRequestError(res, error);
   }
@@ -816,262 +738,6 @@ app.post('/api/save', async (req, res) => {
   }
 });
 
-// ── POST /api/chat/edit ─────────────────────────────────────────
-// Applies validated natural-language changes through Codex, with a
-// deterministic local path for simple contact/summary/skill edits.
-app.post('/api/chat/edit', async (req, res) => {
-  const { resume, instruction, language = 'en' } = req.body || {};
-  try {
-    const safeResume = validateResume(resume);
-    const safeInstruction = String(instruction || '').trim();
-    if (!safeInstruction || safeInstruction.length > 4000) return res.status(400).json({ error: 'Instruction must be between 1 and 4000 characters.' });
-    const result = await runResumeChat({ resume: safeResume, instruction: safeInstruction, language: language === 'ja' ? 'ja' : 'en', rootDir: RESUME_ROOT });
-    res.json(result);
-  } catch (error) {
-    sendRequestError(res, error);
-  }
-});
-
-// ── POST /api/compile ────────────────────────────────────────────
-// Body: { template: 'en_01' | 'en_02' | ..., resume: {...} }
-// Returns: JSON with pdfUrl or error
-app.post('/api/compile', async (req, res) => {
-  const { template } = req.body || {};
-  if (!VALID_TEMPLATES.has(template)) return res.status(400).json({ error: 'Invalid resume template.' });
-  let resume;
-  try {
-    resume = validateResume(req.body?.resume);
-  } catch (error) {
-    return sendRequestError(res, error);
-  }
-  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'resume-'));
-
-  try {
-    // Content-hash short-circuit (before the slow steps): if this exact document
-    // was already compiled, serve the stored PDF instantly instead of re-running
-    // Tectonic. Covers template toggles, re-opening the editor, cross-session.
-    const hash = documentHash(template, resume);
-    if (hash === await compiledPdfHash(template) && await readCompiledPdf(template)) {
-      return res.json({ success: true, pdfUrl: `/api/compiled/resume_${template}.pdf`, cached: true });
-    }
-
-    const photoFile = await materializeResumePhoto(resume, tmpDir);
-    const latex = generateLatex(template, resume, { photoFile });
-    const texFile = path.join(tmpDir, 'resume.tex');
-    await fs.writeFile(texFile, latex, 'utf8');
-
-    await execFileAsync(TECTONIC, [texFile, '-r', '0', '--outdir', tmpDir]);
-
-    const pdfFile = path.join(tmpDir, 'resume.pdf');
-    const pdfData = await fs.readFile(pdfFile);
-    await persistCompiledPdf(template, pdfData, { hash });
-
-    res.json({ success: true, pdfUrl: `/api/compiled/resume_${template}.pdf` });
-  } catch (e) {
-    console.error('Compile error:', e.message);
-    const fallback = await readCompiledPdf(template);
-    if (fallback) {
-      return res.json({
-        success: true,
-        pdfUrl: `/api/compiled/resume_${template}.pdf`,
-        cached: true,
-        warning: `Live PDF compilation is unavailable in this environment; serving the latest saved ${template} PDF.`,
-      });
-    }
-    res.status(500).json({ error: e.message || 'Compilation failed' });
-  } finally {
-    fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
-  }
-});
-
-app.get('/api/compiled/:file', async (req, res) => {
-  const match = String(req.params.file || '').match(/^resume_([a-z]{2}_\d{2})\.pdf$/i);
-  if (!match) return res.status(404).json({ error: 'Compiled PDF not found.' });
-  const compiled = await readCompiledPdf(match[1]);
-  if (!compiled) return res.status(404).json({ error: 'Compile the resume first.' });
-  res.setHeader('Content-Type', compiled.contentType || 'application/pdf');
-  res.setHeader('Cache-Control', 'no-store');
-  res.send(compiled.data);
-});
-
-// ── GET /api/export/tex?template=en_01&profile=mohamed_fuad ──────
-app.get('/api/export/tex', async (req, res) => {
-  try {
-    const template = String(req.query.template || '');
-    if (!VALID_TEMPLATES.has(template)) return res.status(400).json({ error: 'Invalid resume template.' });
-    const profile = validateProfileId(req.query.profile || 'mohamed_fuad');
-    const resume = await readProfile(profile);
-    const latex = generateLatex(template, resume);
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="resume_${template}.tex"`);
-    res.send(latex);
-  } catch (e) {
-    sendRequestError(res, e);
-  }
-});
-
-// ── GET /api/export/json?profile=mohamed_fuad ────────────────────
-app.get('/api/export/json', async (req, res) => {
-  try {
-    const profile = validateProfileId(req.query.profile || 'mohamed_fuad');
-    const raw = JSON.stringify(await readProfile(profile), null, 2);
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Content-Disposition', `attachment; filename="${profile}.json"`);
-    res.send(raw);
-  } catch (e) {
-    sendRequestError(res, e);
-  }
-});
-
-// ── GET /api/export/pdf?template=en_01&profile=mohamed_fuad ──────
-app.get('/api/export/pdf', async (req, res) => {
-  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'resume-'));
-  try {
-    const template = String(req.query.template || '');
-    if (!VALID_TEMPLATES.has(template)) return res.status(400).json({ error: 'Invalid resume template.' });
-    const profile = validateProfileId(req.query.profile || 'mohamed_fuad');
-    const resume = await readProfile(profile);
-    const latex = generateLatex(template, resume);
-    const texFile = path.join(tmpDir, 'resume.tex');
-    await fs.writeFile(texFile, latex, 'utf8');
-    await execFileAsync(TECTONIC, [texFile, '-r', '0', '--outdir', tmpDir]);
-    const pdfData = await fs.readFile(path.join(tmpDir, 'resume.pdf'));
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="resume_${template}.pdf"`);
-    res.send(pdfData);
-  } catch (e) {
-    sendRequestError(res, e);
-  } finally {
-    fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
-  }
-});
-
-// ── GET /api/export/ai?profile=mohamed_fuad ──────────────────────
-app.get('/api/export/ai', async (req, res) => {
-  try {
-    const profile = validateProfileId(req.query.profile || 'mohamed_fuad');
-    const r = await readProfile(profile);
-    const md = buildAIProfile(r);
-    res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${profile}_job_profile.md"`);
-    res.send(md);
-  } catch (e) {
-    sendRequestError(res, e);
-  }
-});
-
-// ── POST export variants (client-direct Firestore) ───────────────
-// These accept the résumé in the request body so the server needs no KV profile
-// lookup. The signed-in client owns its résumé in Firestore and posts it here.
-app.post('/api/export/tex', async (req, res) => {
-  try {
-    const template = String(req.body?.template || '');
-    if (!VALID_TEMPLATES.has(template)) return res.status(400).json({ error: 'Invalid resume template.' });
-    const resume = validateResume(req.body?.resume);
-    const latex = generateLatex(template, resume);
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="resume_${template}.tex"`);
-    res.send(latex);
-  } catch (e) {
-    sendRequestError(res, e);
-  }
-});
-
-app.post('/api/export/pdf', async (req, res) => {
-  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'resume-'));
-  try {
-    const template = String(req.body?.template || '');
-    if (!VALID_TEMPLATES.has(template)) return res.status(400).json({ error: 'Invalid resume template.' });
-    const resume = validateResume(req.body?.resume);
-    const photoFile = await materializeResumePhoto(resume, tmpDir);
-    const latex = generateLatex(template, resume, { photoFile });
-    const texFile = path.join(tmpDir, 'resume.tex');
-    await fs.writeFile(texFile, latex, 'utf8');
-    await execFileAsync(TECTONIC, [texFile, '-r', '0', '--outdir', tmpDir]);
-    const pdfData = await fs.readFile(path.join(tmpDir, 'resume.pdf'));
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="resume_${template}.pdf"`);
-    res.send(pdfData);
-  } catch (e) {
-    sendRequestError(res, e);
-  } finally {
-    fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
-  }
-});
-
-app.post('/api/export/ai', async (req, res) => {
-  try {
-    const resume = validateResume(req.body?.resume);
-    const md = buildAIProfile(resume);
-    res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="job_profile.md"');
-    res.send(md);
-  } catch (e) {
-    sendRequestError(res, e);
-  }
-});
-
-// ── POST /api/cover-letter ───────────────────────────────────────
-// Stateless cover-letter builder used by the Firestore application flow: the
-// client posts its résumé + job details, gets back the generated letter, and
-// stores the application record itself under users/{uid}/applications.
-app.post('/api/cover-letter', async (req, res) => {
-  try {
-    const resume = validateResume(req.body?.resume);
-    const { company, jobTitle, jobDescription } = validateApplication(req.body);
-    const coverLetter = buildCoverLetter(resume, company, jobTitle, jobDescription);
-    const fileName = `${company.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${jobTitle.toLowerCase().replace(/[^a-z0-9]/g, '_')}_application.md`;
-    res.json({ success: true, fileName, coverLetter });
-  } catch (e) {
-    sendRequestError(res, e);
-  }
-});
-
-// ── GET /api/applications ────────────────────────────────────────
-app.get('/api/applications', async (req, res) => {
-  try {
-    const profile = validateProfileId(req.query.profile || 'mohamed_fuad');
-    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-    const list = await getApplications(profile);
-    res.json(list);
-  } catch (e) {
-    sendRequestError(res, e);
-  }
-});
-
-// ── POST /api/applications ───────────────────────────────────────
-app.post('/api/applications', async (req, res) => {
-  try {
-    const profile = validateProfileId(req.query.profile || req.body?.profile || 'mohamed_fuad');
-    const { company, jobTitle, jobDescription, notes } = validateApplication(req.body);
-    const resume = await readProfile(profile);
-    const coverLetter = buildCoverLetter(resume, company, jobTitle, jobDescription);
-
-    const filename = `${company.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${jobTitle.toLowerCase().replace(/[^a-z0-9]/g, '_')}_application.md`;
-    const existing = await getApplications(profile);
-    const application = {
-      fileName: filename,
-      company,
-      jobTitle,
-      dateLogged: new Date().toISOString().slice(0, 10),
-      status: 'Applied / Logged via Web UI',
-      jobDescription,
-      notes,
-      coverLetter,
-    };
-    const nextApplications = [application, ...existing.filter(item => item.fileName !== filename)];
-    await writeApplications(profile, nextApplications);
-
-
-    res.json({
-      success: true,
-      ...application,
-    });
-  } catch (e) {
-    sendRequestError(res, e);
-  }
-});
-
 const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isDirectRun) {
   app.listen(PORT, () => {
@@ -1123,291 +789,4 @@ function createEmptyResume() {
     activities: [],
     summary: '',
   };
-}
-
-// ── AI Job Profile generator ─────────────────────────────────────
-// Produces a structured markdown document designed to be consumed by
-// AI job-matching tools (ChatGPT, Claude, Gemini, LinkedIn AI, etc.)
-// Fields are clearly labelled so LLMs can extract candidate attributes
-// and compare them against job descriptions.
-function buildAIProfile(r) {
-  const p = r.personal || {};
-  const sk = r.skills || {};
-  const edu = r.education || [];
-  const exp = r.experience || [];
-  const proj = r.projects || [];
-  const acts = r.activities || [];
-  const now = new Date().toISOString().slice(0, 10);
-
-  // Build tag cloud from skills — one pass over the four comma-lists.
-  const techTags = [];
-  for (const group of [sk.languages, sk.frameworks, sk.tools, sk.concepts]) {
-    for (const tag of String(group || '').split(',')) {
-      const trimmed = tag.trim();
-      if (trimmed) techTags.push(`[${trimmed}]`);
-    }
-  }
-  const allTechTags = techTags.join(' ');
-
-  const spokenTags = (sk.spoken || '').split(',').map(t => `[${t.trim()}]`).join(' ');
-
-  const expBlock = exp.map(e =>
-    `### ${e.role || e.roleJa} — ${e.company || e.companyJa}\n` +
-    `- **Period**: ${e.startDate} – ${e.endDate}\n` +
-    `- **Location**: ${e.location}\n` +
-    (e.bullets?.length ? e.bullets.map(b => `- ${b}`).join('\n') : '')
-  ).join('\n\n');
-
-  const eduBlock = edu.map(e =>
-    `### ${e.degree} — ${e.institution}\n` +
-    `- **Period**: ${e.startDate} – ${e.endDate}\n` +
-    `- **Location**: ${e.location}\n` +
-    (e.bullets?.length ? e.bullets.map(b => `- ${b}`).join('\n') : '')
-  ).join('\n\n');
-
-  const projBlock = proj.map(p =>
-    `### ${p.title} (${p.year || 'N/A'})\n` +
-    `- **Stack**: ${p.tech}\n` +
-    (p.bullets?.length ? p.bullets.map(b => `- ${b}`).join('\n') : '')
-  ).join('\n\n');
-
-  const actsBlock = acts.map(a =>
-    `### ${a.title}${a.org ? ` — ${a.org}` : ''}\n` +
-    `- **Period**: ${a.startDate} – ${a.endDate}\n` +
-    (a.bullets?.length ? a.bullets.map(b => `- ${b}`).join('\n') : '')
-  ).join('\n\n');
-
-  return `---
-# AI JOB MATCHING PROFILE
-<!-- Generated: ${now} | Format: Structured Markdown for AI parsing -->
-<!-- Intended consumers: ChatGPT, Claude, Gemini, LinkedIn AI, ATS systems -->
----
-
-## CANDIDATE OVERVIEW
-
-| Field             | Value |
-|-------------------|-------|
-| **Full Name**     | ${p.nameEn || ''} (${p.nameJa || ''}) |
-| **Location**      | ${p.address || 'Tokyo, Japan'} |
-| **Email**         | ${p.email || ''} |
-| **Phone**         | ${p.phone || ''} |
-| **LinkedIn**      | ${p.linkedin || ''} |
-| **GitHub**        | ${p.github || ''} |
-| **Date of Birth** | ${p.dob || ''} |
-| **Languages**     | ${sk.spoken || ''} |
-
----
-
-## PROFESSIONAL SUMMARY
-
-${r.summary || ''}
-
----
-
-## TECHNICAL SKILLS
-
-### Programming Languages
-${sk.languages || ''}
-
-### Frameworks & Libraries
-${sk.frameworks || ''}
-
-### Tools & Infrastructure
-${sk.tools || ''}
-
-### Concepts & Methodologies
-${sk.concepts || ''}
-
-### Spoken Languages
-${sk.spoken || ''}
-
----
-
-## WORK EXPERIENCE
-
-${expBlock || '_No experience listed._'}
-
----
-
-## EDUCATION
-
-${eduBlock || '_No education listed._'}
-
----
-
-## PROJECTS
-
-${projBlock || '_No projects listed._'}
-
----
-
-## ACTIVITIES & CERTIFICATIONS
-
-${actsBlock || '_No activities listed._'}
-
----
-
-## JOB MATCHING TAGS
-<!-- AI: Use these tags to match against job requirements -->
-
-### Technical Tags
-${allTechTags}
-
-### Language Tags
-${spokenTags}
-
-### Profile Tags
-[Tokyo] [Japan-Based] [Bilingual-EN-JA] [JLPT-N2] [Student-Developer]
-[Full-Stack] [Web-Development] [Mobile-First] [REST-API] [Open-Source]
-
----
-<!-- END OF AI JOB PROFILE -->
-`;
-}
-
-// ── Helper to parse and list applications ────────────────────────
-async function getApplications(profileId = 'mohamed_fuad') {
-  const profile = validateProfileId(profileId);
-  const stored = await store.getJson(applicationsKey(profile), null);
-  if (Array.isArray(stored)) return stored;
-  if (profile === 'mohamed_fuad') {
-    const legacy = await store.getJson('applications', null);
-    if (Array.isArray(legacy)) {
-      await store.setJson(applicationsKey(profile), legacy);
-      return legacy;
-    }
-  }
-  if (profile !== 'mohamed_fuad') {
-    await store.setJson(applicationsKey(profile), []);
-    return [];
-  }
-  const dir = APPLICATIONS_DIR;
-  try {
-    await fs.mkdir(dir, { recursive: true });
-    const files = await fs.readdir(dir);
-    const mdFiles = files.filter(f => f.endsWith('.md'));
-    // Independent reads — parse every dossier concurrently.
-    const list = await Promise.all(mdFiles.map(async f => {
-      const fullPath = path.join(dir, f);
-      const content = await fs.readFile(fullPath, 'utf8');
-
-      // Parsing using regex
-      const titleMatch = content.match(/# Application Dossier:\s*(.*?)\s+at\s+(.*)/);
-      const jobTitle = titleMatch ? titleMatch[1].trim() : 'Unknown Role';
-      const company = titleMatch ? titleMatch[2].trim() : 'Unknown Company';
-
-      const dateMatch = content.match(/-\s+\*\*Date Logged\*\*:\s*([0-9-]{10})/);
-      const dateLogged = dateMatch ? dateMatch[1].trim() : '';
-
-      const statusMatch = content.match(/-\s+\*\*Status\*\*:\s*(.*)/);
-      const status = statusMatch ? statusMatch[1].trim() : 'Applied';
-
-      let jobDescription = '';
-      const descIndex = content.indexOf('## Job Description / Requirements');
-      if (descIndex !== -1) {
-        const subContent = content.substring(descIndex + '## Job Description / Requirements'.length);
-        const nextHeading = subContent.indexOf('##');
-        if (nextHeading !== -1) {
-          jobDescription = subContent.substring(0, nextHeading).trim();
-        } else {
-          jobDescription = subContent.trim();
-        }
-      }
-
-      let notes = '';
-      const notesIndex = content.indexOf('## Notes');
-      if (notesIndex !== -1) {
-        const subContent = content.substring(notesIndex + '## Notes'.length);
-        const nextHeading = subContent.indexOf('##');
-        if (nextHeading !== -1) {
-          notes = subContent.substring(0, nextHeading).trim();
-        } else {
-          notes = subContent.trim();
-        }
-      }
-
-      let coverLetter = '';
-      const clIndex = content.indexOf('## Auto-Generated Cover Letter');
-      if (clIndex !== -1) {
-        const subContent = content.substring(clIndex + '## Auto-Generated Cover Letter'.length);
-        const textBlockMatch = subContent.match(/```text\s*([\s\S]*?)```/);
-        if (textBlockMatch) {
-          coverLetter = textBlockMatch[1].trim();
-        }
-      }
-
-      return {
-        fileName: f,
-        company,
-        jobTitle,
-        dateLogged,
-        status,
-        jobDescription,
-        notes,
-        coverLetter
-      };
-    }));
-
-    list.sort((a, b) => b.dateLogged.localeCompare(a.dateLogged));
-    await store.setJson(applicationsKey(profile), list);
-    return list;
-  } catch (e) {
-    console.error('Error reading applications:', e);
-    return [];
-  }
-}
-
-async function writeApplications(profileId, list) {
-  const profile = validateProfileId(profileId);
-  await store.setJson(applicationsKey(profile), list);
-  if (process.env.VERCEL) return;
-  if (profile !== 'mohamed_fuad') return;
-  await fs.mkdir(APPLICATIONS_DIR, { recursive: true });
-  for (const item of list) {
-    if (!item.fileName) continue;
-    const dossierContent = `# Application Dossier: ${item.jobTitle} at ${item.company}
-- **Date Logged**: ${item.dateLogged}
-- **Status**: ${item.status}
-
-## Job Description / Requirements
-${item.jobDescription || ''}
-
-${item.notes ? `## Notes\n${item.notes}\n` : ''}
-## Auto-Generated Cover Letter
-\`\`\`text
-${item.coverLetter || ''}
-\`\`\`
-`;
-    await fs.writeFile(path.join(APPLICATIONS_DIR, item.fileName), dossierContent, 'utf8');
-  }
-}
-
-// ── Cover Letter Generator ──────────────────────────────────────────
-function buildCoverLetter(r, company, jobTitle, jobDescription) {
-  const p = r.personal || {};
-  const education = r.education?.[0] || {};
-  const exp = r.experience?.[0] || {};
-  const projectNames = (r.projects || []).slice(0, 3).map(project => project.title || project.name).filter(Boolean);
-  const skills = [r.skills?.languages, r.skills?.frameworks, r.skills?.tools].filter(Boolean).join(', ');
-  const identity = [education.degree, education.institution || education.school].filter(Boolean).join(' student at ');
-  const experience = [exp.role, exp.company].filter(Boolean).join(' at ');
-  const evidence = [
-    skills ? `My technical background includes ${skills}.` : '',
-    projectNames.length ? `Projects such as ${projectNames.join(', ')} demonstrate my ability to ship working software.` : '',
-    experience ? `My experience as ${experience} strengthened my professional communication and execution.` : '',
-  ].filter(Boolean).join(' ');
-  const requirementContext = String(jobDescription || '').trim().slice(0, 600);
-  return `Dear Hiring Team at ${company},
-
-I am writing to express my interest in the ${jobTitle} position at ${company}.${identity ? ` As a ${identity},` : ''} I would welcome the opportunity to contribute to your team.
-
-${evidence || r.summary || 'My resume includes the experience and projects most relevant to this application.'}
-${requirementContext ? `I am particularly interested in the responsibilities described for this role and would be glad to discuss how my background maps to them.` : ''}
-
-Thank you for your time and consideration. I would welcome the opportunity to discuss how my technical skills and background align with the needs of ${company}.
-
-Sincerely,
-${p.nameEn || p.nameJa || ''}
-${[p.email, p.phone].filter(Boolean).join(' | ')}
-`;
 }

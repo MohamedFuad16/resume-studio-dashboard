@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { requestJson } from '../api/client.js';
 import GmailMark from './GmailMark.jsx';
+import { GMAIL_SCAN_EVENT } from '../hooks/useGmailInbox.js';
+import { useActivityPeriod } from '../hooks/useActivityPeriod.js';
 
 const copy = {
   en: {
@@ -21,6 +23,13 @@ const copy = {
     errConnect: 'Could not connect Gmail. Please try again.',
     denied: 'Gmail connection was cancelled.',
     norefresh: 'Google did not return offline access — try again and keep "stay signed in".',
+    aiTitle: 'Automatic AI scans',
+    aiOn: 'On: new mail is checked every few minutes with the search and audit models, which uses your OpenRouter credits.',
+    aiOff: 'Paused: no model runs in the background. Use "Scan emails" when you want an update.',
+    pause: 'Pause', resume: 'Resume',
+    errPause: 'Could not change automatic scans. Try again.',
+    scan: days => `Scan emails from the last ${days} days`,
+    scanning: 'Scanning…', scanStarted: 'Scan started. New results appear in Applications within a minute or two.',
   },
   ja: {
     title: 'Gmail',
@@ -40,6 +49,13 @@ const copy = {
     errConnect: 'Gmailを連携できませんでした。もう一度お試しください。',
     denied: 'Gmail連携がキャンセルされました。',
     norefresh: 'オフラインアクセスが取得できませんでした。もう一度お試しください。',
+    aiTitle: 'AIによる自動スキャン',
+    aiOn: '有効: 数分ごとに検索モデルと監査モデルで新着メールを確認します（OpenRouterのクレジットを消費します）。',
+    aiOff: '一時停止中: バックグラウンドでモデルは動きません。更新したいときは「メールをスキャン」を押してください。',
+    pause: '一時停止', resume: '再開',
+    errPause: '自動スキャンの設定を変更できませんでした。もう一度お試しください。',
+    scan: days => `直近${days}日のメールをスキャン`,
+    scanning: 'スキャン中…', scanStarted: 'スキャンを開始しました。1〜2分で応募一覧に反映されます。',
   },
 };
 
@@ -52,6 +68,8 @@ export default function GmailConnectCard({ profile, isJa }) {
   const [status, setStatus] = useState(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
+  const [scanning, setScanning] = useState(false);
+  const { days } = useActivityPeriod();
 
   const refresh = useCallback(async () => {
     try {
@@ -98,6 +116,27 @@ export default function GmailConnectCard({ profile, isJa }) {
     }
   };
 
+  const setAiPaused = async aiPaused => {
+    setBusy(true);
+    try {
+      const next = await requestJson(`/api/integrations/gmail/automation?profile=${encodeURIComponent(profile)}`, { method: 'POST', body: { aiPaused } });
+      setStatus(prev => ({ ...prev, ...next }));
+    } catch {
+      setNotice(t.errPause);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // The scan outlives the request (see contracts/api.md), so this only starts it;
+  // the inbox hook drains the queue and its next poll picks up late results.
+  const scanNow = () => {
+    setScanning(true);
+    setNotice(t.scanStarted);
+    window.dispatchEvent(new CustomEvent(GMAIL_SCAN_EVENT));
+    setTimeout(() => setScanning(false), 4000);
+  };
+
   const configured = status?.configured;
   const connected = status?.connected;
 
@@ -136,6 +175,25 @@ export default function GmailConnectCard({ profile, isJa }) {
               </small>
             </div>
             <button type="button" className="btn gmail-disconnect" onClick={disconnect} disabled={busy}>{t.disconnect}</button>
+          </div>
+          <div className="gmail-ai">
+            <div>
+              <b>{t.aiTitle}</b>
+              <small className="settings-note">{status.aiPaused ? t.aiOff : t.aiOn}</small>
+            </div>
+            <button
+              type="button"
+              className={`btn gmail-ai-toggle ${status.aiPaused ? 'paused' : ''}`}
+              onClick={() => setAiPaused(!status.aiPaused)}
+              disabled={busy}
+            >
+              {status.aiPaused ? t.resume : t.pause}
+            </button>
+          </div>
+          <div className="gmail-actions">
+            <button type="button" className="btn" onClick={scanNow} disabled={scanning || busy}>
+              {scanning ? t.scanning : t.scan(days)}
+            </button>
           </div>
           {status.lastError === 'reauth_required' && (
             <div className="gmail-reauth">
