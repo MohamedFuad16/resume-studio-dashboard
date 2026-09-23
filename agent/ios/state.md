@@ -20,6 +20,51 @@ Known-good production facts: server `portal-compile-jp` (japaneast) runs image
 inbox (80 scanned → 20 real internships queued, 23 non-internships dropped).
 
 ## Recent changes
+- **2026-09-24 — Sync-now marks user-triggered scans (`manual=1`); Settings row
+  points at the web's new PDF upload (ADR-I-016).** Web added a per-profile pause
+  on automatic Gmail scans and widened the backfill cap (contracts/CHANGELOG.md,
+  same date): once that ships, an automatic scan returns
+  `{skipped: 'ai-paused'}` while the owner has paused, and only a request
+  carrying `&manual=1` still runs. `PortalAPI.gmailSyncNow` gained a `manual`
+  parameter (default `false`); `rebuildFromGmail()` and the two Settings buttons
+  ("Sync now" / "Rescan last 90 days" in `GmailSettingsView`) pass `manual: true`,
+  load/foreground drains pass nothing and stay automatic. Also: web removed its
+  résumé editor (LaTeX compile, wizard) in favor of a browser-side PDF upload
+  that is parsed client-side and never stored (never an iOS route, so no contract
+  changed) — the Settings row that used to read "Résumé editor / LaTeX editing
+  stays on the desktop" now reads "Résumé PDF / Upload it in the web app's
+  Profile page" (+ JA strings). `bash scripts/verify-ios.sh` passes.
+
+- **2026-08-12 — Backend host repointed to AWS (`PortalAPIBaseURL`):** the
+  production server moved from the Azure Container App to Docker on EC2 Tokyo
+  (`https://api.mohamedfuad.com`, Elastic-IP-bound nip.io name, Caddy TLS).
+  Same image and API surface — config-only change: `ios/project.yml` Info.plist
+  value + the `API.swift` fallback, plus `contracts/api.md` Base URLs and a
+  `contracts/CHANGELOG.md` entry. Shipped builds keep working against Azure
+  until it is decommissioned; this change must reach an installed build first.
+
+- **2026-07-21 — AI Brain MCP registered for the source project.** Root `.mcp.json` points
+  at this machine's local `brain-mcp` stdio server in `ai-brain-platform`, giving Claude Code
+  the same search, current-ADR, convention, impact, resource, and prompt surface as Codex.
+  This is developer-tool wiring only; no iOS product code or shared contract changed.
+
+- **2026-07-21 — Company pages behind the orb expansion; records stay sheets.**
+  Card-expand on Applications records doubled the chrome (RecordSheet's close
+  button under the expander's — owner's screenshot), so records are SHEETS again
+  everywhere and the gesture moved to the Companies orbs: tap one and it grows,
+  circle-out-of-circle (`collapsedRadius` is now a function of the source frame),
+  into the new `CompanyDetailView`. First ship rendered as a floating cutout —
+  the overlay grew to the SAFE AREA, boxed by the nav and tab bars; it now adds
+  the safe-area insets back and both bars hide while a page is up, so it lands
+  edge-to-edge. The page shows only numbers that exist: catalog popularity (the
+  same score that drives Radar rank), listing count, per-role history with pin
+  badges, and the research-company job's summary + verified openings behind a
+  button. Funding/WLB/headcount are requested from web in contracts/CHANGELOG —
+  `ResearchJob.Facts` already decodes and renders the object when it ships.
+  Sounds were built (synthesised AVAudioEngine pops), shipped, and REMOVED the
+  same day — the owner found them weird. Onboarding feedback is haptic-only
+  again; if sound returns it should be a designed asset, not math. Onboarding
+  replay tag bumped to `2026-07-20a`.
 
 - **2026-07-20 (later) — Rebuild made non-destructive after it wiped the tracker
   (ADR-I-015).** A launch migration ran `rebuildFromGmail()` unattended; it

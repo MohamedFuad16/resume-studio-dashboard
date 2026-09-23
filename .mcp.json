@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "brain": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/Users/mfuad16/Documents/Codex/2026-07-21/hand-ai-brain-build-instructions-md/ai-brain-platform/platform/mcp/brain-mcp.js"
+      ]
+    }
+  }
+}

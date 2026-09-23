@@ -616,3 +616,30 @@ wrong store. Migration and purge breadcrumbs now go to `os_log` (subsystem
 Debug, since reading os_log off an attached device needs root while
 `devicectl process launch --console` carries stdout. That log is what caught
 this within a minute of it happening.
+
+
+## ADR-I-016 · 2026-09-24 · gmailSyncNow carries a manual flag, so the app never fights the owner's own pause
+
+Web added a per-profile aiPaused flag (contracts/CHANGELOG.md, 2026-09-24): while
+paused, sync-now runs the model pipeline only for a request marked &manual=1;
+an unmarked request returns {skipped: 'ai-paused'} and spends nothing. iOS calls
+sync-now from three places with different intent — automatic load/foreground
+drains, and two explicit Settings buttons (Sync now, Rescan last 90 days) — and
+those two kinds must not be indistinguishable to the server, or a pause set on
+the web would either block a button the user just pressed, or an automatic
+background drain would keep spending model credits through a pause meant to
+stop exactly that.
+
+Decision: PortalAPI.gmailSyncNow(profile:backfillDays:manual:) takes an explicit
+manual parameter, default false, appending &manual=1 only when true.
+rebuildFromGmail() and both GmailSettingsView buttons pass manual: true; the
+routine load/foreground drainGmail() call passes nothing. The parameter is
+plumbed through drainGmail's own manual: Bool = false rather than inferred from
+call site, so a future call site defaults to automatic (the safer failure mode)
+instead of silently claiming to be user-triggered.
+
+Consequences: pressing Sync now or Rescan always runs, pause or not — the
+owner's own request should never be the one thing a pause blocks. An automatic
+drain now genuinely stops spending while paused instead of ignoring the flag
+because it never knew it existed. No TrackerRecord or GmailAction shape changed;
+this is request-marking only. Verified: bash scripts/verify-ios.sh passes.

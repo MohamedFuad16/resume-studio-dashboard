@@ -82,10 +82,14 @@ extension PortalAPI {
     /// Ask the server to read new mail. Returns quietly on the gateway's 240s
     /// timeout — a long backfill keeps running server-side and its actions land in
     /// the queue regardless, so the drain that follows still finds them.
-    static func gmailSyncNow(profile: String, backfillDays: Int? = nil) async {
+    /// - Parameter manual: the user asked for this scan. Only a manual scan runs
+    ///   while the owner has paused automatic scans on the web (`aiPaused`);
+    ///   load/foreground drains stay automatic and get `{skipped: "ai-paused"}`.
+    static func gmailSyncNow(profile: String, backfillDays: Int? = nil, manual: Bool = false) async {
         var url = baseURL.appending(path: "api/integrations/gmail/sync-now")
         var query: [URLQueryItem] = [.init(name: "profile", value: profile)]
         if let backfillDays { query.append(.init(name: "backfill", value: String(backfillDays))) }
+        if manual { query.append(.init(name: "manual", value: "1")) }
         url.append(queryItems: query)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -330,7 +334,7 @@ extension CatalogStore {
         defer { isSyncing = false }
 
         syncStage = String(localized: "Asking the server to re-read \(days) days of mail…")
-        await PortalAPI.gmailSyncNow(profile: profile, backfillDays: days)
+        await PortalAPI.gmailSyncNow(profile: profile, backfillDays: days, manual: true)
 
         syncStage = String(localized: "Waiting for classified results…")
         var actions = (try? await PortalAPI.gmailPending(profile: profile)) ?? []
@@ -408,9 +412,10 @@ extension CatalogStore {
     /// The routine drain: pull whatever Gmail has queued, apply it additively, ack
     /// it. Safe to call repeatedly — on load and on every foreground.
     /// - Parameter backfillDays: rescan older mail (ignores the processed list).
+    /// - Parameter manual: true only from a Settings button (see `gmailSyncNow`).
     /// - Returns: how many records the drain touched.
     @discardableResult
-    func drainGmail(backfillDays: Int? = nil) async -> Int {
+    func drainGmail(backfillDays: Int? = nil, manual: Bool = false) async -> Int {
         // A rebuild owns the queue while it runs; an additive drain here would
         // apply the backfill's actions on top of the old rows the rebuild is about
         // to purge, and ack them out from under it.
@@ -424,7 +429,7 @@ extension CatalogStore {
         let profile = profileID ?? PortalAPI.profile
         guard (try? await PortalAPI.gmailStatus(profile: profile))?.connected == true else { return 0 }
 
-        await PortalAPI.gmailSyncNow(profile: profile, backfillDays: backfillDays)
+        await PortalAPI.gmailSyncNow(profile: profile, backfillDays: backfillDays, manual: manual)
 
         guard let actions = try? await PortalAPI.gmailPending(profile: profile), !actions.isEmpty else {
             return 0

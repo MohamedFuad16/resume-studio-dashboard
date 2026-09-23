@@ -49,6 +49,8 @@ struct CompaniesView: View {
 
     @State private var selected: CompanyBubble?
     @State private var listing: BubbleCluster?
+    /// The orb currently expanded into its company page.
+    @State private var expandedCompany: String?
 
     /// How many bubbles each tier shows. Eight per cluster keeps every bubble big
     /// enough to carry a legible logo.
@@ -103,31 +105,59 @@ struct CompaniesView: View {
     // A PAGE, not a sheet: it is pushed from Applications and gets the system
     // back button. Only the company detail below is a sheet — a market overview
     // is a place you go, a single company is a card you lift.
-    var body: some View {
-        ZStack {
-            Palette.canvas.ignoresSafeArea()
+    private func bubble(for id: String) -> CompanyBubble? {
+        clusters.flatMap(\.all).first { $0.id == id }
+    }
 
-            ScrollView {
-                VStack(spacing: 0) {
-                    ForEach(clusters) { cluster in
-                        ClusterBand(
-                            cluster: cluster,
-                            onTap: { selected = $0 },
-                            onMore: { listing = $0 }
-                        )
+    var body: some View {
+        // Orbs expand into the company page — a circle growing out of a circle
+        // (collapsedRadius = half the orb's width). This is where the card-expand
+        // gesture lives; application records everywhere stay sheets.
+        CardExpandContainer(
+            expandedID: $expandedCompany,
+            collapsedRadius: { $0.width / 2 },
+            face: { id in
+                AnyView(bubble(for: id).map { GlassOrb(bubble: $0, diameter: 96) })
+            },
+            content: {
+                ZStack {
+                    Palette.canvas.ignoresSafeArea()
+
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            ForEach(clusters) { cluster in
+                                ClusterBand(
+                                    cluster: cluster,
+                                    hiddenID: expandedCompany,
+                                    onTap: { expandedCompany = $0.id },
+                                    onMore: { listing = $0 }
+                                )
+                            }
+                        }
+                        .padding(.bottom, 24)
                     }
+                    .scrollIndicators(.hidden)
                 }
-                .padding(.bottom, 24)
+            },
+            detail: { id in
+                if let bubble = bubble(for: id) {
+                    CompanyDetailView(bubble: bubble)
+                }
             }
-            .scrollIndicators(.hidden)
-        }
+        )
         .navigationTitle("Companies")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarVisibility(.visible, for: .navigationBar)
+        // Both bars step aside while a company page is up — the page is
+        // edge-to-edge, and a back button pointing at a dimmed bubble field
+        // under the sheet would be a lie anyway.
+        .toolbarVisibility(expandedCompany == nil ? .visible : .hidden, for: .navigationBar)
+        .toolbar(expandedCompany == nil ? .visible : .hidden, for: .tabBar)
         .sheet(item: $selected) { CompanyRolesSheet(company: $0) }
         .sheet(item: $listing) { cluster in
             TierListSheet(cluster: cluster) { bubble in
                 listing = nil
+                // From the flat list there is no orb on screen to grow out of, so
+                // the roles sheet keeps serving this path.
                 selected = bubble
             }
         }
@@ -137,6 +167,7 @@ struct CompaniesView: View {
 /// One tier: a heading, then its bubbles fused into a single blob.
 private struct ClusterBand: View {
     var cluster: BubbleCluster
+    var hiddenID: String?
     var onTap: (CompanyBubble) -> Void
     var onMore: (BubbleCluster) -> Void
 
@@ -181,7 +212,7 @@ private struct ClusterBand: View {
             .padding(.bottom, 2)
 
             GeometryReader { proxy in
-                BubbleField(bubbles: cluster.shown, size: proxy.size, onTap: onTap)
+                BubbleField(bubbles: cluster.shown, size: proxy.size, hiddenID: hiddenID, onTap: onTap)
             }
             .frame(height: height)
         }
@@ -192,6 +223,7 @@ private struct ClusterBand: View {
 struct BubbleField: View {
     var bubbles: [CompanyBubble]
     var size: CGSize
+    var hiddenID: String?
     var onTap: (CompanyBubble) -> Void
 
     private var placed: [PlacedBubble] { Self.pack(bubbles, in: size) }
@@ -208,7 +240,7 @@ struct BubbleField: View {
         // over the canvas; nothing merges, nothing draws a shared skin.
         ZStack(alignment: .topLeading) {
             ForEach(placed.sorted { $0.radius > $1.radius }) { item in
-                FloatingOrb(item: item) { onTap(item.bubble) }
+                FloatingOrb(item: item, hidden: item.bubble.id == hiddenID) { onTap(item.bubble) }
             }
         }
         .frame(width: size.width, height: size.height)
@@ -298,6 +330,7 @@ struct BubbleField: View {
 /// is what keeps a still layout from looking frozen.
 private struct FloatingOrb: View {
     var item: PlacedBubble
+    var hidden: Bool
     var action: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -326,6 +359,12 @@ private struct FloatingOrb: View {
                 .offset(x: drag.width, y: drag.height + bob)
                 .zIndex(dragging ? 1 : 0)
         }
+        // Source frame for the company-page expansion — attached BEFORE
+        // .position, which would otherwise report the whole field's rect.
+        .cardExpandSource(item.bubble.id)
+        // Hidden, not removed, while its expanded twin is up: removal would
+        // reflow the packing and every other orb would jump.
+        .opacity(hidden ? 0 : 1)
         .position(x: item.center.x, y: item.center.y)
         .gesture(
             // Pull a bubble out of the cluster and it springs home — the cluster

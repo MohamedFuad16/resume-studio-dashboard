@@ -2,6 +2,36 @@
 
 Every entry: date · who · what changed · what the OTHER side must do.
 
+- **2026-08-12 · both · Final production host: `https://api.mohamedfuad.com`
+  (custom domain over the same EC2 backend).** The owner mapped their IONOS
+  domain hours after the move below; Caddy serves both the domain and the
+  `3-112-141-17.nip.io` fallback. Both client configs now use the domain —
+  it survives an Elastic-IP change with a DNS edit instead of two commits.
+  The Azure resource groups were deleted the same day, so the old Azure host
+  no longer exists: **any installed iOS build older than this entry is broken
+  until updated.** Redirect URI on the domain authorized in Google Console.
+
+- **2026-08-12 · both · Production base URL moved: Azure Container App → AWS
+  EC2 (initially `https://3-112-141-17.nip.io`, superseded same day by the
+  entry above).** Same server image (`portal-compile:48fdcd6`), same routes
+  and shapes — only the host changed. Web: Vercel `VITE_API_BASE_URL` updated
+  + redeployed. iOS: `PortalAPIBaseURL` in `ios/project.yml` and the
+  `API.swift` fallback. Gmail OAuth callback moved with the host and was
+  authorized in Google Cloud Console (owner action).
+
+- **2026-07-20 · iOS · REQUEST to web — company facts in the research payload.**
+  iOS now has a company page (tap an orb in Companies → it expands into
+  `CompanyDetailView`) that shows real stats: catalog popularity, listings, the
+  owner's per-role history, and the `research-company` job's summary + verified
+  openings. The owner wants funding, work-life balance, headcount and similar
+  facts there. iOS will NOT invent these client-side. Ask: extend the
+  research-company job JSON with an optional `facts` object —
+  `{funding, workLifeBalance, employees, founded, rating}`, strings, each
+  omitted when the search cannot ground it (grounded like everything else in
+  that pipeline; no guesses). iOS already decodes and renders `facts` if
+  present (`ResearchJob.Facts` in `Views/CompanyDetailView.swift`), so shipping
+  it lights the page up with no app update.
+
 - **2026-07-20 · both · The owner can overrule the pipeline: `statusPinned` +
   tombstones (ADR-S-004).** The tracker was a cache of classifier output — the
   owner deleted a wrong row and the next rescan re-created it; they knew they were

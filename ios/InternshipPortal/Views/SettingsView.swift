@@ -194,12 +194,12 @@ struct SettingsView: View {
                             }
                             .buttonStyle(.plain)
 
-                            // The one remaining web handoff: the résumé editor is a
-                            // LaTeX pipeline with live PDF compile — a desktop tool.
+                            // The one remaining web handoff: the web app reads an uploaded
+                            // résumé PDF (Profile → Upload résumé PDF); the old editor is gone.
                             SettingsRow(
                                 symbol: "doc.text", tint: .blue,
-                                title: String(localized: "Résumé editor"),
-                                subtitle: String(localized: "LaTeX editing stays on the desktop")
+                                title: String(localized: "Résumé PDF"),
+                                subtitle: String(localized: "Upload it in the web app's Profile page")
                             ) { openURL(webURL) }
                         }
                     }
@@ -844,7 +844,7 @@ struct GmailSettingsView: View {
                 ? String(localized: "Asking the server to re-read 90 days of mail…")
                 : String(localized: "Checking for anything new…")
 
-            let applied = await store.drainGmail(backfillDays: backfill ? 90 : nil)
+            let applied = await store.drainGmail(backfillDays: backfill ? 90 : nil, manual: true)
             await refresh()
 
             if applied == 0 {

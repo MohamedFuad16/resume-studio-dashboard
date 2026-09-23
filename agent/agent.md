@@ -8,6 +8,7 @@ Route by what you're working on:
 | **iOS app** | `ios/` | [`agent/ios/agent.md`](ios/agent.md) |
 | **Web app / server / LaTeX pipeline** | `editor/`, `Dockerfile`, `docs/`, `en/`, `ja/` | [`agent/web/agent.md`](web/agent.md) |
 | **Anything both clients depend on** (API routes, tracker/Gmail shapes, Firestore, normalization) | `contracts/` | [`contracts/README.md`](../contracts/README.md) |
+| **Engineering memory system** | external | [`ai-brain-platform`](https://github.com/MohamedFuad16/ai-brain-platform) |
 
 Hard rules (both teams):
 1. Never edit the other surface's tree or agent folder.
