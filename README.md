@@ -2,14 +2,16 @@
 
 # Internship Portal
 
-**A bilingual (EN / 日本語) internship tracker, résumé editor, and LaTeX → PDF compiler — on the web and on iOS.**
+**A bilingual (EN / 日本語) app for finding internships and keeping every application in one list, on the web and on iOS.**
 
+[![Live App](https://img.shields.io/badge/Live-portal.mohamedfuad.com-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://portal.mohamedfuad.com)
 [![React](https://img.shields.io/badge/React_18-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://react.dev/)
-[![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=FFD62E)](https://vitejs.dev/)
 [![Swift](https://img.shields.io/badge/SwiftUI_iOS_27-F05138?style=for-the-badge&logo=swift&logoColor=white)](https://developer.apple.com/swiftui/)
 [![Node](https://img.shields.io/badge/Node_Express-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://expressjs.com/)
-[![Azure](https://img.shields.io/badge/Server_on_Azure-0078D4?style=for-the-badge&logo=microsoftazure&logoColor=white)](https://azure.microsoft.com/en-us/products/container-apps)
+[![AWS](https://img.shields.io/badge/Server-AWS_EC2-FF9900?style=for-the-badge&logo=amazonwebservices&logoColor=white)](#deployment)
 [![Firebase](https://img.shields.io/badge/Auth_+_Firestore-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com/)
+
+<img src="docs/screenshots/sign-in.jpg" alt="Internship Portal sign-in screen with the dashboard preview" width="100%" />
 
 </div>
 
@@ -17,24 +19,53 @@
 
 ## Overview
 
-One repository, **two products** that share one backend and one user-data store:
+Search internships with a match score for each, and track every application in
+one list until a decision. The same repository ships a React web app and a
+SwiftUI iOS app, both in English and Japanese. Your own data stays in Firestore
+under owner-only rules and never reaches the server.
+
+**Live:** <https://portal.mohamedfuad.com>
 
 | Surface | Tree | Branch | What it is |
 |---|---|---|---|
-| **Web app** | `editor/` | `web` | React SPA — résumé editor, internship radar, tracker, calendar, LaTeX PDF preview |
-| **iOS app** | `ios/` | `ios` | SwiftUI (iOS 27) — the tracker away from a desk: radar, applications, calendar, Gmail sync, notifications |
-| **Shared contracts** | `contracts/` | both | The API routes, data shapes, and algorithms **both** clients depend on |
-| **LaTeX pipeline** | `en/`, `ja/`, `build_all.sh` | `web` | Standalone print-ready résumé sources → `output/*.pdf` |
+| **Web app** | `editor/` | `web` | React SPA: internship radar, application tracker, calendar, company research, résumé upload |
+| **iOS app** | `ios/` | `ios` | SwiftUI (iOS 27): radar, applications, calendar, companies, Gmail sync and notifications |
+| **Shared contracts** | `contracts/` | both | The API routes, data shapes and algorithms both clients depend on |
+| **LaTeX résumés** | `en/`, `ja/`, `build_all.sh` | `web` | Standalone print-ready résumé sources compiled to `output/*.pdf` |
 
-Branches integrate through `main`. The rules both teams follow are in
+Branches integrate through `main`. The rules both surfaces follow are in
 [`CLAUDE.md`](CLAUDE.md); the knowledge bases are [`agent/web/`](agent/web/agent.md)
 and [`agent/ios/`](agent/ios/agent.md).
 
+## Features
+
+**Both clients**
+- **Internship radar**: every posting in the shared catalog is scored against
+  your profile.
+- **Application tracker**: saved, applying, applied, interview and rejected, all
+  in one list, with a calendar of deadlines and interviews.
+- **Gmail ingest**: the server reads the inbox and queues an application only
+  when a quote from the email proves it. Each client drains the queue into its
+  own Firestore tracker.
+- **Company research**: live research over official company and ATS pages.
+- **English and Japanese** throughout, with company logos.
+
+**Web only**
+- **Résumé upload**: a PDF is parsed in the browser into the résumé JSON and is
+  never sent to the server or stored.
+- **Activity period filter** on the dashboard and applications views.
+- **Pause automatic Gmail scans** per profile; a manual scan always runs.
+
+**iOS only**
+- Metal-shaded glass UI and a Companies bubble field.
+- Background app refresh that syncs Gmail and posts a notification with the
+  company logo when a new application is detected.
+
 ## Architecture
 
-The single most important thing to understand: **user data never touches the
-server.** Clients talk to Firestore directly under owner-only rules; the server
-owns only shared data (the internship catalog and the Gmail action queue).
+User data never touches the server. Clients talk to Firestore directly under
+owner-only rules; the server owns only shared data (the internship catalog and
+the Gmail action queue).
 
 ```
 ┌──────────────────────┐          ┌──────────────────────┐
@@ -42,80 +73,60 @@ owns only shared data (the internship catalog and the Gmail action queue).
 │  static on Vercel    │          │  on device           │
 └──────────┬───────────┘          └──────────┬───────────┘
            │                                 │
-           │  ── user data (client-direct) ──┤
+           │  user data (client-direct)      │
            ▼                                 ▼
      ┌───────────────────────────────────────────────┐
      │  Firebase Auth  +  Firestore                  │
-     │  users/{uid}/{profiles,trackers,applications} │
-     │  owner-only rules — the server cannot read it │
+     │  users/{uid}/**, owner-only rules             │
+     │  the server cannot read it                    │
      └───────────────────────────────────────────────┘
            │                                 │
-           │  ── shared data + compute ──────┤
+           │  shared data + compute          │
            ▼                                 ▼
      ┌───────────────────────────────────────────────┐
-     │  Express server — Azure Container Apps        │
-     │  portal-compile-jp (japaneast, always-on)     │
+     │  Express server, Docker on AWS EC2 (Tokyo)    │
+     │  https://api.mohamedfuad.com                  │
      │    ├─ /api/internships   shared catalog       │
-     │    ├─ /api/compile       Tectonic → PDF       │
      │    ├─ /api/integrations/gmail/*  ingest queue │
-     │    └─ storage.js  SQLite (working copy)       │
-     │             └─ snapshot → /data (Azure Files) │
+     │    ├─ company research jobs (OpenRouter)      │
+     │    └─ storage.js  SQLite working copy         │
+     │             └─ snapshot → /data               │
      └───────────────────────────────────────────────┘
 ```
 
-**Vercel hosts static files only.** The SPA calls the Azure origin directly via
-`VITE_API_BASE_URL`; there is no serverless copy of the server. Azure runs
-always-on (`min = max = 1` replica) because live-research jobs hold in-memory
-state and the Gmail poller needs a long-lived process.
+**Vercel hosts static files only.** The web client calls the API origin
+directly through `VITE_API_BASE_URL`; iOS reads the same origin from
+`PortalAPIBaseURL` in `ios/project.yml`. The routes both clients depend on are
+listed in [`contracts/api.md`](contracts/api.md).
 
-### Storage: why it looks unusual
+### Storage
 
-`/data` is an **Azure Files (SMB)** mount, and SQLite cannot lock a file over
-SMB — opening the database directly there makes every write fail `SQLITE_BUSY`.
-So SQLite runs on a **local working copy** (where locking works) and the mount
-only ever receives a whole-file `copyFile` of the finished database after each
-write. Durability is unchanged; the mount never sees a lock. See ADR-0040 and
-`agent/web/errors.md`.
+SQLite runs on a local working copy, and after each write the whole finished
+file is copied to the durable `/data` path (ADR-0040). The design came from an
+earlier Azure Files mount, where SQLite cannot take file locks over SMB; the
+server now runs on EC2 and keeps the same two-tier store.
 
 ### Gmail ingest
 
 The server reads the inbox, classifies each message, and **queues** actions; the
 clients drain that queue into their own Firestore tracker (the server can't).
-Internship detection is **evidence-based, never a company list**: the model must
-quote the email's own words, and the quote is verified against the message.
+Internship detection is based on evidence, never on a company list: the model
+must quote the email's own words, and the quote is checked against the message.
 Contract: [`contracts/gmail-action.md`](contracts/gmail-action.md).
-
-## Features
-
-**Both clients** — internship radar with match scoring, application tracker
-(saved → applying → applied → interview → rejected), calendar of deadlines and
-interviews, automatic Gmail ingest, company logos, EN/JA localization.
-
-**Web only** — live résumé editor with a compiled PDF preview, multiple EN/JA
-LaTeX templates, AI application assistant, live company research, export to
-PDF / `.tex` / `.json`.
-
-**iOS only** — Metal-shaded glass UI (Liquid Glass), the Companies bubble field,
-and background app refresh that syncs Gmail and posts a notification with the
-company's logo when a new application is detected.
-
-**LaTeX pipeline** — `en/` (Jake's Clean, Awesome-CV, Alta Classic, Slate Modern,
-cover letter) and `ja/` (履歴書 grid, 職務経歴書 modern), built by `build_all.sh`
-with Tectonic and validated by a PyMuPDF suite.
 
 ## Tech Stack
 
 | Layer | Technology |
 | ----- | ---------- |
-| Web client | React 18, Vite, hand-written CSS (Tailwind available, migration in progress) |
+| Web client | React 18, Vite, GSAP, hand-written CSS |
 | iOS client | SwiftUI (iOS 27), Swift 6, Metal, XcodeGen |
-| Server | Node.js / Express (ESM) on Azure Container Apps |
+| Server | Node.js / Express (ESM), Docker on AWS EC2 behind Caddy |
 | Auth + user data | Firebase Auth, Firestore (client-direct, owner-only rules) |
-| Shared data | SQLite (`better-sqlite3`) — local working copy, snapshotted to Azure Files |
-| PDF engine | Tectonic (XeLaTeX) |
-| LLM | OpenRouter — `gpt-5-nano` (mail triage), `perplexity/sonar` (company research) |
-| Testing | Playwright (web), PyMuPDF (PDFs), `validate:catalog` (data + storage) |
-| Hosting | Vercel (static SPA) · Azure Container Apps (server) |
+| Shared data | SQLite (`better-sqlite3`), local working copy snapshotted to `/data` |
+| LLM | OpenRouter: `gpt-5-nano` (mail triage), `perplexity/sonar` (company research) |
+| Résumé PDFs | Tectonic (XeLaTeX) for the standalone `en/` and `ja/` sources |
+| Testing | Playwright (web), Node test runner, PyMuPDF (PDFs), `validate:catalog` |
+| Hosting | Vercel (static SPA), AWS EC2 (API) |
 
 ## Getting Started
 
@@ -124,10 +135,26 @@ with Tectonic and validated by a PyMuPDF suite.
 ```bash
 cd editor
 npm install
-npm run dev          # http://127.0.0.1:5173
+npm run dev          # client on http://127.0.0.1:5173, API on :5005
 ```
 
-Runs the SPA and the Express server together (Vite proxies `/api` → `:5005`).
+`npm run dev` starts the Vite client and the Express server together, and Vite
+proxies `/api` to `http://localhost:5005`. The server reads `editor/.env.local`
+or `editor/.env`; the OpenRouter and Gmail features need `OPENROUTER_API_KEY`,
+`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI` and
+`GMAIL_TOKEN_ENC_KEY`.
+
+Other scripts in `editor/`:
+
+```bash
+npm run build              # production build
+npm run lint               # ESLint over src and server
+npm run test:e2e           # Playwright
+npm run test:classify      # Gmail classifier tests
+npm run validate:catalog   # catalog data and storage checks
+```
+
+`scripts/verify-web.sh` runs the full web verification battery.
 
 ### iOS app
 
@@ -137,58 +164,58 @@ xcodegen generate    # regenerate after adding/removing any file
 open InternshipPortal.xcodeproj
 ```
 
-Requires Xcode 27 (iOS 27 SDK). Signing must stay **on** even for the simulator —
-Firebase Auth needs a keychain entitlement. See [`agent/ios/setup.md`](agent/ios/setup.md).
+Requires Xcode 27 (iOS 27 SDK). Signing must stay **on** even for the simulator,
+because Firebase Auth needs a keychain entitlement. See
+[`agent/ios/setup.md`](agent/ios/setup.md).
 
-### LaTeX pipeline
+### LaTeX résumés
 
 ```bash
 ./build_all.sh              # en/ + ja/ → output/*.pdf
-python tests/run_tests.py   # validate the compiled PDFs
+python3 tests/run_tests.py  # validate the compiled PDFs
 ```
 
-Requires `tectonic` on `PATH`.
+`build_all.sh` expects Tectonic at `/opt/homebrew/bin/tectonic`; edit the
+`TECTONIC` line if yours lives elsewhere.
 
 ## Deployment
 
-**Web client (Vercel)** — static only; pushing to `main` auto-deploys. The API
-origin is baked in at build time via `VITE_API_BASE_URL`.
+**Web client (Vercel):** static only; pushing to `main` deploys it. The API
+origin is baked in at build time through `VITE_API_BASE_URL`.
 
-**Server (Azure)** — manual, and *not* triggered by a push:
-
-```bash
-az acr build --registry ca7959c48768acr --image portal-compile:<sha> \
-  --platform linux/amd64 --file Dockerfile .
-az containerapp update -n portal-compile-jp -g internship-portal \
-  --image ca7959c48768acr.azurecr.io/portal-compile:<sha>
-```
-
-> ⚠️ `portal-compile-jp` (japaneast) is the live app — it holds the Gmail
-> connection and queue on its Azure Files mount. Always verify a **write** path
-> (`POST /api/integrations/gmail/sync-now` → 200) after deploying, not just a
-> read: a storage regression shows up only on writes.
+**Server (AWS EC2):** the root `Dockerfile` builds the API image for
+`linux/amd64`. Production runs it as a Docker container on an EC2 host in Tokyo
+behind Caddy, at `https://api.mohamedfuad.com`, with data under `/data`.
+Deploys are manual; a push does not update the server. After a deploy, check a
+**write** path (`POST /api/integrations/gmail/sync-now` returns 200), not just a
+read, because a storage regression shows up only on writes.
 
 ## Repository Layout
 
 ```
-editor/          # Web app — React SPA + Express server
-ios/             # iOS app — SwiftUI
+editor/          # Web app: React SPA + Express server
+ios/             # iOS app: SwiftUI
 contracts/       # Shared API/data/algorithm contracts (both clients)
-agent/web/       # Web knowledge base (architecture, api, decisions, state…)
+agent/web/       # Web knowledge base (architecture, api, decisions, state)
 agent/ios/       # iOS knowledge base
 en/  ja/         # LaTeX résumé sources
 build_all.sh     # Compile all LaTeX templates → output/
 tests/           # PyMuPDF PDF validation suite
-docs/            # Deployment + compile notes
+docs/            # Deployment and compile notes, screenshots
+scripts/         # verify-web.sh, verify-ios.sh
 CLAUDE.md        # Working rules for both surfaces
 DOCTOR.md        # Operating prompt for the code-review account
-PLAN-SIMPLIFICATION.md  # Architecture simplification plan + status
 ```
 
 ## Quality
 
 A third **code-doctor** account audits the repo on a schedule and files findings
-as `doctor/*` pull requests — React/iOS lint passes, dead-code sweeps, and
-(highest value) **contract-conformance diffing** between the two clients'
-implementations of the shared algorithms. Both surface teams verify, fix, and
-close those PRs. See [`DOCTOR.md`](DOCTOR.md).
+as `doctor/*` pull requests: React and iOS lint passes, dead-code sweeps, and
+contract-conformance diffing between the two clients' implementations of the
+shared algorithms. See [`DOCTOR.md`](DOCTOR.md).
+
+---
+
+<div align="center">
+Built by <a href="https://github.com/MohamedFuad16">Mohamed Fuad</a> · <a href="https://www.mohamedfuad.com">mohamedfuad.com</a>
+</div>
