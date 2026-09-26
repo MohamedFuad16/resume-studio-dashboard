@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-07-25",
+  "updatedAt": "2026-09-26",
   "retired": [
     {
       "id": "chanel-enterprise-architecture-intern-2026",
@@ -10,12 +10,68 @@
       "evidenceUrl": "https://cc.wd3.myworkdayjobs.com/en-US/chanelcareers/job/Tokyo/Intern--Unfilled-_JOBREQ00112350"
     },
     {
+      "id": "global-001",
+      "company": "SpaceX",
+      "role": "Fall 2026 Software Engineering Internship/Co-op",
+      "retiredAt": "2026-09-26",
+      "reason": "apply URL HTTP-dead · model: unknown",
+      "evidenceUrl": "https://job-boards.greenhouse.io/spacex/jobs/8403219002?gh_jid=8403219002"
+    },
+    {
+      "id": "global-005",
+      "company": "Scale AI",
+      "role": "AI Builder Intern",
+      "retiredAt": "2026-09-26",
+      "reason": "apply URL HTTP-dead · model: no",
+      "evidenceUrl": "https://jobs.accel.com/companies/scale-ai/jobs/89848618-ai-builder-intern"
+    },
+    {
+      "id": "global-014",
+      "company": "Gemini",
+      "role": "Software Engineer Intern",
+      "retiredAt": "2026-09-26",
+      "reason": "apply URL HTTP-dead · model: unknown",
+      "evidenceUrl": "https://job-boards.greenhouse.io/gemini/jobs/7293075"
+    },
+    {
       "id": "global-040",
       "company": "Cloudflare",
       "role": "Technical Support Engineer Intern (July to December 2026)",
       "retiredAt": "2026-07-19",
       "reason": "apply URL HTTP-dead · model: unknown",
       "evidenceUrl": "https://internship.sg/internships/technical-support-engineer-intern-july-to-december-2026-cloudflare-1778652096746-0"
+    },
+    {
+      "id": "global-041",
+      "company": "Astranis",
+      "role": "Software Engineer-Backend Intern",
+      "retiredAt": "2026-09-26",
+      "reason": "apply URL HTTP-dead · model: unknown",
+      "evidenceUrl": "https://job-boards.greenhouse.io/astranis/jobs/4681183006"
+    },
+    {
+      "id": "global-046",
+      "company": "Verkada",
+      "role": "Technical Support Engineering Intern - Fall 2026",
+      "retiredAt": "2026-09-26",
+      "reason": "apply URL HTTP-dead · model: unknown",
+      "evidenceUrl": "https://job-boards.greenhouse.io/verkada/jobs/5017082007"
+    },
+    {
+      "id": "global-050",
+      "company": "Magnet Forensics",
+      "role": "Software Developer Co-op",
+      "retiredAt": "2026-09-26",
+      "reason": "apply URL HTTP-dead · model: unknown",
+      "evidenceUrl": "https://jobs.lever.co/magnetforensics/d393ab82-448a-4dc2-87d0-a00981a55785/apply"
+    },
+    {
+      "id": "global-051",
+      "company": "Magnet Forensics",
+      "role": "Software Developer Co-op",
+      "retiredAt": "2026-09-26",
+      "reason": "apply URL HTTP-dead · model: unknown",
+      "evidenceUrl": "https://www.magnetforensics.com/careers-at-magnet/"
     },
     {
       "id": "global-066",
@@ -26,6 +82,30 @@
       "evidenceUrl": "https://job-boards.greenhouse.io/rocketlab/jobs/7736776003"
     },
     {
+      "id": "global-067",
+      "company": "Scale AI",
+      "role": "Technical Advisor Specialist (Part-Time Internship)",
+      "retiredAt": "2026-09-26",
+      "reason": "apply URL HTTP-dead · model: unknown",
+      "evidenceUrl": "https://job-boards.greenhouse.io/scaleai/jobs/4611533005"
+    },
+    {
+      "id": "global-070",
+      "company": "SpaceX",
+      "role": "Fall 2026 Business Operations Internship/Co-op",
+      "retiredAt": "2026-09-26",
+      "reason": "apply URL HTTP-dead · model: no",
+      "evidenceUrl": "https://www.prosple.com/graduate-employers/spacex/jobs-internships/fall-business-operations-internshipco-op"
+    },
+    {
+      "id": "global-072",
+      "company": "Apera AI",
+      "role": "Software Developer Co-op - C++",
+      "retiredAt": "2026-09-26",
+      "reason": "apply URL HTTP-dead · model: unknown",
+      "evidenceUrl": "https://job-boards.greenhouse.io/aperaaiinc/jobs/5151788007"
+    },
+    {
       "id": "global-082",
       "company": "Kinaxis",
       "role": "Software Development Co-op/Intern - C++",
@@ -34,12 +114,52 @@
       "evidenceUrl": "https://careers-kinaxis.icims.com/jobs/34764/co-op-intern-software-development---c++/job"
     },
     {
+      "id": "global-089",
+      "company": "Altom Transport",
+      "role": "Software Development Intern",
+      "retiredAt": "2026-09-26",
+      "reason": "apply URL HTTP-dead · model: unknown",
+      "evidenceUrl": "https://apply.workable.com/altom-transport/j/8536165C7B/apply"
+    },
+    {
       "id": "global-091",
       "company": "Harbinger Motors",
       "role": "Production Data Analytics Intern",
       "retiredAt": "2026-07-16",
       "reason": "apply URL HTTP-dead · model: unknown",
       "evidenceUrl": "https://job-boards.greenhouse.io/harbingermotors/jobs/5164341007"
+    },
+    {
+      "id": "global-100",
+      "company": "Formlabs",
+      "role": "Hardware Systems Integration Intern",
+      "retiredAt": "2026-09-26",
+      "reason": "apply URL HTTP-dead · model: no",
+      "evidenceUrl": "https://careers.formlabs.com/internships/"
+    },
+    {
+      "id": "ispace-ground-systems-intern-2026",
+      "company": "ispace",
+      "role": "Ground Systems / Testing Infrastructure Intern",
+      "retiredAt": "2026-09-26",
+      "reason": "apply URL HTTP-dead · model: unknown",
+      "evidenceUrl": "https://jobs.lever.co/ispace-inc"
+    },
+    {
+      "id": "t2-summer-internship-autonomous-driving-2026",
+      "company": "T2",
+      "role": "2026 Summer Internship - Autonomous Driving Engineering Tracks",
+      "retiredAt": "2026-09-26",
+      "reason": "apply URL HTTP-dead · model: no",
+      "evidenceUrl": "https://herp.careers/v1/t2auto/8QPse9MhkGtM"
+    },
+    {
+      "id": "tenstorrent-meti-risc-v-internship-2026",
+      "company": "Tenstorrent",
+      "role": "METI Internship Program - RISC V Course",
+      "retiredAt": "2026-09-26",
+      "reason": "apply URL HTTP-dead · model: unknown",
+      "evidenceUrl": "https://job-boards.greenhouse.io/tenstorrentunlisted/jobs/4998825007"
     }
   ],
   "deadlinePatches": {
@@ -56,10 +176,10 @@
       "note": "auto-refresh 2026-07-25"
     },
     "rakuten-techcamp-ai-engineer-2026": {
-      "deadline": "2026-06-30 09:00 JST",
-      "deadlineDate": "2026-06-30",
-      "verifiedDate": "2026-07-25",
-      "note": "auto-refresh 2026-07-25"
+      "deadline": "Applications for this internship are now closed.",
+      "deadlineDate": null,
+      "verifiedDate": "2026-09-26",
+      "note": "auto-refresh 2026-09-26"
     },
     "rakuten-techcamp-marketing-cloud-2026": {
       "deadline": "June 30, 2026 9:00 AM JST",
@@ -80,10 +200,10 @@
       "note": "auto-refresh 2026-07-25"
     },
     "rakuten-techcamp-data-ai-2026": {
-      "deadline": "2026-06-30 09:00 JST",
-      "deadlineDate": "2026-06-30",
-      "verifiedDate": "2026-07-25",
-      "note": "auto-refresh 2026-07-25"
+      "deadline": "Application Closed",
+      "deadlineDate": null,
+      "verifiedDate": "2026-09-26",
+      "note": "auto-refresh 2026-09-26"
     },
     "rakuten-techcamp-infra-services-2026": {
       "deadline": "2026-06-30 09:00 JST",
@@ -164,10 +284,10 @@
       "note": "auto-refresh 2026-07-19"
     },
     "global-061": {
-      "deadline": "Applications for this job will be accepted at least until May 31, 2026",
-      "deadlineDate": "2026-05-31",
-      "verifiedDate": "2026-07-19",
-      "note": "auto-refresh 2026-07-19"
+      "deadline": "No longer accepting applications",
+      "deadlineDate": null,
+      "verifiedDate": "2026-09-26",
+      "note": "auto-refresh 2026-09-26"
     },
     "global-070": {
       "deadline": "Opportunity expired",
@@ -476,10 +596,10 @@
       "note": "auto-refresh 2026-07-25"
     },
     "sansan-software-engineer-intern-2026": {
-      "deadline": "2025年12月31日（水）",
-      "deadlineDate": "2025-12-31",
-      "verifiedDate": "2026-07-25",
-      "note": "auto-refresh 2026-07-25"
+      "deadline": "2026年12月31日（木）",
+      "deadlineDate": "2026-12-31",
+      "verifiedDate": "2026-09-26",
+      "note": "auto-refresh 2026-09-26"
     },
     "cyberagent-software-engineer-intern-2026": {
       "deadline": "募集終了（現在は応募受付終了）",
@@ -492,6 +612,18 @@
       "deadlineDate": "2026-07-03",
       "verifiedDate": "2026-07-25",
       "note": "auto-refresh 2026-07-25"
+    },
+    "mercari-software-engineer-2028": {
+      "deadline": "September 30, 2026, 23:59 JST",
+      "deadlineDate": "2026-09-30",
+      "verifiedDate": "2026-09-26",
+      "note": "auto-refresh 2026-09-26"
+    },
+    "dena-software-engineer-intern-2026": {
+      "deadline": "2026-08-31 23:59 JST",
+      "deadlineDate": "2026-08-31",
+      "verifiedDate": "2026-09-26",
+      "note": "auto-refresh 2026-09-26"
     }
   }
 }
