@@ -19,6 +19,9 @@ const STATUS_ICONS = {
   rejected: CircleSlash,
 };
 
+// Only a real date gets the urgent colour (see ProfileDashboard).
+const isDatedDeadline = record => Boolean(record.deadlineDate) || /^\d{4}-\d{2}-\d{2}/.test(record.deadline || '');
+
 const copy = {
   en: {
     title: 'Applications',
@@ -150,7 +153,7 @@ export default function ApplicationsView({ isJa, activeProfile, onOpenRadar, onO
             <article className="application-row" key={record.internshipId}>
               <span className="application-company"><CompanyLogo item={item} /><button type="button" className="application-company-trigger" onClick={() => setSelectedItem(item)} aria-label={isJa ? `${displayCompany(item, isJa)}の詳細を開く` : `Open details for ${displayCompany(item, isJa)}`}><b>{displayCompany(item, isJa)}{record.source === 'gmail' && <span className="src-gmail" title={isJa ? 'Gmailから追加' : 'Added from Gmail'}><GmailMark size={12} /></span>}{record.statusPinned && <span className="src-pinned" title={isJa ? '手動で設定した状況 — Gmailの同期で変更されません' : 'Status set by you — Gmail sync will not change it'}><Pin size={12} /></span>}</b><small>{displayRole(item.role || record.role, isJa)}{cooldown ? <span className="application-cooldown-tag"><CalendarClock size={11} />{cooldownLabel(cooldown, isJa)}</span> : null}</small></button></span>
               <span>{displayValue(record.location, isJa)}</span>
-              <span className="application-deadline">{formatDisplayDeadline(record.deadline, isJa)}</span>
+              <span className={`application-deadline${isDatedDeadline(record) ? '' : ' undated'}`}>{formatDisplayDeadline(record.deadline, isJa)}</span>
               <select value={record.status} onChange={event => onStatusChange(item, event.target.value)} aria-label={isJa ? `${record.company}の応募状況` : `Status for ${record.company}`}>
                 {APPLICATION_STATUSES.map(status => <option value={status.value} key={status.value}>{statusLabel(status.value, isJa)}</option>)}
                 <option value="">{t.notApplied}</option>

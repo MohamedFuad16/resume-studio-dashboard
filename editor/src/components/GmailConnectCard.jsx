@@ -8,7 +8,7 @@ const copy = {
   en: {
     title: 'Gmail',
     hint: 'Connect your inbox (read-only) so new application emails, replies, and interview invites flow into Applications and the Calendar automatically.',
-    notConfigured: 'Not available yet — the server needs Google OAuth credentials (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_OAUTH_REDIRECT_URI) and GMAIL_TOKEN_ENC_KEY. See the setup guide.',
+    notConfigured: 'Gmail sync is paused while we rebuild it. Applications you already have stay as they are.',
     connect: 'Connect Gmail',
     connecting: 'Opening Google…',
     disconnect: 'Disconnect',
@@ -34,7 +34,7 @@ const copy = {
   ja: {
     title: 'Gmail',
     hint: '受信トレイを（読み取り専用で）連携すると、新しい応募メール・返信・面接案内が自動で「応募一覧」とカレンダーに反映されます。',
-    notConfigured: 'まだ利用できません。サーバーに Google OAuth 認証情報（GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_OAUTH_REDIRECT_URI）と GMAIL_TOKEN_ENC_KEY が必要です。',
+    notConfigured: 'Gmail連携は作り直しのため一時停止しています。登録済みの応募はそのまま残ります。',
     connect: 'Gmailを連携',
     connecting: 'Googleを開いています…',
     disconnect: '連携解除',

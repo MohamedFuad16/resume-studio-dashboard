@@ -34,6 +34,10 @@ const STATUS_ICONS = {
   rejected: CircleSlash,
 };
 
+// A deadline is "dated" only when it carries a real date; "Not stated" and
+// "No official deadline" must not wear the urgent colour.
+const isDatedDeadline = record => Boolean(record.deadlineDate) || /^\d{4}-\d{2}-\d{2}/.test(record.deadline || '');
+
 // Rejected applications stay in Recent — losing them would hide the outcome.
 const APPLIED_STATUSES = new Set(['applying', 'applied', 'interview', 'rejected']);
 
@@ -273,13 +277,13 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenProfile, onResumeC
               return (
                 <article className="application-row" key={record.internshipId}>
                   <span className="application-company"><CompanyLogo item={item} /><button type="button" className="application-company-trigger" onClick={() => setSelectedItem(item)} aria-label={isJa ? `${displayCompany(item, isJa)}の詳細を開く` : `Open details for ${displayCompany(item, isJa)}`}><b>{displayCompany(item, isJa)}</b><small>{displayRole(item.role || record.role, isJa)}{(() => { const cd = cooldownForCompany(cooldownMap, record.company); return cd ? <span className="application-cooldown-tag"><CalendarClock size={11} />{cooldownLabel(cd, isJa)}</span> : null; })()}</small></button></span>
-                  <span><MapPin size={13} />{dashboardValue(record.location, isJa)}</span>
-                  <span className="application-deadline">{formatDisplayDeadline(record.deadline, isJa)}</span>
+                  <span>{record.location ? <><MapPin size={13} />{dashboardValue(record.location, isJa)}</> : null}</span>
+                  <span className={`application-deadline${isDatedDeadline(record) ? '' : ' undated'}`}>{formatDisplayDeadline(record.deadline, isJa)}</span>
                   <select value={record.status} onChange={event => onStatusChange(item, event.target.value)} aria-label={isJa ? `${record.company}の応募状況` : `Status for ${record.company}`}>
                     {APPLICATION_STATUSES.map(status => <option value={status.value} key={status.value}>{statusLabel(status.value, isJa)}</option>)}
                     <option value="">{t.notApplied}</option>
                   </select>
-                  <a href={record.applyUrl} target="_blank" rel="noreferrer">{t.continue} <ArrowRight size={14} /></a>
+                  {record.applyUrl ? <a href={record.applyUrl} target="_blank" rel="noreferrer">{t.continue} <ArrowRight size={14} /></a> : <span className="application-nolink">—</span>}
                 </article>
               );
             }) : (

@@ -57,19 +57,44 @@ const trackerDoc = id => doc(db, 'users', uid(), 'trackers', id);
 const appsDoc = id => doc(db, 'users', uid(), 'applications', id);
 const settingsDoc = () => doc(db, 'users', uid(), 'settings', 'app');
 
+// Sign-in used to cost three Firestore round trips in a row before the
+// dashboard could render: ensureSeed's getDocs, then listProfiles' identical
+// getDocs, then getProfile's getDoc. The profile documents already carry the
+// résumé, so the snapshot ensureSeed reads is kept for a few seconds and the
+// boot list/get are served from it: one round trip instead of three. Any write
+// drops it, and it is keyed by uid so an account switch never sees another
+// user's data.
+const SNAPSHOT_TTL_MS = 10000;
+let profilesSnapshot = null; // { uid, at, docs: Map<id, data> }
+function rememberProfiles(snap) {
+  profilesSnapshot = { uid: uid(), at: Date.now(), docs: new Map(snap.docs.map(d => [d.id, d.data()])) };
+}
+function freshProfiles() {
+  const s = profilesSnapshot;
+  return s && s.uid === auth?.currentUser?.uid && Date.now() - s.at < SNAPSHOT_TTL_MS ? s.docs : null;
+}
+const forgetProfiles = () => { profilesSnapshot = null; };
+
 function deriveName(resume, fallback) {
   return resume?.personal?.nameEn || resume?.personal?.nameJa || fallback;
 }
 
 // ── profiles ──────────────────────────────────────────────────────
 export async function listProfiles() {
-  const snap = await getDocs(profilesCol());
-  return snap.docs
-    .map(d => ({ id: d.id, name: d.data().name || d.id, fileName: `${d.id}.json` }))
+  let docs = freshProfiles();
+  if (!docs) {
+    const snap = await getDocs(profilesCol());
+    rememberProfiles(snap);
+    docs = profilesSnapshot.docs;
+  }
+  return [...docs.entries()]
+    .map(([id, data]) => ({ id, name: data.name || id, fileName: `${id}.json` }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function getProfile(id) {
+  const cached = freshProfiles()?.get(id);
+  if (cached) return cached.resume || {};
   const snap = await getDoc(profileDoc(id));
   if (!snap.exists()) {
     const err = new Error('Profile not found.');
@@ -80,6 +105,7 @@ export async function getProfile(id) {
 }
 
 export async function saveProfile(id, resume) {
+  forgetProfiles();
   const ref = profileDoc(id);
   const existed = (await getDoc(ref)).exists();
   const payload = { name: deriveName(resume, id), resume, updatedAt: serverTimestamp() };
@@ -89,6 +115,7 @@ export async function saveProfile(id, resume) {
 }
 
 export async function removeProfile(id) {
+  forgetProfiles();
   await deleteDoc(profileDoc(id));
   await Promise.allSettled([deleteDoc(trackerDoc(id)), deleteDoc(appsDoc(id))]);
   return { ok: true, success: true };
@@ -156,6 +183,7 @@ export async function saveSettings(patch) {
 export async function ensureSeed(user) {
   if (!firestoreEnabled() || !user) return;
   const existing = await getDocs(profilesCol());
+  rememberProfiles(existing);
   if (!existing.empty) return;
 
   const isOwner = OWNER_EMAILS.includes((user.email || '').toLowerCase());

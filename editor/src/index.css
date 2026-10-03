@@ -1330,7 +1330,8 @@ body,
     padding: 20px 14px 28px;
   }
   .intern-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
-  .intern-heading p { flex-wrap: wrap; }
+  .intern-heading p { display: block; }
+  .intern-heading p svg { display: inline-block; margin-right: 6px; vertical-align: -3px; }
   .intern-heading p span,
   .intern-heading p span + * { display: none; }
   .intern-summary { min-height: 0; grid-template-columns: repeat(3, 1fr); padding: 18px 8px; background: #fff; color: #151922; box-shadow: none; border: 1px solid var(--intern-line); }
@@ -1558,7 +1559,7 @@ body,
 .donut-legend i { width: 10px; height: 10px; border-radius: 3px; }
 .donut-legend span { color: #4b5768; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .donut-legend b { color: #172033; font-size: 12px; }
-.donut-legend-empty { color: #8b95a5; font-size: 11px; }
+.donut-legend .donut-legend-empty { display: block; color: #8b95a5; font-size: 11px; }
 
 /* ── Tokyo opportunities: card grid (lives beside the trend chart) ──── */
 .tokyo-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
@@ -1594,6 +1595,7 @@ body,
 .application-company small { overflow: hidden; color: #748095; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .application-row > span:not(.application-company) { display: flex; align-items: center; gap: 5px; }
 .application-deadline { color: #c66a1b; font-weight: 700; }
+.application-deadline.undated { color: #7a8597; font-weight: 560; }
 .intern-row-status,
 .intern-status-control select { min-height: 32px; padding: 0 8px; border: 1px solid #d5ddea; border-radius: 7px; background: #fff; color: #34445e; font: inherit; font-size: 10px; font-weight: 650; }
 .application-row a { display: inline-flex; align-items: center; gap: 4px; color: var(--career-blue); font-weight: 750; text-decoration: none; }
@@ -1735,8 +1737,11 @@ body,
   .profile-hero { grid-template-columns: 1fr; gap: 20px; padding: 22px 18px; }
   .profile-socials { grid-template-columns: 1fr 1fr; }
   .profile-breakdown { grid-column: auto; }
-  .pipeline-strip { grid-template-columns: repeat(2, 1fr); }
+  .pipeline-strip { grid-template-columns: repeat(6, 1fr); }
   .pipeline-title { grid-column: 1 / -1; }
+  .pipeline-stat { grid-column: span 2; }
+  .pipeline-stat:nth-child(n + 5) { grid-column: span 3; }
+  .pipeline-stat:nth-child(4) { border-right: 0; }
   .dashboard-grid { grid-template-columns: 1fr; }
   .dashboard-main { padding: 21px 16px; }
   .application-list-head { display: none; }
@@ -1757,8 +1762,7 @@ body,
   .profile-identity { align-items: flex-start; }
   .profile-photo { width: 82px; height: 82px; }
   .profile-socials { grid-template-columns: 1fr; }
-  .pipeline-strip { grid-template-columns: 1fr 1fr; }
-  .pipeline-stat { padding: 15px; }
+  .pipeline-stat { gap: 8px; padding: 14px 10px; }
 }
 
 @media (max-width: 560px) {
@@ -4178,12 +4182,16 @@ body,
   box-shadow: 0 1px 2px rgba(30, 41, 59, 0.04), 0 10px 30px rgba(30, 41, 59, 0.06);
 }
 
-/* Calendar is NOT framed as a card — the day cells are the surfaces. Remove the
-   outer card's fill/border/shadow so it sits flat on the app gutter. */
-.app-main > .calendar-view {
-  background: transparent;
+/* Calendar sits in the same white card as every other view. Its inner section
+   used to draw a second card (own border, shadow, 24px top margin), which left
+   the calendar floating and inset compared with the rest of the app. */
+.app-main > .calendar-view .application-calendar {
+  width: 100%;
+  margin: 0;
+  padding: 0;
   border: 0;
   border-radius: 0;
+  background: transparent;
   box-shadow: none;
 }
 
@@ -4211,7 +4219,8 @@ body,
 .applications-tab.active svg { color: #cbd5e1; }
 .applications-tab.active b { background: rgba(255,255,255,0.18); color: #fff; }
 .applications-tab.rejected.active { background: #d54b50; border-color: #d54b50; }
-.applications-view .application-nolink { color: #b6bfcd; }
+.applications-view .application-nolink,
+.profile-dashboard .application-nolink { color: #b6bfcd; }
 .src-gmail { display: inline-flex; vertical-align: middle; margin-left: 6px; opacity: .9; }
 .src-gmail svg { display: block; }
 /* The owner set this status by hand — a Gmail drain will never move it again
@@ -4341,6 +4350,8 @@ body,
     border-top: 0;
   }
   .side-foot .app-lang-switcher { width: auto; }
+  /* The 4px left gutter only makes sense beside a left sidebar. */
+  .app-main { padding: 12px; }
 }
 
 /* Phone: tighten the top nav so all 7 icons + language + profile fit within

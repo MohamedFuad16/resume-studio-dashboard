@@ -19,6 +19,27 @@ iOS app, `contracts/` and the LaTeX résumés live in
 
 ## Recent changes
 
+- **2026-10-03 — UI audit fixes on `feat/ui-rebuild` (rebuild phase 1b).** Eight
+  defects from a desktop and phone pass over every view. On phones the main card
+  sat off-centre because the desktop gutter (`12px 12px 12px 4px`, sized for a
+  left sidebar) applied under the top bar; it is now symmetric. The calendar was
+  the only view drawing its own inset card (24px top margin, own border and
+  shadow); it now fills the shared white panel. The donut's "No applications
+  yet" sat in the legend's 10px swatch column and wrapped to three lines on
+  every width; phones showed "Rejected" alone on a third counter row (now 3 + 2);
+  the radar's shield icon wrapped away from its text. Empty locations drew a
+  lone pin and an empty apply URL drew a "Continue" link to nowhere (now a
+  dash). "Not stated" deadlines no longer share the urgent orange of a real date.
+  The Gmail card showed server env-var names to users while Gmail is off; it now
+  says the sync is paused. The AI key copy no longer mentions résumé drafting.
+  Sign-in read the profile list twice and then the profile (three sequential
+  Firestore round trips); the seed check's snapshot now serves the boot reads
+  for 10 s, keyed by uid and dropped on any write (inferred one round trip;
+  not measured, Google sign-in does not work in the agent's browser pane).
+  Verified in the browser (no-auth mode, local sample data) at 1440x900 and
+  375x812; `scripts/verify-web.sh` PASS (build, catalog, Playwright 5/5,
+  react-doctor 51 vs 46).
+
 - **2026-10-03 — Repo is web-only; iOS, contracts and LaTeX archived; one
   branch (ADR-0044).** The iOS app, the `contracts/` layer, the LaTeX résumés
   (`en/`, `ja/`, `build_all.sh`, the PyMuPDF tests) and the root plan docs left
