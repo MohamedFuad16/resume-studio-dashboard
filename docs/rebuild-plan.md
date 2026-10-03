@@ -44,47 +44,42 @@ API on EC2, Tokyo (Node/Express; firebase-admin verifies the token)
   ├─ /api/mailboxes            link / unlink several Gmail accounts per user
   └─ /api/documents            tailored résumé or cover letter -> edit -> PDF
 Workers (same image, separate process on the same host)
-  ├─ collectors   every 6-12 h per source -> normalize -> dedupe -> jobs
-  ├─ enricher     LLM company summary + selection process, cached per company,
-  │               re-run only when the source page hash changes
-  ├─ research     LLM agent with tools (see below), for gaps the collectors miss
+  ├─ research     one LLM agent with job-board, search and browser tools
+  │               (see below): jobs, companies, selection steps; cached, re-run
+  │               only when a source changes
   └─ gmail-sync   every 3 h per mailbox, last 30 days by default -> classify -> applications
 ```
 
-### Research agent (LLM backup for search and enrichment)
+### One research system (owner's direction, 2026-10-03)
 
-The owner's idea, 2026-10-03: when the index cannot answer ("show me
-internships at <company>") or a scheduled refresh needs facts the collectors
-do not have, an LLM on the EC2 worker does the research itself and returns
-structured JSON the app can show.
+There are no separate scrapers, searchers and enrichers. One LLM agent on the
+EC2 worker finds and refreshes internships, new-grad and full-time roles, and
+company facts, and returns structured JSON the app shows.
 
 ```
-trigger (user search with too few hits · scheduled refresh · new company)
+trigger: schedule (slow, steady pace) · user search with too few hits · new company
   -> worker builds the system prompt + task + JSON schema
-  -> OpenRouter model loop, at most N tool calls:
-       web_search(query)   OpenRouter's server-side search tool; returns titles,
-                           snippets and URLs from a search provider, so our server
-                           does not crawl the site to find a listing
-       open_page(url)      headless Chromium on EC2 loads the page, returns its
-                           text and JSON-LD; same politeness rules as collectors
-  -> JSON validated on the server -> jobs / companies tables -> shown in the app
+  -> OpenRouter model loop, capped steps and tokens; the model picks its tools:
+       read_job_board(type, slug)  Greenhouse / Lever / Ashby JSON, HRMOS / HERP /
+                                   Talentio JSON-LD. No model cost to fetch, exact
+                                   data, so it does the bulk of every refresh
+       web_search(query)           OpenRouter's server-side search: titles,
+                                   snippets, URLs from a search provider
+       open_page(url)              headless Chromium on EC2 returns page text and
+                                   JSON-LD
+  -> JSON validated on the server -> jobs / companies tables -> app
 ```
 
-- Both chosen models list native web search on their OpenRouter endpoints
-  (research 2026-10-03). Search costs about $0.01 to $0.014 per call on top of
-  tokens.
-- Every run has a step cap and a token cap, and is logged to `llm_calls`.
-- `open_page` follows the scraper limits: no CAPTCHA solving, no bot-detection
-  bypass. A page behind a challenge is answered from search results only.
+- Why the agent still prefers job-board feeds: answering from search alone
+  costs about $0.01 to $0.014 per search plus tokens, and snippets often miss
+  deadlines and selection steps. Feeds are free and exact. The agent uses
+  search and the browser for whatever the feeds do not cover.
+- The agent identifies itself honestly and paces requests politely. It does
+  not solve CAPTCHAs or bypass bot detection; a page behind a challenge is
+  answered from search results only.
+- Every run is logged to `llm_calls` with its cost; a monthly cap stops runs.
 - Unknown: whether web search and strict JSON output work in the same call.
   If not, the agent searches first and structures the result in a second call.
-
-Why this is faster than today: the current dashboard waits on three
-Firestore round trips in a row (seed check, profile list, profile) behind a
-full-screen spinner, and Gmail results travel server -> queue -> browser ->
-Firestore. In the new design the browser makes one request to a server about
-20 ms away (measured 2026-10-03 from Tokyo) and paints a cached copy while it
-waits.
 
 ## Data model (first draft)
 
@@ -125,6 +120,36 @@ Each phase ends with its check passing and a dated entry in the state file.
 - Check: `scripts/verify-web.sh` passes; `git branch -r` shows only `main`
   (and the catalog bot branch if kept).
 
+### Phase 1b: UI first (owner, 2026-10-03: "complete the entire UI first, backend later")
+
+Built on branch `feat/ui-rebuild`, not pushed to `main` until the backend can
+serve it (a push to `main` deploys the client). Screens that need the new
+backend read from a sample-data adapter (`VITE_DATA_MODE=mock`, dev only)
+behind the same interface the phase 2 API will implement, written down in
+`docs/api-v2.md` as each screen lands.
+
+- DONE 2026-10-03: eight fixes from the UI audit (phone gutter, calendar
+  framing, phone header wrapping, empty location and link cells, Gmail and AI
+  key copy, deadline colours, sign-in reads cut from three Firestore round
+  trips to one).
+- U1 Job type everywhere: internship / new grad / full time on Applications,
+  Dashboard and the radar. Inferred from the role text until the classifier
+  supplies it.
+- U2 Company page: overview, why it fits you, selection steps in order with
+  the next step one click from the calendar, Apply, and "Create a résumé for
+  this role".
+- U3 Radar search in plain language: the query becomes filter chips the user
+  can see and remove; a "search the web" state for misses.
+- U4 Documents: Résumé and Cover letter sections in Settings showing the
+  AI-registered template (read-only); the per-role generator (EN or JA; résumé,
+  CV, or 履歴書 + 職務経歴書 with the AI's suggestion), an editable preview, and
+  Download PDF.
+- U5 Gmail accounts: several linked mailboxes per account, each with its last
+  sync and status; one-month window and a three-hourly sync shown; each
+  application row shows which mailbox it came from.
+- U6 Calendar: selection-step events alongside deadlines and interviews.
+- U7 Loading: the app shell with placeholders instead of a full-screen spinner.
+
 ### Phase 2: server foundation
 - firebase-admin token check on every `/api` route except health, with each
   query scoped to the caller's uid.
@@ -136,27 +161,27 @@ Each phase ends with its check passing and a dated entry in the state file.
   under 200 ms on EC2; the auth test suite covers every data route.
 
 ### Phase 3: jobs index, company pages, search
-- One collector module per source with a shared interface. v1 sources,
-  from the 2026-10-03 survey:
+- The research agent above, with tools for the v1 sources from the
+  2026-10-03 survey:
   - documented public job-board APIs: Greenhouse, Lever, Ashby;
   - company boards with JSON-LD: HRMOS (has an internship filter), HERP
     company boards, Talentio;
-  - Japan Dev (sitemap plus JSON-LD);
+  - English job boards with sitemaps and JSON-LD;
   - other job sites, method per site in `docs/private/`;
-  - everything else through the research agent's web search.
+  - web search and the headless browser for everything else.
 - A seed list of 50 to 100 Japanese tech companies with their job-board type
   and slug. Found by checking each careers page for a job-board hostname.
 - Job type from `employmentType` plus title patterns (インターン, 新卒,
   2[7-9]卒, intern, new grad, junior).
 - Normalize to `jobs`, dedupe across sources by company + title + URL.
-- Enricher: company summary, selection steps (選考フロー), why it fits the
-  user's master profile. Structured JSON, cached.
+- Company facts from the same agent: summary, selection steps (選考フロー),
+  why it fits the user's master profile. Structured JSON, cached.
 - Radar search: the LLM turns a query such as "internships with no experience
   needed in AI engineering" into filters; FTS5 runs them. Live web search only
   when the index returns too few results.
 - Company page: steps shown in order; "add next step to calendar"; Apply opens
   the official application page and marks the application applied.
-- Check: each collector run is logged in `scrape_runs`; search answers in under
+- Check: each agent run is logged in `scrape_runs` and `llm_calls`; search answers in under
   300 ms without the LLM and under 3 s with it.
 
 ### Phase 4: Gmail, several mailboxes per account
