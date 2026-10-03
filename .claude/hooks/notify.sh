@@ -2,7 +2,7 @@
 # Stop / Notification — iMessages you a short, human summary of what just landed.
 #
 # The handle lives in $CLAUDE_NOTIFY_IMESSAGE, set in .claude/settings.local.json
-# (personal, never committed). Unset means silence: that is how the second device
+# (personal, never committed). Unset means silence: that is how other machines
 # and the code-doctor account run this same repo without messaging anyone.
 #
 # WHY IT READS THE TRANSCRIPT: "finished — ready for you" tells you nothing you

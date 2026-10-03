@@ -20,9 +20,8 @@ Diff vs main:
 ## Title
 
 Same grammar as a commit subject — `type(scope): imperative summary`, under 72
-characters. For cross-account review (the code doctor, the other device), prefix
-the surface instead: `[web]`, `[ios]`, `[contracts]`, `[repo]`. Match whichever
-convention the target already uses.
+characters. The code doctor prefixes its PRs `[web]`, `[server]` or `[repo]`
+instead; match whichever convention the target already uses.
 
 ## Body
 
@@ -39,16 +38,11 @@ is more convincing than an adjective.
 Exact commands and their outcomes, so the reviewer can reproduce them:
 
     scripts/verify-web.sh   → build ✓ · catalog ✓ · playwright 5/5 · react-doctor 46
-    scripts/verify-ios.sh   → 0 errors · 0 warnings · swiftlint clean
 ```
 
-`## Verified by` is the section that matters most across accounts — it is how the
-doctor and the other surface confirm a claim without re-deriving it. Vague
-entries ("tested locally") make the whole PR unverifiable.
-
-Add `## Notes for the other surface` when the change is contract-adjacent, and
-make sure the same information is in `contracts/CHANGELOG.md` — the changelog is
-what the other team actually reads on merge; a PR body is not.
+`## Verified by` is the section that matters most across accounts: it is how the
+doctor and later sessions confirm a claim without re-deriving it. Vague entries
+("tested locally") make the whole PR unverifiable.
 
 ## Never
 

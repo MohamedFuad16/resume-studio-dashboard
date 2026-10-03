@@ -1,9 +1,9 @@
 ---
 name: docs
 description: >
-  This repo's documentation formats — state.md dated entries, ADR skeletons for
-  all three numbering spaces, and contracts/CHANGELOG.md entries. Use when
-  updating those files by hand, instead of delegating to the scribe agent.
+  This repo's documentation formats: agent/state.md dated entries and ADR
+  skeletons for agent/decisions.md. Use when updating those files by hand,
+  instead of delegating to the scribe agent.
 allowed-tools: Read, Grep, Edit
 ---
 
@@ -16,20 +16,18 @@ that does not justify spawning an agent.
 
 | Change touches | File | Numbering |
 |---|---|---|
-| `editor/` | `agent/web/state.md`, `agent/web/decisions.md` | `ADR-####` |
-| `ios/` | `agent/ios/state.md`, `agent/ios/decisions.md` | `ADR-I-###` |
-| Both clients | `contracts/CHANGELOG.md`, `contracts/decisions.md` | `ADR-S-###` |
-| Architecture a newcomer would misread | `README.md` | — |
+| `editor/`, `Dockerfile`, `scripts/` | `agent/state.md`, `agent/decisions.md` | `ADR-####` |
+| A rebuild phase finished or changed | `docs/rebuild-plan.md` | none |
+| Architecture a newcomer would misread | `README.md` | none |
 
-The three ADR spaces are disjoint on purpose: the two teams once appended two
-ADR-0044s and two ADR-0045s to a shared file on the same day. Always read the
-tail of the target file and increment; never reuse.
+Always read the tail of `agent/decisions.md` and increment; never reuse a
+number. The iOS (`ADR-I-###`) and shared (`ADR-S-###`) spaces were retired with
+the iOS app on 2026-10-03; their files live in `~/Documents/InternshipPortal-archive`.
 
 ## Formats
 
 - Dated state entry → [references/state-entry.md](references/state-entry.md)
 - ADR → [references/adr.md](references/adr.md)
-- Contract changelog entry → [references/changelog-entry.md](references/changelog-entry.md)
 
 ## The rule that matters more than the format
 

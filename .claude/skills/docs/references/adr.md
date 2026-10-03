@@ -1,13 +1,7 @@
 # ADR skeletons
 
-Three disjoint numbering spaces. Read the tail of the target file and increment;
-never reuse a number.
-
-| File | Prefix | Scope |
-|---|---|---|
-| `agent/web/decisions.md` | `ADR-####` | web only |
-| `agent/ios/decisions.md` | `ADR-I-###` | iOS only |
-| `contracts/decisions.md` | `ADR-S-###` | binds BOTH surfaces |
+One numbering space: `ADR-####` in `agent/decisions.md`. Read the tail of the
+file and increment; never reuse a number.
 
 Recent house style (prose, no rigid headers):
 
@@ -24,6 +18,3 @@ Decision: <the rule that now holds, phrased so someone can apply it.>
 
 <How it was verified — the checks that would have caught the earlier failure.>
 ```
-
-Choose `ADR-S-###` whenever the other surface is bound by the decision. A
-per-surface ADR wrongly implies the other team may ignore it.

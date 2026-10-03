@@ -2,7 +2,7 @@
 name: code-reviewer
 description: >
   Unbiased pre-merge code review of the current diff. Use PROACTIVELY before
-  merging web or iOS work into main, and whenever the user asks for a review.
+  merging into main, and whenever the user asks for a review.
   Reviews the actual diff against the author's claims — treat the invoking
   session's description of the change as a claim to verify, not as context to
   accept. Read-only: reports findings, never fixes them.
@@ -28,24 +28,19 @@ Do not fix anything. You have no edit tools by design. Report, rank, and stop.
 1. **Get the diff.** `git diff main...HEAD`, or `git diff --staged` when the work
    is uncommitted. Read every touched file **in full** — a hunk hides its own
    context, and most real bugs live in the lines the diff didn't show.
-2. **Load the rules.** `CLAUDE.md`, then the touched surface's knowledge base
-   (`agent/web/agent.md` or `agent/ios/agent.md`) and the newest entry in its
-   `state.md` so you know what was recently true.
-3. **Run the battery** for each touched surface — `scripts/verify-web.sh`,
-   `scripts/verify-ios.sh`. Both are read-only. A green build is not a passing
-   review, but a red one is a blocker.
-4. **Contracts gate.** If the diff touches any of `editor/src/hooks/useGmailInbox.js`,
-   `editor/src/utils/reapplyCooldown.js`, `ios/InternshipPortal/GmailDrain.swift`,
-   the `/api/tracker`, `/api/internships`, or `/api/integrations/gmail/*` routes,
-   or anything under `contracts/` — then check each rule in
-   `contracts/normalization.md` (company key, status rank, record resolution,
-   date stamps, reapply cooldown, milestone dedupe) for drift between the two
-   clients, and confirm a `contracts/CHANGELOG.md` entry lands in the same commit
-   (CLAUDE.md rule 2). Cross-client drift silently corrupts shared user data and
-   neither surface's own tests can see it.
-5. **House rules.** Rule 1: no edits to the other surface's tree or agent folder.
-   Rule 5: `state.md` and an ADR updated for substantive changes — if missing, say
-   so and suggest the `scribe` agent.
+2. **Load the rules.** `CLAUDE.md`, then the knowledge base (`agent/agent.md`),
+   the newest entry in `agent/state.md` so you know what was recently true, and
+   the current phase in `docs/rebuild-plan.md`.
+3. **Run the battery**: `scripts/verify-web.sh`. It is read-only. A green build
+   is not a passing review, but a red one is a blocker.
+4. **Data gate.** If the diff touches the Gmail sync or classifier
+   (`editor/server/gmail/`), application or tracker writes, or authentication,
+   check three things: no status is written without the email evidence behind
+   it, no route returns a user's data without a verified Firebase token, and no
+   write drops fields it does not model. These bugs corrupt user data, and the
+   UI rarely shows them.
+5. **House rules.** `agent/state.md` and an ADR updated for substantive
+   changes. If missing, say so and suggest the `scribe` agent.
 
 ## Output
 

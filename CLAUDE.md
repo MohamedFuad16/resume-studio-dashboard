@@ -1,45 +1,42 @@
 # CLAUDE.md
 
-One repo, two products, two teams, one contract layer:
+One product in this repo since 2026-10-03: the Internship Portal web app and
+its API. The iOS app, the shared `contracts/` layer and the LaTeX résumés moved
+to `~/Documents/InternshipPortal-archive` and come back only when the owner
+says so.
 
-- **iOS app** — `ios/` · branch `ios` · knowledge base [`agent/ios/agent.md`](agent/ios/agent.md)
-- **Web app + server** — `editor/`, `Dockerfile`, `docs/`, `en/`, `ja/` · branch `web` · knowledge base [`agent/web/agent.md`](agent/web/agent.md)
-- **Shared contracts** — [`contracts/`](contracts/README.md): the API routes, data
-  shapes, Firestore paths, and normalization algorithms BOTH clients depend on.
+- **Code:** `editor/` (React client in `src/`, Express API in `server/`),
+  `Dockerfile`, `scripts/`
+- **Knowledge base:** [`agent/agent.md`](agent/agent.md)
+- **Rebuild:** [`docs/rebuild-plan.md`](docs/rebuild-plan.md) holds the target
+  architecture, the owner's decisions and the phase list.
 
-ALWAYS read your surface's `agent.md` first and follow its routing table.
+ALWAYS read `agent/agent.md` first and follow its routing table, then find the
+first open phase in the rebuild plan.
 
 ## Rules
 
-1. **Stay on your surface.** Never edit the other team's tree or agent folder.
-   If a task needs a change there, write it as a request in
-   `contracts/CHANGELOG.md` and stop.
-2. **Contracts are load-bearing.** Before changing server routes
-   (`/api/tracker`, `/api/internships`, `/api/integrations/gmail/*`),
-   TrackerRecord or Gmail-action fields, Firestore paths/rules, or the
-   company-key / status-rank algorithms — read the matching `contracts/` file
-   and add a `contracts/CHANGELOG.md` entry in the same commit.
-3. **Branches.** Web works on `web`, iOS on `ios`; integrate through `main`.
-   Merge `main` into your branch regularly and read `contracts/CHANGELOG.md`
-   on every merge.
-4. **User data is central.** Firestore `users/{uid}/**` is the only user-data
-   store; the server holds only the shared catalog + Gmail queue. Every client
-   must round-trip record fields it does not model.
-5. **After changes:** update YOUR `state.md`; append ADRs to YOUR
-   `decisions.md` (iOS: `ADR-I-###` · web: `ADR-####` · shared:
-   `contracts/decisions.md` `ADR-S-###`). Never commit secrets
-   (`agent/web/secrets.md` is pointers-only).
-6. **Doctor PRs.** A third account audits the repo and files findings as
-   `doctor/*` PRs (see `DOCTOR.md`). At session start, check open doctor PRs
-   for YOUR surface: reproduce with the PR's "Verified by" command; if real,
-   fix on your branch and close the PR with a comment; if not, close with the
-   reason. Never leave one unanswered past a working day, and never merge a
-   doctor PR directly — the fix belongs on your branch.
-7. **Toolkit.** Commit with the `/commit` skill: Conventional, surface-scoped,
-   and **never carrying AI attribution** — no `Co-Authored-By: Claude`, no
-   "Generated with…", no 🤖. A `PreToolUse` hook blocks commits and PRs that do.
-   Before merging to `main`, run `/preflight` (the local verification ritual —
-   `scripts/verify-web.sh` / `scripts/verify-ios.sh`; there is no CI for iOS, so
-   skipping it ships unverified Swift), then the `code-reviewer` agent on the
-   diff. After substantive changes, the `scribe` agent updates state.md, ADRs
-   and the contracts changelog. Rote multi-file sweeps go to `mech`.
+1. **One branch.** `main` is the only long-lived branch. Use a short-lived
+   branch when a change needs review, and merge it after `/preflight`.
+2. **User data.** The rebuild moves user data from Firestore to the EC2
+   database (plan phase 2). Until that lands, every write must round-trip the
+   record fields it does not model.
+3. **Spending.** Any run that spends OpenRouter credits needs the owner's yes
+   first, with an estimate. Spend caps change only by the owner's hand.
+4. **After changes:** update `agent/state.md` with a dated entry and append
+   ADRs to `agent/decisions.md` (`ADR-####`). Never commit secrets;
+   `agent/secrets.md` is pointers only.
+5. **Doctor PRs.** A third account audits the repo and files findings as
+   `doctor/*` PRs (see `DOCTOR.md`). At session start, check open doctor PRs:
+   reproduce with the PR's "Verified by" command; if real, fix it on your
+   branch and close the PR with a comment; if not, close it with the reason.
+   Never merge a doctor PR directly.
+6. **Toolkit.** Commit with the `/commit` skill: Conventional, scoped, and
+   never carrying AI attribution (no `Co-Authored-By: Claude`, no "Generated
+   with", no robot emoji). A `PreToolUse` hook blocks commits and PRs that do.
+   Before merging to `main`, run `/preflight` (`scripts/verify-web.sh`), then
+   the `code-reviewer` agent on the diff. After substantive changes, the
+   `scribe` agent updates the state file and ADRs. Rote multi-file sweeps go to
+   `mech`.
+7. **This repo is public.** Keep secrets, unfixed vulnerability details and
+   private decisions out of commits, issues and PR bodies.

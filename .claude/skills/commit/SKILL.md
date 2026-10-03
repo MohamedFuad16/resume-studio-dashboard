@@ -1,7 +1,7 @@
 ---
 name: commit
 description: >
-  Draft and make a commit in this repo's style — Conventional, surface-scoped,
+  Draft and make a commit in this repo's style — Conventional, scoped,
   written in a human voice, with no AI attribution. Use whenever committing.
 allowed-tools: Bash, Read
 ---
@@ -35,11 +35,12 @@ and what was wrong before.
 ```
 
 **Types:** `feat` `fix` `docs` `refactor` `perf` `test` `chore` `build`
-**Scopes:** `ios` `web` `contracts` `server` `repo` (repo = cross-cutting, e.g. tooling)
+**Scopes:** `web` (the React client) `server` (Express API and workers) `repo`
+(cross-cutting, e.g. tooling and docs)
 
 Pick the scope from the tree that dominates the diff. A commit that changes code
-*and* its `contracts/CHANGELOG.md` entry keeps the code's scope — rule 2 wants
-them in one commit, so that is normal, not a mixed commit.
+*and* its `agent/` docs keeps the code's scope; one commit carrying both is the
+house rule, not a mixed commit.
 
 ## Voice
 
