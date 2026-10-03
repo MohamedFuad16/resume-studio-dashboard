@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Bookmark, CalendarClock, CircleSlash, FilePenLine, Inbox, Pin, Send } from 'lucide-react';
+import { ArrowRight, Bookmark, CalendarClock, CircleSlash, FilePenLine, Inbox, Mail, Pin, Send } from 'lucide-react';
 import { APPLICATION_STATUSES, statusLabel, useApplicationTracker } from '../hooks/useApplicationTracker.js';
 import { useInternshipCatalog } from '../hooks/useInternshipCatalog.js';
 import { CompanyLogo } from './CompanyLogo.jsx';
@@ -7,6 +7,9 @@ import GmailMark from './GmailMark.jsx';
 import { DetailPanel } from './InternshipDashboard.jsx';
 import InterviewDateModal from './InterviewDateModal.jsx';
 import PeriodPicker from './PeriodPicker.jsx';
+import JobTypeTabs from './JobTypeTabs.jsx';
+import { useJobTypeFilter } from '../hooks/useJobTypeFilter.js';
+import { JOB_TYPES, filterByJobType, inferJobType, jobTypeCounts, jobTypeLabel } from '../utils/jobType.js';
 import { filterRecordsByPeriod, useActivityPeriod } from '../hooks/useActivityPeriod.js';
 import { displayCompany, displayRole, displayValue, formatDisplayDeadline } from '../utils/internshipDisplay.js';
 import { companyCooldownMap, cooldownForCompany, cooldownLabel } from '../utils/reapplyCooldown.js';
@@ -28,11 +31,15 @@ const copy = {
     subtitle: 'Every company you have saved, applied to, or heard back from — in one place.',
     all: 'All',
     companyRole: 'Company & role',
+    type: 'Type',
+    typeFor: company => `Job type for ${company}`,
     location: 'Location',
     deadline: 'Deadline',
     status: 'Status',
     open: 'Open',
     notApplied: 'Not applied',
+    emptyType: type => `No ${type.toLowerCase()} applications in this period`,
+    emptyTypeSub: 'Switch the type above, or widen the period.',
     empty: 'No applications yet',
     emptySub: 'Track a role from Internship Radar and it will show up here.',
     emptyPeriod: 'Nothing in this period',
@@ -45,11 +52,15 @@ const copy = {
     subtitle: '保存・応募・結果待ちのすべての企業をまとめて確認できます。',
     all: 'すべて',
     companyRole: '企業・職種',
+    type: '形態',
+    typeFor: company => `${company}の雇用形態`,
     location: '場所',
     deadline: '締切',
     status: '状況',
     open: '開く',
     notApplied: '未応募',
+    emptyType: type => `この期間の${type}の応募はありません`,
+    emptyTypeSub: '上の形態を切り替えるか、表示期間を広げてください。',
     empty: 'まだ応募はありません',
     emptySub: 'インターン検索から応募を管理するとここに表示されます。',
     emptyPeriod: 'この期間の応募はありません',
@@ -61,14 +72,20 @@ const copy = {
 
 export default function ApplicationsView({ isJa, activeProfile, onOpenRadar, onOpenProfile }) {
   const t = isJa ? copy.ja : copy.en;
-  const { records: allRecords, statusFor, updateStatus, addMilestone } = useApplicationTracker(activeProfile);
+  const { records: allRecords, statusFor, updateStatus, updateRecord, addMilestone } = useApplicationTracker(activeProfile);
   const { period } = useActivityPeriod();
-  const records = useMemo(() => filterRecordsByPeriod(allRecords, period), [allRecords, period]);
+  const { jobType, setJobType } = useJobTypeFilter();
+  const periodRecords = useMemo(() => filterRecordsByPeriod(allRecords, period), [allRecords, period]);
+  const typeCounts = useMemo(() => jobTypeCounts(periodRecords), [periodRecords]);
+  // Everything below (status tabs, count, rows) follows both the period and the type.
+  const records = useMemo(() => filterByJobType(periodRecords, jobType), [periodRecords, jobType]);
   const counts = useMemo(() => {
     const next = {};
     for (const record of records) next[record.status] = (next[record.status] || 0) + 1;
     return next;
   }, [records]);
+  // A type picked by hand is pinned: a later sync must not re-infer it.
+  const onJobTypeChange = (record, value) => updateRecord(record.internshipId, { jobType: value, jobTypePinned: true });
   const { catalog } = useInternshipCatalog();
   const [filter, setFilter] = useState('all');
   const [interviewPending, setInterviewPending] = useState(null);
@@ -121,6 +138,8 @@ export default function ApplicationsView({ isJa, activeProfile, onOpenRadar, onO
         </div>
       </div>
 
+      <JobTypeTabs value={jobType} onChange={setJobType} counts={typeCounts} isJa={isJa} />
+
       <div className="applications-tabs" role="tablist" aria-label={t.title}>
         {tabs.map(tab => {
           const Icon = STATUS_ICONS[tab.value];
@@ -143,15 +162,20 @@ export default function ApplicationsView({ isJa, activeProfile, onOpenRadar, onO
 
       <div className="application-list">
         <div className="application-list-head">
-          <span>{t.companyRole}</span><span>{t.location}</span><span>{t.deadline}</span><span>{t.status}</span><span>{t.open}</span>
+          <span>{t.companyRole}</span><span>{t.type}</span><span>{t.location}</span><span>{t.deadline}</span><span>{t.status}</span><span>{t.open}</span>
         </div>
         {visible.length ? visible.map(record => {
           const item = catalog.find(entry => entry.id === record.internshipId)
             || { ...record, id: record.internshipId, url: record.applyUrl };
           const cooldown = cooldownForCompany(cooldownMap, record.company);
+          const recordType = inferJobType(record);
           return (
             <article className="application-row" key={record.internshipId}>
-              <span className="application-company"><CompanyLogo item={item} /><button type="button" className="application-company-trigger" onClick={() => setSelectedItem(item)} aria-label={isJa ? `${displayCompany(item, isJa)}の詳細を開く` : `Open details for ${displayCompany(item, isJa)}`}><b>{displayCompany(item, isJa)}{record.source === 'gmail' && <span className="src-gmail" title={isJa ? 'Gmailから追加' : 'Added from Gmail'}><GmailMark size={12} /></span>}{record.statusPinned && <span className="src-pinned" title={isJa ? '手動で設定した状況 — Gmailの同期で変更されません' : 'Status set by you — Gmail sync will not change it'}><Pin size={12} /></span>}</b><small>{displayRole(item.role || record.role, isJa)}{cooldown ? <span className="application-cooldown-tag"><CalendarClock size={11} />{cooldownLabel(cooldown, isJa)}</span> : null}</small></button></span>
+              <span className="application-company"><CompanyLogo item={item} /><button type="button" className="application-company-trigger" onClick={() => setSelectedItem(item)} aria-label={isJa ? `${displayCompany(item, isJa)}の詳細を開く` : `Open details for ${displayCompany(item, isJa)}`}><b>{displayCompany(item, isJa)}{record.source === 'gmail' && <span className="src-gmail" title={isJa ? 'Gmailから追加' : 'Added from Gmail'}><GmailMark size={12} /></span>}{record.statusPinned && <span className="src-pinned" title={isJa ? '手動で設定した状況 — Gmailの同期で変更されません' : 'Status set by you — Gmail sync will not change it'}><Pin size={12} /></span>}</b><small>{displayRole(item.role || record.role, isJa)}{cooldown ? <span className="application-cooldown-tag"><CalendarClock size={11} />{cooldownLabel(cooldown, isJa)}</span> : null}</small>{record.sourceMeta?.mailbox ? <em className="application-mailbox" title={record.sourceMeta.mailbox}><Mail size={10} aria-hidden="true" />{record.sourceMeta.mailbox}</em> : null}</button></span>
+              <select className={`jobtype-select ${recordType}`} value={recordType} onChange={event => onJobTypeChange(record, event.target.value)} aria-label={t.typeFor(record.company)}>
+                {JOB_TYPES.map(type => <option key={type} value={type}>{jobTypeLabel(type, isJa)}</option>)}
+                {recordType === 'unknown' ? <option value="unknown" disabled>{jobTypeLabel('unknown', isJa)}</option> : null}
+              </select>
               <span>{displayValue(record.location, isJa)}</span>
               <span className={`application-deadline${isDatedDeadline(record) ? '' : ' undated'}`}>{formatDisplayDeadline(record.deadline, isJa)}</span>
               <select value={record.status} onChange={event => onStatusChange(item, event.target.value)} aria-label={isJa ? `${record.company}の応募状況` : `Status for ${record.company}`}>
@@ -162,7 +186,9 @@ export default function ApplicationsView({ isJa, activeProfile, onOpenRadar, onO
             </article>
           );
         }) : (
-          allRecords.length && !records.length ? (
+          periodRecords.length && !records.length ? (
+            <div className="application-empty"><span className="application-empty-icon" aria-hidden="true"><Inbox size={20} /></span><b>{t.emptyType(jobTypeLabel(jobType, isJa))}</b><span>{t.emptyTypeSub}</span></div>
+          ) : allRecords.length && !periodRecords.length ? (
             <div className="application-empty"><span className="application-empty-icon" aria-hidden="true"><Inbox size={20} /></span><b>{t.emptyPeriod}</b><span>{t.emptyPeriodSub}</span></div>
           ) : (
             <div className="application-empty"><span className="application-empty-icon" aria-hidden="true"><Inbox size={20} /></span><b>{t.empty}</b><span>{t.emptySub}</span><button type="button" onClick={onOpenRadar}>{t.explore}</button></div>

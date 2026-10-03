@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowUpRight,
   Bookmark,
+  Building2,
+  FileText,
   BookmarkCheck,
   BriefcaseBusiness,
   CalendarClock,
@@ -15,6 +17,7 @@ import {
   PlusCircle,
   Search,
   ShieldCheck,
+  Sparkles,
   Star,
   X,
 } from 'lucide-react';
@@ -28,6 +31,10 @@ import { appliedCompaniesForProfile, appliedCompanyRank, compareCompanyAwareMatc
 import { resolveTechIcon } from '../utils/techIcons.js';
 import { keyed } from '../utils/keyedList.js';
 import { companyCooldownMap, cooldownForCompany, cooldownLabel } from '../utils/reapplyCooldown.js';
+import { JOB_TYPES, inferJobType, jobTypeLabel } from '../utils/jobType.js';
+import { hasStructuredFilters, matchesParsedFilters, parseSearchQuery, withoutChips } from '../utils/searchQuery.js';
+import { searchApi, isSampleData } from '../api/v2/index.js';
+import { useAppActions } from '../context/AppActions.js';
 
 const DESKTOP_PAGE_SIZE = 14;
 const MOBILE_PAGE_SIZE = 6;
@@ -81,10 +88,21 @@ const copy = {
     english: 'English-first',
     tracked: 'tracked applications',
     review: 'Review priority list',
-    search: 'Search company, role, or keyword',
+    search: 'Search in plain words, e.g. “AI internships in Tokyo, no experience”',
+    understood: 'Searching for',
+    removeChip: label => `Remove filter: ${label}`,
+    fewResults: count => count ? `Only ${count} ${count === 1 ? 'listing matches' : 'listings match'} in the index.` : 'Nothing in the index matches yet.',
+    searchWeb: 'Search the web',
+    searchingWeb: 'Searching the web…',
+    webNotConnected: 'Web search runs once the research agent is connected. It will look across job sites and company career pages for this query.',
+    webResults: count => `${count} results from the web`,
+    sampleData: 'Sample data',
     filters: 'Filters',
     allLocations: 'All locations',
     allTracks: 'All tracks',
+    allTypes: 'All types',
+    createResume: 'Create a résumé for this role',
+    companyPage: 'Company page',
     allLanguages: 'All languages',
     allDeadlines: 'All deadlines',
     allStatuses: 'All statuses',
@@ -163,10 +181,21 @@ const copy = {
     english: '英語中心',
     tracked: '管理中の応募',
     review: '優先リストを見る',
-    search: '企業名・職種・キーワードで検索',
+    search: '自然な言葉で検索（例：東京のAIインターン、未経験可）',
+    understood: '検索条件',
+    removeChip: label => `条件を外す: ${label}`,
+    fewResults: count => count ? `インデックスで一致する募集は${count}件のみです。` : 'インデックスに一致する募集はまだありません。',
+    searchWeb: 'Webで検索',
+    searchingWeb: 'Webを検索中…',
+    webNotConnected: 'Web検索はリサーチ機能の接続後に利用できます。求人サイトや企業の採用ページを横断してこの条件で探します。',
+    webResults: count => `Webから${count}件`,
+    sampleData: 'サンプルデータ',
     filters: '絞り込み',
     allLocations: 'すべての地域',
     allTracks: 'すべての職種',
+    allTypes: 'すべての形態',
+    createResume: 'この募集用の履歴書を作成',
+    companyPage: '企業ページ',
     allLanguages: 'すべての言語',
     allDeadlines: 'すべての締切',
     allStatuses: 'すべての状況',
@@ -305,7 +334,7 @@ const formatVerifiedDate = (date, isJa) => {
   return DISPLAY_DATE_FORMAT.format(parsed);
 };
 
-const splitRole = role => {
+export const splitRole = role => {
   const [lead, ...rest] = String(role || '').split(/\s[-–—]\s/);
   if (!rest.length) return [String(role || '').trim()];
   const detail = rest.join(' – ').trim();
@@ -323,17 +352,17 @@ const splitLocation = (value, isJa) => String(displayValue(value, isJa) || '')
   .filter(Boolean)
   .map(part => isJa ? part : `${part.charAt(0).toUpperCase()}${part.slice(1)}`);
 
-const formatDeadline = (value, isJa) => String(displayValue(value, isJa) || '')
+export const formatDeadline = (value, isJa) => String(displayValue(value, isJa) || '')
   .replace(/\s+JST\b/gi, '')
   .trim();
 
-const fitNoteDisplay = (item, isJa) => {
+export const fitNoteDisplay = (item, isJa) => {
   if (!isJa) return item.fitNote;
   const field = JA_TRACK_LABELS[item.track] || '専門分野';
   return `${field}に関するスキルとプロジェクト経験が募集要件に合っています。`;
 };
 
-const reasonDisplay = (reason, isJa) => {
+export const reasonDisplay = (reason, isJa) => {
   if (!isJa) return reason;
   const text = String(reason || '');
   const rules = [
@@ -379,6 +408,7 @@ const isRemoteRole = item => /remote|リモート/i.test(`${item.location || ''}
 // open the same detail drawer when a company row is clicked.
 export const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenProfile, cooldown = null, isJa = false }) => {
   const t = copy[isJa ? 'ja' : 'en'];
+  const { openCompany, openDocumentStudio } = useAppActions();
   const details = internshipDetails(item);
   const companyName = displayCompany(item, isJa);
   const eligibility = isJa ? details.eligibilityJa : details.eligibility;
@@ -495,11 +525,52 @@ export const DetailPanel = ({ item, status, onStatus, onApply, onClose, onOpenPr
           {copy[isJa ? 'ja' : 'en'].applyNow} <ExternalLink size={15} />
         </a>
       ) : null}
-      <button type="button" className="intern-save-large" onClick={onOpenProfile}>{t.tune} <ArrowUpRight size={15} /></button>
+      {openDocumentStudio ? (
+        <button type="button" className="intern-save-large" onClick={() => openDocumentStudio(item)}><FileText size={15} /> {t.createResume}</button>
+      ) : null}
+      {openCompany ? (
+        <button type="button" className="intern-save-large" onClick={() => { onClose?.(); openCompany(item.company, item.id); }}><Building2 size={15} /> {t.companyPage}</button>
+      ) : (
+        <button type="button" className="intern-save-large" onClick={onOpenProfile}>{t.tune} <ArrowUpRight size={15} /></button>
+      )}
     </div>
   </aside>
   );
 };
+
+// Shown when a plain-language query finds fewer than three listings. Phase 2
+// sends the query to the research agent; until then it says so.
+function WebSearchCard({ query, count, t }) {
+  const [state, setState] = useState({ status: 'idle', results: [] });
+  const run = async () => {
+    setState({ status: 'searching', results: [] });
+    try {
+      const result = await searchApi.web(query);
+      setState({ status: result?.status === 'not_connected' ? 'not_connected' : 'done', results: Array.isArray(result?.results) ? result.results : [] });
+    } catch {
+      setState({ status: 'not_connected', results: [] });
+    }
+  };
+  return (
+    <section className="web-search-card" aria-live="polite">
+      <Globe2 size={18} aria-hidden="true" />
+      <div>
+        <b>{t.fewResults(count)}</b>
+        <span>{state.status === 'not_connected' ? t.webNotConnected : state.status === 'done' ? t.webResults(state.results.length) : ''}</span>
+        {state.results.length ? (
+          <ul className="web-search-results">
+            {state.results.map(result => <li key={result.url}><a href={result.url} target="_blank" rel="noreferrer">{result.title} <ExternalLink size={12} /></a><small>{result.snippet}</small></li>)}
+          </ul>
+        ) : null}
+      </div>
+      {isSampleData ? <span className="sample-pill">{t.sampleData}</span> : null}
+      <button type="button" onClick={run} disabled={state.status === 'searching'}>
+        {state.status === 'searching' ? <LoaderCircle size={15} className="spin" /> : <Search size={15} />}
+        {state.status === 'searching' ? t.searchingWeb : t.searchWeb}
+      </button>
+    </section>
+  );
+}
 
 function CompanyResearchPanel({ company, t, isJa, job, results, error, onStart, onAdd, addedIds, addingId, onOpenSettings, phase = 0 }) {
   if (!company) return null;
@@ -567,6 +638,7 @@ export function InternshipDashboard({ isJa, onOpenProfile, onOpenSettings, activ
   const [query, setQuery] = useState('');
   const [region, setRegion] = useState('All');
   const [track, setTrack] = useState('All');
+  const [jobTypeFilter, setJobTypeFilter] = useState('All');
   const [language, setLanguage] = useState('All');
   const [deadlineFilter, setDeadlineFilter] = useState('All');
   const [sort, setSort] = useState('japan');
@@ -582,6 +654,15 @@ export function InternshipDashboard({ isJa, onOpenProfile, onOpenSettings, activ
   const [addingId, setAddingId] = useState('');
   const [interviewTarget, setInterviewTarget] = useState(null);
   const autoResearchStarted = useRef(new Set());
+  // Plain-language search (U3): the query becomes visible, removable filter
+  // chips. A bare word or company name keeps the old keyword search.
+  const parsedQuery = useMemo(() => parseSearchQuery(query), [query]);
+  const nlActive = hasStructuredFilters(parsedQuery);
+  const [dismissed, setDismissed] = useState({ query: '', keys: new Set() });
+  const dismissedKeys = useMemo(() => (dismissed.query === query ? dismissed.keys : new Set()), [dismissed, query]);
+  const nlFilters = useMemo(() => withoutChips(parsedQuery.filters, dismissedKeys), [parsedQuery, dismissedKeys]);
+  const visibleChips = parsedQuery.chips.filter(chip => !dismissedKeys.has(chip.key));
+  const dismissChip = key => setDismissed(current => ({ query, keys: new Set([...(current.query === query ? current.keys : []), key]) }));
 
   const eligibleCatalog = catalog;
   // Company-wide reapply cooldowns from rejection emails that stated a wait
@@ -645,19 +726,20 @@ export function InternshipDashboard({ isJa, onOpenProfile, onOpenSettings, activ
   // already have catalog rows (e.g. "mercari") so the user can find current openings
   // beyond the seeded ones. Auto-search is still gated to non-catalog queries below so
   // we don't auto-spend on companies already in the catalog.
-  const canLiveSearchCompany = isCompanyResearchQuery(companyQuery);
+  const canLiveSearchCompany = isCompanyResearchQuery(companyQuery) && !nlActive;
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const next = visibleCatalog.filter(item => {
       const status = statusFor(item.id);
       const haystack = [item.company, item.role, item.location, item.track, item.language, item.codingTest, ...(item.reasons || [])].join(' ').toLowerCase();
-      return (!needle || haystack.includes(needle))
+      return (nlActive ? matchesParsedFilters(item, nlFilters) : (!needle || haystack.includes(needle)))
         && (region === 'All'
           || (region === 'Japan' ? isJapanBased(item)
             : region === 'Remote' ? isRemoteRole(item)
             : !isJapanBased(item) && !isRemoteRole(item)))
         && (track === 'All' || item.track === track)
+        && (jobTypeFilter === 'All' || inferJobType(item) === jobTypeFilter)
         && (language === 'All' || item.languageType === language)
         && (deadlineFilter === 'All'
           || (deadlineFilter === 'Not stated' && !item.deadlineDate)
@@ -680,13 +762,13 @@ export function InternshipDashboard({ isJa, onOpenProfile, onOpenSettings, activ
         || Number(Boolean(b.priority)) - Number(Boolean(a.priority))
         || b.score - a.score;
     });
-  }, [visibleCatalog, query, region, track, language, deadlineFilter, sort, savedOnly, statusFor, appliedCompanies]);
+  }, [visibleCatalog, query, nlActive, nlFilters, region, track, jobTypeFilter, language, deadlineFilter, sort, savedOnly, statusFor, appliedCompanies]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   // Filter changes restart pagination, and a shrunken result set clamps the
   // page — both adjusted DURING render (React's previous-render-info pattern)
   // instead of post-paint effects, so there is never a frame on a ghost page.
-  const filterKey = JSON.stringify([query, region, track, language, deadlineFilter, sort, savedOnly]);
+  const filterKey = JSON.stringify([query, region, track, jobTypeFilter, language, deadlineFilter, sort, savedOnly]);
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (prevFilterKey !== filterKey) {
     setPrevFilterKey(filterKey);
@@ -846,10 +928,10 @@ export function InternshipDashboard({ isJa, onOpenProfile, onOpenSettings, activ
     setInterviewTarget(null);
   };
   const clearFilters = () => {
-    setQuery(''); setRegion('All'); setTrack('All'); setLanguage('All'); setDeadlineFilter('All'); setSavedOnly(false); setSort('japan');
+    setQuery(''); setRegion('All'); setTrack('All'); setJobTypeFilter('All'); setLanguage('All'); setDeadlineFilter('All'); setSavedOnly(false); setSort('japan');
   };
 
-  const hasFilters = Boolean(query || region !== 'All' || track !== 'All' || language !== 'All' || deadlineFilter !== 'All' || savedOnly);
+  const hasFilters = Boolean(query || region !== 'All' || track !== 'All' || jobTypeFilter !== 'All' || language !== 'All' || deadlineFilter !== 'All' || savedOnly);
   const start = filtered.length ? (effectivePage - 1) * pageSize + 1 : 0;
   const end = Math.min(effectivePage * pageSize, filtered.length);
 
@@ -875,6 +957,7 @@ export function InternshipDashboard({ isJa, onOpenProfile, onOpenSettings, activ
           </div>
           <div className="intern-filter-row">
             <select value={region} onChange={event => setRegion(event.target.value)} aria-label={t.allLocations}>{regions.map(option => <option key={option} value={option}>{option === 'All' ? t.allLocations : option === 'Japan' ? (isJa ? '日本' : 'Japan') : option === 'Remote' ? (isJa ? 'リモート' : 'Remote') : (isJa ? 'グローバル' : 'Global')}</option>)}</select>
+            <select value={jobTypeFilter} onChange={event => setJobTypeFilter(event.target.value)} aria-label={t.allTypes}><option value="All">{t.allTypes}</option>{JOB_TYPES.map(type => <option key={type} value={type}>{jobTypeLabel(type, isJa)}</option>)}</select>
             <select value={track} onChange={event => setTrack(event.target.value)} aria-label={t.allTracks}>{tracks.map(option => <option key={option} value={option}>{option === 'All' ? t.allTracks : trackLabel(option, isJa)}</option>)}</select>
             <select value={language} onChange={event => setLanguage(event.target.value)} aria-label={t.allLanguages}><option value="All">{t.allLanguages}</option><option value="English-first">{t.english}</option><option value="Bilingual">{isJa ? 'バイリンガル' : 'Bilingual'}</option></select>
             <select value={deadlineFilter} onChange={event => setDeadlineFilter(event.target.value)} aria-label={t.allDeadlines}><option value="All">{t.allDeadlines}</option><option value="7 days">{t.next7}</option><option value="30 days">{t.next30}</option><option value="Not stated">{t.notStated}</option></select>
@@ -882,6 +965,22 @@ export function InternshipDashboard({ isJa, onOpenProfile, onOpenSettings, activ
             {hasFilters ? <button type="button" className="intern-clear" onClick={clearFilters}>{t.clear}</button> : null}
           </div>
         </div>
+
+        {nlActive ? (
+          <div className="search-chips" aria-label={t.understood}>
+            <span className="search-chips-label"><Sparkles size={13} /> {t.understood}</span>
+            {visibleChips.map(chip => {
+              const label = isJa ? chip.label.ja : chip.label.en;
+              return (
+                <button key={chip.key} type="button" className="search-chip" onClick={() => dismissChip(chip.key)} aria-label={t.removeChip(label)}>
+                  {label}<X size={12} aria-hidden="true" />
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
+        {nlActive && filtered.length < 3 ? <WebSearchCard key={query} query={query} count={filtered.length} t={t} /> : null}
 
         {canLiveSearchCompany ? (
           <CompanyResearchPanel

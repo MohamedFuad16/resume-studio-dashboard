@@ -8,7 +8,8 @@
 import { useEffect, useState } from 'react';
 import { I } from './ui.jsx';
 import { settingsApi } from '../api/client.js';
-import GmailConnectCard from './GmailConnectCard.jsx';
+import MailboxesCard from './MailboxesCard.jsx';
+import DocumentsSettings from './DocumentsSettings.jsx';
 
 const DEFAULT_SEARCH_MODEL = 'perplexity/sonar';
 const DEFAULT_AUDIT_MODEL = 'openai/gpt-5-nano';
@@ -40,7 +41,7 @@ const MODEL_RE = /^[a-z0-9][a-z0-9._/:-]{1,60}$/i;
 const COPY = {
   en: {
     title: 'Settings',
-    subtitle: 'Manage your AI keys and data.',
+    subtitle: 'Manage your documents, Gmail accounts, AI keys and data.',
     ai: 'AI & API keys',
     aiHint: 'Used for live company research. Your key is stored to your account and never shown again after saving.',
     keyLabel: 'OpenRouter API key', keyPh: 'sk-or-...', keySaved: 'A key is saved. Enter a new one to replace it.',
@@ -68,7 +69,7 @@ const COPY = {
   },
   ja: {
     title: '設定',
-    subtitle: 'AIキーとデータを管理します。',
+    subtitle: '書類・Gmailアカウント・AIキー・データを管理します。',
     ai: 'AI・APIキー',
     aiHint: 'ライブ企業リサーチに使用します。キーはアカウントに保存され、保存後は再表示されません。',
     keyLabel: 'OpenRouter APIキー', keyPh: 'sk-or-...', keySaved: 'キーは保存済みです。変更する場合は新しいキーを入力してください。',
@@ -103,6 +104,7 @@ const DELETE_CONFIRM_WORD = 'DELETE';
 export default function SettingsPanel({
   onExportJson, onDeleteProfile, onDeleteAccount,
   needsPassword = false, activeProfile, canDelete, isJa = false,
+  resume, onResumeParsed, onUploadError,
 }) {
   const t = COPY[isJa ? 'ja' : 'en'];
 
@@ -256,7 +258,9 @@ export default function SettingsPanel({
         </div>
       </section>
 
-      <GmailConnectCard profile={activeProfile} isJa={isJa} />
+      <DocumentsSettings resume={resume} isJa={isJa} onResumeParsed={onResumeParsed} onUploadError={onUploadError} />
+
+      <MailboxesCard isJa={isJa} />
 
       <section className="settings-card">
         <header><h2>{t.data}</h2></header>

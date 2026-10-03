@@ -5,6 +5,7 @@ import { debounce, newItemId } from './utils/helpers.js';
 import { mergeParsedResume } from './utils/resumePdf.js';
 import { I, Toasts } from './components/ui.jsx';
 import ResumeUpload from './components/ResumeUpload.jsx';
+import AppSkeleton from './components/AppSkeleton.jsx';
 import { InternshipDashboard } from './components/InternshipDashboard.jsx';
 import { ProfileDashboard } from './components/ProfileDashboard.jsx';
 import { ProfileSwitcher } from './components/ProfileSwitcher.jsx';
@@ -12,9 +13,14 @@ import SettingsPanel from './components/SettingsPanel.jsx';
 import { ApplicationCalendar } from './components/ApplicationCalendar.jsx';
 import ApplicationsView from './components/ApplicationsView.jsx';
 import ProfileView from './components/ProfileView.jsx';
+import CompanyPage from './components/CompanyPage.jsx';
+import DocumentStudio from './components/DocumentStudio.jsx';
+import { AppActionsContext } from './context/AppActions.js';
 import { useApplicationTracker } from './hooks/useApplicationTracker.js';
 import { useGmailInbox } from './hooks/useGmailInbox.js';
 import { filterRecordsByPeriod, useActivityPeriod } from './hooks/useActivityPeriod.js';
+import { useJobTypeFilter } from './hooks/useJobTypeFilter.js';
+import { filterByJobType } from './utils/jobType.js';
 import {
   LayoutDashboard, Telescope, CalendarDays, Settings2, PanelLeftClose,
   BriefcaseBusiness, UserRound,
@@ -225,6 +231,24 @@ export default function App() {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [showEmptyWarning, setShowEmptyWarning] = useState(false);
   const [appView, setAppView] = useState('dashboard');
+  // Company page (U2) and document studio (U4): reachable from any view through
+  // AppActionsContext, so the drawers and rows do not thread callbacks through
+  // every component in between.
+  const [companyTarget, setCompanyTarget] = useState(null);
+  const [prevView, setPrevView] = useState('dashboard');
+  const [studioTarget, setStudioTarget] = useState(null);
+  const appViewRef = useRef(appView);
+  useEffect(() => { appViewRef.current = appView; }, [appView]);
+  const openCompany = useCallback((company, focusId) => {
+    if (!company) return;
+    if (appViewRef.current !== 'company') setPrevView(appViewRef.current);
+    setCompanyTarget({ company, focusId: focusId || null });
+    setAppView('company');
+  }, []);
+  const openDocumentStudio = useCallback((job, options = {}) => {
+    setStudioTarget({ job, kind: options.kind, doc: options.doc });
+  }, []);
+  const appActions = useMemo(() => ({ openCompany, openDocumentStudio }), [openCompany, openDocumentStudio]);
 
   useEffect(() => {
     const goOnline = () => setIsOffline(false);
@@ -260,13 +284,17 @@ export default function App() {
   // ── Profile management states & helpers ──────────────────
   const [profiles, setProfiles] = useState([]);
   const [activeProfile, setActiveProfile] = useState(getUrlProfile);
-  // Same source and the same activity period as the dashboard's "N roles
+  // Same source, activity period and job type as the dashboard's "N roles
   // tracked", so the sidebar badge can never disagree with the page.
   const {
     records: trackedRecords, addMilestone: addTrackerMilestone, removeMilestone: removeTrackerMilestone,
   } = useApplicationTracker(activeProfile);
   const { period } = useActivityPeriod();
-  const periodRecordCount = useMemo(() => filterRecordsByPeriod(trackedRecords, period).length, [trackedRecords, period]);
+  const { jobType } = useJobTypeFilter();
+  const periodRecordCount = useMemo(
+    () => filterByJobType(filterRecordsByPeriod(trackedRecords, period), jobType).length,
+    [trackedRecords, period, jobType],
+  );
   // Gmail ingest: drains inbox-derived actions into the tracker/calendar (full-auto).
   const { justApplied, clearJustApplied } = useGmailInbox(activeProfile);
   // Sidebar collapse — persisted so it survives reloads.
@@ -458,17 +486,11 @@ export default function App() {
   };
 
   // ── Loading ──────────────────────────────────────────────
-  if (!resume) {
-    return (
-      <div className="loading">
-        <div className="spinner" />
-        <span>Loading…</span>
-      </div>
-    );
-  }
+  if (!resume) return <AppSkeleton label={isJa ? '読み込み中…' : 'Loading…'} />;
 
 
   return (
+    <AppActionsContext.Provider value={appActions}>
     <div className="shell">
       {isOffline && (
         <div data-testid="offline-banner" className="offline-banner" style={{ background: 'var(--err)', color: 'white', padding: '8px', textAlign: 'center', fontSize: '12px', fontWeight: 'bold', zIndex: 1000 }}>
@@ -612,12 +634,24 @@ export default function App() {
             isJa={isJa}
           />
         </main>
+      ) : appView === 'company' && companyTarget ? (
+        <CompanyPage
+          key={`${companyTarget.company}|${companyTarget.focusId || ''}`}
+          company={companyTarget.company}
+          focusId={companyTarget.focusId}
+          isJa={isJa}
+          activeProfile={activeProfile}
+          onBack={() => setAppView(prevView || 'dashboard')}
+        />
       ) : appView === 'settings' ? (
         <SettingsPanel
           isJa={isJa}
           activeProfile={activeProfile}
           canDelete={profiles.length > 1}
           onExportJson={onJson}
+          resume={resume}
+          onResumeParsed={handleResumeParsed}
+          onUploadError={onUploadError}
           onDeleteProfile={id => { handleDeleteProfile(id); setAppView('dashboard'); }}
           // Only offered when there is a real signed-in account. On the no-auth
           // path there is nothing to delete, so Settings hides the whole section.
@@ -667,7 +701,12 @@ export default function App() {
         </div>
       )}
 
+      {studioTarget ? (
+        <DocumentStudio target={studioTarget} resume={resume} isJa={isJa} onClose={() => setStudioTarget(null)} />
+      ) : null}
+
       <Toasts list={toasts} dismiss={dismiss} />
     </div>
+    </AppActionsContext.Provider>
   );
 }

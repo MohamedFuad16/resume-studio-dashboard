@@ -45,9 +45,9 @@ test.describe('Internship Portal — app shell', () => {
   });
 
   test('primary navigation switches between dashboard, radar, and profile', async ({ page }) => {
-    // Radar view exposes the internship search field.
+    // Radar view exposes the plain-language internship search field.
     await page.locator('.side-nav-btn', { hasText: 'Internship Radar' }).click();
-    const search = page.getByPlaceholder('Search company, role, or keyword');
+    const search = page.getByPlaceholder(/^Search in plain words/);
     await expect(search).toBeVisible();
 
     // Profile view offers the résumé PDF upload that replaced the editor.

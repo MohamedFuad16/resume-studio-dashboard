@@ -19,6 +19,44 @@ iOS app, `contracts/` and the LaTeX résumés live in
 
 ## Recent changes
 
+- **2026-10-03 (later) — Rebuild UI screens U1–U7 committed on
+  `feat/ui-rebuild` (not merged); battery FAILS on react-doctor (24 vs
+  baseline 46).** Built
+  against a new data layer (`src/api/v2/`: `mock.js` serves sample data in
+  `vite dev`, `http.js` calls the phase 2 routes written down in
+  `docs/api-v2.md`). U1 job type (internship / new grad / full time) inferred
+  from role text and email subject (`utils/jobType.js`; co-ops and
+  apprenticeships count as internships, so the 167-listing catalog splits 167
+  internships), shared Dashboard/Applications filter, a Type column the owner
+  can correct (pinned, `updatedAt` untouched), radar type filter. U2 company
+  page (`CompanyPage.jsx`): the posting's own selection steps with per-step
+  progress (`selectionProgress`) and the next step one click from the calendar
+  (milestone kind `step`); roles grouped by a looser company key
+  (`utils/companyGroup.js`; "Mercari Group" and "Mercari" share a page) that
+  does not touch the tracker identity key. U3 plain-language radar search
+  (`utils/searchQuery.js`, rule-based, removable chips, web-search fallback
+  card). U4 document studio (`DocumentStudio.jsx`, `documents/tailor.js`,
+  `documents/template.js`): résumé, CV, 履歴書, 職務経歴書 and cover letter,
+  EN/JA, AI format suggestion, editable draft beside a live A4 preview, print
+  to PDF until the server renders; the sample generator only selects and
+  orders profile text, and a test fails if any heading or bullet is not in the
+  profile (checked against an injected fake line). Settings shows read-only
+  résumé and cover-letter templates plus saved drafts. U5 Gmail accounts card
+  for several inboxes with window, interval, job types and pause; rows show the
+  source inbox. U6 calendar `step` events, legend, link to the company page.
+  U7 app-shaped loading skeleton. Real bugs caught while checking: Tailwind
+  generated `.fixed { position: fixed }` from a `fixed` class and stacked the
+  履歴書 rows; "closing this month" left "closing" as a keyword; the cover
+  letter claimed skills the posting never named. Verified: node:test 92/92;
+  Playwright 5/5 after updating the smoke test for the new search placeholder;
+  every screen clicked through in the browser (no-auth mode, local sample
+  tracker) at desktop and 375px, EN and JA. NOT passing: react-doctor 24 vs
+  baseline 46; the same tool version scores the previous commit 51, so the
+  drop is this work (13 impure state updaters in DocumentStudio's draft edit
+  helper, index keys, high-complexity components, an unescaped RegExp in
+  searchQuery, helper exports from InternshipDashboard). Fixing that is the
+  next session's first job; see docs/handoff-2026-10-03.md.
+
 - **2026-10-03 — UI audit fixes on `feat/ui-rebuild` (rebuild phase 1b).** Eight
   defects from a desktop and phone pass over every view. On phones the main card
   sat off-centre because the desktop gutter (`12px 12px 12px 4px`, sized for a

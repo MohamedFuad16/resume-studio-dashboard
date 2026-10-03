@@ -3,6 +3,7 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Building2,
   Clock3,
   ExternalLink,
   Plus,
@@ -10,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import { statusLabel } from '../hooks/useApplicationTracker.js';
+import { useAppActions } from '../context/AppActions.js';
 import { CompanyLogo } from './CompanyLogo.jsx';
 import { displayCompany, displayRole, formatDisplayDeadline } from '../utils/internshipDisplay.js';
 
@@ -100,7 +102,10 @@ const copy = {
     codingTest: 'Coding test',
     submitted: 'Application submitted',
     followUp: 'Follow-up',
+    step: 'Selection step',
     other: 'Other',
+    legend: 'Event types',
+    openCompany: 'Company page',
     currentStatus: 'Current status',
     open: 'Open application',
     remove: 'Remove event',
@@ -129,7 +134,10 @@ const copy = {
     codingTest: 'コーディングテスト',
     submitted: '応募完了',
     followUp: 'フォローアップ',
+    step: '選考ステップ',
     other: 'その他',
+    legend: '予定の種類',
+    openCompany: '企業ページ',
     currentStatus: '現在の状況',
     open: '応募ページを開く',
     remove: '予定を削除',
@@ -144,6 +152,7 @@ function eventLabel(kind, t) {
   if (kind === 'coding-test') return t.codingTest;
   if (kind === 'application-submitted') return t.submitted;
   if (kind === 'follow-up') return t.followUp;
+  if (kind === 'step') return t.step;
   return t.other;
 }
 
@@ -199,8 +208,12 @@ function calendarEvents(records, t) {
   }).sort((a, b) => `${a.date}${a.time || ''}`.localeCompare(`${b.date}${b.time || ''}`));
 }
 
+// Colour key for the event kinds; the swatch classes reuse the event colours.
+const LEGEND_KINDS = ['deadline', 'applied', 'interview', 'coding-test', 'step', 'follow-up'];
+
 export function ApplicationCalendar({ records, addMilestone, removeMilestone, isJa }) {
   const t = isJa ? copy.ja : copy.en;
+  const { openCompany } = useAppActions();
   const locale = isJa ? 'ja-JP' : 'en-US';
   const [view, setView] = useState('month');
   const [anchor, setAnchor] = useState(() => tokyoTodayAnchor());
@@ -269,7 +282,7 @@ export function ApplicationCalendar({ records, addMilestone, removeMilestone, is
           <div className="calendar-form-title"><strong>{t.addTitle}</strong><button type="button" onClick={() => setShowForm(false)} aria-label={t.cancel}><X size={16} /></button></div>
           {records.length ? <>
             <label><span>{t.role}</span><select value={draft.recordId} onChange={event => setDraft(current => ({ ...current, recordId: event.target.value }))}>{records.map(record => <option key={record.internshipId} value={record.internshipId}>{displayCompany(record, isJa)} — {displayRole(record.role, isJa)}</option>)}</select></label>
-            <label><span>{t.event}</span><select value={draft.kind} onChange={event => setDraft(current => ({ ...current, kind: event.target.value }))}><option value="interview">{t.interview}</option><option value="coding-test">{t.codingTest}</option><option value="application-submitted">{t.submitted}</option><option value="follow-up">{t.followUp}</option><option value="other">{t.other}</option></select></label>
+            <label><span>{t.event}</span><select value={draft.kind} onChange={event => setDraft(current => ({ ...current, kind: event.target.value }))}><option value="interview">{t.interview}</option><option value="coding-test">{t.codingTest}</option><option value="application-submitted">{t.submitted}</option><option value="step">{t.step}</option><option value="follow-up">{t.followUp}</option><option value="other">{t.other}</option></select></label>
             <label><span>{t.date}</span><input type="date" required value={draft.date} onChange={event => setDraft(current => ({ ...current, date: event.target.value }))} /></label>
             <label><span>{t.time}</span><input type="time" value={draft.time} onChange={event => setDraft(current => ({ ...current, time: event.target.value }))} /></label>
             <label className="calendar-form-note"><span>{t.note}</span><input value={draft.title} onChange={event => setDraft(current => ({ ...current, title: event.target.value }))} placeholder={isJa ? '例：技術面接' : 'Example: Technical interview'} /></label>
@@ -284,6 +297,10 @@ export function ApplicationCalendar({ records, addMilestone, removeMilestone, is
         <button type="button" className="calendar-today" onClick={() => setAnchor(tokyoTodayAnchor())}>{t.today}</button>
         <button type="button" onClick={() => shift(1)} aria-label={isJa ? '次へ' : 'Next period'}><ChevronRight size={16} /></button>
       </div>
+
+      <ul className="calendar-legend" aria-label={t.legend}>
+        {LEGEND_KINDS.map(kind => <li key={kind}><i className={`kind-${kind}`} aria-hidden="true" />{eventLabel(kind, t)}</li>)}
+      </ul>
 
       <div className={`calendar-grid ${view}`}>
         <div className="calendar-weekdays">{weekdayLabels.map(label => <span key={label}>{label}</span>)}</div>
@@ -328,6 +345,7 @@ export function ApplicationCalendar({ records, addMilestone, removeMilestone, is
           <CompanyLogo item={{ id: selected.internshipId, company: selected.company, role: selected.role, url: selected.applyUrl, companyDomain: selected.companyDomain, logoUrl: selected.logoUrl }} size="lg" />
           <div><strong>{displayCompany(selected, isJa)}</strong><span>{displayRole(selected.role, isJa)}</span><small><CalendarDays size={13} />{formatDisplayDeadline(selected.date, isJa)}{selected.time ? ` · ${selected.time}` : ''}<Clock3 size={13} />{selected.title || eventLabel(selected.kind, t)} · {statusLabel(selected.status, isJa)}</small></div>
           <div className="calendar-selected-actions">
+            {openCompany ? <button type="button" onClick={() => openCompany(selected.company, selected.internshipId)}><Building2 size={13} />{t.openCompany}</button> : null}
             {selected.applyUrl ? <a href={selected.applyUrl} target="_blank" rel="noreferrer">{t.open}<ExternalLink size={13} /></a> : null}
             {selected.removable ? <button type="button" onClick={() => { removeMilestone(selected.internshipId, selected.id); setSelected(null); }}><Trash2 size={13} />{t.remove}</button> : null}
             <button type="button" className="calendar-close" onClick={() => setSelected(null)} aria-label={t.cancel}><X size={15} /></button>

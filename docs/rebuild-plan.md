@@ -132,6 +132,10 @@ behind the same interface the phase 2 API will implement, written down in
   framing, phone header wrapping, empty location and link cells, Gmail and AI
   key copy, deadline colours, sign-in reads cut from three Firestore round
   trips to one).
+- STATUS 2026-10-03: U1–U7 below are built, checked in the browser and
+  committed on feat/ui-rebuild, but the battery fails on react-doctor (24 vs
+  baseline 46). See docs/handoff-2026-10-03.md for the fix list. API contract:
+  docs/api-v2.md.
 - U1 Job type everywhere: internship / new grad / full time on Applications,
   Dashboard and the radar. Inferred from the role text until the classifier
   supplies it.

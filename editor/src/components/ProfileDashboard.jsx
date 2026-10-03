@@ -19,6 +19,9 @@ import { DetailPanel } from './InternshipDashboard.jsx';
 import InterviewDateModal from './InterviewDateModal.jsx';
 import { ApplicationTrendChart, StatusBreakdownDonut } from './DashboardCharts.jsx';
 import PeriodPicker from './PeriodPicker.jsx';
+import JobTypeTabs from './JobTypeTabs.jsx';
+import { useJobTypeFilter } from '../hooks/useJobTypeFilter.js';
+import { filterByJobType, jobTypeCounts } from '../utils/jobType.js';
 import { filterRecordsByPeriod, useActivityPeriod } from '../hooks/useActivityPeriod.js';
 import { displayCompany, displayRole, displayValue, formatDisplayDeadline } from '../utils/internshipDisplay.js';
 import { prepareProfilePhoto } from '../utils/imageUpload.js';
@@ -125,10 +128,13 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenProfile, onResumeC
   const fileRef = useRef(null);
   const [interviewPending, setInterviewPending] = useState(null);
   const { records: allRecords, statusFor, updateStatus, addMilestone } = useApplicationTracker(activeProfile);
-  // Stats, chart and Recent follow the period; Tokyo matches and cooldowns use
-  // every record, since an older application still shapes both.
+  // Stats, chart and Recent follow the period and the job type; Tokyo matches
+  // and cooldowns use every record, since an older application still shapes both.
   const { period, days } = useActivityPeriod();
-  const records = useMemo(() => filterRecordsByPeriod(allRecords, period), [allRecords, period]);
+  const { jobType, setJobType } = useJobTypeFilter();
+  const periodRecords = useMemo(() => filterRecordsByPeriod(allRecords, period), [allRecords, period]);
+  const typeCounts = useMemo(() => jobTypeCounts(periodRecords), [periodRecords]);
+  const records = useMemo(() => filterByJobType(periodRecords, jobType), [periodRecords, jobType]);
   const counts = useMemo(() => {
     const next = {};
     for (const record of records) next[record.status] = (next[record.status] || 0) + 1;
@@ -234,6 +240,10 @@ export function ProfileDashboard({ resume, onOpenRadar, onOpenProfile, onResumeC
           <StatusBreakdownDonut counts={counts} isJa={isJa} />
         </div>
       </section>
+
+      <div className="dashboard-type-row">
+        <JobTypeTabs value={jobType} onChange={setJobType} counts={typeCounts} isJa={isJa} />
+      </div>
 
       <section className="pipeline-strip" aria-label={t.pipeline}>
         <div className="pipeline-title"><BriefcaseBusiness size={19} /><span><b>{t.pipeline}</b><small>{t.rolesTracked(records.length)}</small></span><PeriodPicker isJa={isJa} /></div>

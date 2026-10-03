@@ -190,6 +190,22 @@ export function useApplicationTracker(profileId) {
     commit(next, nextTombstones);
   }, [commit, replaceTracker]);
 
+  /**
+   * Merge `patch` into an existing record: owner edits that are not a status,
+   * such as a hand-picked job type or selection-step progress. Leaves
+   * `updatedAt` alone on purpose: it orders the lists and, for hand-added
+   * records, the activity period, and a metadata edit is not new activity.
+   * A no-op for an id that is not tracked.
+   */
+  const updateRecord = useCallback((internshipId, patch) => {
+    const current = trackerRef.current;
+    const record = current[internshipId];
+    if (!record || !patch) return;
+    const next = { ...current, [internshipId]: { ...record, ...patch } };
+    replaceTracker(next);
+    commit(next);
+  }, [commit, replaceTracker]);
+
   const statusFor = useCallback(id => tracker[id]?.status || '', [tracker]);
   // Contract: addMilestone(internship, { kind, date, time?, note? }).
   // `internship` may be the internship/record object or a bare id string, so both the
@@ -254,5 +270,5 @@ export function useApplicationTracker(profileId) {
     return acc;
   }, {}), [records]);
 
-  return { tracker, tombstones, records, counts, statusFor, updateStatus, addMilestone, removeMilestone, loading, error, refresh };
+  return { tracker, tombstones, records, counts, statusFor, updateStatus, updateRecord, addMilestone, removeMilestone, loading, error, refresh };
 }

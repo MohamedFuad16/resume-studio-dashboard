@@ -10,6 +10,13 @@ import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth.js';
 import { ensureSeed } from '../data/firestoreData.js';
 import LoginScreen from '../components/LoginScreen.jsx';
+import AppSkeleton from '../components/AppSkeleton.jsx';
+
+// Set while someone is signed in on this browser, so the next visit can show the
+// app's outline straight away instead of a spinner. A first visit (no hint) keeps
+// the plain spinner, because that visitor is about to see the login screen.
+const SIGNED_IN_HINT = 'internship-portal:signed-in';
+const hadSession = () => { try { return localStorage.getItem(SIGNED_IN_HINT) === '1'; } catch { return false; } };
 
 function Spinner() {
   return (
@@ -26,6 +33,14 @@ export default function AuthGate({ children }) {
   const [seeded, setSeeded] = useState(false);
 
   useEffect(() => {
+    if (loading) return;
+    try {
+      if (user) localStorage.setItem(SIGNED_IN_HINT, '1');
+      else localStorage.removeItem(SIGNED_IN_HINT);
+    } catch { /* private mode */ }
+  }, [loading, user]);
+
+  useEffect(() => {
     if (!authAvailable || !user) return;
     let cancelled = false;
     setSeeding(true);
@@ -36,8 +51,8 @@ export default function AuthGate({ children }) {
   }, [authAvailable, user]);
 
   if (!authAvailable) return children;
-  if (loading) return <Spinner />;
+  if (loading) return hadSession() ? <AppSkeleton /> : <Spinner />;
   if (!user) return <LoginScreen />;
-  if (seeding || !seeded) return <Spinner />;
+  if (seeding || !seeded) return <AppSkeleton />;
   return children;
 }
